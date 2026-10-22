@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary-blue: #2563EB;
+    --primary-hover: #1D4ED8;
+    --secondary-black: #111111;
+    --destructive-red: #DC2626;
+    --text-primary: #111111;
+    --text-secondary: #526070;
+    --border-neutral: #E1E7EF;
+    --surface-base: #FFFFFF;
+    --surface-pale: #F8FAFC;
+    
+    /* Dynamic Theme Variables for Public Results */
+    --fest-primary: #2563EB;
+    --fest-accent: #D97706;
+    --fest-font: 'Montserrat', sans-serif;
+  }
+
+  body {
+    background-color: #FFFFFF;
+    color: #111111;
+    font-family: var(--font-montserrat), sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Utilities for Corporate/Modern Stitch UI */
+.bg-surface-base {
+  background-color: #FFFFFF;
+}
+
+.bg-surface-pale {
+  background-color: #F8FAFC;
+}
+
+.text-text-primary {
+  color: #111111;
+}
+
+.text-text-secondary {
+  color: #526070;
+}
+
+.border-border-neutral {
+  border-color: #E1E7EF;
+}
+
+.bg-primary-blue {
+  background-color: #2563EB;
+}
+
+.bg-primary-hover:hover {
+  background-color: #1D4ED8;
+}
+
+.bg-destructive-red {
+  background-color: #DC2626;
+}
+
+/* Print styling for ID cards and tabulation sheets */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

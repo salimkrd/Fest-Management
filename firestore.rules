@@ -1,0 +1,230 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // HELPER FUNCTIONS & ROLE CHECKERS
+    // ==========================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'ADMIN' ||
+        getUserData().role == 'ADMIN'
+      );
+    }
+
+    function isTeamManager(teamId) {
+      return isSignedIn() &&
+        (request.auth.token.role == 'TEAM_MANAGER' && request.auth.token.teamId == teamId) &&
+        getUserData().role == 'TEAM_MANAGER' &&
+        getUserData().teamId == teamId &&
+        getUserData().disabled != true &&
+        getUserData().status == 'ACTIVE' &&
+        exists(/databases/$(database)/documents/teams/$(teamId)) &&
+        get(/databases/$(database)/documents/teams/$(teamId)).data.status == 'ACTIVE';
+    }
+
+    function isJudgeForAssignment(assignmentId) {
+      return isSignedIn() && (
+        request.auth.token.role == 'JUDGE' &&
+        request.auth.token.assignmentId == assignmentId
+      );
+    }
+
+    function isJudgeAssignmentActive(assignmentId, compId) {
+      return isSignedIn() &&
+        request.auth.token.role == 'JUDGE' &&
+        request.auth.token.assignmentId == assignmentId &&
+        exists(/databases/$(database)/documents/judgeAssignments/$(assignmentId)) &&
+        get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.revoked != true &&
+        get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.status == 'ACTIVE' &&
+        get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.competitionId == compId &&
+        ('expiresAtMs' in get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data) &&
+        get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.expiresAtMs != null &&
+        get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.expiresAtMs is int &&
+        request.time.toMillis() < get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.expiresAtMs;
+    }
+
+
+
+    // ==========================================
+    // USERS & ROLES
+    // Client cannot escalate their own role or write to other users.
+    // ==========================================
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // FESTIVAL CATEGORIES & TEAMS
+    // Public can view public team metadata.
+    // Private manager info & onboarding state is strictly Admin-only.
+    // ==========================================
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      // Private Admin-only onboarding metadata and manager records
+      match /private/{docId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // ==========================================
+    // PARTICIPANTS
+    // Admin: Full access.
+    // Team Manager: Read & manage ONLY their own team's participants.
+    // Public: Read-only.
+    // ==========================================
+    match /participants/{participantId} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        isSignedIn() && isTeamManager(request.resource.data.teamId)
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        isTeamManager(resource.data.teamId) && 
+        request.resource.data.teamId == resource.data.teamId
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && isTeamManager(resource.data.teamId)
+      );
+    }
+
+    // ==========================================
+    // COMPETITIONS
+    // Public: Read-only. Admin: Full management.
+    // ==========================================
+    match /competitions/{competitionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // REGISTRATIONS
+    // Team Managers can only register for their own team.
+    // ==========================================
+    match /registrations/{registrationId} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        isSignedIn() && isTeamManager(request.resource.data.teamId)
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        isTeamManager(resource.data.teamId) && 
+        request.resource.data.teamId == resource.data.teamId
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && isTeamManager(resource.data.teamId)
+      );
+    }
+
+    // ==========================================
+    // STAGES & SCHEDULES
+    // Public: Read-only. Admin: Full management.
+    // ==========================================
+    match /stages/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /schedules/{scheduleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // JUDGES & ASSIGNMENTS
+    // Credentials/hashes must NEVER be publicly readable.
+    // Admin can manage assignments. Judges can read only their own assignment metadata.
+    // ==========================================
+    match /judges/{judgeId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /judgeAssignments/{assignmentId} {
+      allow read: if isAdmin() || isJudgeForAssignment(assignmentId);
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // MARK ENTRIES
+    // Judges can create/update marks for their assigned competition sheet ONLY while assignment is ACTIVE.
+    // Scorecard Immutability: Once marked SUBMITTED, submitted == true, or isFinal == true, marks CANNOT be edited.
+    // Revoked, expired, or finalized assignments cannot create or modify mark entries.
+    // Admin can audit and review all mark entries.
+    // Public visitors CANNOT read raw juror marks before publication.
+    // ==========================================
+    match /markEntries/{entryId} {
+      // Read access strictly requires live ACTIVE assignment (revoked/expired/finalized cannot read raw scorecards)
+      allow read: if isAdmin() || (
+        isJudgeAssignmentActive(resource.data.assignmentId, resource.data.competitionId)
+      );
+      // Direct client writes are strictly prohibited.
+      // All scorecard operations (draft save & final submission) are executed exclusively
+      // via authenticated JudgeService server operations with full rubric & registration validation.
+      allow write: if false;
+    }
+
+    // ==========================================
+    // RESULTS (CRITICAL RULE)
+    // Direct client writes are strictly prohibited.
+    // Results are committed exclusively by trusted Admin server operations.
+    // Public can read ONLY results where resultStatus == 'PUBLISHED'.
+    // Admin can read all drafts and under-review results.
+    // ==========================================
+    match /results/{resultId} {
+      allow read: if isAdmin() || resource.data.resultStatus == 'PUBLISHED';
+      allow write: if false; // Must be performed via Firebase Admin SDK / Cloud Functions
+    }
+
+    // ==========================================
+    // POINTS LEDGER & LEADERBOARD (CRITICAL RULE)
+    // Direct client writes are strictly prohibited.
+    // Maintained by trusted backend operations only.
+    // ==========================================
+    match /pointsLedger/{entryId} {
+      allow read: if isAdmin() || resource.data.status == 'COMMITTED';
+      allow write: if false; // Must be performed via Firebase Admin SDK / Cloud Functions
+    }
+
+    match /leaderboard/{teamId} {
+      allow read: if true;
+      allow write: if false; // Updated only by server calculation
+    }
+
+    // ==========================================
+    // SETTINGS (THEME & FEST METADATA)
+    // Only publicTheme is publicly readable.
+    // bootstrapLock and internal configurations require Admin for read and cannot be written via client SDK.
+    // ==========================================
+    match /settings/{settingId} {
+      allow read: if settingId == 'publicTheme' || isAdmin();
+      allow write: if isAdmin() && settingId != 'bootstrapLock';
+    }
+
+    // ==========================================
+    // AUDIT LOGS
+    // Append-only for backend, readable only by Admin.
+    // ==========================================
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

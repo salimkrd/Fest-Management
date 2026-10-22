@@ -1,0 +1,45 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'ADMIN';
+    }
+
+    function isImageFile() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // Max 5MB
+    }
+
+    // Participant Profile Photos
+    match /participants/{participantId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && (
+        isAdmin() || 
+        request.auth.token.role == 'TEAM_MANAGER'
+      ) && isImageFile();
+    }
+
+    // Festival Branding & Logos
+    match /branding/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImageFile();
+    }
+
+    // Generated Result Posters & Certificates
+    match /posters/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImageFile();
+    }
+
+    // Tabulation Register PDFs
+    match /exports/{fileName} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

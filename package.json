@@ -1,0 +1,40 @@
+{
+  "name": "fest-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "env:emulator": "node -e \"require('fs').copyFileSync('.env.local.emulator', '.env.local'); console.log('Switched to Local Firebase Emulator profile');\"",
+    "env:live": "node -e \"require('fs').copyFileSync('.env.local.live', '.env.local'); console.log('Switched to Live Firebase profile');\"",
+    "seed": "npx tsx scripts/seedDemoData.ts",
+    "emulators": "firebase emulators:start --project demo-sahithyolsav-2025"
+  },
+  "dependencies": {
+    "firebase": "^13.0.0",
+    "firebase-admin": "^14.5.0",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^1.58.0",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "firebase-tools": "^15.34.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}
