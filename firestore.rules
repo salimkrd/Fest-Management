@@ -15,10 +15,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.role == 'ADMIN' ||
-        getUserData().role == 'ADMIN'
-      );
+      return isSignedIn() &&
+        request.auth.token.role == 'ADMIN' &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'ADMIN' &&
+        getUserData().status == 'ACTIVE' &&
+        getUserData().disabled != true;
     }
 
     function isTeamManager(teamId) {
@@ -89,10 +91,12 @@ service cloud.firestore {
     // PARTICIPANTS
     // Admin: Full access.
     // Team Manager: Read & manage ONLY their own team's participants.
-    // Public: Read-only.
+    // Public reads strictly prohibited to protect student personal data (phone, email, DOB, photo).
     // ==========================================
     match /participants/{participantId} {
-      allow read: if true;
+      allow read: if isAdmin() || (
+        isSignedIn() && isTeamManager(resource.data.teamId)
+      );
       allow create: if isAdmin() || (
         isSignedIn() && isTeamManager(request.resource.data.teamId)
       );
@@ -117,10 +121,14 @@ service cloud.firestore {
 
     // ==========================================
     // REGISTRATIONS
-    // Team Managers can only register for their own team.
+    // Admin: Full access.
+    // Team Manager: Read & manage ONLY their own team's registrations.
+    // Public reads strictly prohibited.
     // ==========================================
     match /registrations/{registrationId} {
-      allow read: if true;
+      allow read: if isAdmin() || (
+        isSignedIn() && isTeamManager(resource.data.teamId)
+      );
       allow create: if isAdmin() || (
         isSignedIn() && isTeamManager(request.resource.data.teamId)
       );

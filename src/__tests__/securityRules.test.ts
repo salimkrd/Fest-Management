@@ -1463,6 +1463,268 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     const draftData = await validDraftRes.json();
     expect(draftData.success).toBe(true);
   });
+
+  // =========================================================================
+  // REQUIREMENT 1: AUTHORITATIVE ADMIN AUTHORIZATION TESTS (STRICT 2-WAY CHECK)
+  // =========================================================================
+
+  it('39. Reject admin access if token claim is ADMIN but Firestore user role is PUBLIC', async () => {
+    const adminDb = getAdminDb()!;
+    const adminAuth = getAdminAuth()!;
+    const uid = `test-admin-mismatch-claim-${Date.now()}`;
+
+    await adminDb.collection('users').doc(uid).set({
+      uid,
+      email: `${uid}@sahithyolsav.com`,
+      role: 'PUBLIC',
+      status: 'ACTIVE',
+      disabled: false
+    });
+
+    const token = await adminAuth.createCustomToken(uid, { role: 'ADMIN' });
+    await signInWithCustomToken(clientAuth, token);
+
+    const probeRef = doc(clientDb, 'categories', `cat-probe-39-${Date.now()}`);
+    await expect(setDoc(probeRef, { id: 'probe-39', name: 'Probe 39', status: 'ACTIVE' })).rejects.toThrow();
+  });
+
+  it('40. Reject admin access if Firestore user role is ADMIN but token claim is PUBLIC', async () => {
+    const adminDb = getAdminDb()!;
+    const adminAuth = getAdminAuth()!;
+    const uid = `test-admin-mismatch-role-${Date.now()}`;
+
+    await adminDb.collection('users').doc(uid).set({
+      uid,
+      email: `${uid}@sahithyolsav.com`,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      disabled: false
+    });
+
+    const token = await adminAuth.createCustomToken(uid, { role: 'PUBLIC' });
+    await signInWithCustomToken(clientAuth, token);
+
+    const probeRef = doc(clientDb, 'categories', `cat-probe-40-${Date.now()}`);
+    await expect(setDoc(probeRef, { id: 'probe-40', name: 'Probe 40', status: 'ACTIVE' })).rejects.toThrow();
+  });
+
+  it('41. Reject admin access if administrator is marked disabled in Firestore', async () => {
+    const adminDb = getAdminDb()!;
+    const adminAuth = getAdminAuth()!;
+    const uid = `test-admin-disabled-${Date.now()}`;
+
+    await adminDb.collection('users').doc(uid).set({
+      uid,
+      email: `${uid}@sahithyolsav.com`,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      disabled: true
+    });
+
+    const token = await adminAuth.createCustomToken(uid, { role: 'ADMIN' });
+    await signInWithCustomToken(clientAuth, token);
+
+    const probeRef = doc(clientDb, 'categories', `cat-probe-41-${Date.now()}`);
+    await expect(setDoc(probeRef, { id: 'probe-41', name: 'Probe 41', status: 'ACTIVE' })).rejects.toThrow();
+  });
+
+  it('42. Reject admin access if administrator status is PENDING in Firestore', async () => {
+    const adminDb = getAdminDb()!;
+    const adminAuth = getAdminAuth()!;
+    const uid = `test-admin-pending-${Date.now()}`;
+
+    await adminDb.collection('users').doc(uid).set({
+      uid,
+      email: `${uid}@sahithyolsav.com`,
+      role: 'ADMIN',
+      status: 'PENDING',
+      disabled: false
+    });
+
+    const token = await adminAuth.createCustomToken(uid, { role: 'ADMIN' });
+    await signInWithCustomToken(clientAuth, token);
+
+    const probeRef = doc(clientDb, 'categories', `cat-probe-42-${Date.now()}`);
+    await expect(setDoc(probeRef, { id: 'probe-42', name: 'Probe 42', status: 'ACTIVE' })).rejects.toThrow();
+  });
+
+  it('43. Reject admin access if authoritative users/{uid} document is missing', async () => {
+    const adminAuth = getAdminAuth()!;
+    const uid = `test-admin-missing-doc-${Date.now()}`;
+
+    const token = await adminAuth.createCustomToken(uid, { role: 'ADMIN' });
+    await signInWithCustomToken(clientAuth, token);
+
+    const probeRef = doc(clientDb, 'categories', `cat-probe-43-${Date.now()}`);
+    await expect(setDoc(probeRef, { id: 'probe-43', name: 'Probe 43', status: 'ACTIVE' })).rejects.toThrow();
+  });
+
+  it('44. Preserve full admin access for legitimate Chief Administrator with valid claim and ACTIVE user record', async () => {
+    await signInWithEmailAndPassword(clientAuth, 'admin@sahithyolsav.com', 'AdminPassword123!');
+    const catRef = doc(clientDb, 'categories', 'cat-1');
+    await expect(updateDoc(catRef, { status: 'ACTIVE' })).resolves.not.toThrow();
+  });
+
+  // =========================================================================
+  // REQUIREMENT 2: PARTICIPANT PERSONAL DATA PROTECTION TESTS
+  // =========================================================================
+
+  it('45. Reject unauthenticated public reads of participant private records (phone, email, DOB, photo)', async () => {
+    const adminDb = getAdminDb()!;
+    const partId = `part-privacy-test-${Date.now()}`;
+    await adminDb.collection('participants').doc(partId).set({
+      id: partId,
+      name: 'Private Student',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      email: 'student@example.com',
+      phone: '+919999888877',
+      dob: '2007-04-12',
+      photoUrl: 'https://storage.example.com/photo.jpg'
+    });
+
+    try {
+      await signOut(clientAuth).catch(() => {});
+      await expect(getDoc(doc(clientDb, 'participants', partId))).rejects.toThrow();
+    } finally {
+      await adminDb.collection('participants').doc(partId).delete().catch(() => {});
+    }
+  });
+
+  it('46. Reject unauthenticated public reads of registration private records', async () => {
+    const adminDb = getAdminDb()!;
+    const regId = `reg-privacy-test-${Date.now()}`;
+    await adminDb.collection('registrations').doc(regId).set({
+      id: regId,
+      participantId: 'part-privacy-test-1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      competitionId: 'comp-1',
+      status: 'APPROVED'
+    });
+
+    try {
+      await signOut(clientAuth).catch(() => {});
+      await expect(getDoc(doc(clientDb, 'registrations', regId))).rejects.toThrow();
+    } finally {
+      await adminDb.collection('registrations').doc(regId).delete().catch(() => {});
+    }
+  });
+
+  it('47. Reject cross-team manager read of participant private records (Team 2 manager reading Team 1 participant)', async () => {
+    const adminDb = getAdminDb()!;
+    const partId = `part-cross-read-${Date.now()}`;
+    await adminDb.collection('participants').doc(partId).set({
+      id: partId,
+      name: 'Team 1 Student',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      email: 't1student@example.com',
+      phone: '+919111222333'
+    });
+
+    try {
+      // Sign in as Nawa Team Manager (team-2)
+      await signInWithEmailAndPassword(clientAuth, 'manager.nawa@sahithyolsav.com', 'TeamPassword123!');
+      await expect(getDoc(doc(clientDb, 'participants', partId))).rejects.toThrow();
+    } finally {
+      await adminDb.collection('participants').doc(partId).delete().catch(() => {});
+    }
+  });
+
+  it('48. Reject cross-team manager read of registration records (Team 2 manager reading Team 1 registration)', async () => {
+    const adminDb = getAdminDb()!;
+    const regId = `reg-cross-read-${Date.now()}`;
+    await adminDb.collection('registrations').doc(regId).set({
+      id: regId,
+      participantId: 'part-1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      competitionId: 'comp-1',
+      status: 'APPROVED'
+    });
+
+    try {
+      // Sign in as Nawa Team Manager (team-2)
+      await signInWithEmailAndPassword(clientAuth, 'manager.nawa@sahithyolsav.com', 'TeamPassword123!');
+      await expect(getDoc(doc(clientDb, 'registrations', regId))).rejects.toThrow();
+    } finally {
+      await adminDb.collection('registrations').doc(regId).delete().catch(() => {});
+    }
+  });
+
+  it('49. Allow legitimate Team Manager to read their own team participants and registrations', async () => {
+    const adminDb = getAdminDb()!;
+    const partId = `part-own-read-${Date.now()}`;
+    const regId = `reg-own-read-${Date.now()}`;
+
+    await adminDb.collection('participants').doc(partId).set({
+      id: partId,
+      name: 'Shamama Student',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      email: 'shamama.student@example.com'
+    });
+    await adminDb.collection('registrations').doc(regId).set({
+      id: regId,
+      participantId: partId,
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      competitionId: 'comp-1',
+      status: 'APPROVED'
+    });
+
+    try {
+      // Sign in as Shamama Team Manager (team-1)
+      await signInWithEmailAndPassword(clientAuth, 'manager.shamama@sahithyolsav.com', 'TeamPassword123!');
+
+      const partSnap = await getDoc(doc(clientDb, 'participants', partId));
+      expect(partSnap.exists()).toBe(true);
+      expect(partSnap.data()?.name).toBe('Shamama Student');
+
+      const regSnap = await getDoc(doc(clientDb, 'registrations', regId));
+      expect(regSnap.exists()).toBe(true);
+    } finally {
+      await adminDb.collection('participants').doc(partId).delete().catch(() => {});
+      await adminDb.collection('registrations').doc(regId).delete().catch(() => {});
+    }
+  });
+
+  it('50. Allow legitimate Administrator to read any participant and registration records', async () => {
+    const adminDb = getAdminDb()!;
+    const partId = `part-admin-read-${Date.now()}`;
+    const regId = `reg-admin-read-${Date.now()}`;
+
+    await adminDb.collection('participants').doc(partId).set({
+      id: partId,
+      name: 'Any Student',
+      teamId: 'team-3',
+      teamCode: 'ISH',
+      email: 'student@example.com'
+    });
+    await adminDb.collection('registrations').doc(regId).set({
+      id: regId,
+      participantId: partId,
+      teamId: 'team-3',
+      teamCode: 'ISH',
+      competitionId: 'comp-2',
+      status: 'APPROVED'
+    });
+
+    try {
+      await signInWithEmailAndPassword(clientAuth, 'admin@sahithyolsav.com', 'AdminPassword123!');
+
+      const partSnap = await getDoc(doc(clientDb, 'participants', partId));
+      expect(partSnap.exists()).toBe(true);
+
+      const regSnap = await getDoc(doc(clientDb, 'registrations', regId));
+      expect(regSnap.exists()).toBe(true);
+    } finally {
+      await adminDb.collection('participants').doc(partId).delete().catch(() => {});
+      await adminDb.collection('registrations').doc(regId).delete().catch(() => {});
+    }
+  });
 });
+
 
 

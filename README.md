@@ -125,24 +125,35 @@ npm run test:coverage
 
 ---
 
-## Production Deployment Checklist
+## Production Deployment & Operational Safeguards
 
-Before deploying to production (e.g. Vercel + Live Firebase):
+Before deploying to production (e.g., Vercel + Live Firebase):
 
-1. **Canonical Application URL**:
-   Set `NEXT_PUBLIC_APP_URL` in production hosting to your verified HTTPS domain (e.g. `https://fest.example.com`). Arbitrary forwarded host headers are strictly rejected to prevent Host Header Injection attacks.
-2. **Firebase Production Project**:
-   - Create and configure project in Firebase Console.
-   - Deploy Firestore Security Rules: `firebase deploy --project production --only firestore:rules`
-   - Deploy Storage Security Rules: `firebase deploy --project production --only storage`
-   - Deploy Firestore Indexes: `firebase deploy --project production --only firestore:indexes`
-3. **Admin SDK Credentials**:
-   Provide `FIREBASE_ADMIN_CLIENT_EMAIL` and `FIREBASE_ADMIN_PRIVATE_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS` path) in production environment secrets.
-4. **Build Verification**:
-   Verify production build locally:
-   ```bash
-   npm run build
-   ```
+### 1. Vercel Git-Based Automatic Deployment Behavior
+- **Default Vercel Behavior**: Connecting this repository to Vercel enables automatic production deployments on every push to the `main` branch.
+- **Release Control**: If you wish to stage or gate production releases, configure **Ignored Build Step** or enable deployment protection/preview branch promotions in the Vercel Project Settings.
+- **Runtime Environment**: Uses Node.js `22.x` as declared in `package.json` (`engines`) and `.nvmrc`.
+
+### 2. Trusted HTTPS Canonical URL
+- Set `NEXT_PUBLIC_APP_URL` in Vercel Production Environment Variables to your confirmed HTTPS domain (e.g., `https://fest.example.com` or your production Vercel URL).
+- Arbitrary forwarded host headers (`host`, `x-forwarded-host`) are strictly rejected in production to eliminate Host Header Injection vulnerabilities.
+
+### 3. Firebase Security Rules Deployment & Rollback
+- **Explicit Project Required**: Production deployments must explicitly target `--project production` (`inspirath-d6778`):
+  ```bash
+  firebase deploy --project production --only firestore:rules
+  firebase deploy --project production --only storage
+  firebase deploy --project production --only firestore:indexes
+  ```
+- **Rules Rollback Procedure**: Always preserve a local backup of the previously active rules source file (e.g., in `backups/`). To roll back rules, restore the previous rules file content and redeploy:
+  ```bash
+  firebase deploy --project production --only firestore:rules
+  ```
+
+### 4. Admin SDK & Bootstrap Security
+- In Vercel, provide `FIREBASE_ADMIN_CLIENT_EMAIL` and `FIREBASE_ADMIN_PRIVATE_KEY` (or `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`).
+- **Do NOT configure `ADMIN_BOOTSTRAP_SECRET` on the web application**: The authoritative Chief Administrator account is already provisioned and locked; bootstrap endpoints are retired from runtime web operation.
+- Ensure all emulator variables (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, `NEXT_PUBLIC_USE_FIREBASE_EMULATOR`) are absent in the production environment.
 
 ---
 
