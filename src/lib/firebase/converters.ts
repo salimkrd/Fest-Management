@@ -26,10 +26,12 @@ import {
   FirestoreAuditLog
 } from '@/types/firestore';
 
+import { sanitizeForFirestore } from './sanitize';
+
 export function createConverter<T extends DocumentData>(): FirestoreDataConverter<T> {
   return {
     toFirestore(modelObject: T): DocumentData {
-      return modelObject;
+      return sanitizeForFirestore(modelObject);
     },
     fromFirestore(snapshot: QueryDocumentSnapshot, options: SnapshotOptions): T {
       const data = snapshot.data(options);

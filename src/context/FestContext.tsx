@@ -5,6 +5,7 @@ import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
+import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
 import {
   Category,
@@ -1378,7 +1379,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
-  const isIsolatedDemoOrTest = isEmulator || isDemoMode || isTestEnv;
+  // Live production and local Firebase Emulator connect to Firestore for dynamic realtime sync.
+  // Isolated mock demo mode is strictly for offline showcase (NEXT_PUBLIC_DEMO_MODE=true) or tests without DB.
+  const isIsolatedDemoOrTest = isDemoMode || (isTestEnv && !isEmulator);
 
   const DEMO_TEAM_IDS = ['team-1', 'team-2', 'team-3', 'team-4'];
   const DEMO_CATEGORY_IDS = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
@@ -1665,6 +1668,20 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     });
   });
 
+  const [currentTeamUser, setCurrentTeamUser] = useState<Team | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fest_current_team_user_v2');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return null;
+  });
+
   // Purge stale mock fixtures from localStorage in live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
@@ -1931,9 +1948,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (!user) return;
 
       try {
-        const tokenResult = await user.getIdTokenResult();
-        const role = tokenResult.claims.role;
-        const teamId = tokenResult.claims.teamId as string | undefined;
+        const tokenResult = await user.getIdTokenResult(true);
+        const role = tokenResult.claims.role || (currentTeamUser ? 'TEAM_MANAGER' : undefined);
+        const teamId = (tokenResult.claims.teamId as string | undefined) || currentTeamUser?.id;
 
         if (role === 'ADMIN') {
           // 1. Admin reads all participants in realtime
@@ -2012,7 +2029,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   { id: 'cat-gen', name: 'General', code: 'CAT-GEN', eligibility: 'All Eligible Students', ageRange: 'Open Tier', classRange: 'Campus Wide', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' }
                 ];
                 for (const c of canonicalCategories) {
-                  setDoc(doc(firestore, 'categories', c.id), c).catch(() => {});
+                  setDoc(doc(firestore, 'categories', c.id), sanitizeForFirestore(c)).catch(() => {});
                 }
               }
             });
@@ -2027,7 +2044,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 if (Array.isArray(parsed)) {
                   for (const p of parsed) {
                     if (p && p.id && p.name && !isDemoParticipant(p)) {
-                      setDoc(doc(firestore, 'participants', p.id), p, { merge: true }).catch(() => {});
+                      setDoc(doc(firestore, 'participants', p.id), sanitizeForFirestore(p), { merge: true }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            } catch {}
+
+            try {
+              const savedRegs = localStorage.getItem('fest_registrations_v2');
+              if (savedRegs) {
+                const parsed = JSON.parse(savedRegs);
+                if (Array.isArray(parsed)) {
+                  for (const r of parsed) {
+                    if (r && r.id && !isDemoRegistration(r)) {
+                      setDoc(doc(firestore, 'registrations', r.id), sanitizeForFirestore(r), { merge: true }).catch(() => {});
                     }
                   }
                 }
@@ -2107,7 +2138,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 if (Array.isArray(parsed)) {
                   for (const p of parsed) {
                     if (p && p.id && p.name && p.teamId === teamId && !isDemoParticipant(p)) {
-                      setDoc(doc(firestore, 'participants', p.id), p, { merge: true }).catch(() => {});
+                      setDoc(doc(firestore, 'participants', p.id), sanitizeForFirestore(p), { merge: true }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            } catch {}
+
+            try {
+              const savedRegs = localStorage.getItem('fest_registrations_v2');
+              if (savedRegs) {
+                const parsed = JSON.parse(savedRegs);
+                if (Array.isArray(parsed)) {
+                  for (const r of parsed) {
+                    if (r && r.id && r.teamId === teamId && !isDemoRegistration(r)) {
+                      setDoc(doc(firestore, 'registrations', r.id), sanitizeForFirestore(r), { merge: true }).catch(() => {});
                     }
                   }
                 }
@@ -2125,21 +2170,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (unsubParts) unsubParts();
       if (unsubRegs) unsubRegs();
     };
-  }, [isIsolatedDemoOrTest]);
-
-  const [currentTeamUser, setCurrentTeamUser] = useState<Team | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fest_current_team_user_v2');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return null;
-  });
+  }, [isIsolatedDemoOrTest, currentTeamUser?.id]);
 
   // Sync state to localStorage
   useEffect(() => {
@@ -2189,7 +2220,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCategories(prev => [...prev.filter(c => c.id !== newId), newCat]);
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await setDoc(doc(db!, 'categories', newId), newCat);
+        await setDoc(doc(db!, 'categories', newId), sanitizeForFirestore(newCat));
       } catch (err) {
         console.warn('[FestContext] Firestore addCategory error:', err);
       }
@@ -2200,7 +2231,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await updateDoc(doc(db!, 'categories', id), updated);
+        await updateDoc(doc(db!, 'categories', id), sanitizeForFirestore(updated));
       } catch (err) {
         console.warn('[FestContext] Firestore updateCategory error:', err);
       }
@@ -2277,7 +2308,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await setDoc(doc(db!, 'competitions', newId), newComp);
+        await setDoc(doc(db!, 'competitions', newId), sanitizeForFirestore(newComp));
       } catch (err) {
         console.warn('[FestContext] Firestore addCompetition error:', err);
       }
@@ -2288,7 +2319,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCompetitions(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await updateDoc(doc(db!, 'competitions', id), updated);
+        await updateDoc(doc(db!, 'competitions', id), sanitizeForFirestore(updated));
       } catch (err) {
         console.warn('[FestContext] Firestore updateCompetition error:', err);
       }
@@ -2326,7 +2357,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await setDoc(doc(db!, 'participants', newId), newParticipant);
+        await setDoc(doc(db!, 'participants', newId), sanitizeForFirestore(newParticipant));
         if (partData.teamId) {
           updateDoc(doc(db!, 'teams', partData.teamId), {
             contestantsCount: (teams.find(t => t.id === partData.teamId)?.contestantsCount || 0) + 1
@@ -2342,7 +2373,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await updateDoc(doc(db!, 'participants', id), updated);
+        await updateDoc(doc(db!, 'participants', id), sanitizeForFirestore(updated));
       } catch (err) {
         console.warn('[FestContext] Firestore updateParticipant error:', err);
       }
@@ -2388,7 +2419,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
     if (!isIsolatedDemoOrTest && db) {
       try {
-        await setDoc(doc(db!, 'registrations', newId), newReg);
+        await setDoc(doc(db!, 'registrations', newId), sanitizeForFirestore(newReg));
         if (regData.competitionId) {
           updateDoc(doc(db!, 'competitions', regData.competitionId), {
             entriesCount: (competitions.find(c => c.id === regData.competitionId)?.entriesCount || 0) + 1
