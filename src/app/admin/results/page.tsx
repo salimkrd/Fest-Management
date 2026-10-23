@@ -32,6 +32,8 @@ export default function ResultManagementPage() {
   const [selectedResult, setSelectedResult] = useState<CompetitionResult | null>(null);
   const [publishConfirmResult, setPublishConfirmResult] = useState<CompetitionResult | null>(null);
   const [posterStudioResult, setPosterStudioResult] = useState<CompetitionResult | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [savingResult, setSavingResult] = useState(false);
 
   const filteredResults = results.filter(r => {
     const matchesSearch = r.competitionName.toLowerCase().includes(search.toLowerCase()) ||
@@ -40,10 +42,18 @@ export default function ResultManagementPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleConfirmPublish = () => {
+  const handleConfirmPublish = async () => {
     if (publishConfirmResult) {
-      publishResult(publishConfirmResult.id);
-      setPublishConfirmResult(null);
+      setSavingResult(true);
+      setActionError('');
+      try {
+        await publishResult(publishConfirmResult.id);
+        setPublishConfirmResult(null);
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not publish the result.');
+      } finally {
+        setSavingResult(false);
+      }
     }
   };
 
@@ -65,14 +75,40 @@ export default function ResultManagementPage() {
     }
   };
 
-  const handleConfirmGradesAndPositions = (result: CompetitionResult) => {
-    confirmResultPositionsAndGrades(result.id, result.ranks);
-    setSelectedResult(prev => prev ? { ...prev, resultStatus: 'READY_TO_PUBLISH' } : null);
+  const handleConfirmGradesAndPositions = async (result: CompetitionResult) => {
+    setSavingResult(true);
+    setActionError('');
+    try {
+      await confirmResultPositionsAndGrades(result.id, result.ranks);
+      setSelectedResult(prev => prev ? { ...prev, resultStatus: 'READY_TO_PUBLISH' } : null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not confirm result positions.');
+    } finally {
+      setSavingResult(false);
+    }
+  };
+
+  const handleUnpublish = async (resultId: string, reason: string) => {
+    setSavingResult(true);
+    setActionError('');
+    try {
+      await unpublishResult(resultId, reason);
+      setSelectedResult(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not unpublish the result.');
+    } finally {
+      setSavingResult(false);
+    }
   };
 
   return (
     <AdminLayout>
       <div className="space-y-6 max-w-6xl">
+        {actionError && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+            {actionError}
+          </div>
+        )}
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
           <div>
@@ -270,7 +306,8 @@ export default function ResultManagementPage() {
                     variant="secondary"
                     size="sm"
                     leftIcon={<FileCheck className="w-4 h-4 text-[#2563EB]" />}
-                    onClick={() => handleConfirmGradesAndPositions(selectedResult)}
+                    onClick={() => void handleConfirmGradesAndPositions(selectedResult)}
+                    disabled={savingResult}
                   >
                     Confirm Positions &amp; Grades
                   </Button>
@@ -294,10 +331,8 @@ export default function ResultManagementPage() {
                     size="sm"
                     className="text-[#DC2626] border-red-200 hover:bg-red-50"
                     leftIcon={<RotateCcw className="w-4 h-4 text-[#DC2626]" />}
-                    onClick={() => {
-                      unpublishResult(selectedResult.id, 'Unpublished from Audit Modal');
-                      setSelectedResult(null);
-                    }}
+                    onClick={() => void handleUnpublish(selectedResult.id, 'Unpublished from Audit Modal')}
+                    disabled={savingResult}
                   >
                     Unpublish Result
                   </Button>
@@ -399,7 +434,7 @@ export default function ResultManagementPage() {
               <Button variant="outline" size="sm" onClick={() => setPublishConfirmResult(null)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleConfirmPublish} leftIcon={<CheckCircle2 className="w-4 h-4" />}>
+              <Button variant="primary" size="sm" onClick={() => void handleConfirmPublish()} disabled={savingResult} leftIcon={<CheckCircle2 className="w-4 h-4" />}>
                 Confirm &amp; Publish Official Result
               </Button>
             </div>

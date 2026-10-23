@@ -41,8 +41,23 @@ export default function AdminLoginPage() {
     try {
       const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCred.user;
-      const tokenResult = await user.getIdTokenResult(true);
-      const role = tokenResult.claims.role;
+      let tokenResult = await user.getIdTokenResult(true);
+      let role = tokenResult.claims.role;
+
+      if (role !== 'ADMIN') {
+        try {
+          const syncRes = await fetch('/api/auth/sync-claims', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+          });
+          if (syncRes.ok) {
+            tokenResult = await user.getIdTokenResult(true);
+            role = tokenResult.claims.role;
+          }
+        } catch (syncErr) {
+          console.warn('[Admin Login] Claims auto-sync attempt error:', syncErr);
+        }
+      }
 
       if (role !== 'ADMIN') {
         await signOut(auth);

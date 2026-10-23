@@ -22,9 +22,11 @@ export default function TeamRegistrationPage() {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [participantId, setParticipantId] = useState('');
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Scoped to team only!
   const myRegistrations = registrations.filter(r => r.teamId === team?.id);
@@ -52,6 +54,7 @@ export default function TeamRegistrationPage() {
     const initialComps = competitions.filter(c => c.categoryId === initialCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantId('');
+    setGroupMemberIds([]);
     setGroupName('');
     setChestNumber('');
     setError('');
@@ -67,6 +70,7 @@ export default function TeamRegistrationPage() {
       setCompetitionId('');
     }
     setParticipantId('');
+    setGroupMemberIds([]);
     setChestNumber('');
   };
 
@@ -77,6 +81,7 @@ export default function TeamRegistrationPage() {
       setCategoryId(comp.categoryId);
     }
     setParticipantId('');
+    setGroupMemberIds([]);
     setChestNumber('');
   };
 
@@ -88,7 +93,7 @@ export default function TeamRegistrationPage() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const cat = categories.find(c => c.id === categoryId);
     const comp = competitions.find(c => c.id === competitionId);
@@ -107,11 +112,15 @@ export default function TeamRegistrationPage() {
       }
       participantName = part.name;
     } else {
-      if (!groupName) {
+      if (!groupName.trim()) {
         setError('Please enter your ensemble or group troupe name.');
         return;
       }
-      participantName = groupName;
+      if (groupMemberIds.length < 2) {
+        setError('Please select at least two eligible team members for this group registration.');
+        return;
+      }
+      participantName = groupName.trim();
     }
 
     if (!team) {
@@ -119,22 +128,32 @@ export default function TeamRegistrationPage() {
       return;
     }
 
-    addRegistration({
-      participantId: comp.type === 'SOLO' ? participantId : undefined,
-      participantName,
-      teamId: team.id,
-      teamCode: team.code,
-      teamName: team.name,
-      categoryId: comp.categoryId || categoryId,
-      categoryName: comp.categoryName || cat?.name || 'General',
-      competitionId: comp.id,
-      competitionName: comp.name,
-      type: comp.type,
-      chestNumber: chestNumber || (comp.type === 'SOLO' ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
-      status: 'APPROVED'
-    });
-
-    setModalOpen(false);
+    setSaving(true);
+    setError('');
+    try {
+      await addRegistration({
+        participantId: comp.type === 'SOLO' ? participantId : undefined,
+        participantName,
+        teamId: team.id,
+        teamCode: team.code,
+        teamName: team.name,
+        categoryId: comp.categoryId || categoryId,
+        categoryName: comp.categoryName || cat?.name || 'General',
+        competitionId: comp.id,
+        competitionName: comp.name,
+        type: comp.type,
+        chestNumber: chestNumber || (comp.type === 'SOLO'
+          ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000')
+          : `GRP-${team.code}-${comp.code}`),
+        groupMembers: comp.type === 'GROUP' ? groupMemberIds : undefined,
+        status: 'APPROVED'
+      });
+      setModalOpen(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -259,8 +278,8 @@ export default function TeamRegistrationPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
-                Confirm Entry
+              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? 'Registering...' : 'Confirm Entry'}
               </Button>
             </div>
           }
@@ -291,13 +310,41 @@ export default function TeamRegistrationPage() {
             )}
 
             {isGroup ? (
-              <Input
-                label="Team Ensemble / Troupe Name"
-                placeholder={`e.g. ${team?.name} Voice Troupe`}
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                required
-              />
+              <>
+                <Input
+                  label="Team Ensemble / Troupe Name"
+                  placeholder={`e.g. ${team?.name} Voice Troupe`}
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  required
+                />
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-semibold text-[#111111] uppercase tracking-wider">
+                    Group Members (select at least 2)
+                  </legend>
+                  {teamEligibleParticipants.length === 0 ? (
+                    <p className="text-xs text-amber-700">No eligible participants are available for this category.</p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto rounded-lg border border-[#E1E7EF] divide-y divide-[#E1E7EF]">
+                      {teamEligibleParticipants.map(participant => (
+                        <label key={participant.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={groupMemberIds.includes(participant.id)}
+                            onChange={event => {
+                              setGroupMemberIds(previous => event.target.checked
+                                ? [...previous, participant.id]
+                                : previous.filter(id => id !== participant.id)
+                              );
+                            }}
+                          />
+                          <span>{participant.name} ({participant.bib})</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
+              </>
             ) : (
               <div>
                 <Select

@@ -3,7 +3,7 @@
  * Manages judge assignments, cryptographic password verification, and session token generation.
  */
 
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   createJudgeAssignment,
@@ -13,6 +13,7 @@ import {
   VerificationResult
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
+import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 
 export class JudgeService {
   /**
@@ -25,6 +26,8 @@ export class JudgeService {
     competitionId: string;
     competitionCode: string;
     competitionName: string;
+    categoryName?: string;
+    type?: 'SOLO' | 'GROUP';
     stageName: string;
     durationHours?: number;
     baseUrl?: string;
@@ -36,7 +39,7 @@ export class JudgeService {
     await AuthService.assertAdmin(params.adminIdToken);
 
     const db = getAdminDb();
-    const docId = `asgn-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const docId = `asgn-${randomUUID()}`;
 
     const creds = await createJudgeAssignment({
       id: docId,
@@ -45,6 +48,8 @@ export class JudgeService {
       competitionId: params.competitionId,
       competitionCode: params.competitionCode,
       competitionName: params.competitionName,
+      categoryName: params.categoryName,
+      type: params.type,
       stageName: params.stageName,
       durationHours: params.durationHours,
       baseUrl: params.baseUrl
@@ -327,6 +332,109 @@ export class JudgeService {
     };
   }
 
+  private static async updateResultForCompetition(
+    db: FirebaseFirestore.Firestore,
+    competitionId: string
+  ): Promise<void> {
+    const [competitionSnapshot, assignmentSnapshot, registrationSnapshot] = await Promise.all([
+      db.collection('competitions').doc(competitionId).get(),
+      db.collection('judgeAssignments').where('competitionId', '==', competitionId).get(),
+      db.collection('registrations').where('competitionId', '==', competitionId).get()
+    ]);
+
+    if (!competitionSnapshot.exists) return;
+    const competition = competitionSnapshot.data()!;
+    const assignments = assignmentSnapshot.docs.filter(doc => {
+      const data = doc.data();
+      return !data.revoked && data.status !== 'REVOKED' && data.status !== 'EXPIRED';
+    });
+    if (assignments.length === 0 || assignments.some(doc => doc.data().status !== 'SUBMITTED')) return;
+
+    const submittedMarks = await Promise.all(assignments.map(async assignment => {
+      const markSnapshot = await db.collection('markEntries').doc(`me-${assignment.id}`).get();
+      return markSnapshot.exists ? markSnapshot.data() : null;
+    }));
+    if (submittedMarks.some(mark => !mark || mark.status !== 'SUBMITTED')) return;
+
+    const criteria = Array.isArray(competition.criteria) ? competition.criteria : [];
+    const maxMarks = Number(competition.maxMarks) ||
+      (criteria.length
+        ? criteria.reduce((total: number, criterion: { maxMarks?: number }) => total + Number(criterion.maxMarks || 0), 0)
+        : 100);
+    if (maxMarks <= 0) {
+      throw new Error(`Validation Error: Competition "${competitionId}" has an invalid maximum mark value.`);
+    }
+
+    const totalsByRegistration = new Map<string, number[]>();
+    submittedMarks.forEach(mark => {
+      Object.entries(mark!.scores as Record<string, Record<string, number> | number>).forEach(([registrationId, value]) => {
+        const total = typeof value === 'number'
+          ? value
+          : Object.values(value).reduce((sum, score) => sum + score, 0);
+        const totals = totalsByRegistration.get(registrationId) || [];
+        totals.push(total);
+        totalsByRegistration.set(registrationId, totals);
+      });
+    });
+
+    const registrations = registrationSnapshot.docs.filter(doc => doc.data().status === 'APPROVED');
+    const evaluated = registrations.flatMap(doc => {
+      const totals = totalsByRegistration.get(doc.id);
+      if (!totals?.length) return [];
+      const registration = doc.data();
+      const score = Number((totals.reduce((sum, value) => sum + value, 0) / totals.length).toFixed(2));
+      return [{
+        registrationId: doc.id,
+        bib: registration.chestNumber || '',
+        candidateName: registration.participantName || '',
+        teamId: registration.teamId || '',
+        teamCode: registration.teamCode || '',
+        teamName: registration.teamName || '',
+        teamColor: '#2563EB',
+        score,
+        grade: calculateGrade(score, maxMarks)
+      }];
+    }).sort((a, b) => b.score - a.score);
+
+    let previousScore: number | undefined;
+    let previousRank: 1 | 2 | 3 | null = null;
+    const ranks = evaluated.map((entry, index) => {
+      const rank: 1 | 2 | 3 | null = entry.score === previousScore
+        ? previousRank
+        : index < 3 ? (index + 1) as 1 | 2 | 3 : null;
+      previousScore = entry.score;
+      previousRank = rank;
+      return {
+        ...entry,
+        rank,
+        officialPoints: getChampionshipPoints(competition.type, entry.grade, rank),
+        totalEarnedPoints: getChampionshipPoints(competition.type, entry.grade, rank)
+      };
+    });
+
+    const resultId = `res-${competitionId}`;
+    const resultRef = db.collection('results').doc(resultId);
+    const existingResult = await resultRef.get();
+    if (existingResult.exists && ['PUBLISHED', 'READY_TO_PUBLISH'].includes(existingResult.data()?.resultStatus)) {
+      return;
+    }
+
+    await resultRef.set({
+      id: resultId,
+      competitionId,
+      competitionCode: competition.code || '',
+      competitionName: competition.name || '',
+      categoryName: competition.categoryName || '',
+      type: competition.type || 'SOLO',
+      stageName: competition.stageName || 'Main Stage',
+      marksStatus: 'COMPLETE',
+      resultStatus: 'READY_FOR_REVIEW',
+      ranks,
+      posterReleased: false,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  }
+
   /**
    * Judge operation: Submits scores for registered participants in the assigned competition.
    * Verifies assignment scope and secret before atomically sealing markEntry with SHA-256 verification hash.
@@ -378,10 +486,13 @@ export class JudgeService {
       throw new Error(`Unauthorized: Judge authentication failed (${authResult.reason}).`);
     }
 
-    await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const { resolvedRegistrations } = await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const normalizedScores = Object.fromEntries(
+      Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key)!, value])
+    );
 
     const submittedAt = new Date().toISOString();
-    const hashPayload = `${params.assignmentId}:${params.competitionId}:${submittedAt}:${JSON.stringify(params.scores)}`;
+    const hashPayload = `${params.assignmentId}:${params.competitionId}:${submittedAt}:${JSON.stringify(normalizedScores)}`;
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
     const markEntryId = `me-${params.assignmentId}`;
 
@@ -397,7 +508,7 @@ export class JudgeService {
       status: 'SUBMITTED',
       submitted: true,
       isFinal: true,
-      scores: params.scores,
+      scores: normalizedScores,
       submittedAt,
       verificationHash
     });
@@ -409,10 +520,11 @@ export class JudgeService {
     });
 
     await batch.commit();
+    await this.updateResultForCompetition(db, params.competitionId);
 
     return {
       success: true,
-      marksRecorded: Object.keys(params.scores).length,
+      marksRecorded: Object.keys(normalizedScores).length,
       verificationHash,
       submittedAt,
       markEntryId

@@ -20,6 +20,84 @@ import { FirestoreTeam, FirestoreLeaderboardEntry } from '@/types/firestore';
 import { AuthService } from './authService';
 
 export class PointsLedgerService {
+  static async publishResultsPoints(params: {
+    results: Array<{
+      resultId: string;
+      competition: {
+        id: string;
+        code: string;
+        name: string;
+        type: CompetitionType;
+      };
+      ranks: CompetitionRankInput[];
+    }>;
+    adminIdToken: string;
+  }): Promise<{ success: boolean; resultsPublished: number; entriesCommitted: number }> {
+    if (!params.adminIdToken || typeof params.adminIdToken !== 'string') {
+      throw new Error('Unauthorized: Admin ID token is required to commit points to the festival ledger.');
+    }
+
+    const adminUser = await AuthService.assertAdmin(params.adminIdToken);
+    const db = getAdminDb();
+    if (!db) {
+      throw new Error('Database service unavailable.');
+    }
+
+    let entriesCommitted = 0;
+    for (const result of params.results) {
+      const existingSnap = await db.collection('pointsLedger')
+        .where('resultId', '==', result.resultId)
+        .get();
+      const publishedAt = new Date().toISOString();
+      const batch = db.batch();
+      const expectedEntryIds = new Set(result.ranks.map(rank => `${result.resultId}_${rank.registrationId}`));
+
+      existingSnap.docs.forEach(doc => {
+        if (!expectedEntryIds.has(doc.id)) batch.delete(doc.ref);
+      });
+
+      result.ranks.forEach(rank => {
+        const entryId = `${result.resultId}_${rank.registrationId}`;
+        const entryData: PointsLedgerEntry = {
+          id: entryId,
+          resultId: result.resultId,
+          competitionId: result.competition.id,
+          competitionCode: result.competition.code,
+          competitionName: result.competition.name,
+          competitionType: result.competition.type,
+          teamId: rank.teamId,
+          teamCode: rank.teamCode,
+          teamName: rank.teamName,
+          registrationId: rank.registrationId,
+          candidateName: rank.candidateName,
+          bib: rank.bib,
+          score: rank.score,
+          rank: rank.rank,
+          grade: rank.grade,
+          points: getChampionshipPoints(result.competition.type, rank.grade, rank.rank),
+          status: 'COMMITTED',
+          publishedAt
+        };
+        batch.set(db.collection('pointsLedger').doc(entryId), entryData);
+      });
+
+      batch.update(db.collection('results').doc(result.resultId), {
+        resultStatus: 'PUBLISHED',
+        publishedDate: publishedAt,
+        publishedBy: adminUser.uid
+      });
+      await batch.commit();
+      entriesCommitted += result.ranks.length;
+    }
+
+    await this.syncLeaderboardFromLedger();
+    return {
+      success: true,
+      resultsPublished: params.results.length,
+      entriesCommitted
+    };
+  }
+
   /**
    * Commits official points for a published result inside a Firestore transaction.
    * Cryptographically verifies Admin ID token.
@@ -149,7 +227,11 @@ export class PointsLedgerService {
     });
 
     await batch.commit();
-    await this.syncLeaderboardFromLedger();
+    const affectedTeamIds = snapshot.docs.flatMap(doc => {
+      const teamId = doc.data()?.teamId;
+      return typeof teamId === 'string' ? [teamId] : [];
+    });
+    if (affectedTeamIds.length > 0) await this.syncLeaderboardFromLedger();
     return true;
   }
 
@@ -165,39 +247,49 @@ export class PointsLedgerService {
       db.collection('pointsLedger').where('status', '==', 'COMMITTED').get()
     ]);
 
-    const baseTeams = teamsSnap.docs.map((d: any) => ({
-      id: d.id,
-      code: d.data().code,
-      name: d.data().name
+    const baseTeams = teamsSnap.docs.map((doc: any) => ({
+      id: doc.id,
+      code: doc.data().code,
+      name: doc.data().name
     }));
 
-    const activeLedger = ledgerSnap.docs.map((d: any) => d.data() as PointsLedgerEntry);
+    const activeLedger = ledgerSnap.docs.map((doc: any) => doc.data() as PointsLedgerEntry);
     const aggregated = recalculateTeamChampionship(baseTeams, activeLedger);
 
-    const batch = db.batch();
-    aggregated.forEach(agg => {
-      const leaderRef = db.collection('leaderboard').doc(agg.teamId);
-      const teamDoc = teamsSnap.docs.find((d: any) => d.id === agg.teamId);
-      const color = teamDoc?.data().color || '#2563EB';
+    for (let index = 0; index < aggregated.length; index += 250) {
+      const batch = db.batch();
+      aggregated.slice(index, index + 250).forEach(agg => {
+        const teamDoc = teamsSnap.docs.find((doc: any) => doc.id === agg.teamId);
+        const color = teamDoc?.data()?.color || '#2563EB';
+        const entry: FirestoreLeaderboardEntry = {
+          teamId: agg.teamId,
+          teamCode: agg.teamCode,
+          teamName: agg.teamName,
+          color,
+          soloPoints: agg.soloPoints,
+          groupPoints: agg.groupPoints,
+          totalPoints: agg.totalPoints,
+          firstCount: agg.firstCount,
+          secondCount: agg.secondCount,
+          thirdCount: agg.thirdCount,
+          rank: agg.rank,
+          lastUpdated: new Date().toISOString()
+        };
 
-      const entry: FirestoreLeaderboardEntry = {
-        teamId: agg.teamId,
-        teamCode: agg.teamCode,
-        teamName: agg.teamName,
-        color,
-        soloPoints: agg.soloPoints,
-        groupPoints: agg.groupPoints,
-        totalPoints: agg.totalPoints,
-        firstCount: agg.firstCount,
-        secondCount: agg.secondCount,
-        thirdCount: agg.thirdCount,
-        rank: agg.rank,
-        lastUpdated: new Date().toISOString()
-      };
-
-      batch.set(leaderRef, entry);
-    });
-
-    await batch.commit();
+        batch.set(db.collection('leaderboard').doc(agg.teamId), entry);
+        if (teamDoc) {
+          batch.set(teamDoc.ref, {
+            soloPoints: agg.soloPoints,
+            groupPoints: agg.groupPoints,
+            totalPoints: agg.totalPoints,
+            firstCount: agg.firstCount,
+            secondCount: agg.secondCount,
+            thirdCount: agg.thirdCount,
+            rank: agg.rank
+          }, { merge: true });
+        }
+      });
+      await batch.commit();
+    }
   }
 }

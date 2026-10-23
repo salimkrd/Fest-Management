@@ -31,7 +31,9 @@ export default function MarkEntryPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedForDispatch, setSelectedForDispatch] = useState<MarkEntry | null>(null);
+  const [dispatchCredentials, setDispatchCredentials] = useState<{ oneTimeSecret: string; directUrl: string } | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [savingAssignment, setSavingAssignment] = useState(false);
 
   // Assignment Form State
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
@@ -59,20 +61,48 @@ export default function MarkEntryPage() {
     setAssignModalOpen(true);
   };
 
-  const handleSaveAssignment = (e: React.FormEvent) => {
+  const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!judgeName || !judgePhone) {
       setError('Please provide judge name and WhatsApp phone number.');
       return;
     }
 
-    addOrUpdateJudgeAssignment({
-      competitionId,
-      judgeName,
-      judgePhone
-    });
-
-    setAssignModalOpen(false);
+    setSavingAssignment(true);
+    setError('');
+    try {
+      const credentials = await addOrUpdateJudgeAssignment({
+        competitionId,
+        judgeName,
+        judgePhone
+      });
+      const competition = competitions.find(item => item.id === competitionId);
+      setSelectedForDispatch({
+        id: credentials.assignmentId,
+        competitionId,
+        competitionName: competition?.name || '',
+        competitionCode: competition?.code || '',
+        categoryName: competition?.categoryName || 'General',
+        type: competition?.type || 'SOLO',
+        judgeName,
+        judgePhone,
+        accessCode: credentials.accessCode,
+        secretHash: '',
+        salt: '',
+        revoked: false,
+        status: 'NOT_STARTED',
+        scores: []
+      });
+      setDispatchCredentials({
+        oneTimeSecret: credentials.oneTimeSecret,
+        directUrl: credentials.directUrl
+      });
+      setAssignModalOpen(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not create the judge assignment.');
+    } finally {
+      setSavingAssignment(false);
+    }
   };
 
   const getStatusBadge = (st: MarkEntry['status']) => {
@@ -222,7 +252,10 @@ export default function MarkEntryPage() {
                           variant="outline"
                           size="sm"
                           leftIcon={<MessageSquare className="w-3.5 h-3.5 text-emerald-600" />}
-                          onClick={() => setSelectedForDispatch(entry)}
+                          onClick={() => {
+                            setDispatchCredentials(null);
+                            setSelectedForDispatch(entry);
+                          }}
                         >
                           Dispatch Link
                         </Button>
@@ -253,6 +286,8 @@ export default function MarkEntryPage() {
         <WhatsAppDispatchModal
           markEntry={selectedForDispatch}
           isOpen={!!selectedForDispatch}
+          oneTimeSecret={dispatchCredentials?.oneTimeSecret}
+          directUrl={dispatchCredentials?.directUrl}
           onClose={() => setSelectedForDispatch(null)}
         />
 
@@ -268,8 +303,8 @@ export default function MarkEntryPage() {
               <Button variant="outline" size="sm" onClick={() => setAssignModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveAssignment}>
-                Generate Credentials
+              <Button variant="primary" size="sm" onClick={handleSaveAssignment} disabled={savingAssignment}>
+                {savingAssignment ? 'Generating...' : 'Generate Credentials'}
               </Button>
             </div>
           }

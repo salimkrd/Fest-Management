@@ -31,6 +31,7 @@ export default function TeamParticipantsPage() {
   const [phone, setPhone] = useState('+91 98470 ');
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Scoped to team only!
   const myParticipants = participants.filter(p => p.teamId === team?.id);
@@ -68,7 +69,7 @@ export default function TeamParticipantsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) {
       setError('Please provide contestant full name.');
@@ -99,13 +100,20 @@ export default function TeamParticipantsPage() {
       remarks
     };
 
-    if (editingPart) {
-      updateParticipant(editingPart.id, partData);
-    } else {
-      addParticipant(partData);
+    setSaving(true);
+    setError('');
+    try {
+      if (editingPart) {
+        await updateParticipant(editingPart.id, partData);
+      } else {
+        await addParticipant(partData);
+      }
+      setModalOpen(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save participant.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -269,8 +277,8 @@ export default function TeamParticipantsPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
-                Save Contestant
+              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Contestant'}
               </Button>
             </div>
           }
