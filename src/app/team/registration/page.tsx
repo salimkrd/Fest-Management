@@ -77,12 +77,17 @@ export default function TeamRegistrationPage() {
       participantName = groupName;
     }
 
+    if (!team) {
+      setError('No active team assigned to this manager session.');
+      return;
+    }
+
     addRegistration({
       participantId: comp.type === 'SOLO' ? participantId : undefined,
       participantName,
-      teamId: team?.id || 'team-1',
-      teamCode: team?.code || 'ABH',
-      teamName: team?.name || 'Al-Bayan House',
+      teamId: team.id,
+      teamCode: team.code,
+      teamName: team.name,
       categoryId,
       categoryName: cat?.name || 'Senior',
       competitionId: comp.id,

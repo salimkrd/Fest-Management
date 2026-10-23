@@ -61,6 +61,10 @@ export default function RegistrationManagementPage() {
     setError('');
 
     const team = teams.find(t => t.id === teamId);
+    if (!team) {
+      setError('Please select a valid participating team.');
+      return;
+    }
     const cat = categories.find(c => c.id === categoryId);
     const comp = competitions.find(c => c.id === competitionId);
 
@@ -88,9 +92,9 @@ export default function RegistrationManagementPage() {
     addRegistration({
       participantId: comp.type === 'SOLO' ? participantId : undefined,
       participantName,
-      teamId,
-      teamCode: team?.code || 'ABH',
-      teamName: team?.name || 'Al-Bayan House',
+      teamId: team.id,
+      teamCode: team.code,
+      teamName: team.name,
       categoryId,
       categoryName: cat?.name || 'Senior',
       competitionId,

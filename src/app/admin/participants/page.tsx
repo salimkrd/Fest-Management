@@ -83,15 +83,19 @@ export default function ParticipantsPage() {
     }
 
     const team = teams.find(t => t.id === teamId);
+    if (!team) {
+      setError('Please select a valid participating team.');
+      return;
+    }
     const cat = categories.find(c => c.id === categoryId);
 
     const partData = {
       name,
       email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@student.institution.org`,
       phone,
-      teamId,
-      teamCode: team?.code || 'ABH',
-      teamName: team?.name || 'Al-Bayan House',
+      teamId: team.id,
+      teamCode: team.code,
+      teamName: team.name,
       categoryId,
       categoryName: cat?.name || 'Senior',
       classGrade,

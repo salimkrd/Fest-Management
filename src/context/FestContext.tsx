@@ -1341,6 +1341,24 @@ const initialPointsLedger: PointsLedgerEntry[] = [
 const FestContext = createContext<FestContextType | undefined>(undefined);
 
 export function FestProvider({ children }: { children: React.ReactNode }) {
+  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+  const isIsolatedDemoOrTest = isEmulator || isDemoMode || isTestEnv;
+
+  const DEMO_TEAM_IDS = ['team-1', 'team-2', 'team-3', 'team-4'];
+  const isDemoParticipant = (p: Participant) =>
+    initialParticipants.some(init => init.id === p.id) || DEMO_TEAM_IDS.includes(p.teamId);
+  const isDemoRegistration = (r: Registration) =>
+    initialRegistrations.some(init => init.id === r.id) || DEMO_TEAM_IDS.includes(r.teamId);
+  const isDemoMarkEntry = (m: MarkEntry) =>
+    initialMarkEntries.some(init => init.id === m.id);
+  const isDemoResult = (res: CompetitionResult) =>
+    initialResults.some(init => init.id === res.id) ||
+    res.ranks.some(rk => DEMO_TEAM_IDS.includes(rk.teamId));
+  const isDemoPointsLedgerEntry = (l: PointsLedgerEntry) =>
+    initialPointsLedger.some(init => init.id === l.id) || DEMO_TEAM_IDS.includes(l.teamId);
+
   const [theme, setTheme] = useState<PublicThemeSettings>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_theme_settings_v2');
@@ -1372,6 +1390,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [participants, setParticipants] = useState<Participant[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_participants_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(p => !isDemoParticipant(p));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_participants_v2');
       if (saved) {
@@ -1382,6 +1415,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_registrations_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(r => !isDemoRegistration(r));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_registrations_v2');
       if (saved) {
@@ -1412,6 +1460,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [markEntries, setMarkEntries] = useState<MarkEntry[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_mark_entries_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(m => !isDemoMarkEntry(m));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_mark_entries_v2');
       if (saved) {
@@ -1422,6 +1485,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [results, setResults] = useState<CompetitionResult[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_results_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(res => !isDemoResult(res));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_results_v2');
       if (saved) {
@@ -1432,6 +1510,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [pointsLedger, setPointsLedger] = useState<PointsLedgerEntry[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_points_ledger_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(l => !isDemoPointsLedgerEntry(l));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_points_ledger_v2');
       if (saved) {
@@ -1440,11 +1533,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return initialPointsLedger;
   });
-
-  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
-  const isIsolatedDemoOrTest = isEmulator || isDemoMode || isTestEnv;
 
   // Teams with points dynamically updated from the Points Ledger
   const [teams, setTeams] = useState<Team[]>(() => {
@@ -1480,11 +1568,36 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     });
   });
 
-  // Purge stale mock teams from localStorage in live production
+  // Purge stale mock fixtures from localStorage in live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
       try {
         localStorage.removeItem('fest_teams_v2');
+
+        const cleanse = (key: string, isDemoFn: (item: any) => boolean) => {
+          const val = localStorage.getItem(key);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (Array.isArray(parsed)) {
+                const filtered = parsed.filter(item => !isDemoFn(item));
+                if (filtered.length > 0) {
+                  localStorage.setItem(key, JSON.stringify(filtered));
+                } else {
+                  localStorage.removeItem(key);
+                }
+              }
+            } catch {
+              localStorage.removeItem(key);
+            }
+          }
+        };
+
+        cleanse('fest_participants_v2', isDemoParticipant);
+        cleanse('fest_registrations_v2', isDemoRegistration);
+        cleanse('fest_mark_entries_v2', isDemoMarkEntry);
+        cleanse('fest_results_v2', isDemoResult);
+        cleanse('fest_points_ledger_v2', isDemoPointsLedgerEntry);
       } catch {}
     }
   }, [isIsolatedDemoOrTest]);
@@ -1667,10 +1780,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addParticipant = (partData: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
-    const newBib = '#' + (1000 + participants.length + 1);
+    const nextNum = participants.length + 1;
+    const newBib = '#' + (1000 + nextNum);
     const newParticipant: Participant = {
       ...partData,
-      id: 'part-' + (participants.length + 1),
+      id: 'part-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
       bib: newBib,
       idStatus: 'GENERATED'
     };
@@ -1687,10 +1801,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addRegistration = (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
+    const nextNum = registrations.length + 1;
     const newReg: Registration = {
       ...regData,
-      id: 'reg-' + (registrations.length + 1),
-      code: 'REG-' + (8820 + registrations.length + 1),
+      id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      code: 'REG-' + (8820 + nextNum),
       registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     };
     setRegistrations(prev => [...prev, newReg]);

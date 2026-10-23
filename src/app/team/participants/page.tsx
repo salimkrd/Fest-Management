@@ -75,15 +75,20 @@ export default function TeamParticipantsPage() {
       return;
     }
 
+    if (!team) {
+      setError('No active team assigned to this manager session.');
+      return;
+    }
+
     const cat = categories.find(c => c.id === categoryId);
 
     const partData = {
       name,
       email: `${name.toLowerCase().replace(/\s+/g, '.')}@student.institution.org`,
       phone,
-      teamId: team?.id || 'team-1',
-      teamCode: team?.code || 'ABH',
-      teamName: team?.name || 'Al-Bayan House',
+      teamId: team.id,
+      teamCode: team.code,
+      teamName: team.name,
       categoryId,
       categoryName: cat?.name || 'Senior',
       classGrade,
