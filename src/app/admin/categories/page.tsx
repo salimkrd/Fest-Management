@@ -56,7 +56,9 @@ export default function CategoriesPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -65,32 +67,42 @@ export default function CategoriesPage() {
       return;
     }
 
-    if (editingCategory) {
-      updateCategory(editingCategory.id, {
-        name,
-        code: code.toUpperCase(),
-        ageRange,
-        classRange,
-        eligibility,
-        status
-      });
-    } else {
-      addCategory({
-        name,
-        code: code.toUpperCase(),
-        ageRange,
-        classRange,
-        eligibility,
-        status
-      });
+    setSaving(true);
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, {
+          name,
+          code: code.toUpperCase(),
+          ageRange,
+          classRange,
+          eligibility,
+          status
+        });
+      } else {
+        await addCategory({
+          name,
+          code: code.toUpperCase(),
+          ageRange,
+          classRange,
+          eligibility,
+          status
+        });
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save category.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete category "${name}"?`)) {
-      deleteCategory(id);
+      try {
+        await deleteCategory(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete category.');
+      }
     }
   };
 

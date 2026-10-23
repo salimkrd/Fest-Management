@@ -156,9 +156,13 @@ export default function TeamRegistrationPage() {
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to cancel event registration for "${name}"?`)) {
-      deleteRegistration(id);
+      try {
+        await deleteRegistration(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to cancel registration.');
+      }
     }
   };
 

@@ -99,7 +99,9 @@ export default function RegistrationManagementPage() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -132,27 +134,37 @@ export default function RegistrationManagementPage() {
       participantName = groupName;
     }
 
-    addRegistration({
-      participantId: comp.type === 'SOLO' ? participantId : undefined,
-      participantName,
-      teamId: team.id,
-      teamCode: team.code,
-      teamName: team.name,
-      categoryId: comp.categoryId || categoryId,
-      categoryName: comp.categoryName || cat?.name || 'General',
-      competitionId: comp.id,
-      competitionName: comp.name,
-      type: comp.type,
-      chestNumber: chestNumber || (comp.type === 'SOLO' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
-      status: 'APPROVED'
-    });
-
-    setModalOpen(false);
+    setSaving(true);
+    try {
+      await addRegistration({
+        participantId: comp.type === 'SOLO' ? participantId : undefined,
+        participantName,
+        teamId: team.id,
+        teamCode: team.code,
+        teamName: team.name,
+        categoryId: comp.categoryId || categoryId,
+        categoryName: comp.categoryName || cat?.name || 'General',
+        competitionId: comp.id,
+        competitionName: comp.name,
+        type: comp.type,
+        chestNumber: chestNumber || (comp.type === 'SOLO' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
+        status: 'APPROVED'
+      });
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save registration.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to revoke registration for "${name}"?`)) {
-      deleteRegistration(id);
+      try {
+        await deleteRegistration(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete registration.');
+      }
     }
   };
 

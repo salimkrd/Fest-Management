@@ -73,7 +73,9 @@ export default function CompetitionsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -110,18 +112,28 @@ export default function CompetitionsPage() {
       ]
     };
 
-    if (editingComp) {
-      updateCompetition(editingComp.id, compData);
-    } else {
-      addCompetition(compData);
+    setSaving(true);
+    try {
+      if (editingComp) {
+        await updateCompetition(editingComp.id, compData);
+      } else {
+        await addCompetition(compData);
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save competition.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete competition "${name}"?`)) {
-      deleteCompetition(id);
+      try {
+        await deleteCompetition(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete competition.');
+      }
     }
   };
 

@@ -41,7 +41,7 @@ import {
 
 interface FestContextType {
   theme: PublicThemeSettings;
-  updateTheme: (newTheme: Partial<PublicThemeSettings>) => void;
+  updateTheme: (newTheme: Partial<PublicThemeSettings>) => Promise<void>;
 
   categories: Category[];
   addCategory: (cat: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => Promise<void>;
@@ -49,9 +49,9 @@ interface FestContextType {
   deleteCategory: (id: string) => Promise<void>;
 
   teams: Team[];
-  addTeam: (team: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'>) => void;
-  updateTeam: (id: string, team: Partial<Team>) => void;
-  deleteTeam: (id: string) => void;
+  addTeam: (team: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => Promise<void>;
+  updateTeam: (id: string, team: Partial<Team>) => Promise<void>;
+  deleteTeam: (id: string) => Promise<void>;
 
   competitions: Competition[];
   addCompetition: (comp: Omit<Competition, 'id' | 'entriesCount'>) => Promise<void>;
@@ -1376,8 +1376,9 @@ function readStoredResult(id: string, data: DocumentData): CompetitionResult {
 }
 
 export function FestProvider({ children }: { children: React.ReactNode }) {
-  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const isEmulator = !isProduction && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+  const isDemoMode = !isProduction && process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
   // Live production and local Firebase Emulator connect to Firestore for dynamic realtime sync.
   // Isolated mock demo mode is strictly for offline showcase (NEXT_PUBLIC_DEMO_MODE=true) or tests without DB.
@@ -1425,23 +1426,14 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
       if (snapshot.exists()) {
         setTheme(previous => ({ ...previous, ...snapshot.data(), ...localThemeEdits.current }));
+      } else {
+        setTheme(defaultTheme);
       }
     }, error => console.warn('[FestContext] Published theme synchronization failed:', error));
   }, []);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_categories_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(c => !isDemoCategory(c));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1456,17 +1448,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [competitions, setCompetitions] = useState<Competition[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_competitions_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(c => !isDemoCompetition(c));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1481,17 +1462,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [participants, setParticipants] = useState<Participant[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_participants_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(p => !isDemoParticipant(p));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1506,17 +1476,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_registrations_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(r => !isDemoRegistration(r));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1531,17 +1490,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [stages, setStages] = useState<Stage[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_stages_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(s => !isDemoStage(s));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1556,17 +1504,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_schedules_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(s => !isDemoSchedule(s));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1581,17 +1518,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [markEntries, setMarkEntries] = useState<MarkEntry[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_mark_entries_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(m => !isDemoMarkEntry(m));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1606,17 +1532,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [resultRecords, setResults] = useState<CompetitionResult[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_results_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(res => !isDemoResult(res));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1647,17 +1562,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [pointsLedger, setPointsLedger] = useState<PointsLedgerEntry[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_points_ledger_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(l => !isDemoPointsLedgerEntry(l));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1718,40 +1622,20 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
-  // Purge stale mock fixtures from localStorage in live production
+  // Purge stale localStorage caches in live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
       try {
         localStorage.removeItem('fest_teams_v2');
-
-        const cleanse = (key: string, isDemoFn: (item: any) => boolean) => {
-          const val = localStorage.getItem(key);
-          if (val) {
-            try {
-              const parsed = JSON.parse(val);
-              if (Array.isArray(parsed)) {
-                const filtered = parsed.filter(item => !isDemoFn(item));
-                if (filtered.length > 0) {
-                  localStorage.setItem(key, JSON.stringify(filtered));
-                } else {
-                  localStorage.removeItem(key);
-                }
-              }
-            } catch {
-              localStorage.removeItem(key);
-            }
-          }
-        };
-
-        cleanse('fest_categories_v2', isDemoCategory);
-        cleanse('fest_competitions_v2', isDemoCompetition);
-        cleanse('fest_participants_v2', isDemoParticipant);
-        cleanse('fest_registrations_v2', isDemoRegistration);
-        cleanse('fest_mark_entries_v2', isDemoMarkEntry);
-        cleanse('fest_results_v2', isDemoResult);
-        cleanse('fest_points_ledger_v2', isDemoPointsLedgerEntry);
-        cleanse('fest_stages_v2', isDemoStage);
-        cleanse('fest_schedules_v2', isDemoSchedule);
+        localStorage.removeItem('fest_categories_v2');
+        localStorage.removeItem('fest_competitions_v2');
+        localStorage.removeItem('fest_participants_v2');
+        localStorage.removeItem('fest_registrations_v2');
+        localStorage.removeItem('fest_stages_v2');
+        localStorage.removeItem('fest_schedules_v2');
+        localStorage.removeItem('fest_mark_entries_v2');
+        localStorage.removeItem('fest_results_v2');
+        localStorage.removeItem('fest_points_ledger_v2');
       } catch {}
     }
   }, [isIsolatedDemoOrTest]);
@@ -1812,7 +1696,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       unsubscribeResults = onSnapshot(source, snapshot => {
         if (stopped || currentGeneration !== generation) return;
         const records = snapshot.docs.map(item => readStoredResult(item.id, item.data()));
-        if (records.length || !isIsolatedDemoOrTest) setResults(records);
+        setResults(records);
       }, error => console.warn('[FestContext] Official results synchronization failed:', error));
       ready = true;
       void refreshPosters();
@@ -2125,7 +2009,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         unsubJudges = null;
       }
 
-      if (!user) return;
+      if (!user) {
+        setParticipants([]);
+        setRegistrations([]);
+        setMarkEntries([]);
+        return;
+      }
 
       try {
         const tokenResult = await user.getIdTokenResult(true);
@@ -2223,9 +2112,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   verificationHash: dt.verificationHash
                 };
               });
-              if (liveAssignments.length > 0) {
-                setMarkEntries(liveAssignments);
-              }
+              setMarkEntries(liveAssignments);
             },
             (err) => console.warn('[FestContext] Firestore judgeAssignments sync warning:', err)
           );
@@ -2311,30 +2198,39 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isIsolatedDemoOrTest, currentTeamUser?.id]);
 
-  // Sync state to localStorage
+  // Sync state to localStorage only in offline demo mode
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('fest_theme_settings_v2', JSON.stringify(theme));
-      localStorage.setItem('fest_categories_v2', JSON.stringify(categories));
       if (isIsolatedDemoOrTest) {
+        localStorage.setItem('fest_theme_settings_v2', JSON.stringify(theme));
+        localStorage.setItem('fest_categories_v2', JSON.stringify(categories));
         localStorage.setItem('fest_teams_v2', JSON.stringify(teams));
+        localStorage.setItem('fest_competitions_v2', JSON.stringify(competitions));
+        localStorage.setItem('fest_participants_v2', JSON.stringify(participants));
+        localStorage.setItem('fest_registrations_v2', JSON.stringify(registrations));
+        localStorage.setItem('fest_stages_v2', JSON.stringify(stages));
+        localStorage.setItem('fest_schedules_v2', JSON.stringify(schedules));
+        localStorage.setItem('fest_mark_entries_v2', JSON.stringify(markEntries));
+        localStorage.setItem('fest_results_v2', JSON.stringify(results.map(result => ({
+          ...result,
+          posterReleased: false,
+          posterConfig: undefined,
+          posterPublishedConfig: undefined,
+          posterDraftConfig: undefined,
+        }))));
+        localStorage.setItem('fest_points_ledger_v2', JSON.stringify(pointsLedger));
       } else {
+        localStorage.removeItem('fest_categories_v2');
         localStorage.removeItem('fest_teams_v2');
+        localStorage.removeItem('fest_competitions_v2');
+        localStorage.removeItem('fest_participants_v2');
+        localStorage.removeItem('fest_registrations_v2');
+        localStorage.removeItem('fest_stages_v2');
+        localStorage.removeItem('fest_schedules_v2');
+        localStorage.removeItem('fest_mark_entries_v2');
+        localStorage.removeItem('fest_results_v2');
+        localStorage.removeItem('fest_points_ledger_v2');
       }
-      localStorage.setItem('fest_competitions_v2', JSON.stringify(competitions));
-      localStorage.setItem('fest_participants_v2', JSON.stringify(participants));
-      localStorage.setItem('fest_registrations_v2', JSON.stringify(registrations));
-      localStorage.setItem('fest_stages_v2', JSON.stringify(stages));
-      localStorage.setItem('fest_schedules_v2', JSON.stringify(schedules));
-      localStorage.setItem('fest_mark_entries_v2', JSON.stringify(markEntries));
-      localStorage.setItem('fest_results_v2', JSON.stringify(results.map(result => ({
-        ...result,
-        posterReleased: false,
-        posterConfig: undefined,
-        posterPublishedConfig: undefined,
-        posterDraftConfig: undefined,
-      }))));
-      localStorage.setItem('fest_points_ledger_v2', JSON.stringify(pointsLedger));
       if (currentTeamUser) {
         localStorage.setItem('fest_current_team_user_v2', JSON.stringify(currentTeamUser));
       } else {
@@ -2343,9 +2239,16 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser, isIsolatedDemoOrTest]);
 
-  const updateTheme = (newTheme: Partial<PublicThemeSettings>) => {
+  const updateTheme = async (newTheme: Partial<PublicThemeSettings>) => {
     localThemeEdits.current = { ...localThemeEdits.current, ...newTheme };
     setTheme(prev => ({ ...prev, ...newTheme }));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db, 'settings', 'publicTheme'), sanitizeForFirestore(newTheme), { merge: true });
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateTheme error:', err);
+      }
+    }
   };
 
   const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
@@ -2391,11 +2294,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTeam = (teamData: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => {
+  const addTeam = async (teamData: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => {
     const customId = (teamData as any).id;
+    const newId = customId || ('team-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6));
     const newTeam: Team = {
       ...teamData,
-      id: customId || ('team-' + (teams.length + 1)),
+      id: newId,
       contestantsCount: (teamData as any).contestantsCount || 0,
       eventsCount: (teamData as any).eventsCount || 0,
       totalPoints: (teamData as any).totalPoints || 0,
@@ -2406,6 +2310,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       thirdCount: (teamData as any).thirdCount || 0,
       rank: (teamData as any).rank || (teams.length + 1)
     };
+    if (!isIsolatedDemoOrTest && db) {
+      await setDoc(doc(db, 'teams', newId), sanitizeForFirestore(newTeam), { merge: true });
+    }
     setTeams(prev => {
       const idx = prev.findIndex(t => t.id === newTeam.id);
       if (idx !== -1) {
@@ -2417,11 +2324,17 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateTeam = (id: string, updated: Partial<Team>) => {
+  const updateTeam = async (id: string, updated: Partial<Team>) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await updateDoc(doc(db, 'teams', id), sanitizeForFirestore(updated));
+    }
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t));
   };
 
-  const deleteTeam = (id: string) => {
+  const deleteTeam = async (id: string) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'teams', id));
+    }
     setTeams(prev => prev.filter(t => t.id !== id));
   };
 

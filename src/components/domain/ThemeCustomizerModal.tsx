@@ -31,30 +31,40 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
   const [bodyFont, setBodyFont] = useState(theme.bodyFont || 'Montserrat');
   const [backgroundStyle, setBackgroundStyle] = useState(theme.backgroundStyle);
   const [cardStyle, setCardStyle] = useState(theme.cardStyle || 'elevated');
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    updateTheme({
-      festivalName,
-      institutionName,
-      tagline,
-      logoUrl: logoUrl.trim() || undefined,
-      primaryColor,
-      secondaryColor,
-      accentColor,
-      headingFont,
-      bodyFont,
-      fontFamily: headingFont,
-      backgroundStyle,
-      cardStyle
-    });
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      onClose();
-    }, 1200);
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await updateTheme({
+        festivalName,
+        institutionName,
+        tagline,
+        logoUrl: logoUrl.trim() || undefined,
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        headingFont,
+        bodyFont,
+        fontFamily: headingFont,
+        backgroundStyle,
+        cardStyle
+      });
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update theme.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const presetColors = [
@@ -105,6 +115,12 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
             <strong>Admin Authorization Active:</strong> Public visitors cannot edit or save theme changes. Changes saved here immediately update the live public website.
           </span>
         </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-semibold">
+            {error}
+          </div>
+        )}
 
         {saved && (
           <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-semibold flex items-center gap-2">

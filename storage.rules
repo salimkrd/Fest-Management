@@ -20,7 +20,15 @@ service firebase.storage {
       allow read: if true;
       allow write: if isSignedIn() && (
         isAdmin() || 
-        request.auth.token.role == 'TEAM_MANAGER'
+        (request.auth.token.role == 'TEAM_MANAGER' && request.resource.metadata.teamId == request.auth.token.teamId)
+      ) && isImageFile();
+    }
+
+    match /teams/{teamId}/participants/{participantId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.role == 'TEAM_MANAGER' && request.auth.token.teamId == teamId)
       ) && isImageFile();
     }
 
