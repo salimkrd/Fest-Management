@@ -105,6 +105,7 @@ For security, do not share this invitation.
     managerPhone: string;
     appUrl?: string;
     expiresInHours?: number;
+    teamId?: string;
   }): GenerateInvitationResult {
     const code = this.generateInvitationCode();
     const tokenHash = this.hashInvitationCode(code);
@@ -135,7 +136,9 @@ For security, do not share this invitation.
       }
     }
 
-    const activationUrl = `${baseUrl}/team/activate`;
+    const activationUrl = params.teamId
+      ? `${baseUrl}/team/activate?code=${encodeURIComponent(code)}&teamId=${encodeURIComponent(params.teamId)}`
+      : `${baseUrl}/team/activate`;
 
     const message = this.buildWhatsAppMessage({
       teamName: params.teamName,

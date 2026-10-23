@@ -290,7 +290,8 @@ export class TeamService {
         teamName,
         managerEmail: rawEmail,
         managerPhone: rawPhone,
-        appUrl: params.appUrl
+        appUrl: params.appUrl,
+        teamId
       });
 
       // 9. Write Public Firestore teams/{teamId} document (SAFE PUBLIC METADATA ONLY)
@@ -409,7 +410,8 @@ export class TeamService {
       teamName: publicTeam.name,
       managerEmail: privateData.managerEmail,
       managerPhone: privateData.managerPhone || '',
-      appUrl
+      appUrl,
+      teamId
     });
 
     await privateRef.update({
@@ -563,7 +565,8 @@ export class TeamService {
    */
   static async verifyInvitationCode(
     code: string,
-    email?: string
+    email?: string,
+    teamId?: string
   ): Promise<{
     valid: boolean;
     teamName: string;
@@ -583,17 +586,54 @@ export class TeamService {
     const normalizedCode = InvitationService.normalizeInvitationCode(code);
     const tokenHash = InvitationService.hashInvitationCode(normalizedCode);
 
-    const querySnap = await db
-      .collectionGroup('private')
-      .where('invitationTokenHash', '==', tokenHash)
-      .limit(1)
-      .get();
+    let privateDoc: FirebaseFirestore.DocumentSnapshot | null = null;
 
-    if (querySnap.empty) {
+    // Fast path: direct team lookup if teamId provided
+    if (teamId) {
+      const ref = db.collection('teams').doc(teamId).collection('private').doc('managerInfo');
+      const snap = await ref.get();
+      if (snap.exists && (snap.data() as FirestoreTeamPrivate).invitationTokenHash === tokenHash) {
+        privateDoc = snap;
+      }
+    }
+
+    // Secondary path: attempt collectionGroup query with resilient catch
+    if (!privateDoc) {
+      try {
+        const querySnap = await db
+          .collectionGroup('private')
+          .where('invitationTokenHash', '==', tokenHash)
+          .limit(1)
+          .get();
+
+        if (!querySnap.empty) {
+          privateDoc = querySnap.docs[0];
+        }
+      } catch (cgErr: any) {
+        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', cgErr.message);
+      }
+    }
+
+    // Direct team subcollection scan fallback (guarantees success even without collection group index)
+    if (!privateDoc) {
+      const teamsSnap = await db.collection('teams').get();
+      for (const tDoc of teamsSnap.docs) {
+        const pRef = tDoc.ref.collection('private').doc('managerInfo');
+        const pSnap = await pRef.get();
+        if (pSnap.exists) {
+          const pData = pSnap.data() as FirestoreTeamPrivate;
+          if (pData.invitationTokenHash === tokenHash) {
+            privateDoc = pSnap;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!privateDoc || !privateDoc.exists) {
       throw new Error('Validation Error: Invalid or unrecognized invitation code.');
     }
 
-    const privateDoc = querySnap.docs[0];
     const privateData = privateDoc.data() as FirestoreTeamPrivate;
 
     // Check account-specific lockout
@@ -691,18 +731,41 @@ export class TeamService {
     }
 
     if (!privateDocRef) {
-      const querySnap = await db
-        .collectionGroup('private')
-        .where('invitationTokenHash', '==', tokenHash)
-        .limit(1)
-        .get();
+      try {
+        const querySnap = await db
+          .collectionGroup('private')
+          .where('invitationTokenHash', '==', tokenHash)
+          .limit(1)
+          .get();
 
-      if (querySnap.empty) {
-        throw new Error('Validation Error: Invalid or unrecognized invitation code.');
+        if (!querySnap.empty) {
+          privateDocRef = querySnap.docs[0].ref;
+          targetTeamId = (querySnap.docs[0].data() as FirestoreTeamPrivate).teamId;
+        }
+      } catch (cgErr: any) {
+        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', cgErr.message);
       }
+    }
 
-      privateDocRef = querySnap.docs[0].ref;
-      targetTeamId = (querySnap.docs[0].data() as FirestoreTeamPrivate).teamId;
+    // Direct team subcollection scan fallback (guarantees success even without collection group index)
+    if (!privateDocRef) {
+      const teamsSnap = await db.collection('teams').get();
+      for (const tDoc of teamsSnap.docs) {
+        const pRef = tDoc.ref.collection('private').doc('managerInfo');
+        const pSnap = await pRef.get();
+        if (pSnap.exists) {
+          const pData = pSnap.data() as FirestoreTeamPrivate;
+          if (pData.invitationTokenHash === tokenHash) {
+            privateDocRef = pRef;
+            targetTeamId = pData.teamId || tDoc.id;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!privateDocRef) {
+      throw new Error('Validation Error: Invalid or unrecognized invitation code.');
     }
 
     const now = new Date().toISOString();
@@ -1019,7 +1082,8 @@ export class TeamService {
         teamName: publicTeam.name,
         managerEmail: newEmail,
         managerPhone: newPhone,
-        appUrl: params.appUrl
+        appUrl: params.appUrl,
+        teamId
       });
 
       // 6. Update private managerInfo

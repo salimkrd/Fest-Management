@@ -12,14 +12,14 @@ export async function POST(req: NextRequest) {
 
     // Mode 1: Code Verification / Preview
     if (body.action === 'VERIFY') {
-      const { code, email } = body;
+      const { code, email, teamId } = body;
       if (!code) {
         return NextResponse.json(
           { error: 'Validation Error: Invitation code is required.' },
           { status: 400 }
         );
       }
-      const verified = await TeamService.verifyInvitationCode(code, email);
+      const verified = await TeamService.verifyInvitationCode(code, email, teamId);
       return NextResponse.json({ success: true, ...verified }, { status: 200 });
     }
 

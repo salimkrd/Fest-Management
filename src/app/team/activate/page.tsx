@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, Lock, Mail, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-export default function TeamActivatePage() {
+function TeamActivateForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,6 +21,16 @@ export default function TeamActivatePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activatedTeam, setActivatedTeam] = useState<{ teamName?: string; email?: string } | null>(null);
+
+  useEffect(() => {
+    const codeParam = searchParams.get('code');
+    const emailParam = searchParams.get('email');
+    const teamIdParam = searchParams.get('teamId');
+
+    if (codeParam) setCode(codeParam.trim().toUpperCase());
+    if (emailParam) setEmail(emailParam.trim().toLowerCase());
+    if (teamIdParam) setTeamId(teamIdParam.trim());
+  }, [searchParams]);
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +63,8 @@ export default function TeamActivatePage() {
         body: JSON.stringify({
           code: trimmedCode,
           email: trimmedEmail || undefined,
-          newPassword
+          newPassword,
+          teamId: teamId || undefined
         })
       });
 
@@ -224,5 +237,17 @@ export default function TeamActivatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TeamActivatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-slate-400 text-sm font-medium animate-pulse">Loading activation portal...</div>
+      </div>
+    }>
+      <TeamActivateForm />
+    </Suspense>
   );
 }
