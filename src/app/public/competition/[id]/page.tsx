@@ -7,41 +7,42 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { PublicResultPoster } from '@/components/domain/PublicResultPoster';
 import {
   Trophy,
-  Award,
-  Medal,
-  Download,
   Share2,
   ArrowLeft,
   Check,
   Sparkles,
   Calendar,
-  MapPin,
-  CheckCircle2
+  MapPin
 } from 'lucide-react';
-import { exportPosterAsPng } from '@/utils/canvasExport';
 
 function CompetitionDetailContent() {
-  const params = useParams();
-  const compId = params?.id as string;
-  const { results, competitions, theme } = useFest();
+  const params = useParams<{ id: string }>();
+  const compId = params.id;
+  const { results, theme } = useFest();
 
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   // Find result for this competition
-  const result = results.find(r => r.competitionId === compId || r.id === compId) || results[0];
-  const competition = competitions.find(c => c.id === result?.competitionId) || competitions[0];
+  const result = results.find(r =>
+    (r.competitionId === compId || r.id === compId) && r.resultStatus === 'PUBLISHED'
+  );
 
   const rank1 = result?.ranks.find(r => r.rank === 1);
   const rank2 = result?.ranks.find(r => r.rank === 2);
   const rank3 = result?.ranks.find(r => r.rank === 3);
 
-  const handleShare = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    setShareError(null);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setShareError('Unable to copy the link. You can copy it from your address bar.');
     }
   };
 
@@ -67,7 +68,7 @@ function CompetitionDetailContent() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Back Link & Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <Link
           href="/public"
           className="inline-flex items-center gap-2 text-xs font-bold text-[#526070] hover:text-[#111111] transition-colors"
@@ -96,11 +97,13 @@ function CompetitionDetailContent() {
         </div>
       </div>
 
+      {shareError && <p role="alert" className="text-sm text-red-700">{shareError}</p>}
+
       {/* Event Header Banner */}
       <div className="bg-white rounded-3xl border border-[#E1E7EF] p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
                 {result.competitionCode}
               </span>
@@ -304,84 +307,19 @@ function CompetitionDetailContent() {
         </div>
       </section>
 
-      {/* Media Studio Released Poster Showcase */}
       {result.posterReleased && (
-        <section className="bg-white rounded-3xl border border-[#E1E7EF] p-8 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-[#111111] flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500" />
-                Media Studio Official Poster
-              </h3>
-              <p className="text-xs text-[#526070]">
-                Official high-resolution graphic release for sharing across digital platforms
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              leftIcon={<Download className="w-4 h-4" />}
-              onClick={() => exportPosterAsPng(result, theme, result.posterConfig)}
-            >
-              Download Poster (PNG)
-            </Button>
+        <section id="poster" aria-labelledby="official-poster-heading" className="scroll-mt-24 rounded-3xl border border-[#E1E7EF] bg-white p-5 shadow-xs sm:p-8">
+          <div className="mb-6">
+            <h2 id="official-poster-heading" className="flex items-center gap-2 text-lg font-bold text-[#111111]">
+              <Sparkles className="h-5 w-5 text-amber-500" />
+              Official Result Poster
+            </h2>
+            <p className="mt-1 text-sm text-[#526070]">
+              The festival’s released poster, ready to download and share as a high-resolution PNG.
+            </p>
           </div>
-
-          {/* Poster Preview */}
-          <div className="flex justify-center">
-            <div className="w-full max-w-md bg-gradient-to-b from-[#1E3A8A] via-[#1D4ED8] to-[#172554] rounded-2xl p-6 text-white shadow-xl flex flex-col justify-between border border-blue-400/30">
-              <div className="text-center">
-                <span className="text-[10px] uppercase tracking-widest text-white/70 font-bold block">
-                  {theme.festivalName.toUpperCase()} · OFFICIAL RESULT
-                </span>
-                <h2 className="text-lg font-black tracking-tight mt-1 text-white">
-                  {result.competitionName}
-                </h2>
-                <span className="inline-block mt-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-white/10 text-white">
-                  {result.categoryName} · {result.type}
-                </span>
-              </div>
-
-              <div className="my-6 space-y-3">
-                {rank1 && (
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-full bg-amber-400 text-neutral-900 font-black text-xs flex items-center justify-center shrink-0">
-                        1
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-bold text-white">{rank1.candidateName}</h4>
-                        <p className="text-[10px] text-white/70">{rank1.teamName} ({rank1.teamCode})</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-amber-300 block">{rank1.score} PTS</span>
-                      <span className="text-[9px] text-white/60">GRADE {rank1.grade}</span>
-                    </div>
-                  </div>
-                )}
-
-                {rank2 && (
-                  <div className="bg-white/5 backdrop-blur-sm rounded-xl p-2.5 border border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-6 h-6 rounded-full bg-slate-300 text-neutral-900 font-black text-[10px] flex items-center justify-center shrink-0">
-                        2
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-medium text-white">{rank2.candidateName}</h4>
-                        <p className="text-[9px] text-white/60">{rank2.teamName}</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-white/80">{rank2.score} PTS</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="text-center pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-white/60">
-                <span>{theme.institutionName}</span>
-                <span className="font-mono">VERIFIED RESULT</span>
-              </div>
-            </div>
+          <div className="mx-auto max-w-lg">
+            <PublicResultPoster result={result} theme={theme} />
           </div>
         </section>
       )}

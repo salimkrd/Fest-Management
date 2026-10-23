@@ -1,8 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from '@/lib/firebase/client';
-import { collection, onSnapshot } from 'firebase/firestore';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import { auth, db } from '@/lib/firebase/client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
+import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
 import {
   Category,
   Team,
@@ -91,7 +94,7 @@ interface FestContextType {
   unpublishResult: (resultId: string, reason?: string) => void;
   updateResultStatus: (resultId: string, status: ResultStatus) => void;
   confirmResultPositionsAndGrades: (resultId: string, ranks: ResultRank[]) => void;
-  updatePosterConfig: (resultId: string, config: PosterConfig, release?: boolean) => void;
+  updatePosterConfig: (resultId: string, config: PosterConfig, release?: boolean) => Promise<void>;
 
   currentTeamUser: Team | null;
   setCurrentTeamUser: (team: Team | null) => void;
@@ -1340,6 +1343,37 @@ const initialPointsLedger: PointsLedgerEntry[] = [
 
 const FestContext = createContext<FestContextType | undefined>(undefined);
 
+// Older imported results use category/name/points rather than the current field names.
+function readStoredResult(id: string, data: DocumentData): CompetitionResult {
+  return {
+    id,
+    competitionId: data.competitionId || '',
+    competitionCode: data.competitionCode || '',
+    competitionName: data.competitionName || '',
+    categoryName: data.categoryName || data.category || '',
+    type: data.type === 'GROUP' ? 'GROUP' : 'SOLO',
+    stageName: data.stageName || '',
+    marksStatus: data.marksStatus === 'PARTIAL' ? 'PARTIAL' : 'COMPLETE',
+    resultStatus: data.resultStatus,
+    publishedDate: data.publishedDate || data.publishedAt,
+    posterReleased: false,
+    ranks: Array.isArray(data.ranks) ? data.ranks.map((rank: DocumentData) => ({
+      rank: [1, 2, 3].includes(rank.rank) ? rank.rank : null,
+      registrationId: rank.registrationId || '',
+      bib: rank.bib || '',
+      candidateName: rank.candidateName || rank.name || '',
+      teamId: rank.teamId || '',
+      teamCode: rank.teamCode || '',
+      teamName: rank.teamName || '',
+      teamColor: rank.teamColor || '#2563EB',
+      score: typeof rank.score === 'number' ? rank.score : 0,
+      grade: rank.grade || 'NO_GRADE',
+      officialPoints: rank.officialPoints ?? rank.points ?? rank.totalEarnedPoints ?? 0,
+      totalEarnedPoints: rank.totalEarnedPoints ?? rank.officialPoints ?? rank.points ?? 0,
+    })) : [],
+  };
+}
+
 export function FestProvider({ children }: { children: React.ReactNode }) {
   const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -1375,6 +1409,16 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return defaultTheme;
   });
+  const localThemeEdits = useRef<Partial<PublicThemeSettings>>({});
+
+  useEffect(() => {
+    if (!db) return;
+    return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
+      if (snapshot.exists()) {
+        setTheme(previous => ({ ...previous, ...snapshot.data(), ...localThemeEdits.current }));
+      }
+    }, error => console.warn('[FestContext] Published theme synchronization failed:', error));
+  }, []);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
@@ -1521,7 +1565,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return initialMarkEntries;
   });
 
-  const [results, setResults] = useState<CompetitionResult[]>(() => {
+  const [resultRecords, setResults] = useState<CompetitionResult[]>(() => {
     if (!isIsolatedDemoOrTest) {
       if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('fest_results_v2');
@@ -1545,6 +1589,22 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return initialResults;
   });
+
+  // Draft artwork lives only in memory after an authenticated API read. Cached result
+  // data never determines whether a poster is publicly available.
+  const [posterMedia, setPosterMedia] = useState<Record<string, PosterMediaRecord>>({});
+  const posterRevision = useRef(0);
+  const results = useMemo(() => resultRecords.map(result => {
+    const media = posterMedia[result.id];
+    const published = result.resultStatus === 'PUBLISHED' && media?.posterReleased === true;
+    return {
+      ...result,
+      posterReleased: published,
+      posterConfig: published ? media.posterPublishedConfig : undefined,
+      posterPublishedConfig: published ? media.posterPublishedConfig : undefined,
+      posterDraftConfig: media?.posterDraftConfig,
+    };
+  }), [resultRecords, posterMedia]);
 
   const [pointsLedger, setPointsLedger] = useState<PointsLedgerEntry[]>(() => {
     if (!isIsolatedDemoOrTest) {
@@ -1641,6 +1701,83 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isIsolatedDemoOrTest]);
 
+  // Read official records from the same source the poster API checks before release.
+  // Public subscriptions cannot see unpublished results or private poster drafts.
+  useEffect(() => {
+    if (!db) return;
+    const firestore = db;
+    let stopped = false;
+    let generation = 0;
+    let ready = false;
+    let isAdmin = false;
+    let unsubscribeResults: (() => void) | undefined;
+
+    const refreshPosters = async () => {
+      if (!ready || stopped) return;
+      const currentGeneration = generation;
+      const currentRevision = posterRevision.current;
+      try {
+        const token = isAdmin && auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        const response = await fetch(isAdmin ? '/api/posters?view=admin' : '/api/posters', {
+          cache: 'no-store',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) throw new Error('Could not refresh saved posters.');
+        const data = await response.json() as { posters: Array<PosterMediaRecord | ReleasedPoster> };
+        if (stopped || generation !== currentGeneration || currentRevision !== posterRevision.current) return;
+        const records: Record<string, PosterMediaRecord> = {};
+        for (const item of data.posters) {
+          records[item.resultId] = 'config' in item
+            ? { resultId: item.resultId, posterReleased: true, posterPublishedConfig: item.config }
+            : item;
+        }
+        setPosterMedia(records);
+      } catch (error) {
+        if (!stopped && generation === currentGeneration && currentRevision === posterRevision.current) {
+          // An expired or revoked session cannot retain a cached private draft.
+          setPosterMedia({});
+          console.warn('[FestContext] Poster synchronization failed:', error);
+        }
+      }
+    };
+
+    const subscribe = async () => {
+      const currentGeneration = ++generation;
+      ready = false;
+      unsubscribeResults?.();
+      setPosterMedia({});
+      let admin = false;
+      try { admin = (await auth?.currentUser?.getIdTokenResult())?.claims.role === 'ADMIN'; }
+      catch (error) { console.warn('[FestContext] Could not verify result access:', error); }
+      if (stopped || currentGeneration !== generation) return;
+      isAdmin = admin;
+      const source = admin
+        ? collection(firestore, 'results')
+        : query(collection(firestore, 'results'), where('resultStatus', '==', 'PUBLISHED'));
+      unsubscribeResults = onSnapshot(source, snapshot => {
+        if (stopped || currentGeneration !== generation) return;
+        const records = snapshot.docs.map(item => readStoredResult(item.id, item.data()));
+        if (records.length || !isIsolatedDemoOrTest) setResults(records);
+      }, error => console.warn('[FestContext] Official results synchronization failed:', error));
+      ready = true;
+      void refreshPosters();
+    };
+
+    const unsubscribeAuth = auth ? onAuthStateChanged(auth, () => { void subscribe(); }) : undefined;
+    if (!auth) void subscribe();
+    const interval = window.setInterval(() => { void refreshPosters(); }, 30_000);
+    const onFocus = () => { void refreshPosters(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      stopped = true;
+      generation++;
+      unsubscribeAuth?.();
+      unsubscribeResults?.();
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [isIsolatedDemoOrTest]);
+
   // Realtime Firestore teams synchronization for live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && db) {
@@ -1690,6 +1827,306 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isIsolatedDemoOrTest]);
 
+  // Realtime Firestore categories synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      const firestore = db;
+      try {
+        const catRef = collection(firestore, 'categories');
+        const unsubscribe = onSnapshot(
+          catRef,
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const liveCategories: Category[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  name: dt.name || '',
+                  code: dt.code || '',
+                  eligibility: dt.eligibility || '',
+                  ageRange: dt.ageRange || '',
+                  classRange: dt.classRange || '',
+                  enrolledCount: dt.enrolledCount || 0,
+                  competitionsCount: dt.competitionsCount || 0,
+                  status: dt.status || 'ACTIVE'
+                };
+              });
+              setCategories(liveCategories);
+            }
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore categories sync warning:', err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (e) {
+        console.warn('[FestContext] Could not subscribe to categories:', e);
+      }
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore competitions synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      const firestore = db;
+      try {
+        const compRef = collection(firestore, 'competitions');
+        const unsubscribe = onSnapshot(
+          compRef,
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const liveCompetitions: Competition[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  code: dt.code || '',
+                  name: dt.name || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  type: dt.type || 'SOLO',
+                  entriesCount: dt.entriesCount || 0,
+                  stageId: dt.stageId || '',
+                  stageName: dt.stageName || '',
+                  assignedJudges: dt.assignedJudges || [],
+                  status: dt.status || 'SCHEDULED',
+                  date: dt.date || '',
+                  timeSlot: dt.timeSlot || '',
+                  durationMinutes: dt.durationMinutes || 60,
+                  maxEntriesPerTeam: dt.maxEntriesPerTeam || 1,
+                  criteria: dt.criteria || []
+                };
+              });
+              setCompetitions(liveCompetitions);
+            }
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore competitions sync warning:', err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (e) {
+        console.warn('[FestContext] Could not subscribe to competitions:', e);
+      }
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore participants and registrations synchronization for live production
+  useEffect(() => {
+    if (isIsolatedDemoOrTest || !db || !auth) return;
+    const firestore = db;
+
+    let unsubParts: (() => void) | null = null;
+    let unsubRegs: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubParts) {
+        unsubParts();
+        unsubParts = null;
+      }
+      if (unsubRegs) {
+        unsubRegs();
+        unsubRegs = null;
+      }
+
+      if (!user) return;
+
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        const role = tokenResult.claims.role;
+        const teamId = tokenResult.claims.teamId as string | undefined;
+
+        if (role === 'ADMIN') {
+          // 1. Admin reads all participants in realtime
+          const partsRef = collection(firestore, 'participants');
+          unsubParts = onSnapshot(
+            partsRef,
+            (snapshot) => {
+              const liveParts: Participant[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  bib: dt.bib || '',
+                  name: dt.name || '',
+                  email: dt.email || '',
+                  phone: dt.phone || '',
+                  teamId: dt.teamId || '',
+                  teamCode: dt.teamCode || '',
+                  teamName: dt.teamName || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  classGrade: dt.classGrade || '',
+                  division: dt.division || '',
+                  dob: dt.dob || '',
+                  photoUrl: dt.photoUrl || '',
+                  registeredEventIds: dt.registeredEventIds || [],
+                  idStatus: dt.idStatus || 'GENERATED',
+                  remarks: dt.remarks
+                };
+              });
+              setParticipants(liveParts);
+            },
+            (err) => console.warn('[FestContext] Firestore participants sync warning:', err)
+          );
+
+          // 2. Admin reads all registrations in realtime
+          const regsRef = collection(firestore, 'registrations');
+          unsubRegs = onSnapshot(
+            regsRef,
+            (snapshot) => {
+              const liveRegs: Registration[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  code: dt.code || '',
+                  participantId: dt.participantId,
+                  participantName: dt.participantName || '',
+                  teamId: dt.teamId || '',
+                  teamCode: dt.teamCode || '',
+                  teamName: dt.teamName || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  competitionId: dt.competitionId || '',
+                  competitionName: dt.competitionName || '',
+                  type: dt.type || 'SOLO',
+                  chestNumber: dt.chestNumber || '',
+                  status: dt.status || 'PENDING',
+                  groupMembers: dt.groupMembers,
+                  registeredAt: dt.registeredAt || ''
+                };
+              });
+              setRegistrations(liveRegs);
+            },
+            (err) => console.warn('[FestContext] Firestore registrations sync warning:', err)
+          );
+
+          // 3. Auto-seed canonical categories if categories collection is currently empty
+          try {
+            const catCheck = collection(firestore, 'categories');
+            const catUnsub = onSnapshot(catCheck, (snap) => {
+              catUnsub();
+              if (snap.empty) {
+                const canonicalCategories: Category[] = [
+                  { id: 'cat-sj', name: 'Sub Junior', code: 'CAT-SJ', eligibility: 'Class 5 to 7', ageRange: '10 - 12 Years', classRange: 'Std 5 - 7', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
+                  { id: 'cat-jr', name: 'Junior', code: 'CAT-JR', eligibility: 'Class 8 to 10', ageRange: '13 - 15 Years', classRange: 'Std 8 - 10', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
+                  { id: 'cat-sr', name: 'Senior', code: 'CAT-SR', eligibility: 'Class 11 to 12', ageRange: '16 - 18 Years', classRange: 'Std 11 - 12', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
+                  { id: 'cat-gen', name: 'General', code: 'CAT-GEN', eligibility: 'All Eligible Students', ageRange: 'Open Tier', classRange: 'Campus Wide', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' }
+                ];
+                for (const c of canonicalCategories) {
+                  setDoc(doc(firestore, 'categories', c.id), c).catch(() => {});
+                }
+              }
+            });
+          } catch {}
+
+          // 4. Auto-migrate existing local participants to Firestore
+          if (typeof window !== 'undefined') {
+            try {
+              const saved = localStorage.getItem('fest_participants_v2');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                  for (const p of parsed) {
+                    if (p && p.id && p.name && !isDemoParticipant(p)) {
+                      setDoc(doc(firestore, 'participants', p.id), p, { merge: true }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+        } else if (role === 'TEAM_MANAGER' && teamId) {
+          // 1. Team Manager reads ONLY their own team's participants
+          const partsQ = query(collection(firestore, 'participants'), where('teamId', '==', teamId));
+          unsubParts = onSnapshot(
+            partsQ,
+            (snapshot) => {
+              const liveParts: Participant[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  bib: dt.bib || '',
+                  name: dt.name || '',
+                  email: dt.email || '',
+                  phone: dt.phone || '',
+                  teamId: dt.teamId || '',
+                  teamCode: dt.teamCode || '',
+                  teamName: dt.teamName || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  classGrade: dt.classGrade || '',
+                  division: dt.division || '',
+                  dob: dt.dob || '',
+                  photoUrl: dt.photoUrl || '',
+                  registeredEventIds: dt.registeredEventIds || [],
+                  idStatus: dt.idStatus || 'GENERATED',
+                  remarks: dt.remarks
+                };
+              });
+              setParticipants(liveParts);
+            },
+            (err) => console.warn('[FestContext] Firestore team participants sync warning:', err)
+          );
+
+          // 2. Team Manager reads ONLY their own team's registrations
+          const regsQ = query(collection(firestore, 'registrations'), where('teamId', '==', teamId));
+          unsubRegs = onSnapshot(
+            regsQ,
+            (snapshot) => {
+              const liveRegs: Registration[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  code: dt.code || '',
+                  participantId: dt.participantId,
+                  participantName: dt.participantName || '',
+                  teamId: dt.teamId || '',
+                  teamCode: dt.teamCode || '',
+                  teamName: dt.teamName || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  competitionId: dt.competitionId || '',
+                  competitionName: dt.competitionName || '',
+                  type: dt.type || 'SOLO',
+                  chestNumber: dt.chestNumber || '',
+                  status: dt.status || 'PENDING',
+                  groupMembers: dt.groupMembers,
+                  registeredAt: dt.registeredAt || ''
+                };
+              });
+              setRegistrations(liveRegs);
+            },
+            (err) => console.warn('[FestContext] Firestore team registrations sync warning:', err)
+          );
+
+          // 3. Auto-migrate existing local participants for this team to Firestore
+          if (typeof window !== 'undefined') {
+            try {
+              const saved = localStorage.getItem('fest_participants_v2');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                  for (const p of parsed) {
+                    if (p && p.id && p.name && p.teamId === teamId && !isDemoParticipant(p)) {
+                      setDoc(doc(firestore, 'participants', p.id), p, { merge: true }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch (authErr) {
+        console.warn('[FestContext] Auth state token check warning:', authErr);
+      }
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubParts) unsubParts();
+      if (unsubRegs) unsubRegs();
+    };
+  }, [isIsolatedDemoOrTest]);
+
   const [currentTeamUser, setCurrentTeamUser] = useState<Team | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_current_team_user_v2');
@@ -1720,7 +2157,13 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('fest_stages_v2', JSON.stringify(stages));
       localStorage.setItem('fest_schedules_v2', JSON.stringify(schedules));
       localStorage.setItem('fest_mark_entries_v2', JSON.stringify(markEntries));
-      localStorage.setItem('fest_results_v2', JSON.stringify(results));
+      localStorage.setItem('fest_results_v2', JSON.stringify(results.map(result => ({
+        ...result,
+        posterReleased: false,
+        posterConfig: undefined,
+        posterPublishedConfig: undefined,
+        posterDraftConfig: undefined,
+      }))));
       localStorage.setItem('fest_points_ledger_v2', JSON.stringify(pointsLedger));
       if (currentTeamUser) {
         localStorage.setItem('fest_current_team_user_v2', JSON.stringify(currentTeamUser));
@@ -1731,25 +2174,48 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser, isIsolatedDemoOrTest]);
 
   const updateTheme = (newTheme: Partial<PublicThemeSettings>) => {
+    localThemeEdits.current = { ...localThemeEdits.current, ...newTheme };
     setTheme(prev => ({ ...prev, ...newTheme }));
   };
 
-  const addCategory = (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
+  const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
+    const newId = 'cat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newCat: Category = {
       ...catData,
-      id: 'cat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      id: newId,
       enrolledCount: 0,
       competitionsCount: 0
     };
-    setCategories(prev => [...prev, newCat]);
+    setCategories(prev => [...prev.filter(c => c.id !== newId), newCat]);
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db!, 'categories', newId), newCat);
+      } catch (err) {
+        console.warn('[FestContext] Firestore addCategory error:', err);
+      }
+    }
   };
 
-  const updateCategory = (id: string, updated: Partial<Category>) => {
+  const updateCategory = async (id: string, updated: Partial<Category>) => {
     setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await updateDoc(doc(db!, 'categories', id), updated);
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateCategory error:', err);
+      }
+    }
   };
 
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
     setCategories(prev => prev.filter(c => c.id !== id));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await deleteDoc(doc(db!, 'categories', id));
+      } catch (err) {
+        console.warn('[FestContext] Firestore deleteCategory error:', err);
+      }
+    }
   };
 
   const handleSetCurrentTeamUser = (teamUser: Team | null) => {
@@ -1801,62 +2267,168 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setTeams(prev => prev.filter(t => t.id !== id));
   };
 
-  const addCompetition = (compData: Omit<Competition, 'id' | 'entriesCount'>) => {
+  const addCompetition = async (compData: Omit<Competition, 'id' | 'entriesCount'>) => {
+    const newId = 'cmp-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newComp: Competition = {
       ...compData,
-      id: 'cmp-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      id: newId,
       entriesCount: 0
     };
-    setCompetitions(prev => [...prev, newComp]);
+    setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db!, 'competitions', newId), newComp);
+      } catch (err) {
+        console.warn('[FestContext] Firestore addCompetition error:', err);
+      }
+    }
   };
 
-  const updateCompetition = (id: string, updated: Partial<Competition>) => {
+  const updateCompetition = async (id: string, updated: Partial<Competition>) => {
     setCompetitions(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await updateDoc(doc(db!, 'competitions', id), updated);
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateCompetition error:', err);
+      }
+    }
   };
 
-  const deleteCompetition = (id: string) => {
+  const deleteCompetition = async (id: string) => {
     setCompetitions(prev => prev.filter(c => c.id !== id));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await deleteDoc(doc(db!, 'competitions', id));
+      } catch (err) {
+        console.warn('[FestContext] Firestore deleteCompetition error:', err);
+      }
+    }
   };
 
-  const addParticipant = (partData: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
-    const nextNum = participants.length + 1;
-    const newBib = '#' + (1000 + nextNum);
+  const addParticipant = async (partData: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
+    let maxBibNum = 1000;
+    for (const p of participants) {
+      const num = parseInt((p.bib || '').replace('#', ''), 10);
+      if (!isNaN(num) && num > maxBibNum) {
+        maxBibNum = num;
+      }
+    }
+    const newBib = '#' + (maxBibNum + 1);
+    const newId = 'part-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newParticipant: Participant = {
       ...partData,
-      id: 'part-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      id: newId,
       bib: newBib,
       idStatus: 'GENERATED'
     };
-    setParticipants(prev => [...prev, newParticipant]);
+    setParticipants(prev => [...prev.filter(p => p.id !== newId), newParticipant]);
     setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db!, 'participants', newId), newParticipant);
+        if (partData.teamId) {
+          updateDoc(doc(db!, 'teams', partData.teamId), {
+            contestantsCount: (teams.find(t => t.id === partData.teamId)?.contestantsCount || 0) + 1
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[FestContext] Firestore addParticipant error:', err);
+      }
+    }
   };
 
-  const updateParticipant = (id: string, updated: Partial<Participant>) => {
+  const updateParticipant = async (id: string, updated: Partial<Participant>) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await updateDoc(doc(db!, 'participants', id), updated);
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateParticipant error:', err);
+      }
+    }
   };
 
-  const deleteParticipant = (id: string) => {
+  const deleteParticipant = async (id: string) => {
+    const partToDelete = participants.find(p => p.id === id);
     setParticipants(prev => prev.filter(p => p.id !== id));
+    if (partToDelete?.teamId) {
+      setTeams(prev => prev.map(t => t.id === partToDelete.teamId ? { ...t, contestantsCount: Math.max(0, t.contestantsCount - 1) } : t));
+    }
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await deleteDoc(doc(db!, 'participants', id));
+        if (partToDelete?.teamId) {
+          updateDoc(doc(db!, 'teams', partToDelete.teamId), {
+            contestantsCount: Math.max(0, (teams.find(t => t.id === partToDelete.teamId)?.contestantsCount || 1) - 1)
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[FestContext] Firestore deleteParticipant error:', err);
+      }
+    }
   };
 
-  const addRegistration = (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
-    const nextNum = registrations.length + 1;
+  const addRegistration = async (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
+    let maxRegNum = 8820;
+    for (const r of registrations) {
+      const num = parseInt((r.code || '').replace('REG-', ''), 10);
+      if (!isNaN(num) && num > maxRegNum) {
+        maxRegNum = num;
+      }
+    }
+    const newId = 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newReg: Registration = {
       ...regData,
-      id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
-      code: 'REG-' + (8820 + nextNum),
+      id: newId,
+      code: 'REG-' + (maxRegNum + 1),
       registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     };
-    setRegistrations(prev => [...prev, newReg]);
+    setRegistrations(prev => [...prev.filter(r => r.id !== newId), newReg]);
     setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db!, 'registrations', newId), newReg);
+        if (regData.competitionId) {
+          updateDoc(doc(db!, 'competitions', regData.competitionId), {
+            entriesCount: (competitions.find(c => c.id === regData.competitionId)?.entriesCount || 0) + 1
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[FestContext] Firestore addRegistration error:', err);
+      }
+    }
   };
 
-  const updateRegistrationStatus = (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
+  const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
     setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await updateDoc(doc(db!, 'registrations', id), { status });
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateRegistrationStatus error:', err);
+      }
+    }
   };
 
-  const deleteRegistration = (id: string) => {
+  const deleteRegistration = async (id: string) => {
+    const regToDelete = registrations.find(r => r.id === id);
     setRegistrations(prev => prev.filter(r => r.id !== id));
+    if (regToDelete?.competitionId) {
+      setCompetitions(prev => prev.map(c => c.id === regToDelete.competitionId ? { ...c, entriesCount: Math.max(0, c.entriesCount - 1) } : c));
+    }
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await deleteDoc(doc(db!, 'registrations', id));
+        if (regToDelete?.competitionId) {
+          updateDoc(doc(db!, 'competitions', regToDelete.competitionId), {
+            entriesCount: Math.max(0, (competitions.find(c => c.id === regToDelete.competitionId)?.entriesCount || 1) - 1)
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[FestContext] Firestore deleteRegistration error:', err);
+      }
+    }
   };
 
   const addStage = (stageData: Omit<Stage, 'id'>) => {
@@ -2101,17 +2673,22 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const updatePosterConfig = (resultId: string, config: PosterConfig, release?: boolean) => {
-    setResults(prev => prev.map(r => {
-      if (r.id === resultId) {
-        return {
-          ...r,
-          posterConfig: config,
-          posterReleased: release !== undefined ? release : r.posterReleased
-        };
-      }
-      return r;
-    }));
+  const updatePosterConfig = async (resultId: string, config: PosterConfig, release?: boolean): Promise<void> => {
+    const user = auth?.currentUser;
+    if (!user) throw new Error('Sign in as an administrator to save or publish a poster.');
+    const token = await user.getIdToken();
+    const response = await fetch(`/api/posters/results/${encodeURIComponent(resultId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ config, ...(release !== undefined ? { release } : {}) }),
+    });
+    const data = await response.json() as { poster?: PosterMediaRecord; error?: string };
+    if (!response.ok || !data.poster) throw new Error(data.error || 'Could not save this poster. Please try again.');
+    if (auth?.currentUser?.uid !== user.uid) return;
+    // Ignore an older refresh that started before this successful save.
+    posterRevision.current++;
+    const poster = data.poster;
+    setPosterMedia(previous => ({ ...previous, [resultId]: poster }));
   };
 
   return (

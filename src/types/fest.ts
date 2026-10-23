@@ -212,6 +212,8 @@ export interface CompetitionResult {
   ranks: ResultRank[];
   posterReleased: boolean;
   posterConfig?: PosterConfig;
+  posterDraftConfig?: PosterConfig;
+  posterPublishedConfig?: PosterConfig;
 }
 
 export interface PosterConfig {
@@ -221,6 +223,41 @@ export interface PosterConfig {
   fontWeight: string;
   colorPreset: 'royal' | 'crimson' | 'emerald' | 'monochrome';
   customTitle?: string;
+  version?: 2;
+  backgroundColor?: string;
+  accentColor?: string;
+  textColor?: string;
+  backgroundImage?: string;
+  backgroundOpacity?: number;
+  decoration?: 'arches' | 'confetti' | 'minimal';
+  elements?: PosterElement[];
+}
+
+export type PosterField = 'text' | 'festivalName' | 'institutionName' | 'competitionName' | 'categoryName' | 'competitionCode' | 'rank1.name' | 'rank1.team' | 'rank1.grade' | 'rank1.score' | 'rank2.name' | 'rank2.team' | 'rank2.grade' | 'rank2.score' | 'rank3.name' | 'rank3.team' | 'rank3.grade' | 'rank3.score';
+
+export interface PosterElement {
+  id: string;
+  type: 'text' | 'image';
+  label: string;
+  field: PosterField;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontFamily: 'sans' | 'serif' | 'mono';
+  fontWeight: '400' | '600' | '800';
+  color: string;
+  align: 'left' | 'center' | 'right';
+  image?: string;
+}
+
+export interface PosterTemplate {
+  id: string;
+  name: string;
+  config: PosterConfig;
+  updatedAt?: string;
 }
 
 export interface PublicThemeSettings {

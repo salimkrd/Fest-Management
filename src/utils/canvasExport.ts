@@ -8,199 +8,35 @@ import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } fro
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
  */
-export function exportPosterAsPng(
+export async function exportPosterAsPng(
   result: CompetitionResult,
   theme: PublicThemeSettings,
   config?: PosterConfig
-): void {
-  if (typeof window === 'undefined') return;
-
-  const aspectRatio = config?.aspectRatio || '1:1';
-  const colorPreset = config?.colorPreset || 'royal';
-
-  // Base resolution: 1080 width
-  let width = 1080;
-  let height = 1080;
-  if (aspectRatio === '4:5') {
-    height = 1350;
-  } else if (aspectRatio === '9:16') {
-    height = 1920;
-  }
-
+): Promise<void> {
+  if (typeof window === 'undefined') throw new Error('Poster downloads require a browser.');
+  const { validatePosterConfig, normalizePosterConfig, posterDimensions, posterSvgDataUrl } = await import('@/domain/poster');
+  const checked = validatePosterConfig(normalizePosterConfig(config));
+  const { width, height } = posterDimensions(checked.aspectRatio);
+  await document.fonts.ready;
+  const artwork = new Image();
+  artwork.src = posterSvgDataUrl(result, theme, checked);
+  await artwork.decode();
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  // Background Gradients
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  if (colorPreset === 'crimson') {
-    grad.addColorStop(0, '#7F1D1D');
-    grad.addColorStop(0.5, '#991B1B');
-    grad.addColorStop(1, '#450A0A');
-  } else if (colorPreset === 'emerald') {
-    grad.addColorStop(0, '#064E3B');
-    grad.addColorStop(0.5, '#047857');
-    grad.addColorStop(1, '#022C22');
-  } else if (colorPreset === 'monochrome') {
-    grad.addColorStop(0, '#18181B');
-    grad.addColorStop(0.5, '#27272A');
-    grad.addColorStop(1, '#09090B');
-  } else {
-    // Royal Blue
-    grad.addColorStop(0, '#1E3A8A');
-    grad.addColorStop(0.5, '#1D4ED8');
-    grad.addColorStop(1, '#172554');
-  }
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, height);
-
-  // Outer decorative border
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 12;
-  ctx.strokeRect(36, 36, width - 72, height - 72);
-
-  // Corner decorative accents
-  ctx.fillStyle = '#F59E0B'; // Amber / Gold accent
-  const cornerSize = 40;
-  ctx.fillRect(36, 36, cornerSize, 8);
-  ctx.fillRect(36, 36, 8, cornerSize);
-  ctx.fillRect(width - 36 - cornerSize, 36, cornerSize, 8);
-  ctx.fillRect(width - 44, 36, 8, cornerSize);
-  ctx.fillRect(36, height - 44, cornerSize, 8);
-  ctx.fillRect(36, height - 36 - cornerSize, 8, cornerSize);
-  ctx.fillRect(width - 36 - cornerSize, height - 44, cornerSize, 8);
-  ctx.fillRect(width - 44, height - 36 - cornerSize, 8, cornerSize);
-
-  // Header Typography
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-  ctx.font = '700 24px Montserrat, sans-serif';
-  ctx.letterSpacing = '6px';
-  ctx.fillText(`${theme.festivalName.toUpperCase()} · OFFICIAL RESULT`, width / 2, 110);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 48px Montserrat, sans-serif';
-  ctx.letterSpacing = '0px';
-  ctx.fillText(result.competitionName, width / 2, 175);
-
-  // Category & Type Pill
-  const categoryPillText = `${(result.categoryName || '').toUpperCase()}  |  ${(result.type || 'SOLO').toUpperCase()}`;
-  ctx.font = '700 20px Montserrat, sans-serif';
-  const pillWidth = ctx.measureText(categoryPillText).width + 48;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.beginPath();
-  ctx.roundRect((width - pillWidth) / 2, 205, pillWidth, 40, 20);
-  ctx.fill();
-  ctx.fillStyle = '#FBBF24';
-  ctx.fillText(categoryPillText, width / 2, 232);
-
-  // Winners Cards
-  const rank1 = result.ranks.find(r => r.rank === 1);
-  const rank2 = result.ranks.find(r => r.rank === 2);
-  const rank3 = result.ranks.find(r => r.rank === 3);
-
-  const cardWidth = width - 160;
-  const cardX = 80;
-  let startY = 280;
-  const cardGap = 24;
-
-  const drawWinnerCard = (
-    rankNum: number,
-    rankData: any,
-    yPos: number,
-    cardHeight: number,
-    badgeColor: string,
-    badgeTextColor: string,
-    title: string
-  ) => {
-    if (!rankData) return;
-
-    // Card background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.beginPath();
-    ctx.roundRect(cardX, yPos, cardWidth, cardHeight, 24);
-    ctx.fill();
-
-    ctx.strokeStyle = rankNum === 1 ? 'rgba(245, 158, 11, 0.6)' : 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Rank Badge Circle
-    ctx.fillStyle = badgeColor;
-    ctx.beginPath();
-    ctx.arc(cardX + 70, yPos + cardHeight / 2, 38, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = badgeTextColor;
-    ctx.font = '900 36px Montserrat, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${rankNum}`, cardX + 70, yPos + cardHeight / 2 + 13);
-
-    // Winner Info (Left Aligned)
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 32px Montserrat, sans-serif';
-    const candidateName = rankData.candidateName || rankData.name || 'Contestant';
-    ctx.fillText(candidateName, cardX + 135, yPos + cardHeight / 2 - 10);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.font = '600 22px Montserrat, sans-serif';
-    const teamString = `${rankData.teamName} (${rankData.teamCode || ''}) · Bib ${rankData.bib || 'N/A'}`;
-    ctx.fillText(teamString, cardX + 135, yPos + cardHeight / 2 + 25);
-
-    // Right side: Grade & Points
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#FDE047';
-    ctx.font = '800 28px Montserrat, sans-serif';
-    const pointsText = `+${rankData.totalEarnedPoints || rankData.points || 0} PTS`;
-    ctx.fillText(pointsText, cardX + cardWidth - 40, yPos + cardHeight / 2 - 10);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-    ctx.font = '700 20px Montserrat, sans-serif';
-    ctx.fillText(`Grade ${rankData.grade || 'A'}`, cardX + cardWidth - 40, yPos + cardHeight / 2 + 24);
-  };
-
-  const cardH = aspectRatio === '9:16' ? 180 : 130;
-  if (rank1) {
-    drawWinnerCard(1, rank1, startY, cardH, '#F59E0B', '#111111', '1st Place');
-    startY += cardH + cardGap;
-  }
-  if (rank2) {
-    drawWinnerCard(2, rank2, startY, cardH, '#E2E8F0', '#111111', '2nd Place');
-    startY += cardH + cardGap;
-  }
-  if (rank3) {
-    drawWinnerCard(3, rank3, startY, cardH, '#F97316', '#FFFFFF', '3rd Place');
-    startY += cardH + cardGap;
-  }
-
-  // Footer / Watermark
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.font = '600 18px Montserrat, sans-serif';
-  ctx.fillText(
-    `${theme.institutionName} · Official Festival Results Management System`,
-    width / 2,
-    height - 60
-  );
-
-  // Trigger Download
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const safeCode = (result.competitionCode || 'COMP').replace(/[^a-zA-Z0-9_-]/g, '_');
-    link.download = `Poster_${safeCode}_Winners.png`;
-    link.href = url;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Your browser could not prepare the poster.');
+  context.drawImage(artwork, 0, 0, width, height);
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('PNG generation failed.')), 'image/png'));
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Poster_${(result.competitionCode || 'Result').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-
 /**
  * Generates and downloads a printable Participant Digital ID Card (PNG)
  */
@@ -378,3 +214,4 @@ export function exportDigitalIdAsPng(
     URL.revokeObjectURL(url);
   }, 'image/png');
 }
+

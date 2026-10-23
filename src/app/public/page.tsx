@@ -5,19 +5,13 @@ import Link from 'next/link';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { ChampionshipPodium } from '@/components/domain/ChampionshipPodium';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { PublicResultPoster } from '@/components/domain/PublicResultPoster';
 import {
   Search,
-  Trophy,
   Sparkles,
   ArrowRight,
-  Award,
-  Medal,
-  Calendar,
-  Share2,
-  ChevronRight,
-  CheckCircle2
+  ImageIcon,
+  ChevronRight
 } from 'lucide-react';
 
 export default function PublicResultHomePage() {
@@ -31,10 +25,12 @@ export default function PublicResultHomePage() {
   const filteredResults = publishedResults.filter(res => {
     const matchesSearch = res.competitionName.toLowerCase().includes(search.toLowerCase()) ||
                           res.competitionCode.toLowerCase().includes(search.toLowerCase()) ||
-                          res.ranks.some(rk => rk.candidateName.toLowerCase().includes(search.toLowerCase()));
+                          res.ranks.some(rk => rk.candidateName.toLowerCase().includes(search.toLowerCase()) || rk.bib.toLowerCase().includes(search.toLowerCase()));
     const matchesCat = selectedCategory === 'ALL' || res.categoryName === selectedCategory;
     return matchesSearch && matchesCat;
   });
+
+  const releasedPosters = filteredResults.filter(result => result.posterReleased);
 
   return (
     <PublicLayout>
@@ -67,6 +63,7 @@ export default function PublicResultHomePage() {
                 <Search className="w-5 h-5 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
+                  aria-label="Search public results and posters"
                   placeholder="Search candidate name, Bib number, or event..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -105,6 +102,61 @@ export default function PublicResultHomePage() {
             </button>
           ))}
         </div>
+
+        <section id="result-posters" aria-labelledby="result-posters-heading" className="scroll-mt-24 space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#526070]">
+                <ImageIcon className="h-4 w-4" />
+                Ready to download & share
+              </div>
+              <h2 id="result-posters-heading" className="text-xl font-bold tracking-tight text-[#111111]">
+                Official Result Posters
+              </h2>
+              <p className="mt-1 text-sm text-[#526070]">
+                View the festival’s released posters and download the original PNG.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-[#526070]">
+              {releasedPosters.length} {releasedPosters.length === 1 ? 'poster' : 'posters'} available
+            </span>
+          </div>
+
+          {releasedPosters.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {releasedPosters.map(result => (
+                <article key={result.id} className="min-w-0 rounded-3xl border border-[#E1E7EF] bg-white p-4 shadow-xs">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-[#111111]">{result.competitionName}</h3>
+                      <p className="mt-1 text-xs text-[#526070]">{result.categoryName} · {result.competitionCode}</p>
+                    </div>
+                    <Link
+                      href={`/public/competition/${result.competitionId}#poster`}
+                      className="shrink-0 rounded text-xs font-bold text-[#2563EB] hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label={`View result and poster for ${result.competitionName}`}
+                    >
+                      View result
+                    </Link>
+                  </div>
+                  <PublicResultPoster result={result} theme={theme} />
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white px-6 py-10 text-center">
+              <ImageIcon className="mx-auto mb-3 h-8 w-8 text-[#8E9CAE]" />
+              <h3 className="text-sm font-bold text-[#111111]">
+                {search || selectedCategory !== 'ALL' ? 'No posters match your filters' : 'Posters are on their way'}
+              </h3>
+              <p className="mt-1 text-sm text-[#526070]">
+                {search || selectedCategory !== 'ALL'
+                  ? 'Try another search or category to find a released poster.'
+                  : 'Official result posters will appear here when the festival team releases them.'}
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Latest Published Results Feed */}
         <section className="space-y-4">
