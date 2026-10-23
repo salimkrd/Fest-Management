@@ -41,6 +41,11 @@ export class AuthService {
       throw new Error('Authentication Service Unavailable: Firebase Admin Auth not initialized.');
     }
 
+    // Fail closed if the authoritative Firestore database is unavailable
+    if (!db) {
+      throw new Error('Database Unavailable: Authoritative Firestore database connection is required to verify session.');
+    }
+
     // 1. Verify token signature and check for revocation
     let decoded;
     try {
@@ -53,55 +58,69 @@ export class AuthService {
     const tokenTeamId = (decoded.teamId as string) || undefined;
     const tokenAssignmentId = (decoded.assignmentId as string) || undefined;
 
-    // 2. Cross-verify with authoritative Firestore user document if database is available
-    if (db) {
-      const userDoc = await db.collection('users').doc(decoded.uid).get();
-      if (!userDoc.exists) {
-        throw new Error(`Unauthorized: User "${decoded.uid}" does not have an authoritative record in Firestore.`);
-      }
-      const userData = userDoc.data() as FirestoreUser;
+    // 2. Cross-verify with authoritative Firestore user document
+    const userDoc = await db.collection('users').doc(decoded.uid).get();
+    if (!userDoc.exists) {
+      throw new Error(`Unauthorized: User "${decoded.uid}" does not have an authoritative record in Firestore.`);
+    }
+    const userData = userDoc.data() as FirestoreUser;
 
-      // Disabled user rejection
-      if (userData.disabled || userData.status === 'DISABLED') {
-        throw new Error(`Unauthorized: User account "${decoded.uid}" has been disabled by fest administration.`);
-      }
+    // 3. Account status & disabled enforcement
+    if (userData.disabled === true || userData.status === 'DISABLED') {
+      throw new Error(`Unauthorized: User account "${decoded.uid}" has been disabled by fest administration.`);
+    }
 
-      // Strict role matching: Ensure token claims match authoritative record
-      if (userData.role && tokenRole !== 'PUBLIC' && userData.role !== tokenRole) {
+    if (userData.status === 'PENDING') {
+      throw new Error(`Unauthorized: User account "${decoded.uid}" is pending activation.`);
+    }
+
+    // 4. Exact role agreement enforcement: Token claims and Firestore record must agree
+    if (userData.role !== tokenRole) {
+      throw new Error(
+        `Security Violation: Token role "${tokenRole}" does not match authoritative record "${userData.role}". Exact agreement required.`
+      );
+    }
+
+    // 5. Privileged operations: ADMIN
+    if (tokenRole === 'ADMIN' || userData.role === 'ADMIN') {
+      if (tokenRole !== 'ADMIN' || userData.role !== 'ADMIN') {
         throw new Error(
-          `Security Violation: Token role "${tokenRole}" does not match authoritative record "${userData.role}".`
+          `Security Violation: Role mismatch for Admin authorization (token: "${tokenRole}", firestore: "${userData.role}"). Exact agreement required.`
         );
       }
-
-      // Strict team matching: Ensure token team assignment matches authoritative record
-      if (userData.role === 'TEAM_MANAGER') {
-        if (!userData.teamId) {
-          throw new Error(
-            `Security Violation: Team Manager account "${decoded.uid}" is missing mandatory team assignment.`
-          );
-        }
-        if (tokenTeamId && userData.teamId !== tokenTeamId) {
-          throw new Error(
-            `Security Violation: Token team assignment "${tokenTeamId}" does not match authoritative assignment "${userData.teamId}".`
-          );
-        }
+      if (userData.status !== 'ACTIVE' || userData.disabled) {
+        throw new Error(`Unauthorized: Administrator account "${decoded.uid}" is not active or disabled.`);
       }
+    }
 
-      return {
-        uid: decoded.uid,
-        email: decoded.email || userData.email || '',
-        role: userData.role || tokenRole,
-        teamId: userData.teamId || tokenTeamId,
-        assignmentId: userData.assignmentId || tokenAssignmentId
-      };
+    // 6. Privileged operations: TEAM_MANAGER
+    if (tokenRole === 'TEAM_MANAGER' || userData.role === 'TEAM_MANAGER') {
+      if (tokenRole !== 'TEAM_MANAGER' || userData.role !== 'TEAM_MANAGER') {
+        throw new Error(
+          `Security Violation: Role mismatch for Team Manager authorization (token: "${tokenRole}", firestore: "${userData.role}"). Exact agreement required.`
+        );
+      }
+      if (userData.status !== 'ACTIVE' || userData.disabled) {
+        throw new Error(`Unauthorized: Team Manager account "${decoded.uid}" is not active or disabled.`);
+      }
+      if (!userData.teamId) {
+        throw new Error(
+          `Security Violation: Team Manager account "${decoded.uid}" is missing mandatory team assignment.`
+        );
+      }
+      if (!tokenTeamId || tokenTeamId !== userData.teamId) {
+        throw new Error(
+          `Security Violation: Team Manager account "${decoded.uid}" requires identical team assignment in token ("${tokenTeamId || 'NONE'}") and authoritative record ("${userData.teamId || 'NONE'}").`
+        );
+      }
     }
 
     return {
       uid: decoded.uid,
-      email: decoded.email || '',
-      role: tokenRole,
-      teamId: tokenTeamId,
-      assignmentId: tokenAssignmentId
+      email: decoded.email || userData.email || '',
+      role: userData.role,
+      teamId: userData.teamId,
+      assignmentId: userData.assignmentId || tokenAssignmentId
     };
   }
 

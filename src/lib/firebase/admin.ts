@@ -80,7 +80,14 @@ export function getAdminApp(): App | null {
   // 3. Check for service account JSON string (Optimized for Vercel / Cloud serverless deployment)
   if (process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON) {
     try {
-      const sa = JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON);
+      let rawSa = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON.trim();
+      if ((rawSa.startsWith('"') && rawSa.endsWith('"')) || (rawSa.startsWith("'") && rawSa.endsWith("'"))) {
+        rawSa = rawSa.slice(1, -1);
+      }
+      if (!rawSa.startsWith('{') && /^[A-Za-z0-9+/=]+$/.test(rawSa)) {
+        rawSa = Buffer.from(rawSa, 'base64').toString('utf-8');
+      }
+      const sa = JSON.parse(rawSa);
       adminApp = initializeApp({
         credential: cert(sa),
         projectId: sa.project_id || projectId || 'inspirath-d6778',
@@ -93,10 +100,14 @@ export function getAdminApp(): App | null {
   }
 
   // 4. Check for discrete environment variables (Alternative cert credential mechanism)
-  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL?.trim();
   let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
   if (privateKey) {
+    privateKey = privateKey.trim();
+    if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) {
+      privateKey = privateKey.slice(1, -1);
+    }
     privateKey = privateKey.replace(/\\n/g, '\n');
   }
 
@@ -104,7 +115,7 @@ export function getAdminApp(): App | null {
     try {
       adminApp = initializeApp({
         credential: cert({
-          projectId,
+          projectId: projectId.trim(),
           clientEmail,
           privateKey
         }),

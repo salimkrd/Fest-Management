@@ -138,6 +138,109 @@ describe('Phase 3 Step 2B: Authentication & Role-Based Authorization Enforcement
         await db.collection('users').doc('tm-shamama').update({ teamId: 'team-1' });
       }
     });
+
+    it('STRICTLY REJECTS privileged operations when token role claim is missing (does not derive role solely from Firestore)', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      // Create an authenticated user with no custom claims (defaults to role: 'PUBLIC' in verifySession)
+      const testEmail = `noclaim-${Date.now()}@test.com`;
+      const cred = await createUserWithEmailAndPassword(clientAuth, testEmail, 'UserPassword123!');
+      const noClaimToken = await cred.user.getIdToken();
+
+      // Create a Firestore document claiming this user is an ADMIN
+      await db.collection('users').doc(cred.user.uid).set({
+        id: cred.user.uid,
+        email: testEmail,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        disabled: false
+      });
+
+      try {
+        // Must reject because token role ('PUBLIC') does not match Firestore ('ADMIN')
+        await expect(
+          AuthService.verifySession(noClaimToken)
+        ).rejects.toThrow(/does not match authoritative record|Exact agreement required/i);
+      } finally {
+        await db.collection('users').doc(cred.user.uid).delete().catch(() => {});
+        await deleteUser(cred.user).catch(() => {});
+      }
+    });
+
+    it('STRICTLY REJECTS role mismatch when token claim does not match authoritative Firestore record', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      // Temporarily change admin-01 Firestore role to TEAM_MANAGER (mismatch against token's ADMIN claim)
+      await db.collection('users').doc('admin-01').update({ role: 'TEAM_MANAGER' });
+      try {
+        await expect(
+          AuthService.verifySession(adminIdToken)
+        ).rejects.toThrow(/does not match authoritative record|Role mismatch/i);
+      } finally {
+        // Restore admin-01 role
+        await db.collection('users').doc('admin-01').update({ role: 'ADMIN' });
+      }
+    });
+
+    it('STRICTLY REJECTS administrator account if status is PENDING in Firestore', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      await db.collection('users').doc('admin-01').update({ status: 'PENDING' });
+      try {
+        await expect(
+          AuthService.verifySession(adminIdToken)
+        ).rejects.toThrow(/pending activation/i);
+      } finally {
+        await db.collection('users').doc('admin-01').update({ status: 'ACTIVE' });
+      }
+    });
+
+    it('STRICTLY REJECTS administrator account if marked disabled in Firestore', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      await db.collection('users').doc('admin-01').update({ status: 'DISABLED', disabled: true });
+      try {
+        await expect(
+          AuthService.verifySession(adminIdToken)
+        ).rejects.toThrow(/has been disabled by fest administration/i);
+      } finally {
+        await db.collection('users').doc('admin-01').update({ status: 'ACTIVE', disabled: false });
+      }
+    });
+
+    it('STRICTLY REJECTS Team Manager if token teamId does not match Firestore teamId', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      // Update Firestore teamId to 'team-2' while token has 'team-1'
+      await db.collection('users').doc('tm-shamama').update({ teamId: 'team-2' });
+      try {
+        await expect(
+          AuthService.verifySession(teamManagerToken)
+        ).rejects.toThrow(/requires identical team assignment in token/i);
+      } finally {
+        // Restore team-1
+        await db.collection('users').doc('tm-shamama').update({ teamId: 'team-1' });
+      }
+    });
+
+    it('STRICTLY REJECTS Team Manager if status is PENDING in Firestore', async () => {
+      const db = getAdminDb();
+      if (!db) return;
+
+      await db.collection('users').doc('tm-shamama').update({ status: 'PENDING' });
+      try {
+        await expect(
+          AuthService.verifySession(teamManagerToken)
+        ).rejects.toThrow(/pending activation/i);
+      } finally {
+        await db.collection('users').doc('tm-shamama').update({ status: 'ACTIVE' });
+      }
+    });
   });
 
   describe('2. Anti-Cross-Team Access & Scope Isolation', () => {

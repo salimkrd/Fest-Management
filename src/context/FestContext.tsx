@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from '@/lib/firebase/client';
+import { collection, onSnapshot } from 'firebase/firestore';
 import {
   Category,
   Team,
@@ -1439,8 +1441,18 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return initialPointsLedger;
   });
 
+  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+  const isIsolatedDemoOrTest = isEmulator || isDemoMode || isTestEnv;
+
   // Teams with points dynamically updated from the Points Ledger
   const [teams, setTeams] = useState<Team[]>(() => {
+    // In live production, demo fixtures are strictly isolated; authoritative source is Firestore
+    if (!isIsolatedDemoOrTest) {
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_teams_v2');
       if (saved) {
@@ -1468,6 +1480,64 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     });
   });
 
+  // Purge stale mock teams from localStorage in live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('fest_teams_v2');
+      } catch {}
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore teams synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        const teamsRef = collection(db, 'teams');
+        const unsubscribe = onSnapshot(
+          teamsRef,
+          (snapshot) => {
+            const liveTeams: Team[] = snapshot.docs.map((d, idx) => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                name: dt.name || '',
+                code: dt.code || '',
+                color: dt.color || '#2563EB',
+                managerName: dt.managerName || '',
+                managerEmail: dt.managerEmail || '',
+                managerPhone: dt.managerPhone || '',
+                zone: dt.zone || '',
+                contestantsCount: dt.contestantsCount || 0,
+                eventsCount: dt.eventsCount || 0,
+                totalPoints: dt.totalPoints || 0,
+                soloPoints: dt.soloPoints || 0,
+                groupPoints: dt.groupPoints || 0,
+                rank: dt.rank || idx + 1,
+                firstCount: dt.firstCount || 0,
+                secondCount: dt.secondCount || 0,
+                thirdCount: dt.thirdCount || 0,
+                portalAccess: dt.portalAccess !== false && dt.status !== 'DISABLED',
+                status: dt.status || 'ACTIVE',
+                provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
+                invitationStatus: dt.invitationStatus || 'PENDING',
+                invitationSentAt: dt.invitationSentAt || '',
+                invitationExpiresAt: dt.invitationExpiresAt || ''
+              };
+            });
+            setTeams(liveTeams);
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore realtime teams sync warning:', err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (e) {
+        console.warn('[FestContext] Could not subscribe to realtime teams:', e);
+      }
+    }
+  }, [isIsolatedDemoOrTest]);
+
   const [currentTeamUser, setCurrentTeamUser] = useState<Team | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_current_team_user_v2');
@@ -1487,7 +1557,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('fest_theme_settings_v2', JSON.stringify(theme));
       localStorage.setItem('fest_categories_v2', JSON.stringify(categories));
-      localStorage.setItem('fest_teams_v2', JSON.stringify(teams));
+      if (isIsolatedDemoOrTest) {
+        localStorage.setItem('fest_teams_v2', JSON.stringify(teams));
+      } else {
+        localStorage.removeItem('fest_teams_v2');
+      }
       localStorage.setItem('fest_competitions_v2', JSON.stringify(competitions));
       localStorage.setItem('fest_participants_v2', JSON.stringify(participants));
       localStorage.setItem('fest_registrations_v2', JSON.stringify(registrations));
@@ -1502,7 +1576,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('fest_current_team_user_v2');
       }
     }
-  }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser]);
+  }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser, isIsolatedDemoOrTest]);
 
   const updateTheme = (newTheme: Partial<PublicThemeSettings>) => {
     setTheme(prev => ({ ...prev, ...newTheme }));

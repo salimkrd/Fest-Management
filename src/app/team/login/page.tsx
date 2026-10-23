@@ -167,13 +167,18 @@ function TeamLoginForm() {
         return;
       }
     } else {
-      // Local development without auth instance fallback
-      const matchingTeam = teams.find(t => t.managerEmail?.toLowerCase() === email.trim().toLowerCase());
-      if (matchingTeam) {
-        setCurrentTeamUser(matchingTeam);
-        router.push('/team');
+      const isEmulatorOrDemo = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+      if (isEmulatorOrDemo) {
+        // Isolated demo / emulator mode fallback only
+        const matchingTeam = teams.find(t => t.managerEmail?.toLowerCase() === email.trim().toLowerCase());
+        if (matchingTeam) {
+          setCurrentTeamUser(matchingTeam);
+          router.push('/team');
+        } else {
+          setError('No team contingent matching this email address was found in local storage.');
+        }
       } else {
-        setError('No team contingent matching this email address was found in local storage.');
+        setError('Authentication service is currently unavailable. Please verify system configuration.');
       }
       setLoading(false);
     }

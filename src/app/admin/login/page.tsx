@@ -8,15 +8,16 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
-import { auth } from '@/lib/firebase/client';
+import { auth, db } from '@/lib/firebase/client';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { theme } = useFest();
 
-  const [email, setEmail] = useState('admin@sahithyolsav.com');
-  const [password, setPassword] = useState('AdminPassword123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,51 +25,82 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       setError('Please provide your admin work email and password.');
       return;
     }
 
     setLoading(true);
 
-    if (auth) {
-      try {
-        const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
-        const tokenResult = await userCred.user.getIdTokenResult();
-        const role = tokenResult.claims.role;
+    if (!auth) {
+      setError('Authentication service is currently unavailable. Please verify system configuration.');
+      setLoading(false);
+      return;
+    }
 
-        if (role !== 'ADMIN') {
-          await signOut(auth);
-          setError('Access denied: Your account does not possess administrator privileges.');
-          setLoading(false);
-          return;
-        }
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCred.user;
+      const tokenResult = await user.getIdTokenResult(true);
+      const role = tokenResult.claims.role;
 
-        router.push('/admin');
+      if (role !== 'ADMIN') {
+        await signOut(auth);
+        setError('Access denied: Your account does not possess administrator privileges.');
+        setLoading(false);
         return;
-      } catch (authErr: any) {
-        console.warn('[Admin Login] Authentication error:', authErr);
-        if (
-          authErr.code === 'auth/invalid-credential' ||
-          authErr.code === 'auth/wrong-password' ||
-          authErr.code === 'auth/user-not-found'
-        ) {
-          setError('Invalid email or password. Please verify your administrator credentials.');
-          setLoading(false);
-          return;
-        } else if (authErr.code === 'auth/network-request-failed') {
-          setError('Network error: Unable to reach the authentication service. Please check your connection.');
+      }
+
+      // Authoritative validation against Firestore user record
+      if (db) {
+        try {
+          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+          if (!userDocSnap.exists()) {
+            await signOut(auth);
+            setError('Access denied: Authoritative administrator profile not found.');
+            setLoading(false);
+            return;
+          }
+          const userData = userDocSnap.data();
+          if (userData?.role !== 'ADMIN' || userData?.status !== 'ACTIVE' || userData?.disabled === true) {
+            await signOut(auth);
+            setError('Access denied: Administrator account is inactive or disabled.');
+            setLoading(false);
+            return;
+          }
+        } catch (dbErr: any) {
+          console.warn('[Admin Login] Authoritative Firestore profile check warning:', dbErr);
+          // If security rules or network blocked getDoc, fail closed
+          await signOut(auth);
+          setError('Access denied: Could not verify authoritative administrator status. Please try again.');
           setLoading(false);
           return;
         }
       }
-    }
 
-    // Offline / fallback transition
-    setTimeout(() => {
-      setLoading(false);
       router.push('/admin');
-    }, 500);
+      return;
+    } catch (authErr: any) {
+      console.warn('[Admin Login] Authentication error:', authErr);
+      if (
+        authErr.code === 'auth/invalid-credential' ||
+        authErr.code === 'auth/wrong-password' ||
+        authErr.code === 'auth/user-not-found' ||
+        authErr.code === 'auth/invalid-login-credentials'
+      ) {
+        setError('Invalid email or password. Please verify your administrator credentials.');
+      } else if (authErr.code === 'auth/user-disabled') {
+        setError('Access denied: This administrator account has been disabled.');
+      } else if (authErr.code === 'auth/too-many-requests') {
+        setError('Access temporarily disabled due to multiple failed login attempts. Please try again later.');
+      } else if (authErr.code === 'auth/network-request-failed') {
+        setError('Network error: Unable to reach the authentication service. Please check your connection.');
+      } else {
+        setError(authErr.message || 'Authentication failed. Please verify your credentials.');
+      }
+      setLoading(false);
+      return;
+    }
   };
 
   return (

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Layers,
@@ -23,6 +23,9 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
+import { auth, db } from '@/lib/firebase/client';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -30,8 +33,85 @@ interface AdminLayoutProps {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme } = useFest();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authorizedUser, setAuthorizedUser] = useState<User | null>(null);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!auth) {
+      setAuthChecking(false);
+      router.replace('/admin/login');
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setAuthorizedUser(null);
+        setAuthChecking(false);
+        router.replace('/admin/login');
+        return;
+      }
+
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.role !== 'ADMIN') {
+          console.warn('[AdminLayout] User is missing ADMIN custom claim.');
+          if (auth) await signOut(auth);
+          setAuthorizedUser(null);
+          setAuthChecking(false);
+          router.replace('/admin/login');
+          return;
+        }
+
+        // Validate authoritative Firestore user document
+        if (db) {
+          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+          if (!userDocSnap.exists()) {
+            console.warn('[AdminLayout] Authoritative user document missing.');
+            if (auth) await signOut(auth);
+            setAuthorizedUser(null);
+            setAuthChecking(false);
+            router.replace('/admin/login');
+            return;
+          }
+
+          const userData = userDocSnap.data();
+          if (userData?.role !== 'ADMIN' || userData?.status !== 'ACTIVE' || userData?.disabled === true) {
+            console.warn('[AdminLayout] User profile inactive, disabled, or not ADMIN.');
+            if (auth) await signOut(auth);
+            setAuthorizedUser(null);
+            setAuthChecking(false);
+            router.replace('/admin/login');
+            return;
+          }
+        }
+
+        setAuthorizedUser(user);
+        setAuthChecking(false);
+      } catch (authErr) {
+        console.warn('[AdminLayout] Auth verification error:', authErr);
+        if (auth) await signOut(auth);
+        setAuthorizedUser(null);
+        setAuthChecking(false);
+        router.replace('/admin/login');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleSignOut = async () => {
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn('[AdminLayout] Sign out error:', err);
+      }
+    }
+    router.push('/admin/login');
+  };
 
   // Exact 12 Authoritative Sidebar Items from PRD / DESIGN v2.0
   const navItems = [
@@ -48,6 +128,29 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Media', href: '/admin/media', icon: ImageIcon },
     { name: 'Export', href: '/admin/export', icon: FileDown },
   ];
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-bold text-lg shadow-md animate-pulse">
+            S
+          </div>
+          <p className="text-xs font-semibold text-[#526070] tracking-wide">
+            Verifying Fest Administrator Session...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authorizedUser) {
+    return null;
+  }
+
+  const userInitials = authorizedUser.email
+    ? authorizedUser.email.slice(0, 2).toUpperCase()
+    : 'AD';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row">
@@ -96,19 +199,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="p-4 border-t border-[#E1E7EF] bg-white">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center justify-center">
-              AD
+              {userInitials}
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-bold text-[#111111] truncate block">Chief Administrator</span>
-              <span className="text-[10px] text-[#526070] truncate block">admin@fest.institution.org</span>
+              <span className="text-[10px] text-[#526070] truncate block">{authorizedUser.email || 'admin@fest.institution.org'}</span>
             </div>
-            <Link
-              href="/admin/login"
-              className="text-[10px] font-semibold text-[#DC2626] hover:underline"
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="text-[10px] font-semibold text-[#DC2626] hover:underline cursor-pointer"
               title="Sign out"
             >
               Exit
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

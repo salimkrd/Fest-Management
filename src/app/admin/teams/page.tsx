@@ -29,6 +29,41 @@ import {
 import { auth } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
 
+/**
+ * Parses and sanitizes HTTP API response errors with specific status-code awareness.
+ */
+async function parseResponseError(res: Response, fallback: string): Promise<string> {
+  try {
+    const text = await res.text();
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        if (json.error) return json.error;
+        if (json.message) return json.message;
+      } catch {
+        if (text.length < 200 && !text.includes('<!DOCTYPE')) {
+          return text;
+        }
+      }
+    }
+  } catch {}
+
+  if (res.status === 401) {
+    return 'Unauthorized (401): Administrator session invalid or expired. Please sign in again.';
+  }
+  if (res.status === 403) {
+    return 'Access Denied (403): Chief Administrator privileges are required for this action.';
+  }
+  if (res.status === 404) {
+    return 'Not Found (404): The requested team contingent or manager record does not exist in the database.';
+  }
+  if (res.status >= 500) {
+    return `Server Error (${res.status}): Serverless function failed to process the request. Please check server logs.`;
+  }
+
+  return fallback;
+}
+
 export default function TeamsPage() {
   const { teams, updateTeam } = useFest();
 
@@ -71,9 +106,11 @@ export default function TeamsPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [successBanner, setSuccessBanner] = useState('');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [loadingTeams, setLoadingTeams] = useState<boolean>(true);
 
-  // Dynamic server-synced teams list
-  const [dynamicTeams, setDynamicTeams] = useState<Team[]>(teams);
+  // Dynamic server-synced teams list (strictly initialized empty in production)
+  const [dynamicTeams, setDynamicTeams] = useState<Team[]>([]);
 
   // Helper to ensure Firebase Auth initialization completes
   const waitForAuthReady = async (): Promise<any> => {
@@ -115,61 +152,88 @@ export default function TeamsPage() {
     }
   };
 
-  // Sync initial teams or fetch from backend
+  // Sync teams from backend authoritative Firestore
   const refreshTeams = async () => {
+    setLoadingTeams(true);
+    setConnectionError(null);
     try {
       let token = '';
       try {
         token = await getAdminToken();
-      } catch {
-        // If unauthenticated during initial background refresh, fetch without token or use state
+      } catch (tokenErr: any) {
+        setConnectionError(tokenErr.message || 'Authentication required to load live teams.');
+        setDynamicTeams([]);
+        setLoadingTeams(false);
+        return;
       }
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
       const res = await fetch('/api/admin/teams', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.teams) && data.teams.length > 0) {
-          const merged: Team[] = data.teams.map((dt: any, idx: number) => {
-            const existing = teams.find(t => t.id === dt.id);
-            return {
-              id: dt.id,
-              name: dt.name,
-              code: dt.code,
-              color: dt.color || '#2563EB',
-              managerName: dt.managerName || '',
-              managerEmail: dt.managerEmail || '',
-              managerPhone: dt.managerPhone || '',
-              zone: dt.zone || '',
-              contestantsCount: existing?.contestantsCount || 0,
-              eventsCount: existing?.eventsCount || 0,
-              totalPoints: existing?.totalPoints || 0,
-              soloPoints: existing?.soloPoints || 0,
-              groupPoints: existing?.groupPoints || 0,
-              rank: existing?.rank || idx + 1,
-              firstCount: existing?.firstCount || 0,
-              secondCount: existing?.secondCount || 0,
-              thirdCount: existing?.thirdCount || 0,
-              portalAccess: dt.portalAccess !== false,
-              status: dt.status || 'ACTIVE',
-              provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
-              invitationStatus: dt.invitationStatus || 'PENDING',
-              invitationSentAt: dt.invitationSentAt || '',
-              invitationExpiresAt: dt.invitationExpiresAt || ''
-            };
-          });
-          setDynamicTeams(merged);
-          return;
-        }
+
+      if (!res.ok) {
+        const errDetail = await parseResponseError(res, 'Failed to fetch teams from server.');
+        setConnectionError(errDetail);
+        setDynamicTeams([]);
+        setLoadingTeams(false);
+        return;
       }
-    } catch (e) {
+
+      const data = await res.json();
+      if (Array.isArray(data.teams)) {
+        const merged: Team[] = data.teams.map((dt: any, idx: number) => {
+          const existing = teams.find(t => t.id === dt.id);
+          return {
+            id: dt.id,
+            name: dt.name,
+            code: dt.code,
+            color: dt.color || '#2563EB',
+            managerName: dt.managerName || '',
+            managerEmail: dt.managerEmail || '',
+            managerPhone: dt.managerPhone || '',
+            zone: dt.zone || '',
+            contestantsCount: existing?.contestantsCount || dt.contestantsCount || 0,
+            eventsCount: existing?.eventsCount || dt.eventsCount || 0,
+            totalPoints: existing?.totalPoints || dt.totalPoints || 0,
+            soloPoints: existing?.soloPoints || dt.soloPoints || 0,
+            groupPoints: existing?.groupPoints || dt.groupPoints || 0,
+            rank: existing?.rank || dt.rank || idx + 1,
+            firstCount: existing?.firstCount || dt.firstCount || 0,
+            secondCount: existing?.secondCount || dt.secondCount || 0,
+            thirdCount: existing?.thirdCount || dt.thirdCount || 0,
+            portalAccess: dt.portalAccess !== false,
+            status: dt.status || 'ACTIVE',
+            provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
+            invitationStatus: dt.invitationStatus || 'PENDING',
+            invitationSentAt: dt.invitationSentAt || '',
+            invitationExpiresAt: dt.invitationExpiresAt || ''
+          };
+        });
+        setDynamicTeams(merged);
+        setConnectionError(null);
+      } else {
+        setConnectionError('Invalid data format received from server.');
+        setDynamicTeams([]);
+      }
+    } catch (e: any) {
       console.warn('[TeamsPage] Fetch error:', e);
+      setConnectionError(e.message || 'Network error: Failed to connect to server.');
+      setDynamicTeams([]);
+    } finally {
+      setLoadingTeams(false);
     }
-    setDynamicTeams(teams);
   };
 
   useEffect(() => {
     refreshTeams();
-  }, [teams]);
+  }, []);
+
+  // When realtime context updates (e.g. from Firestore listener or emulator fixtures), synchronize
+  useEffect(() => {
+    if (teams.length > 0 && dynamicTeams.length === 0 && !connectionError) {
+      setDynamicTeams(teams);
+      setLoadingTeams(false);
+    }
+  }, [teams, connectionError]);
 
   const filteredTeams = dynamicTeams.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -251,9 +315,9 @@ export default function TeamsPage() {
           })
         });
 
-        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to update team.');
+          const errDetail = await parseResponseError(res, 'Failed to update team.');
+          throw new Error(errDetail);
         }
 
         updateTeam(editingTeam.id, {
@@ -287,11 +351,12 @@ export default function TeamsPage() {
           })
         });
 
-        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to create team.');
+          const errDetail = await parseResponseError(res, 'Failed to create team.');
+          throw new Error(errDetail);
         }
 
+        const data = await res.json();
         setModalOpen(false);
         await refreshTeams();
 
@@ -345,11 +410,12 @@ export default function TeamsPage() {
         })
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to replace team manager.');
+        const errDetail = await parseResponseError(res, 'Failed to replace team manager.');
+        throw new Error(errDetail);
       }
 
+      const data = await res.json();
       setReplaceModalOpen(false);
       await refreshTeams();
 
@@ -392,10 +458,12 @@ export default function TeamsPage() {
         }
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate invitation.');
+        const errDetail = await parseResponseError(res, 'Failed to generate invitation.');
+        throw new Error(errDetail);
       }
+
+      const data = await res.json();
 
       setInvitationTeamId(team.id);
       setInvitationTeamName(team.name);
@@ -431,9 +499,9 @@ export default function TeamsPage() {
         }
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to update invitation status.');
+        const errDetail = await parseResponseError(res, 'Failed to update invitation status.');
+        throw new Error(errDetail);
       }
 
       setInvitationStatus('MANUALLY_SENT');
@@ -465,9 +533,9 @@ export default function TeamsPage() {
         }
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to revoke invitation.');
+        const errDetail = await parseResponseError(res, 'Failed to revoke invitation.');
+        throw new Error(errDetail);
       }
 
       setSuccessBanner(`Invitation for ${team.name} has been revoked.`);
@@ -524,9 +592,9 @@ export default function TeamsPage() {
         })
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to toggle team status.');
+        const errDetail = await parseResponseError(res, 'Failed to toggle team status.');
+        throw new Error(errDetail);
       }
 
       updateTeam(team.id, { portalAccess: newTarget });
@@ -609,217 +677,279 @@ export default function TeamsPage() {
           </div>
         )}
 
-        {/* Championship Highlights */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-[#111111] flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-amber-500" />
-              Championship Leaderboard Highlights
-            </h3>
-            <span className="text-xs text-[#526070] font-medium">
-              {dynamicTeams.length} Registered House Contingents
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {dynamicTeams.slice(0, 4).map((team, idx) => (
-              <div
-                key={team.id}
-                className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs relative overflow-hidden flex flex-col justify-between"
-              >
-                <div
-                  className="absolute top-0 left-0 right-0 h-1.5"
-                  style={{ backgroundColor: team.color }}
-                />
-
-                <div>
-                  <div className="flex items-start justify-between">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-extrabold text-xs shadow-xs"
-                      style={{ backgroundColor: team.color }}
-                    >
-                      {team.code}
-                    </div>
-                    <span className="text-xs font-extrabold text-[#526070]">
-                      #{idx + 1}
-                    </span>
-                  </div>
-
-                  <h4 className="text-sm font-bold text-[#111111] mt-3">{team.name}</h4>
-                  <p className="text-[11px] text-[#526070] mt-0.5">
-                    {team.managerName || 'Pending Manager'} · {team.zone || 'Campus'}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-[#E1E7EF] flex items-center justify-between">
-                  <div>
-                    <span className="text-xl font-black text-[#111111]">{team.totalPoints || 0}</span>
-                    <span className="text-[10px] text-[#526070] ml-1 uppercase font-semibold">pts</span>
-                  </div>
-                  <div className="text-right text-[10px] text-[#526070]">
-                    <span>{team.contestantsCount || 0} Contestants</span>
-                  </div>
-                </div>
+        {/* Connection Error Banner */}
+        {connectionError && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-[#DC2626] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+              <div>
+                <span className="font-bold block text-red-900">Unable to Synchronize with Live Database</span>
+                <span className="text-red-700">{connectionError}</span>
               </div>
-            ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshTeams}
+              isLoading={loadingTeams}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              className="bg-white text-red-700 border-red-300 hover:bg-red-50 shrink-0 font-bold"
+            >
+              Retry Connection
+            </Button>
           </div>
-        </div>
+        )}
 
-        {/* Directory Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-[#E1E7EF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search team name, code, manager, or WhatsApp number..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-[#E1E7EF] rounded-lg text-xs bg-white text-[#111111] placeholder:text-[#526070] focus:outline-hidden focus:border-[#2563EB]"
-              />
+        {/* Loading Indicator */}
+        {loadingTeams && dynamicTeams.length === 0 && !connectionError && (
+          <div className="bg-white rounded-2xl border border-[#E1E7EF] p-12 text-center shadow-xs">
+            <RefreshCw className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-[#111111]">Connecting to Production Database...</h3>
+            <p className="text-xs text-[#526070] mt-1">Retrieving authoritative house contingents.</p>
+          </div>
+        )}
+
+        {/* Authoritative Empty State Message */}
+        {!loadingTeams && dynamicTeams.length === 0 && !connectionError && (
+          <div className="bg-white rounded-2xl border border-[#E1E7EF] p-12 text-center shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <UserPlus className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-[#111111]">No House Contingents Found</h3>
+            <p className="text-xs text-[#526070] mt-1.5 max-w-md mx-auto">
+              The live database currently contains zero registered teams. Click &apos;Create Team &amp; Provision Manager&apos; to register your first team and generate their secure WhatsApp onboarding invitation.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Plus className="w-4 h-4" />}
+                onClick={handleOpenAdd}
+              >
+                Create Team &amp; Provision Manager
+              </Button>
             </div>
           </div>
+        )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-semibold">
-                  <th className="py-3 px-6">Contingent</th>
-                  <th className="py-3 px-6">Assigned Team Manager</th>
-                  <th className="py-3 px-6 text-center">Onboarding Status</th>
-                  <th className="py-3 px-6 text-center">Team Access</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredTeams.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-[#526070]">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <AlertCircle className="w-6 h-6 text-[#526070]" />
-                        <p className="font-medium">No team contingents match your query.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredTeams.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-7 h-7 rounded-md flex items-center justify-center text-white font-extrabold text-[10px] shrink-0"
-                            style={{ backgroundColor: t.color }}
-                          >
-                            {t.code}
-                          </div>
-                          <div>
-                            <span className="font-bold text-[#111111] block">{t.name}</span>
-                            <span className="text-[#526070] text-[11px]">
-                              {t.zone || 'Campus Center'}
-                            </span>
-                          </div>
+        {/* Championship Highlights & Directory (Rendered when teams exist) */}
+        {dynamicTeams.length > 0 && (
+          <>
+            {/* Championship Highlights */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-[#111111] flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                  Championship Leaderboard Highlights
+                </h3>
+                <span className="text-xs text-[#526070] font-medium">
+                  {dynamicTeams.length} Registered House Contingents
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {dynamicTeams.slice(0, 4).map((team, idx) => (
+                  <div
+                    key={team.id}
+                    className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs relative overflow-hidden flex flex-col justify-between"
+                  >
+                    <div
+                      className="absolute top-0 left-0 right-0 h-1.5"
+                      style={{ backgroundColor: team.color }}
+                    />
+
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-extrabold text-xs shadow-xs"
+                          style={{ backgroundColor: team.color }}
+                        >
+                          {team.code}
                         </div>
-                      </td>
+                        <span className="text-xs font-extrabold text-[#526070]">
+                          #{idx + 1}
+                        </span>
+                      </div>
 
-                      <td className="py-4 px-6">
-                        {t.managerEmail ? (
-                          <div>
-                            <span className="font-semibold text-[#111111] block">
-                              {t.managerName || 'Team Manager'}
-                            </span>
-                            <span className="text-[#526070] text-[11px] font-mono">{t.managerEmail}</span>
-                            {t.managerPhone && (
-                              <span className="text-[10px] text-emerald-700 font-medium block">
-                                WhatsApp: {t.managerPhone}
+                      <h4 className="text-sm font-bold text-[#111111] mt-3">{team.name}</h4>
+                      <p className="text-[11px] text-[#526070] mt-0.5">
+                        {team.managerName || 'Pending Manager'} · {team.zone || 'Campus'}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-[#E1E7EF] flex items-center justify-between">
+                      <div>
+                        <span className="text-xl font-black text-[#111111]">{team.totalPoints || 0}</span>
+                        <span className="text-[10px] text-[#526070] ml-1 uppercase font-semibold">pts</span>
+                      </div>
+                      <div className="text-right text-[10px] text-[#526070]">
+                        <span>{team.contestantsCount || 0} Contestants</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Directory Table */}
+            <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-[#E1E7EF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search team name, code, manager, or WhatsApp number..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-[#E1E7EF] rounded-lg text-xs bg-white text-[#111111] placeholder:text-[#526070] focus:outline-hidden focus:border-[#2563EB]"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-semibold">
+                      <th className="py-3 px-6">Contingent</th>
+                      <th className="py-3 px-6">Assigned Team Manager</th>
+                      <th className="py-3 px-6 text-center">Onboarding Status</th>
+                      <th className="py-3 px-6 text-center">Team Access</th>
+                      <th className="py-3 px-6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E1E7EF]">
+                    {filteredTeams.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-[#526070]">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <AlertCircle className="w-6 h-6 text-[#526070]" />
+                            <p className="font-medium">
+                              {search ? `No team contingents match "${search}".` : 'No team contingents found in database.'}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTeams.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-7 h-7 rounded-md flex items-center justify-center text-white font-extrabold text-[10px] shrink-0"
+                                style={{ backgroundColor: t.color }}
+                              >
+                                {t.code}
+                              </div>
+                              <div>
+                                <span className="font-bold text-[#111111] block">{t.name}</span>
+                                <span className="text-[#526070] text-[11px]">
+                                  {t.zone || 'Campus Center'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-6">
+                            {t.managerEmail ? (
+                              <div>
+                                <span className="font-semibold text-[#111111] block">
+                                  {t.managerName || 'Team Manager'}
+                                </span>
+                                <span className="text-[#526070] text-[11px] font-mono">{t.managerEmail}</span>
+                                {t.managerPhone && (
+                                  <span className="text-[10px] text-emerald-700 font-medium block">
+                                    WhatsApp: {t.managerPhone}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-amber-700 italic text-[11px] font-medium">
+                                No manager assigned
                               </span>
                             )}
-                          </div>
-                        ) : (
-                          <span className="text-amber-700 italic text-[11px] font-medium">
-                            No manager assigned
-                          </span>
-                        )}
-                      </td>
+                          </td>
 
-                      <td className="py-4 px-6 text-center">
-                        {renderStatusBadge(t.invitationStatus)}
-                      </td>
+                          <td className="py-4 px-6 text-center">
+                            {renderStatusBadge(t.invitationStatus)}
+                          </td>
 
-                      <td className="py-4 px-6 text-center">
-                        <button
-                          type="button"
-                          disabled={actionLoadingId === t.id}
-                          onClick={() => handleToggleAccess(t)}
-                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-colors ${
-                            t.portalAccess && (t as any).status !== 'DISABLED'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                          }`}
-                        >
-                          {actionLoadingId === t.id
-                            ? 'UPDATING...'
-                            : t.portalAccess && (t as any).status !== 'DISABLED'
-                            ? 'ACTIVE'
-                            : 'DISABLED'}
-                        </button>
-                      </td>
-
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Generate / View WhatsApp Invitation */}
-                          {t.managerEmail && (
+                          <td className="py-4 px-6 text-center">
                             <button
                               type="button"
                               disabled={actionLoadingId === t.id}
-                              onClick={() => handleGenerateInvitation(t)}
-                              className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-colors"
-                              title="Generate / Open WhatsApp Invitation"
+                              onClick={() => handleToggleAccess(t)}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-colors ${
+                                t.portalAccess && (t as any).status !== 'DISABLED'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                              }`}
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              {actionLoadingId === t.id
+                                ? 'UPDATING...'
+                                : t.portalAccess && (t as any).status !== 'DISABLED'
+                                ? 'ACTIVE'
+                                : 'DISABLED'}
                             </button>
-                          )}
+                          </td>
 
-                          {/* Revoke Invitation */}
-                          {t.invitationStatus === 'READY_TO_SEND' && (
-                            <button
-                              type="button"
-                              disabled={actionLoadingId === t.id}
-                              onClick={() => handleRevokeInvitation(t)}
-                              className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
-                              title="Revoke Invitation Code"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                          )}
+                          <td className="py-4 px-6 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Generate / View WhatsApp Invitation */}
+                              {t.managerEmail && (
+                                <button
+                                  type="button"
+                                  disabled={actionLoadingId === t.id}
+                                  onClick={() => handleGenerateInvitation(t)}
+                                  className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-colors"
+                                  title="Generate / Open WhatsApp Invitation"
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </button>
+                              )}
 
-                          {/* Replace Manager */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenReplace(t)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                            title="Replace Assigned Team Manager"
-                          >
-                            <UserPlus className="w-4 h-4" />
-                          </button>
+                              {/* Revoke Invitation */}
+                              {t.invitationStatus === 'READY_TO_SEND' && (
+                                <button
+                                  type="button"
+                                  disabled={actionLoadingId === t.id}
+                                  onClick={() => handleRevokeInvitation(t)}
+                                  className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                                  title="Revoke Invitation Code"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </button>
+                              )}
 
-                          {/* Edit Team Info */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(t)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
-                            title="Edit Team Details"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                              {/* Replace Manager */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplace(t)}
+                                className="p-1.5 rounded-lg text-[#526070] hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                title="Replace Assigned Team Manager"
+                              >
+                                <UserPlus className="w-4 h-4" />
+                              </button>
+
+                              {/* Edit Team Info */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(t)}
+                                className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
+                                title="Edit Team Details"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Create / Edit Team Modal */}
         <Modal

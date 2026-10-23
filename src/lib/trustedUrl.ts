@@ -11,18 +11,22 @@ import { NextRequest } from 'next/server';
  */
 export function getTrustedAppUrl(req?: NextRequest): string {
   const isProd = process.env.NODE_ENV === 'production';
-  const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  const configured = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL)?.trim();
 
-  if (configured && configured.trim() !== '') {
-    const trimmed = configured.trim().replace(/\/+$/, '');
+  if (configured && configured !== '') {
+    const trimmed = configured.replace(/\/+$/, '');
     if (isProd && !trimmed.startsWith('https://')) {
-      throw new Error('Security Violation: In production, NEXT_PUBLIC_APP_URL or APP_URL must use HTTPS protocol.');
+      throw new Error(
+        'Security Violation: In production, APP_URL or NEXT_PUBLIC_APP_URL must use HTTPS protocol (e.g. APP_URL=https://inspirath.vercel.app).'
+      );
     }
     return trimmed;
   }
 
   if (isProd) {
-    throw new Error('Configuration Error: In production, trusted application URL (NEXT_PUBLIC_APP_URL or APP_URL) must be explicitly configured. Arbitrary forwarded host headers are strictly rejected.');
+    throw new Error(
+      'Configuration Error: In production, trusted application URL (APP_URL or NEXT_PUBLIC_APP_URL) must be explicitly configured with HTTPS (e.g. APP_URL=https://inspirath.vercel.app). Arbitrary forwarded host headers and silent domain fallbacks are strictly rejected.'
+    );
   }
 
   // Development and test environments only: safe local fallback
