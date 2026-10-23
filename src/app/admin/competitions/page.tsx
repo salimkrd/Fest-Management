@@ -83,13 +83,17 @@ export default function CompetitionsPage() {
     }
 
     const category = categories.find(c => c.id === categoryId);
+    if (!category) {
+      setError('Please select a valid category. You must create at least one category before adding competitions.');
+      return;
+    }
     const stage = stages.find(s => s.id === stageId);
 
     const compData = {
       name,
       code: code.toUpperCase(),
-      categoryId,
-      categoryName: category?.name || 'General',
+      categoryId: category.id,
+      categoryName: category.name,
       type,
       stageId,
       stageName: stage?.name || 'Main Auditorium',

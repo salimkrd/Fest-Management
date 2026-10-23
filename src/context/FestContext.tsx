@@ -1347,6 +1347,13 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const isIsolatedDemoOrTest = isEmulator || isDemoMode || isTestEnv;
 
   const DEMO_TEAM_IDS = ['team-1', 'team-2', 'team-3', 'team-4'];
+  const DEMO_CATEGORY_IDS = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
+  const DEMO_COMPETITION_IDS = ['cmp-1', 'cmp-2', 'cmp-3', 'cmp-4', 'cmp-5', 'cmp-6'];
+
+  const isDemoCategory = (c: Category) =>
+    initialCategories.some(init => init.id === c.id) || DEMO_CATEGORY_IDS.includes(c.id);
+  const isDemoCompetition = (comp: Competition) =>
+    initialCompetitions.some(init => init.id === comp.id) || DEMO_COMPETITION_IDS.includes(comp.id);
   const isDemoParticipant = (p: Participant) =>
     initialParticipants.some(init => init.id === p.id) || DEMO_TEAM_IDS.includes(p.teamId);
   const isDemoRegistration = (r: Registration) =>
@@ -1370,6 +1377,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [categories, setCategories] = useState<Category[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_categories_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(c => !isDemoCategory(c));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_categories_v2');
       if (saved) {
@@ -1380,6 +1402,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [competitions, setCompetitions] = useState<Competition[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('fest_competitions_v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(c => !isDemoCompetition(c));
+            }
+          } catch (e) { console.error(e); }
+        }
+      }
+      return [];
+    }
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_competitions_v2');
       if (saved) {
@@ -1593,6 +1630,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           }
         };
 
+        cleanse('fest_categories_v2', isDemoCategory);
+        cleanse('fest_competitions_v2', isDemoCompetition);
         cleanse('fest_participants_v2', isDemoParticipant);
         cleanse('fest_registrations_v2', isDemoRegistration);
         cleanse('fest_mark_entries_v2', isDemoMarkEntry);
@@ -1698,7 +1737,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const addCategory = (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
     const newCat: Category = {
       ...catData,
-      id: 'cat-' + (categories.length + 1),
+      id: 'cat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
       enrolledCount: 0,
       competitionsCount: 0
     };
@@ -1765,7 +1804,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const addCompetition = (compData: Omit<Competition, 'id' | 'entriesCount'>) => {
     const newComp: Competition = {
       ...compData,
-      id: 'cmp-' + (competitions.length + 1),
+      id: 'cmp-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
       entriesCount: 0
     };
     setCompetitions(prev => [...prev, newComp]);
