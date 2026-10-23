@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { TeamLayout } from '@/components/layout/TeamLayout';
 import { useFest } from '@/context/FestContext';
+import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -27,13 +28,17 @@ export default function TeamRegistrationPage() {
 
   // Scoped to team only!
   const myRegistrations = registrations.filter(r => r.teamId === team?.id);
+  const myTeamParticipants = participants.filter(p => p.teamId === team?.id);
 
+  const selectedCategory = categories.find(c => c.id === categoryId);
   const availableCompetitions = competitions.filter(c => c.categoryId === categoryId);
   const selectedCompetition = competitions.find(c => c.id === competitionId);
   const isGroup = selectedCompetition?.type === 'GROUP';
 
-  // Available participants from this team and category
-  const teamEligibleParticipants = participants.filter(p => p.teamId === team?.id && p.categoryId === categoryId);
+  // Available participants from this team eligible for the selected category/competition
+  const teamEligibleParticipants = myTeamParticipants.filter(p =>
+    isParticipantEligibleForCategory(p, selectedCategory, categories)
+  );
 
   const filtered = myRegistrations.filter(r =>
     r.participantName.toLowerCase().includes(search.toLowerCase()) ||
@@ -42,13 +47,45 @@ export default function TeamRegistrationPage() {
   );
 
   const handleOpenAdd = () => {
-    setCategoryId(categories[0]?.id || '');
-    setCompetitionId(competitions[0]?.id || '');
+    const initialCat = categories[0]?.id || '';
+    setCategoryId(initialCat);
+    const initialComps = competitions.filter(c => c.categoryId === initialCat);
+    setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantId('');
     setGroupName('');
-    setChestNumber('#' + Math.floor(1000 + Math.random() * 9000));
+    setChestNumber('');
     setError('');
     setModalOpen(true);
+  };
+
+  const handleCategoryChange = (newCatId: string) => {
+    setCategoryId(newCatId);
+    const matchingComps = competitions.filter(c => c.categoryId === newCatId);
+    if (matchingComps.length > 0) {
+      setCompetitionId(matchingComps[0].id);
+    } else {
+      setCompetitionId('');
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleCompetitionChange = (newCompId: string) => {
+    setCompetitionId(newCompId);
+    const comp = competitions.find(c => c.id === newCompId);
+    if (comp && comp.categoryId && comp.categoryId !== categoryId) {
+      setCategoryId(comp.categoryId);
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleParticipantChange = (newPartId: string) => {
+    setParticipantId(newPartId);
+    const part = myTeamParticipants.find(p => p.id === newPartId);
+    if (part?.bib) {
+      setChestNumber(part.bib);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -88,12 +125,12 @@ export default function TeamRegistrationPage() {
       teamId: team.id,
       teamCode: team.code,
       teamName: team.name,
-      categoryId,
-      categoryName: cat?.name || 'Senior',
+      categoryId: comp.categoryId || categoryId,
+      categoryName: comp.categoryName || cat?.name || 'General',
       competitionId: comp.id,
       competitionName: comp.name,
       type: comp.type,
-      chestNumber: chestNumber || '#' + Math.floor(1000 + Math.random() * 9000),
+      chestNumber: chestNumber || (comp.type === 'SOLO' ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
       status: 'APPROVED'
     });
 
@@ -236,16 +273,22 @@ export default function TeamRegistrationPage() {
             <Select
               label="Select Category Tier"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               options={categories.map(c => ({ value: c.id, label: c.name }))}
             />
 
             <Select
               label="Select Competition"
               value={competitionId}
-              onChange={(e) => setCompetitionId(e.target.value)}
+              onChange={(e) => handleCompetitionChange(e.target.value)}
               options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type})` }))}
             />
+
+            {availableCompetitions.length === 0 && (
+              <p className="text-xs text-amber-600 italic">
+                No active competitions available for {selectedCategory?.name || 'this category'}.
+              </p>
+            )}
 
             {isGroup ? (
               <Input
@@ -260,17 +303,25 @@ export default function TeamRegistrationPage() {
                 <Select
                   label="Select Team Contestant"
                   value={participantId}
-                  onChange={(e) => setParticipantId(e.target.value)}
+                  onChange={(e) => handleParticipantChange(e.target.value)}
                   options={[
                     { value: '', label: '-- Select Enrolled Team Member --' },
-                    ...teamEligibleParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib} - ${p.classGrade})` }))
+                    ...teamEligibleParticipants.map(p => ({
+                      value: p.id,
+                      label: `${p.name} (${p.bib || 'No Bib'} - ${p.categoryName || p.classGrade || 'Contestant'})`
+                    }))
                   ]}
                   required
                 />
                 {teamEligibleParticipants.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-600">
-                    No participants found under {team?.name} for this category tier.
-                  </p>
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                    <p className="text-xs text-amber-800 font-medium">
+                      {myTeamParticipants.length === 0
+                        ? `No participants enrolled under ${team?.name || 'this team'} yet. Please add contestants in 'My Participants' first.`
+                        : `No participants in ${team?.name || 'this team'} eligible for ${selectedCategory?.name || 'this category'}. (Total team members: ${myTeamParticipants.length})`
+                      }
+                    </p>
+                  </div>
                 )}
               </div>
             )}

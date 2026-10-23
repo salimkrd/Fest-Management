@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
+import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Registration, CompetitionType } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -29,12 +30,15 @@ export default function RegistrationManagementPage() {
   const [error, setError] = useState('');
 
   // Derived available competitions
+  const selectedCategory = categories.find(c => c.id === categoryId);
   const availableCompetitions = competitions.filter(c => c.categoryId === categoryId);
   const selectedCompetition = competitions.find(c => c.id === competitionId);
   const isGroup = selectedCompetition?.type === 'GROUP';
 
-  // Derived available participants for selected team & category
-  const availableParticipants = participants.filter(p => p.teamId === teamId && p.categoryId === categoryId);
+  // Derived available participants for selected team & category using domain eligibility engine
+  const availableParticipants = participants.filter(p =>
+    p.teamId === teamId && isParticipantEligibleForCategory(p, selectedCategory, categories)
+  );
 
   const filteredRegistrations = registrations.filter(r => {
     const matchesSearch = r.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -46,14 +50,53 @@ export default function RegistrationManagementPage() {
   });
 
   const handleOpenAdd = () => {
-    setTeamId(teams[0]?.id || '');
-    setCategoryId(categories[0]?.id || '');
-    setCompetitionId(competitions[0]?.id || '');
+    const initTeam = teams[0]?.id || '';
+    const initCat = categories[0]?.id || '';
+    setTeamId(initTeam);
+    setCategoryId(initCat);
+    const initialComps = competitions.filter(c => c.categoryId === initCat);
+    setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantId('');
     setGroupName('');
-    setChestNumber('#' + Math.floor(1000 + Math.random() * 9000));
+    setChestNumber('');
     setError('');
     setModalOpen(true);
+  };
+
+  const handleTeamChange = (newTeamId: string) => {
+    setTeamId(newTeamId);
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleCategoryChange = (newCatId: string) => {
+    setCategoryId(newCatId);
+    const matchingComps = competitions.filter(c => c.categoryId === newCatId);
+    if (matchingComps.length > 0) {
+      setCompetitionId(matchingComps[0].id);
+    } else {
+      setCompetitionId('');
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleCompetitionChange = (newCompId: string) => {
+    setCompetitionId(newCompId);
+    const comp = competitions.find(c => c.id === newCompId);
+    if (comp && comp.categoryId && comp.categoryId !== categoryId) {
+      setCategoryId(comp.categoryId);
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleParticipantChange = (newPartId: string) => {
+    setParticipantId(newPartId);
+    const part = participants.find(p => p.id === newPartId);
+    if (part?.bib) {
+      setChestNumber(part.bib);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -75,7 +118,7 @@ export default function RegistrationManagementPage() {
 
     let participantName = '';
     if (comp.type === 'SOLO') {
-      const part = participants.find(p => p.id === participantId);
+      const part = availableParticipants.find(p => p.id === participantId);
       if (!part) {
         setError('Please select a student contestant.');
         return;
@@ -95,12 +138,12 @@ export default function RegistrationManagementPage() {
       teamId: team.id,
       teamCode: team.code,
       teamName: team.name,
-      categoryId,
-      categoryName: cat?.name || 'Senior',
-      competitionId,
+      categoryId: comp.categoryId || categoryId,
+      categoryName: comp.categoryName || cat?.name || 'General',
+      competitionId: comp.id,
       competitionName: comp.name,
       type: comp.type,
-      chestNumber: chestNumber || '#' + Math.floor(1000 + Math.random() * 9000),
+      chestNumber: chestNumber || (comp.type === 'SOLO' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
       status: 'APPROVED'
     });
 
@@ -282,13 +325,13 @@ export default function RegistrationManagementPage() {
               <Select
                 label="Select Team"
                 value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
+                onChange={(e) => handleTeamChange(e.target.value)}
                 options={teams.map(t => ({ value: t.id, label: `${t.name} (${t.code})` }))}
               />
               <Select
                 label="Select Category Tier"
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 options={categories.map(c => ({ value: c.id, label: c.name }))}
               />
             </div>
@@ -297,10 +340,16 @@ export default function RegistrationManagementPage() {
               <Select
                 label="Select Competition"
                 value={competitionId}
-                onChange={(e) => setCompetitionId(e.target.value)}
+                onChange={(e) => handleCompetitionChange(e.target.value)}
                 options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type})` }))}
               />
             </div>
+
+            {availableCompetitions.length === 0 && (
+              <p className="text-xs text-amber-600 italic">
+                No active competitions available for {selectedCategory?.name || 'this category'}.
+              </p>
+            )}
 
             {isGroup ? (
               <Input
@@ -315,17 +364,22 @@ export default function RegistrationManagementPage() {
                 <Select
                   label="Select Student Contestant"
                   value={participantId}
-                  onChange={(e) => setParticipantId(e.target.value)}
+                  onChange={(e) => handleParticipantChange(e.target.value)}
                   options={[
                     { value: '', label: '-- Select Enrolled Student --' },
-                    ...availableParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib} - ${p.classGrade})` }))
+                    ...availableParticipants.map(p => ({
+                      value: p.id,
+                      label: `${p.name} (${p.bib || 'No Bib'} - ${p.categoryName || p.classGrade || 'Contestant'})`
+                    }))
                   ]}
                   required
                 />
                 {availableParticipants.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-600">
-                    No participants registered under this team and category. Please register students first.
-                  </p>
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                    <p className="text-xs text-amber-800 font-medium">
+                      No participants found under selected team eligible for {selectedCategory?.name || 'this category'}. Please register students first.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
