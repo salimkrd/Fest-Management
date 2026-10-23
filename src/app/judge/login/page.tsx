@@ -28,7 +28,7 @@ function JudgeLoginForm() {
     if (urlCompId) setCompetitionId(urlCompId);
   }, [urlCode, urlCompId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -38,38 +38,81 @@ function JudgeLoginForm() {
       return;
     }
 
-    // Secure assignment lookup
-    const matchingAssignment = markEntries.find(
-      m => (m.accessCode && m.accessCode.toUpperCase() === cleanCode) ||
-           (m.id && m.id.toUpperCase() === cleanCode)
-    );
-
-    if (!matchingAssignment) {
-      setError('Invalid Access Code. Please check the WhatsApp invitation or contact fest conveners.');
-      return;
-    }
-
-    if (matchingAssignment.revoked || matchingAssignment.status === 'REVOKED') {
-      setError('This jury assignment has been revoked by the administrator.');
-      return;
-    }
-
-    if (matchingAssignment.expiresAt && new Date(matchingAssignment.expiresAt) < new Date()) {
-      setError('This jury access code has expired. Please request a new link from the admin desk.');
-      return;
-    }
-
-    // Competition-specific authorization check
-    if (competitionId && matchingAssignment.competitionId !== competitionId) {
-      setError('Access denied: This juror assignment is valid for a different stage competition.');
-      return;
-    }
-
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      // 1. Authenticate via Server API against Firestore
+      const res = await fetch('/api/judge/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessCode: cleanCode,
+          competitionId,
+          secret: sessionSecret
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('judge_session', JSON.stringify({
+            assignment: data.assignment,
+            competition: data.competition,
+            registrations: data.registrations || [],
+            secret: sessionSecret || ''
+          }));
+        }
+        setLoading(false);
+        router.push(`/judge/marking?assignmentId=${data.assignment.id}&competitionId=${data.assignment.competitionId}`);
+        return;
+      }
+
+      // If server returned a specific error (like REVOKED, EXPIRED, MISMATCH, or BAD_SECRET)
+      const errData = await res.json().catch(() => null);
+
+      // Check local markEntries fallback for test / offline mock mode
+      const localMatch = markEntries.find(
+        m => (m.accessCode && m.accessCode.toUpperCase() === cleanCode) ||
+             (m.id && m.id.toUpperCase() === cleanCode)
+      );
+
+      if (localMatch && (!errData || res.status === 404)) {
+        if (localMatch.revoked || localMatch.status === 'REVOKED') {
+          setError('This jury assignment has been revoked by the administrator.');
+          setLoading(false);
+          return;
+        }
+        if (localMatch.expiresAt && new Date(localMatch.expiresAt) < new Date()) {
+          setError('This jury access code has expired. Please request a new link from the admin desk.');
+          setLoading(false);
+          return;
+        }
+        if (competitionId && localMatch.competitionId !== competitionId) {
+          setError('Access denied: This juror assignment is valid for a different stage competition.');
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
+        router.push(`/judge/marking?assignmentId=${localMatch.id}&competitionId=${localMatch.competitionId}`);
+        return;
+      }
+
+      setError(errData?.error || 'Invalid Access Code. Please check the WhatsApp invitation or contact fest conveners.');
       setLoading(false);
-      router.push(`/judge/marking?assignmentId=${matchingAssignment.id}&competitionId=${matchingAssignment.competitionId}`);
-    }, 500);
+    } catch (err: any) {
+      // Fallback for test environments without network
+      const localMatch = markEntries.find(
+        m => (m.accessCode && m.accessCode.toUpperCase() === cleanCode) ||
+             (m.id && m.id.toUpperCase() === cleanCode)
+      );
+      if (localMatch) {
+        setLoading(false);
+        router.push(`/judge/marking?assignmentId=${localMatch.id}&competitionId=${localMatch.competitionId}`);
+        return;
+      }
+      setError('Connection error. Please check your network or contact fest conveners.');
+      setLoading(false);
+    }
   };
 
   return (

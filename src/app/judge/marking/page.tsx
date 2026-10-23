@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { useFest } from '@/context/FestContext';
+import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -32,11 +33,22 @@ function JudgeMarkingContent() {
   const compId = searchParams.get('competitionId') || 'cmp-1';
   const token = searchParams.get('token') || 'JRY-9921-EN';
 
-  const competition = competitions.find(c => c.id === compId) || competitions[0];
-  const compRegistrations = registrations.filter(r => r.competitionId === competition?.id);
+  const [sessionData] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem('judge_session');
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const competition = competitions.find(c => c.id === compId) || sessionData?.competition || competitions[0];
+  const contextRegs = registrations.filter(r => r.competitionId === competition?.id);
+  const compRegistrations: Registration[] = (contextRegs.length > 0 ? contextRegs : (sessionData?.registrations || [])) as Registration[];
 
   // Criteria setup
-  const criteria = competition?.criteria && competition.criteria.length > 0
+  const criteria: Array<{ id: string; name: string; maxMarks: number }> = competition?.criteria && competition.criteria.length > 0
     ? competition.criteria
     : [
         { id: 'cr-1', name: 'Subject Mastery & Content', maxMarks: 30 },
@@ -48,7 +60,7 @@ function JudgeMarkingContent() {
   // Initialize scores state for all registered participants
   const [scores, setScores] = useState<Record<string, LocalScore>>(() => {
     const initial: Record<string, LocalScore> = {};
-    compRegistrations.forEach((r, idx) => {
+    compRegistrations.forEach((r: any, idx: number) => {
       initial[r.id] = {
         'cr-1': idx === 0 ? 28 : idx === 1 ? 26 : 24,
         'cr-2': idx === 0 ? 24 : idx === 1 ? 23 : 21,
@@ -99,7 +111,7 @@ function JudgeMarkingContent() {
   const handleFinalSubmit = () => {
     setSubmitting(true);
 
-    const formattedScores = compRegistrations.map(r => ({
+    const formattedScores = compRegistrations.map((r: any) => ({
       registrationId: r.id,
       participantName: r.participantName,
       bib: r.chestNumber,
@@ -114,9 +126,8 @@ function JudgeMarkingContent() {
 
     // Save to context
     const matchingMarkEntry = markEntries.find(m => m.competitionId === competition.id);
-    if (matchingMarkEntry) {
-      submitJudgeMarks(matchingMarkEntry.id, formattedScores, verificationHash);
-    }
+    const entryId = matchingMarkEntry?.id || sessionData?.assignment?.id || `me-${competition.id}`;
+    submitJudgeMarks(entryId, formattedScores, verificationHash);
 
     setTimeout(() => {
       setSubmitting(false);

@@ -1934,6 +1934,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
     let unsubParts: (() => void) | null = null;
     let unsubRegs: (() => void) | null = null;
+    let unsubJudges: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (unsubParts) {
@@ -1943,6 +1944,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (unsubRegs) {
         unsubRegs();
         unsubRegs = null;
+      }
+      if (unsubJudges) {
+        unsubJudges();
+        unsubJudges = null;
       }
 
       if (!user) return;
@@ -2016,7 +2021,41 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             (err) => console.warn('[FestContext] Firestore registrations sync warning:', err)
           );
 
-          // 3. Auto-seed canonical categories if categories collection is currently empty
+          // 3. Admin reads all judge assignments in realtime across browsers
+          const judgesRef = collection(firestore, 'judgeAssignments');
+          unsubJudges = onSnapshot(
+            judgesRef,
+            (snapshot) => {
+              const liveAssignments: MarkEntry[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  competitionId: dt.competitionId || '',
+                  competitionName: dt.competitionName || '',
+                  competitionCode: dt.competitionCode || '',
+                  categoryName: dt.categoryName || 'General',
+                  type: dt.type || 'SOLO',
+                  judgeName: dt.judgeName || '',
+                  judgePhone: dt.judgePhone || '',
+                  accessCode: dt.accessCode || '',
+                  secretHash: dt.secretHash || '',
+                  salt: dt.salt || '',
+                  expiresAt: dt.expiresAt || '',
+                  revoked: dt.revoked || false,
+                  status: dt.status === 'ACTIVE' ? 'NOT_STARTED' : (dt.status || 'NOT_STARTED'),
+                  scores: dt.scores || [],
+                  submittedAt: dt.submittedAt,
+                  verificationHash: dt.verificationHash
+                };
+              });
+              if (liveAssignments.length > 0) {
+                setMarkEntries(liveAssignments);
+              }
+            },
+            (err) => console.warn('[FestContext] Firestore judgeAssignments sync warning:', err)
+          );
+
+          // 4. Auto-seed canonical categories if categories collection is currently empty
           try {
             const catCheck = collection(firestore, 'categories');
             const catUnsub = onSnapshot(catCheck, (snap) => {
@@ -2035,7 +2074,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             });
           } catch {}
 
-          // 4. Auto-migrate existing local participants to Firestore
+          // 5. Auto-migrate existing local participants, registrations, and judge assignments to Firestore
           if (typeof window !== 'undefined') {
             try {
               const saved = localStorage.getItem('fest_participants_v2');
@@ -2059,6 +2098,38 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   for (const r of parsed) {
                     if (r && r.id && !isDemoRegistration(r)) {
                       setDoc(doc(firestore, 'registrations', r.id), sanitizeForFirestore(r), { merge: true }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            } catch {}
+
+            try {
+              const savedMarks = localStorage.getItem('fest_mark_entries_v2');
+              if (savedMarks) {
+                const parsed = JSON.parse(savedMarks);
+                if (Array.isArray(parsed)) {
+                  for (const m of parsed) {
+                    if (m && m.id && m.accessCode && !isDemoMarkEntry(m)) {
+                      const record = {
+                        id: m.id,
+                        judgeName: m.judgeName || 'Juror',
+                        judgePhone: m.judgePhone || '',
+                        competitionId: m.competitionId || '',
+                        competitionCode: m.competitionCode || '',
+                        competitionName: m.competitionName || '',
+                        categoryName: m.categoryName || 'General',
+                        type: m.type || 'SOLO',
+                        stageName: m.stageName || 'Main Stage',
+                        accessCode: m.accessCode,
+                        secretHash: m.secretHash || '',
+                        salt: m.salt || '',
+                        issuedAt: m.issuedAt || new Date().toISOString(),
+                        expiresAt: m.expiresAt || new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
+                        revoked: m.revoked || false,
+                        status: m.revoked ? 'REVOKED' : (m.status === 'SUBMITTED' ? 'SUBMITTED' : 'ACTIVE')
+                      };
+                      setDoc(doc(firestore, 'judgeAssignments', m.id), sanitizeForFirestore(record), { merge: true }).catch(() => {});
                     }
                   }
                 }
@@ -2169,6 +2240,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       unsubAuth();
       if (unsubParts) unsubParts();
       if (unsubRegs) unsubRegs();
+      if (unsubJudges) unsubJudges();
     };
   }, [isIsolatedDemoOrTest, currentTeamUser?.id]);
 
@@ -2502,8 +2574,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     stageName?: string;
   }): Promise<{ accessCode: string; oneTimeSecret: string; directUrl: string }> => {
     const comp = competitions.find(c => c.id === params.competitionId);
+    const assignmentId = 'asgn-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const creds = await createJudgeAssignment({
-      id: 'me-' + (markEntries.length + 1),
+      id: assignmentId,
       judgeName: params.judgeName,
       judgePhone: params.judgePhone,
       competitionId: params.competitionId,
@@ -2530,7 +2603,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       scores: []
     };
 
-    setMarkEntries(prev => [...prev, newEntry]);
+    setMarkEntries(prev => [...prev.filter(m => m.id !== creds.assignment.id), newEntry]);
+
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db, 'judgeAssignments', creds.assignment.id), sanitizeForFirestore(creds.assignment), { merge: true });
+      } catch (err) {
+        console.warn('[FestContext] Firestore addOrUpdateJudgeAssignment error:', err);
+      }
+    }
 
     return {
       accessCode: creds.assignment.accessCode,
@@ -2539,8 +2620,18 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const revokeJudgeAssignment = (markEntryId: string) => {
+  const revokeJudgeAssignment = async (markEntryId: string) => {
     setMarkEntries(prev => prev.map(m => m.id === markEntryId ? { ...m, revoked: true, status: 'REVOKED' } : m));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await updateDoc(doc(db, 'judgeAssignments', markEntryId), {
+          revoked: true,
+          status: 'REVOKED'
+        });
+      } catch (err) {
+        console.warn('[FestContext] Firestore revokeJudgeAssignment error:', err);
+      }
+    }
   };
 
   // Task 2: Fix Result Publication Logic
@@ -2561,6 +2652,18 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       }
       return m;
     }));
+
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        updateDoc(doc(db, 'judgeAssignments', markEntryId), {
+          status: 'SUBMITTED',
+          submittedAt: new Date().toISOString(),
+          verificationHash: verificationHash || ''
+        }).catch(() => {});
+      } catch (err) {
+        console.warn('[FestContext] Firestore submitJudgeMarks error:', err);
+      }
+    }
 
     if (assignment) {
       // Find or create result record and set status to READY_FOR_REVIEW
