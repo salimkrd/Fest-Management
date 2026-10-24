@@ -272,7 +272,13 @@ export default function CategoriesPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+                isLoading={saving}
+              >
                 {editingCategory ? 'Update Category' : 'Save Category'}
               </Button>
             </div>

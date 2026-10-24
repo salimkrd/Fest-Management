@@ -2316,24 +2316,108 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
-    const newId = 'cat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
-    const newCat: Category = {
-      ...catData,
-      id: newId,
-      enrolledCount: 0,
-      competitionsCount: 0
-    };
-    if (!isIsolatedDemoOrTest && db) {
-      await setDoc(doc(db, 'categories', newId), sanitizeForFirestore(newCat));
+    let newCat: Category;
+
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to save a category.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(catData)
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to create category (HTTP ${res.status})`);
+      }
+      const data = await res.json();
+      newCat = data.category;
+    } else {
+      const newId = 'cat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
+      newCat = {
+        ...catData,
+        id: newId,
+        enrolledCount: 0,
+        competitionsCount: 0
+      };
+      if (db) {
+        await setDoc(doc(db, 'categories', newId), sanitizeForFirestore(newCat));
+      }
     }
-    setCategories(prev => [...prev.filter(c => c.id !== newId), newCat]);
+
+    setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat]);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fest_categories_v2');
+        if (cached) {
+          const list: Category[] = JSON.parse(cached);
+          localStorage.setItem('fest_categories_v2', JSON.stringify([...list.filter(c => c.id !== newCat.id), newCat]));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached categories on add:', e);
+      }
+    }
   };
 
   const updateCategory = async (id: string, updated: Partial<Category>) => {
-    if (!isIsolatedDemoOrTest && db) {
-      await updateDoc(doc(db, 'categories', id), sanitizeForFirestore(updated));
+    let updatedCat: Category | null = null;
+
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to update a category.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updated)
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to update category (HTTP ${res.status})`);
+      }
+      const data = await res.json();
+      updatedCat = data.category;
+    } else {
+      if (db) {
+        await updateDoc(doc(db, 'categories', id), sanitizeForFirestore(updated));
+      }
     }
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+
+    setCategories(prev => prev.map(c => {
+      if (c.id === id) {
+        return updatedCat ? updatedCat : { ...c, ...updated };
+      }
+      return c;
+    }));
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fest_categories_v2');
+        if (cached) {
+          const list: Category[] = JSON.parse(cached);
+          localStorage.setItem('fest_categories_v2', JSON.stringify(list.map(c => {
+            if (c.id === id) {
+              return updatedCat ? updatedCat : { ...c, ...updated };
+            }
+            return c;
+          })));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached categories on update:', e);
+      }
+    }
   };
 
   const deleteCategory = async (id: string) => {

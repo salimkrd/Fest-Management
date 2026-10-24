@@ -20,7 +20,7 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         getUserData().role == 'ADMIN' &&
         getUserData().status == 'ACTIVE' &&
-        getUserData().disabled != true;
+        (!('disabled' in getUserData()) || getUserData().disabled != true);
     }
 
     function isTeamManager(teamId) {
@@ -29,7 +29,7 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         getUserData().role == 'TEAM_MANAGER' &&
         getUserData().teamId == teamId &&
-        getUserData().disabled != true &&
+        (!('disabled' in getUserData()) || getUserData().disabled != true) &&
         getUserData().status == 'ACTIVE' &&
         exists(/databases/$(database)/documents/teams/$(teamId)) &&
         get(/databases/$(database)/documents/teams/$(teamId)).data.status == 'ACTIVE';
