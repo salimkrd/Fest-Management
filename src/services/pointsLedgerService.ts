@@ -222,6 +222,7 @@ export class PointsLedgerService {
     const resultRef = db.collection('results').doc(resultId);
     batch.update(resultRef, {
       resultStatus: 'REVISION_REQUIRED',
+      publishedDate: null,
       reversedAt,
       reversedBy: adminUser.uid
     });
