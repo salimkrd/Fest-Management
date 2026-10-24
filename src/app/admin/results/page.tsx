@@ -79,6 +79,9 @@ export default function ResultManagementPage() {
     setSavingResult(true);
     setActionError('');
     try {
+      if (!result.ranks.length || result.marksStatus !== 'COMPLETE') {
+        throw new Error('Submitted marks and verified ranks are required before confirming a result.');
+      }
       await confirmResultPositionsAndGrades(result.id, result.ranks);
       setSelectedResult(prev => prev ? { ...prev, resultStatus: 'READY_TO_PUBLISH' } : null);
     } catch (error) {
@@ -243,7 +246,8 @@ export default function ResultManagementPage() {
                             variant="outline"
                             size="sm"
                             leftIcon={<RotateCcw className="w-3.5 h-3.5 text-[#DC2626]" />}
-                            onClick={() => unpublishResult(res.id, 'Admin unpublish from Results table')}
+                            onClick={() => void handleUnpublish(res.id, 'Admin unpublish from Results table')}
+                            disabled={savingResult}
                           >
                             Unpublish
                           </Button>
@@ -256,7 +260,7 @@ export default function ResultManagementPage() {
                           >
                             Publish Result
                           </Button>
-                        ) : res.resultStatus === 'READY_FOR_REVIEW' ? (
+                        ) : res.resultStatus === 'READY_FOR_REVIEW' || res.resultStatus === 'REVISION_REQUIRED' ? (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -301,7 +305,7 @@ export default function ResultManagementPage() {
                 <Button variant="outline" size="sm" onClick={() => setSelectedResult(null)}>
                   Close Audit
                 </Button>
-                {selectedResult && selectedResult.resultStatus === 'READY_FOR_REVIEW' && (
+                {selectedResult && (selectedResult.resultStatus === 'READY_FOR_REVIEW' || selectedResult.resultStatus === 'REVISION_REQUIRED') && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -312,7 +316,7 @@ export default function ResultManagementPage() {
                     Confirm Positions &amp; Grades
                   </Button>
                 )}
-                {selectedResult && (selectedResult.resultStatus === 'READY_TO_PUBLISH' || selectedResult.resultStatus === 'READY_FOR_REVIEW') && (
+                {selectedResult && selectedResult.resultStatus === 'READY_TO_PUBLISH' && (
                   <Button
                     variant="primary"
                     size="sm"
