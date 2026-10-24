@@ -388,6 +388,8 @@ export interface FirestoreGreenRoomAssignment {
   reassignedFrom?: string;
   reassignedAt?: string;
   reassignmentReason?: string;
+  checkInMethod?: 'QR_SCAN' | 'MANUAL_LOOKUP';
+  qrVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -13,7 +13,7 @@
  * 9. Zero personal identity leakage to judge login API.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { initializeApp, getApps, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
@@ -1270,6 +1270,310 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
 
       const groupCounterSnap = await db.collection('greenRoomCounters').doc(testGroupCompId).get();
       expect(groupCounterSnap.exists).toBe(true);
+    });
+  });
+
+  describe('11. Release-Safety Hardening: Concurrency, Stale Mapping, QR Separation & Secret Tests', () => {
+    const staleCompId = 'comp-stale-race-test';
+    const staleJudgeAssignId = 'ja-stale-judge-01';
+
+    beforeAll(async () => {
+      // Seed competition for stale mapping test
+      await db.collection('competitions').doc(staleCompId).set({
+        id: staleCompId,
+        code: 'STALE-01',
+        name: 'Stale Mapping Race Test',
+        categoryId: 'cat-senior',
+        categoryName: 'Senior',
+        type: 'SOLO',
+        stageId: 'stage-1',
+        stageName: 'Main Stage',
+        status: 'IN_PROGRESS',
+        criteria: [
+          { id: 'c1', name: 'Presentation', maxMarks: 50 },
+          { id: 'c2', name: 'Originality', maxMarks: 50 }
+        ],
+        maxMarks: 100
+      });
+
+      // Seed 2 approved registrations with SHA team to prevent teamCode mismatch
+      await db.collection('registrations').doc('reg-stale-1').set({
+        id: 'reg-stale-1',
+        competitionId: staleCompId,
+        participantId: 'part-stale-1',
+        participantName: 'Stale Contestant 1',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        teamName: 'Team Al-Shabab',
+        status: 'APPROVED',
+        code: 'STALE-REG-1',
+        chestNumber: 'ST-01',
+        bib: '#ST-01'
+      });
+
+      await db.collection('registrations').doc('reg-stale-2').set({
+        id: 'reg-stale-2',
+        competitionId: staleCompId,
+        participantId: 'part-stale-2',
+        participantName: 'Stale Contestant 2',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        teamName: 'Team Al-Shabab',
+        status: 'APPROVED',
+        code: 'STALE-REG-2',
+        chestNumber: 'ST-02',
+        bib: '#ST-02'
+      });
+
+      // Seed Judge Assignment with hashed secret and salt
+      const { hashSecret } = await import('@/domain/judgeAuth');
+      const secretHash = await hashSecret('secure_pin_987654', 'salt_stale_race');
+      await db.collection('judgeAssignments').doc(staleJudgeAssignId).set({
+        id: staleJudgeAssignId,
+        judgeName: 'Dr. Concurrency Juror',
+        competitionId: staleCompId,
+        competitionName: 'Stale Mapping Race Test',
+        accessCode: 'JRY-STALE-RACE',
+        secretHash,
+        salt: 'salt_stale_race',
+        status: 'ACTIVE',
+        revoked: false,
+        createdAt: new Date().toISOString()
+      });
+    });
+
+    afterAll(async () => {
+      await db.collection('competitions').doc(staleCompId).delete().catch(() => {});
+      await db.collection('registrations').doc('reg-stale-1').delete().catch(() => {});
+      await db.collection('registrations').doc('reg-stale-2').delete().catch(() => {});
+      await db.collection('judgeAssignments').doc(staleJudgeAssignId).delete().catch(() => {});
+      await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).delete().catch(() => {});
+      await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).delete().catch(() => {});
+      await db.collection('greenRoomCounters').doc(staleCompId).delete().catch(() => {});
+      await db.collection('competitionMarkingLocks').doc(staleCompId).delete().catch(() => {});
+      await db.collection('markEntries').doc(`me-${staleJudgeAssignId}`).delete().catch(() => {});
+    });
+
+    describe('A. Dedicated, Strong QR_SIGNING_SECRET Mandate', () => {
+      it('rejects QR signing when QR_SIGNING_SECRET is missing or empty', () => {
+        const origSecret = process.env.QR_SIGNING_SECRET;
+        try {
+          delete process.env.QR_SIGNING_SECRET;
+          expect(() => QrSignerService.getSigningSecret()).toThrow(/Configuration Error: A dedicated, strong QR_SIGNING_SECRET/);
+        } finally {
+          process.env.QR_SIGNING_SECRET = origSecret;
+        }
+      });
+
+      it('rejects QR signing when QR_SIGNING_SECRET is shorter than 32 characters', () => {
+        const origSecret = process.env.QR_SIGNING_SECRET;
+        try {
+          process.env.QR_SIGNING_SECRET = 'short_secret_28_characters!!';
+          expect(() => QrSignerService.getSigningSecret()).toThrow(/at least 32 characters/);
+        } finally {
+          process.env.QR_SIGNING_SECRET = origSecret;
+        }
+      });
+
+      it('succeeds in cryptographic signing and verification when dedicated secret >= 32 chars is present', () => {
+        const secret = QrSignerService.getSigningSecret();
+        expect(secret.length).toBeGreaterThanOrEqual(32);
+        const { token } = QrSignerService.signParticipantQr('p-test-01', '#101');
+        expect(token.length).toBe(64);
+        expect(QrSignerService.verifyParticipantQrToken('p-test-01', '#101', token)).toBe(true);
+      });
+    });
+
+    describe('B. Strict Separation Between QR_SCAN and MANUAL_LOOKUP', () => {
+      it('rejects QR_SCAN check-in if given a plain identifier or manual search string', async () => {
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: staleCompId,
+            participantIdentifier: 'ST-01',
+            checkInMethod: 'QR_SCAN',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/Validation Error: QR_SCAN requires an authentic server-signed QR payload/);
+      });
+
+      it('rejects QR_SCAN check-in if given a forged or tampered QR payload', async () => {
+        const forgedPayload = JSON.stringify({
+          app: 'INSPIRATH',
+          id: 'part-stale-1',
+          bib: '#ST-01',
+          token: 'badbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbad'
+        });
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: staleCompId,
+            participantIdentifier: forgedPayload,
+            checkInMethod: 'QR_SCAN',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/Validation Error: Invalid or tampered QR verification token/);
+      });
+
+      it('executes authentic QR_SCAN, marks qrVerified: true, and writes GREEN_ROOM_QR_CHECK_IN audit entry', async () => {
+        const { token } = QrSignerService.signParticipantQr('part-stale-1', '#ST-01');
+        const qrPayload = encodeParticipantQrPayload({ id: 'part-stale-1', bib: '#ST-01', token });
+
+        const res = await GreenRoomService.checkInContestant({
+          competitionId: staleCompId,
+          participantIdentifier: qrPayload,
+          checkInMethod: 'QR_SCAN',
+          operatorIdToken: staffIdToken
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.qrVerified).toBe(true);
+        expect(res.checkInMethod).toBe('QR_SCAN');
+        expect(res.assignment.codeLetter).toBe('A');
+
+        // Verify assignment record in Firestore
+        const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
+        expect(doc.data()?.qrVerified).toBe(true);
+        expect(doc.data()?.checkInMethod).toBe('QR_SCAN');
+
+        // Verify audit log entry
+        const auditSnap = await db.collection('auditLogs')
+          .where('action', '==', 'GREEN_ROOM_QR_CHECK_IN')
+          .where('targetDocId', '==', `${staleCompId}_reg-stale-1`)
+          .get();
+        expect(auditSnap.empty).toBe(false);
+        const logData = auditSnap.docs[0].data();
+        expect(logData.details.qrVerified).toBe(true);
+        expect(logData.details.checkInMethod).toBe('QR_SCAN');
+      });
+
+      it('executes authenticated MANUAL_LOOKUP, marks qrVerified: false, and writes GREEN_ROOM_MANUAL_CHECK_IN audit entry', async () => {
+        const res = await GreenRoomService.checkInContestant({
+          competitionId: staleCompId,
+          participantIdentifier: 'ST-02',
+          checkInMethod: 'MANUAL_LOOKUP',
+          operatorIdToken: staffIdToken
+        });
+
+        expect(res.success).toBe(true);
+        expect(res.qrVerified).toBe(false);
+        expect(res.checkInMethod).toBe('MANUAL_LOOKUP');
+        expect(res.assignment.codeLetter).toBe('B');
+
+        // Verify assignment record in Firestore
+        const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).get();
+        expect(doc.data()?.qrVerified).toBe(false);
+        expect(doc.data()?.checkInMethod).toBe('MANUAL_LOOKUP');
+
+        // Verify audit log entry
+        const auditSnap = await db.collection('auditLogs')
+          .where('action', '==', 'GREEN_ROOM_MANUAL_CHECK_IN')
+          .where('targetDocId', '==', `${staleCompId}_reg-stale-2`)
+          .get();
+        expect(auditSnap.empty).toBe(false);
+        const logData = auditSnap.docs[0].data();
+        expect(logData.details.qrVerified).toBe(false);
+        expect(logData.details.checkInMethod).toBe('MANUAL_LOOKUP');
+      });
+    });
+
+    describe('C. Concurrency & Stale Code Letter-to-Registration Race Condition Elimination', () => {
+      it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
+        // Spy on validateScoresPayload to simulate a concurrent race condition:
+        // validateScoresPayload validates that 'A' maps to 'reg-stale-1'.
+        // Right after validation returns and before transaction runs, reg-stale-1's codeLetter is modified backstage to 'X'!
+        const origValidate = (JudgeService as any).validateScoresPayload;
+        const spy = vi.spyOn(JudgeService as any, 'validateScoresPayload').mockImplementation(async function(this: any, ...args: any[]) {
+          const res = await origValidate.apply(this, args);
+          await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
+            codeLetter: 'X',
+            updatedAt: new Date().toISOString()
+          });
+          return res;
+        });
+
+        try {
+          await expect(
+            JudgeService.saveDraftMarks({
+              assignmentId: staleJudgeAssignId,
+              competitionId: staleCompId,
+              secret: 'secure_pin_987654',
+              scores: {
+                'A': { 'c1': 45, 'c2': 40 },
+                'B': { 'c1': 35, 'c2': 38 }
+              }
+            })
+          ).rejects.toThrow(/Stale Mapping Error/);
+        } finally {
+          spy.mockRestore();
+          // Reset reg-stale-1 back to 'A'
+          await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
+            codeLetter: 'A',
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      it('rejects submitMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
+        // Simulate a backstage race condition for submitMarks:
+        const origValidate = (JudgeService as any).validateScoresPayload;
+        const spy = vi.spyOn(JudgeService as any, 'validateScoresPayload').mockImplementation(async function(this: any, ...args: any[]) {
+          const res = await origValidate.apply(this, args);
+          await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
+            codeLetter: 'Z',
+            updatedAt: new Date().toISOString()
+          });
+          return res;
+        });
+
+        try {
+          await expect(
+            JudgeService.submitMarks({
+              assignmentId: staleJudgeAssignId,
+              competitionId: staleCompId,
+              secret: 'secure_pin_987654',
+              scores: {
+                'A': { 'c1': 45, 'c2': 40 },
+                'B': { 'c1': 35, 'c2': 38 }
+              }
+            })
+          ).rejects.toThrow(/Stale Mapping Error/);
+        } finally {
+          spy.mockRestore();
+          // Reset reg-stale-2 back to 'B'
+          await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
+            codeLetter: 'B',
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      it('successfully saves draft and submits marks when Code Letter mappings match the atomic transaction state', async () => {
+        // Save draft marks
+        const draftRes = await JudgeService.saveDraftMarks({
+          assignmentId: staleJudgeAssignId,
+          competitionId: staleCompId,
+          secret: 'secure_pin_987654',
+          scores: {
+            'A': { 'c1': 48, 'c2': 45 },
+            'B': { 'c1': 40, 'c2': 42 }
+          }
+        });
+        expect(draftRes.success).toBe(true);
+
+        // Submit final marks
+        const submitRes = await JudgeService.submitMarks({
+          assignmentId: staleJudgeAssignId,
+          competitionId: staleCompId,
+          secret: 'secure_pin_987654',
+          scores: {
+            'A': { 'c1': 48, 'c2': 45 },
+            'B': { 'c1': 40, 'c2': 42 }
+          }
+        });
+        expect(submitRes.success).toBe(true);
+        expect(submitRes.marksRecorded).toBe(2);
+        expect(submitRes.verificationHash).toMatch(/^SHA256:/);
+      });
     });
   });
 });

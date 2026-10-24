@@ -126,7 +126,11 @@ export default function GreenRoomPage() {
   };
 
   // Perform check-in via API
-  const handlePerformCheckIn = async (identifier: string, manualCode?: string) => {
+  const handlePerformCheckIn = async (
+    identifier: string,
+    manualCode?: string,
+    method: 'QR_SCAN' | 'MANUAL_LOOKUP' = 'MANUAL_LOOKUP'
+  ) => {
     if (!selectedCompetition) return;
     setIsCheckingIn(true);
     setFeedbackMessage(null);
@@ -142,6 +146,7 @@ export default function GreenRoomPage() {
         body: JSON.stringify({
           competitionId: selectedCompetition.id,
           participantIdentifier: identifier,
+          checkInMethod: method,
           manualCodeLetter: manualCode || undefined
         })
       });
@@ -151,9 +156,14 @@ export default function GreenRoomPage() {
         throw new Error(data.error || 'Failed to check in contestant.');
       }
 
+      const isQrVerified = data.qrVerified === true;
+      const successText = isQrVerified
+        ? `QR Verified: Code Letter ${data.assignment?.codeLetter} Assigned to ${data.assignment?.participantName || 'Contestant'}`
+        : (data.message || `Code Letter ${data.assignment?.codeLetter} Assigned!`);
+
       setFeedbackMessage({
         type: 'success',
-        text: data.message || `Code Letter ${data.assignment?.codeLetter} Assigned!`
+        text: successText
       });
 
       setSearchQuery('');
@@ -429,7 +439,7 @@ export default function GreenRoomPage() {
           <div className="lg:col-span-5 space-y-6">
             {/* Camera QR Scanner */}
             <GreenRoomScanner
-              onScanSuccess={(code) => handlePerformCheckIn(code)}
+              onScanSuccess={(code) => handlePerformCheckIn(code, undefined, 'QR_SCAN')}
               isProcessing={isCheckingIn}
             />
 
@@ -458,7 +468,7 @@ export default function GreenRoomPage() {
                           <div
                             key={reg.id}
                             onClick={() => {
-                              handlePerformCheckIn(reg.id, manualCodeInput);
+                              handlePerformCheckIn(reg.id, manualCodeInput, 'MANUAL_LOOKUP');
                             }}
                             className="p-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between text-xs transition-colors"
                           >
@@ -507,7 +517,7 @@ export default function GreenRoomPage() {
                       size="sm"
                       className="w-full"
                       disabled={isCheckingIn || !searchQuery.trim()}
-                      onClick={() => handlePerformCheckIn(searchQuery, manualCodeInput)}
+                      onClick={() => handlePerformCheckIn(searchQuery, manualCodeInput, 'MANUAL_LOOKUP')}
                     >
                       Check In
                     </Button>

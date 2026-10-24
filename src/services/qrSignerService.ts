@@ -12,22 +12,19 @@ import { generateQrVerificationToken, verifyQrVerificationToken } from '@/domain
 export class QrSignerService {
   /**
    * Resolves the server-only private QR signing secret.
-   * Guaranteed never to leak to client bundles.
+   * Mandates a dedicated, strong QR_SIGNING_SECRET in the server environment.
+   * Falling back to unrelated secrets (e.g. Firebase or session secrets) or default keys is strictly prohibited.
    */
   static getSigningSecret(): string {
-    const secret =
-      process.env.QR_SIGNING_SECRET ||
-      process.env.FIREBASE_APP_SECRET ||
-      process.env.SESSION_SECRET;
+    const secret = process.env.QR_SIGNING_SECRET?.trim();
 
-    if (!secret || secret.trim().length === 0) {
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('FATAL: QR_SIGNING_SECRET environment variable is missing in production.');
-      }
-      return 'INTERNAL_DEV_SERVER_ONLY_QR_SIGNING_KEY_2026_DO_NOT_EXPOSE';
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        'Configuration Error: A dedicated, strong QR_SIGNING_SECRET (at least 32 characters) must be configured in server environment variables. Falling back to unrelated secrets or default keys is strictly prohibited.'
+      );
     }
 
-    return secret.trim();
+    return secret;
   }
 
   /**

@@ -364,6 +364,26 @@ export class JudgeService {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
       }
 
+      // Concurrency check: Ensure Code Letter-to-registration mapping has not changed or become stale
+      for (const [codeLetterKey, expectedRegId] of resolvedRegistrations.entries()) {
+        const cleanCode = codeLetterKey.trim().toUpperCase();
+        const asgnRef = db.collection('greenRoomAssignments').doc(`${params.competitionId}_${expectedRegId}`);
+        const asgnDoc = await transaction.get(asgnRef);
+
+        if (!asgnDoc.exists) {
+          throw new Error(
+            `Stale Mapping Error: Contestant registration "${expectedRegId}" is no longer checked in for competition "${params.competitionId}". The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+          );
+        }
+
+        const currentCode = (asgnDoc.data()?.codeLetter || '').trim().toUpperCase();
+        if (currentCode !== cleanCode) {
+          throw new Error(
+            `Stale Mapping Error: Code Letter "${cleanCode}" is no longer mapped to registration "${expectedRegId}" (currently mapped to "${currentCode}"). The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+          );
+        }
+      }
+
       transaction.set(lockRef, {
         competitionId: params.competitionId,
         locked: true,
@@ -569,6 +589,31 @@ export class JudgeService {
       const lockDoc = await transaction.get(lockRef);
       if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
+      }
+
+      const assignDoc = await transaction.get(assignRef);
+      if (assignDoc.exists && assignDoc.data()?.status === 'SUBMITTED') {
+        throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
+      }
+
+      // Concurrency check: Ensure Code Letter-to-registration mapping has not changed or become stale
+      for (const [codeLetterKey, expectedRegId] of resolvedRegistrations.entries()) {
+        const cleanCode = codeLetterKey.trim().toUpperCase();
+        const asgnRef = db.collection('greenRoomAssignments').doc(`${params.competitionId}_${expectedRegId}`);
+        const asgnDoc = await transaction.get(asgnRef);
+
+        if (!asgnDoc.exists) {
+          throw new Error(
+            `Stale Mapping Error: Contestant registration "${expectedRegId}" is no longer checked in for competition "${params.competitionId}". The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+          );
+        }
+
+        const currentCode = (asgnDoc.data()?.codeLetter || '').trim().toUpperCase();
+        if (currentCode !== cleanCode) {
+          throw new Error(
+            `Stale Mapping Error: Code Letter "${cleanCode}" is no longer mapped to registration "${expectedRegId}" (currently mapped to "${currentCode}"). The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+          );
+        }
       }
 
       transaction.set(lockRef, {

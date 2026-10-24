@@ -51,7 +51,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
           // Debounce 2 seconds between scans of identical data
           if (now - lastScannedTimeRef.current > 2000) {
             lastScannedTimeRef.current = now;
-            setSuccessNotice('QR Verified & Scanned');
+            setSuccessNotice('QR Code Captured. Verifying credentials...');
             setTimeout(() => setSuccessNotice(''), 2000);
             onScanSuccess(decodedText);
           }
@@ -115,7 +115,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
 
       const decodedText = await tempScanner.scanFile(file, true);
       if (decodedText) {
-        setSuccessNotice('QR Image Decoded Successfully');
+        setSuccessNotice('QR Code Captured. Verifying credentials...');
         setTimeout(() => setSuccessNotice(''), 2000);
         onScanSuccess(decodedText);
       }

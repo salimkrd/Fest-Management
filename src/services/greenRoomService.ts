@@ -27,6 +27,7 @@ import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firesto
 export interface CheckInContestantParams {
   competitionId: string;
   participantIdentifier: string; // QR raw string, participantId, bib, chestNumber, or registrationId/code
+  checkInMethod?: 'QR_SCAN' | 'MANUAL_LOOKUP';
   manualCodeLetter?: string;
   notes?: string;
   operatorIdToken: string;
@@ -36,6 +37,8 @@ export interface CheckInResult {
   success: boolean;
   assignment: FirestoreGreenRoomAssignment;
   isExisting: boolean;
+  checkInMethod: 'QR_SCAN' | 'MANUAL_LOOKUP';
+  qrVerified: boolean;
   message: string;
 }
 
@@ -78,13 +81,39 @@ export class GreenRoomService {
     }
     const compData = compDoc.data()!;
 
-    // 2. Parse identifier (supports QR code payloads, bibs, IDs, registration codes)
+    // 2. Parse identifier and strictly separate QR_SCAN vs MANUAL_LOOKUP
     const parsedQr = parseParticipantQrPayload(participantIdentifier);
+    const requestedMethod = params.checkInMethod;
 
-    // If QR payload is a JSON payload with verification token, verify token authenticity via server signer
-    if (parsedQr.format === 'JSON_PAYLOAD') {
-      if (!parsedQr.token || !QrSignerService.verifyParticipantQrToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
+    let resolvedMethod: 'QR_SCAN' | 'MANUAL_LOOKUP';
+    let qrVerified = false;
+
+    if (requestedMethod === 'QR_SCAN') {
+      if (parsedQr.format !== 'JSON_PAYLOAD' || !parsedQr.token) {
+        throw new Error(
+          'Validation Error: QR_SCAN requires an authentic server-signed QR payload. Plain identifiers and manual searches must use MANUAL_LOOKUP.'
+        );
+      }
+      if (!QrSignerService.verifyParticipantQrToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
         throw new Error('Validation Error: Invalid or tampered QR verification token. Participant credentials could not be authenticated.');
+      }
+      resolvedMethod = 'QR_SCAN';
+      qrVerified = true;
+    } else if (requestedMethod === 'MANUAL_LOOKUP') {
+      // Manual lookup must remain authenticated and audited (Auth check operator assertAdminOrGreenRoom already passed)
+      resolvedMethod = 'MANUAL_LOOKUP';
+      qrVerified = false;
+    } else {
+      // Inferred fallback if not explicitly provided
+      if (parsedQr.format === 'JSON_PAYLOAD' && parsedQr.token) {
+        if (!QrSignerService.verifyParticipantQrToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
+          throw new Error('Validation Error: Invalid or tampered QR verification token. Participant credentials could not be authenticated.');
+        }
+        resolvedMethod = 'QR_SCAN';
+        qrVerified = true;
+      } else {
+        resolvedMethod = 'MANUAL_LOOKUP';
+        qrVerified = false;
       }
     }
 
@@ -228,6 +257,8 @@ export class GreenRoomService {
         checkedInBy: operator.uid,
         checkedInByRole: operator.role as 'ADMIN' | 'GREEN_ROOM_STAFF',
         notes: notes || '',
+        checkInMethod: resolvedMethod,
+        qrVerified,
         createdAt: now,
         updatedAt: now
       };
@@ -245,10 +276,11 @@ export class GreenRoomService {
         updatedAt: now
       }, { merge: true });
 
-      // Write 3: Append Audit Log
+      // Write 3: Append Audit Log with distinct action and method metadata
+      const auditAction = resolvedMethod === 'QR_SCAN' ? 'GREEN_ROOM_QR_CHECK_IN' : 'GREEN_ROOM_MANUAL_CHECK_IN';
       const auditEntry: FirestoreAuditLog = {
         id: auditLogRef.id,
-        action: 'GREEN_ROOM_CHECK_IN',
+        action: auditAction,
         actorId: operator.uid,
         actorEmail: operator.email,
         actorRole: operator.role,
@@ -260,17 +292,24 @@ export class GreenRoomService {
           codeLetter: assignedCode,
           codeIndex,
           type: finalAssignment.type,
-          isManual: Boolean(manualCodeLetter)
+          isManual: Boolean(manualCodeLetter),
+          checkInMethod: resolvedMethod,
+          qrVerified
         },
         timestamp: now
       };
       transaction.set(auditLogRef, auditEntry);
     });
 
+    const isQrVerified = (finalAssignment as FirestoreGreenRoomAssignment | null)?.qrVerified ?? qrVerified;
+    const resolvedCheckInMethod = (finalAssignment as FirestoreGreenRoomAssignment | null)?.checkInMethod ?? resolvedMethod;
+
     return {
       success: true,
       assignment: finalAssignment!,
       isExisting,
+      checkInMethod: resolvedCheckInMethod,
+      qrVerified: isQrVerified,
       message: isExisting
         ? `Contestant already checked in. Existing Code Letter: ${assignedCode}`
         : `Successfully assigned Code Letter ${assignedCode} to contestant.`

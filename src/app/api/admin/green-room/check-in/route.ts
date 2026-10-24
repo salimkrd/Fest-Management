@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { competitionId, participantIdentifier, manualCodeLetter, notes } = body;
+    const { competitionId, participantIdentifier, manualCodeLetter, notes, checkInMethod } = body;
     if (!competitionId || !participantIdentifier) {
       return NextResponse.json(
         { error: 'Validation Error: competitionId and participantIdentifier are required.' },
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     const result = await GreenRoomService.checkInContestant({
       competitionId,
       participantIdentifier,
+      checkInMethod,
       manualCodeLetter,
       notes,
       operatorIdToken: idToken
