@@ -65,6 +65,26 @@ describe('POST /api/judge/login Endpoint Verification', () => {
       revoked: false,
       status: 'EXPIRED'
     });
+
+    // 4. Seed user-reported access code JRY-LL4X
+    await db.collection('judgeAssignments').doc('asgn-test-ll4x').set({
+      id: 'asgn-test-ll4x',
+      judgeName: 'Prof. Reporter Juror',
+      judgePhone: '+91 98470 44444',
+      competitionId: 'cmp-1',
+      competitionCode: 'CMP-01',
+      competitionName: 'Extempore Speech (English)',
+      categoryName: 'Senior',
+      type: 'SOLO',
+      stageName: 'Main Auditorium',
+      accessCode: 'JRY-LL4X',
+      secretHash,
+      salt,
+      issuedAt: now.toISOString(),
+      expiresAt: future,
+      revoked: false,
+      status: 'ACTIVE'
+    });
   });
 
   it('1. Returns 400 Bad Request when access code is missing or empty', async () => {

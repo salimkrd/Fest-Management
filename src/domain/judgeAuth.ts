@@ -11,6 +11,7 @@
  */
 
 import { scryptSync } from 'crypto';
+import type { CompetitionType } from '@/domain/scoring';
 
 export interface JudgeAssignmentRecord {
   id: string;
@@ -19,6 +20,8 @@ export interface JudgeAssignmentRecord {
   competitionId: string;
   competitionCode: string;
   competitionName: string;
+  categoryName?: string;
+  type?: CompetitionType;
   stageName: string;
   accessCode: string; // e.g. JRY-4821
   secretHash: string; // scrypt KDF hash with salt (NEVER plaintext)
@@ -188,6 +191,8 @@ export async function createJudgeAssignment(params: {
   competitionId: string;
   competitionCode: string;
   competitionName: string;
+  categoryName?: string;
+  type?: CompetitionType;
   stageName: string;
   durationHours?: number;
   baseUrl?: string;
@@ -207,6 +212,8 @@ export async function createJudgeAssignment(params: {
     competitionId: params.competitionId,
     competitionCode: params.competitionCode,
     competitionName: params.competitionName,
+    categoryName: params.categoryName || 'General',
+    type: params.type || 'SOLO',
     stageName: params.stageName,
     accessCode,
     secretHash,
@@ -219,7 +226,10 @@ export async function createJudgeAssignment(params: {
   };
 
   const baseUrl = params.baseUrl || 'http://localhost:3000';
-  const directLoginUrl = `${baseUrl}/judge/login?code=${accessCode}&token=${encodeURIComponent(oneTimeSecret)}`;
+  const directLoginUrl =
+    `${baseUrl}/judge/login?code=${encodeURIComponent(accessCode)}` +
+    `&competitionId=${encodeURIComponent(params.competitionId)}` +
+    `&token=${encodeURIComponent(oneTimeSecret)}`;
 
   return {
     assignment,

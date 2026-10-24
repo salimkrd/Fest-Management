@@ -19,10 +19,12 @@ import {
   Square,
   Trophy,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Database
 } from 'lucide-react';
 import Link from 'next/link';
 import { ExportService } from '@/services/exportService';
+import { DataBackupMigrationModal } from '@/components/domain/DataBackupMigrationModal';
 
 export default function ExportManagementPage() {
   const { results, theme, categories } = useFest();
@@ -32,6 +34,7 @@ export default function ExportManagementPage() {
   const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER'>('WINNERS');
   const [printWinnersOpen, setPrintWinnersOpen] = useState(false);
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
+  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   // CRITICAL RULE: Filter ONLY published results as official winners!
@@ -125,6 +128,14 @@ export default function ExportManagementPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Database className="w-4 h-4 text-amber-600" />}
+              onClick={() => setMigrationModalOpen(true)}
+            >
+              Backup &amp; Migration
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -422,6 +433,12 @@ export default function ExportManagementPage() {
           isOpen={printScoreRegisterOpen}
           onClose={() => setPrintScoreRegisterOpen(false)}
           results={publishedResults}
+        />
+
+        {/* Local Data Backup & Firestore Migration Modal */}
+        <DataBackupMigrationModal
+          isOpen={migrationModalOpen}
+          onClose={() => setMigrationModalOpen(false)}
         />
       </div>
     </AdminLayout>

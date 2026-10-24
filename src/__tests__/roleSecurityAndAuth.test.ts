@@ -71,6 +71,17 @@ describe('Phase 3 Step 2B: Authentication & Role-Based Authorization Enforcement
   });
 
   afterAll(async () => {
+    const db = getAdminDb();
+    if (db) {
+      await db.collection('users').doc('admin-01').set({
+        uid: 'admin-01',
+        email: 'admin@sahithyolsav.com',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        disabled: false,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
     if (clientApp) {
       await deleteApp(clientApp).catch(() => {});
     }

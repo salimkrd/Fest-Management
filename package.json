@@ -12,6 +12,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "simulate:fest": "tsx scripts/simulateFullFest.ts",
+    "simulate:resume:fest": "tsx scripts/resumeFestPublication.ts",
     "env:emulator": "node -e \"require('fs').copyFileSync('.env.local.emulator', '.env.local'); console.log('Switched to Local Firebase Emulator profile');\"",
     "env:live": "node -e \"require('fs').copyFileSync('.env.local.live', '.env.local'); console.log('Switched to Live Firebase profile');\"",
     "seed": "npx tsx scripts/seedDemoData.ts",
@@ -36,6 +38,7 @@
     "eslint-config-next": "16.4.2",
     "firebase-tools": "^15.34.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vite": "^8.3.4",
     "vitest": "^5.0.5"

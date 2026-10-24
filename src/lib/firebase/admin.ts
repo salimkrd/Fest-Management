@@ -36,7 +36,8 @@ export function getAdminApp(): App | null {
 
   // 1. Emulator vs Live Project Isolation (PRIORITIZED FIRST)
   // When emulator is configured, NEVER fall back to live production credentials.
-  const isEmulator = Boolean(
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const isEmulator = !isProduction && Boolean(
     process.env.FIRESTORE_EMULATOR_HOST ||
     process.env.FIREBASE_AUTH_EMULATOR_HOST ||
     process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true'

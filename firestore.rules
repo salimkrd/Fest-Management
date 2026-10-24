@@ -26,6 +26,7 @@ service cloud.firestore {
     function isTeamManager(teamId) {
       return isSignedIn() &&
         (request.auth.token.role == 'TEAM_MANAGER' && request.auth.token.teamId == teamId) &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         getUserData().role == 'TEAM_MANAGER' &&
         getUserData().teamId == teamId &&
         getUserData().disabled != true &&

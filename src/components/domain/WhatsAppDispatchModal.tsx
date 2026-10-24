@@ -12,12 +12,16 @@ interface WhatsAppDispatchModalProps {
   markEntry: MarkEntry | null;
   isOpen: boolean;
   onClose: () => void;
+  oneTimeSecret?: string;
+  directUrl?: string;
 }
 
 export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
   markEntry,
   isOpen,
-  onClose
+  onClose,
+  oneTimeSecret,
+  directUrl: issuedDirectUrl
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [dispatchedSuccess, setDispatchedSuccess] = useState(false);
@@ -25,7 +29,8 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
   if (!markEntry) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const directLink = `${origin}/judge/login?code=${markEntry.accessCode || 'JRY-0001'}`;
+  const directLink = issuedDirectUrl ||
+    `${origin}/judge/login?code=${encodeURIComponent(markEntry.accessCode || 'JRY-0001')}`;
 
   const whatsAppUrl = buildWhatsAppDispatchUrl({
     phone: markEntry.judgePhone,
@@ -33,7 +38,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
     competitionName: `${markEntry.competitionName} (${markEntry.categoryName})`,
     judgeName: markEntry.judgeName,
     accessCode: markEntry.accessCode || 'JRY-0001',
-    oneTimeSecret: 'Sent confidentially via secure link',
+    oneTimeSecret: oneTimeSecret || '',
     directUrl: directLink
   });
 
@@ -44,6 +49,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
   };
 
   const handleWhatsAppDispatch = () => {
+    if (!oneTimeSecret || !issuedDirectUrl) return;
     window.open(whatsAppUrl, '_blank');
     setDispatchedSuccess(true);
   };
@@ -63,6 +69,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           <Button
             variant="primary"
             size="sm"
+            disabled={!oneTimeSecret || !issuedDirectUrl}
             leftIcon={<MessageSquare className="w-4 h-4" />}
             onClick={handleWhatsAppDispatch}
           >
@@ -78,7 +85,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           <div className="text-xs">
             <h4 className="font-bold text-[#111111]">Cryptographically Isolated Evaluation Sheet</h4>
             <p className="mt-0.5 text-[#526070]">
-              The unique link binds strictly to <strong>{markEntry.competitionName}</strong>. Only the salted password hash is stored server-side. Plaintext passwords are never saved.
+              The unique link binds strictly to <strong>{markEntry.competitionName}</strong>. The secret is shown only for this dispatch; only its hash is stored server-side.
             </p>
           </div>
         </div>
@@ -115,6 +122,20 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
             className="bg-[#F8FAFC]"
           />
         </div>
+        {oneTimeSecret ? (
+          <div>
+            <Input
+              label="Confidential Session Secret"
+              value={oneTimeSecret}
+              readOnly
+              className="bg-[#F8FAFC] font-mono font-bold"
+            />
+          </div>
+        ) : (
+          <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            The session secret is only available immediately after assignment creation. Generate a new assignment to issue a fresh secure link.
+          </p>
+        )}
 
         {/* Phone */}
         <div>

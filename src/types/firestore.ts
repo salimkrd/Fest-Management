@@ -110,6 +110,7 @@ export interface FirestoreParticipant {
   phone: string;
   teamId: string;
   teamCode: string;
+  teamName: string;
   categoryId: string;
   categoryName: string;
   classGrade: string;
@@ -154,6 +155,7 @@ export interface FirestoreRegistration {
   teamCode: string;
   teamName: string;
   categoryId: string;
+  categoryName: string;
   competitionId: string;
   competitionName: string;
   type: CompetitionType;

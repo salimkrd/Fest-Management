@@ -62,7 +62,9 @@ export default function SchedulePage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const comp = competitions.find(c => c.id === competitionId);
     const stg = stages.find(s => s.id === stageId);
@@ -85,18 +87,28 @@ export default function SchedulePage() {
       status
     };
 
-    if (editingSlot) {
-      updateSchedule(editingSlot.id, slotData);
-    } else {
-      addSchedule(slotData);
+    setSaving(true);
+    try {
+      if (editingSlot) {
+        await updateSchedule(editingSlot.id, slotData);
+      } else {
+        await addSchedule(slotData);
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save schedule slot.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete schedule slot for "${name}"?`)) {
-      deleteSchedule(id);
+      try {
+        await deleteSchedule(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete schedule slot.');
+      }
     }
   };
 

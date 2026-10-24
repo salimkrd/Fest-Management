@@ -47,9 +47,25 @@ function TeamLoginForm() {
     if (auth) {
       try {
         const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
-        const tokenResult = await userCred.user.getIdTokenResult(true);
-        const role = tokenResult.claims.role;
-        const assignedTeamId = tokenResult.claims.teamId as string | undefined;
+        let tokenResult = await userCred.user.getIdTokenResult(true);
+        let role = tokenResult.claims.role;
+        let assignedTeamId = tokenResult.claims.teamId as string | undefined;
+
+        if (role !== 'TEAM_MANAGER' && role !== 'ADMIN') {
+          try {
+            const syncRes = await fetch('/api/auth/sync-claims', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${await userCred.user.getIdToken()}` }
+            });
+            if (syncRes.ok) {
+              tokenResult = await userCred.user.getIdTokenResult(true);
+              role = tokenResult.claims.role;
+              assignedTeamId = tokenResult.claims.teamId as string | undefined;
+            }
+          } catch (syncErr) {
+            console.warn('[Team Login] Claims auto-sync attempt error:', syncErr);
+          }
+        }
 
         // Verify role
         if (role !== 'TEAM_MANAGER' && role !== 'ADMIN') {

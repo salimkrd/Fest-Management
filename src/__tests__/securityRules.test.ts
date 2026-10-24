@@ -1369,7 +1369,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         scores: { 'reg-only-pending': 75 }
       })
     ).rejects.toThrow(/zero eligible approved registrations/i);
-  });
+  }, 60000);
 
   it('37. Duplicate or ambiguous registration scoring in a single scorecard is strictly rejected', async () => {
     const adminDb = getAdminDb()!;

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { useFest } from '@/context/FestContext';
 import { Registration } from '@/types/fest';
+import { calculateGrade } from '@/domain/scoring';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -28,7 +29,7 @@ interface LocalScore {
 function JudgeMarkingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { competitions, registrations, markEntries, submitJudgeMarks } = useFest();
+  const { competitions, registrations } = useFest();
 
   const compId = searchParams.get('competitionId') || 'cmp-1';
   const token = searchParams.get('token') || 'JRY-9921-EN';
@@ -60,13 +61,11 @@ function JudgeMarkingContent() {
   // Initialize scores state for all registered participants
   const [scores, setScores] = useState<Record<string, LocalScore>>(() => {
     const initial: Record<string, LocalScore> = {};
-    compRegistrations.forEach((r: any, idx: number) => {
-      initial[r.id] = {
-        'cr-1': idx === 0 ? 28 : idx === 1 ? 26 : 24,
-        'cr-2': idx === 0 ? 24 : idx === 1 ? 23 : 21,
-        'cr-3': idx === 0 ? 24 : idx === 1 ? 22 : 20,
-        'cr-4': idx === 0 ? 19 : idx === 1 ? 18 : 17
-      };
+    compRegistrations.forEach((registration, index) => {
+      const percentage = index === 0 ? 0.95 : index === 1 ? 0.85 : 0.75;
+      initial[registration.id] = Object.fromEntries(
+        criteria.map(criterion => [criterion.id, Math.round(criterion.maxMarks * percentage)])
+      );
     });
     return initial;
   });
@@ -75,6 +74,32 @@ function JudgeMarkingContent() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [draftSavedNotice, setDraftSavedNotice] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+
+  const saveMarks = async (action: 'DRAFT' | 'SUBMIT') => {
+    const assignmentId = searchParams.get('assignmentId') || sessionData?.assignment?.id;
+    const secret = sessionData?.secret;
+    if (!assignmentId || !secret || !competition?.id) {
+      throw new Error('Judge assignment or session secret is missing. Reopen the secure assignment link.');
+    }
+
+    const response = await fetch('/api/judge/marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        assignmentId,
+        competitionId: competition.id,
+        secret,
+        scores
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `Could not ${action.toLowerCase()} marks.`);
+    }
+    return result;
+  };
 
   // Handler to adjust score with +/- steppers
   const adjustScore = (regId: string, criterionId: string, delta: number, max: number) => {
@@ -97,43 +122,41 @@ function JudgeMarkingContent() {
   };
 
   const getGrade = (total: number) => {
-    if (total >= 80) return { grade: 'A', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
-    if (total >= 60) return { grade: 'B', color: 'text-blue-700 bg-blue-50 border-blue-200' };
-    if (total >= 40) return { grade: 'C', color: 'text-amber-700 bg-amber-50 border-amber-200' };
-    return { grade: 'NO_GRADE', color: 'text-neutral-600 bg-neutral-100 border-neutral-200' };
+    const maxMarks = criteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0);
+    const grade = calculateGrade(total, maxMarks);
+    const color = grade === 'A+'
+      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+      : grade === 'A'
+        ? 'text-blue-700 bg-blue-50 border-blue-200'
+        : grade === 'B' || grade === 'C'
+          ? 'text-amber-700 bg-amber-50 border-amber-200'
+          : 'text-neutral-600 bg-neutral-100 border-neutral-200';
+    return { grade, color };
   };
 
-  const handleSaveDraft = () => {
-    setDraftSavedNotice(true);
-    setTimeout(() => setDraftSavedNotice(false), 2500);
+  const handleSaveDraft = async () => {
+    setSubmissionError('');
+    try {
+      await saveMarks('DRAFT');
+      setDraftSavedNotice(true);
+      setTimeout(() => setDraftSavedNotice(false), 2500);
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Could not save draft marks.');
+    }
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
     setSubmitting(true);
-
-    const formattedScores = compRegistrations.map((r: any) => ({
-      registrationId: r.id,
-      participantName: r.participantName,
-      bib: r.chestNumber,
-      teamCode: r.teamCode,
-      teamName: r.teamName,
-      criteriaMarks: scores[r.id] || {},
-      totalMarks: calculateTotal(r.id),
-      remarks: remarks[r.id] || ''
-    }));
-
-    const verificationHash = 'SHA256:' + Math.random().toString(36).substring(2, 12) + Math.random().toString(36).substring(2, 8);
-
-    // Save to context
-    const matchingMarkEntry = markEntries.find(m => m.competitionId === competition.id);
-    const entryId = matchingMarkEntry?.id || sessionData?.assignment?.id || `me-${competition.id}`;
-    submitJudgeMarks(entryId, formattedScores, verificationHash);
-
-    setTimeout(() => {
+    setSubmissionError('');
+    try {
+      const result = await saveMarks('SUBMIT');
       setSubmitting(false);
       setConfirmModalOpen(false);
-      router.push(`/judge/confirmation?competitionId=${competition.id}&hash=${verificationHash}`);
-    }, 800);
+      router.push(`/judge/confirmation?competitionId=${competition.id}&hash=${encodeURIComponent(result.verificationHash)}`);
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Could not submit the scorecard.');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -177,7 +200,12 @@ function JudgeMarkingContent() {
         {draftSavedNotice && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 font-semibold flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-4 h-4 text-[#2563EB]" />
-            Score sheet evaluation draft successfully saved to local jury session.
+            Score sheet evaluation draft securely saved.
+          </div>
+        )}
+        {submissionError && (
+          <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-semibold">
+            {submissionError}
           </div>
         )}
 

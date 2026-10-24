@@ -1,9 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
@@ -41,42 +41,42 @@ import {
 
 interface FestContextType {
   theme: PublicThemeSettings;
-  updateTheme: (newTheme: Partial<PublicThemeSettings>) => void;
+  updateTheme: (newTheme: Partial<PublicThemeSettings>) => Promise<void>;
 
   categories: Category[];
-  addCategory: (cat: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => void;
-  updateCategory: (id: string, cat: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (cat: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => Promise<void>;
+  updateCategory: (id: string, cat: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
   teams: Team[];
-  addTeam: (team: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'>) => void;
-  updateTeam: (id: string, team: Partial<Team>) => void;
-  deleteTeam: (id: string) => void;
+  addTeam: (team: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => Promise<void>;
+  updateTeam: (id: string, team: Partial<Team>) => Promise<void>;
+  deleteTeam: (id: string) => Promise<void>;
 
   competitions: Competition[];
-  addCompetition: (comp: Omit<Competition, 'id' | 'entriesCount'>) => void;
-  updateCompetition: (id: string, comp: Partial<Competition>) => void;
-  deleteCompetition: (id: string) => void;
+  addCompetition: (comp: Omit<Competition, 'id' | 'entriesCount'>) => Promise<void>;
+  updateCompetition: (id: string, comp: Partial<Competition>) => Promise<void>;
+  deleteCompetition: (id: string) => Promise<void>;
 
   participants: Participant[];
-  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => void;
-  updateParticipant: (id: string, part: Partial<Participant>) => void;
-  deleteParticipant: (id: string) => void;
+  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
+  updateParticipant: (id: string, part: Partial<Participant>) => Promise<void>;
+  deleteParticipant: (id: string) => Promise<void>;
 
   registrations: Registration[];
-  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => void;
-  updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => void;
-  deleteRegistration: (id: string) => void;
+  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => Promise<void>;
+  updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => Promise<void>;
+  deleteRegistration: (id: string) => Promise<void>;
 
   stages: Stage[];
-  addStage: (stage: Omit<Stage, 'id'>) => void;
-  updateStage: (id: string, stage: Partial<Stage>) => void;
-  deleteStage: (id: string) => void;
+  addStage: (stage: Omit<Stage, 'id'>) => Promise<void>;
+  updateStage: (id: string, stage: Partial<Stage>) => Promise<void>;
+  deleteStage: (id: string) => Promise<void>;
 
   schedules: ScheduleSlot[];
-  addSchedule: (slot: Omit<ScheduleSlot, 'id'>) => void;
-  updateSchedule: (id: string, slot: Partial<ScheduleSlot>) => void;
-  deleteSchedule: (id: string) => void;
+  addSchedule: (slot: Omit<ScheduleSlot, 'id'>) => Promise<void>;
+  updateSchedule: (id: string, slot: Partial<ScheduleSlot>) => Promise<void>;
+  deleteSchedule: (id: string) => Promise<void>;
 
   markEntries: MarkEntry[];
   addOrUpdateJudgeAssignment: (assignment: {
@@ -84,17 +84,28 @@ interface FestContextType {
     judgeName: string;
     judgePhone: string;
     stageName?: string;
-  }) => Promise<{ accessCode: string; oneTimeSecret: string; directUrl: string }>;
+  }) => Promise<{ assignmentId: string; accessCode: string; oneTimeSecret: string; directUrl: string }>;
   submitJudgeMarks: (markEntryId: string, scores: MarkEntry['scores'], verificationHash?: string) => void;
   revokeJudgeAssignment: (markEntryId: string) => void;
+  cleanupOrphanedJudgeAssignments: (options?: { dryRun?: boolean; confirm?: boolean }) => Promise<{
+    success: boolean;
+    dryRun?: boolean;
+    requiresConfirmation?: boolean;
+    totalOrphaned?: number;
+    removedJudgeAssignments?: number;
+    removedMarkEntries?: number;
+    message?: string;
+    orphanedJudgeDetails?: Array<{ id: string; competitionId: string; judgeName: string }>;
+    orphanedMarkDetails?: Array<{ id: string; competitionId: string }>;
+  }>;
 
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
   pointsLedger: PointsLedgerEntry[];
-  publishResult: (resultId: string) => void;
-  unpublishResult: (resultId: string, reason?: string) => void;
+  publishResult: (resultId: string) => Promise<void>;
+  unpublishResult: (resultId: string, reason?: string) => Promise<void>;
   updateResultStatus: (resultId: string, status: ResultStatus) => void;
-  confirmResultPositionsAndGrades: (resultId: string, ranks: ResultRank[]) => void;
+  confirmResultPositionsAndGrades: (resultId: string, ranks: ResultRank[]) => Promise<void>;
   updatePosterConfig: (resultId: string, config: PosterConfig, release?: boolean) => Promise<void>;
 
   currentTeamUser: Team | null;
@@ -1376,8 +1387,9 @@ function readStoredResult(id: string, data: DocumentData): CompetitionResult {
 }
 
 export function FestProvider({ children }: { children: React.ReactNode }) {
-  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const isEmulator = !isProduction && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+  const isDemoMode = !isProduction && process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
   // Live production and local Firebase Emulator connect to Firestore for dynamic realtime sync.
   // Isolated mock demo mode is strictly for offline showcase (NEXT_PUBLIC_DEMO_MODE=true) or tests without DB.
@@ -1386,11 +1398,17 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const DEMO_TEAM_IDS = ['team-1', 'team-2', 'team-3', 'team-4'];
   const DEMO_CATEGORY_IDS = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
   const DEMO_COMPETITION_IDS = ['cmp-1', 'cmp-2', 'cmp-3', 'cmp-4', 'cmp-5', 'cmp-6'];
+  const DEMO_STAGE_IDS = ['stg-1', 'stg-2', 'stg-3'];
+  const DEMO_SCHEDULE_IDS = ['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-5', 'sch-6'];
 
   const isDemoCategory = (c: Category) =>
     initialCategories.some(init => init.id === c.id) || DEMO_CATEGORY_IDS.includes(c.id);
   const isDemoCompetition = (comp: Competition) =>
     initialCompetitions.some(init => init.id === comp.id) || DEMO_COMPETITION_IDS.includes(comp.id);
+  const isDemoStage = (s: Stage) =>
+    initialStages.some(init => init.id === s.id) || DEMO_STAGE_IDS.includes(s.id);
+  const isDemoSchedule = (sch: ScheduleSlot) =>
+    initialSchedules.some(init => init.id === sch.id) || DEMO_SCHEDULE_IDS.includes(sch.id);
   const isDemoParticipant = (p: Participant) =>
     initialParticipants.some(init => init.id === p.id) || DEMO_TEAM_IDS.includes(p.teamId);
   const isDemoRegistration = (r: Registration) =>
@@ -1419,168 +1437,141 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
       if (snapshot.exists()) {
         setTheme(previous => ({ ...previous, ...snapshot.data(), ...localThemeEdits.current }));
+      } else {
+        setTheme(defaultTheme);
       }
     }, error => console.warn('[FestContext] Published theme synchronization failed:', error));
   }, []);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_categories_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(c => !isDemoCategory(c));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_categories_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialCategories;
+    return [];
   });
 
   const [competitions, setCompetitions] = useState<Competition[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_competitions_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(c => !isDemoCompetition(c));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_competitions_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialCompetitions;
+    return [];
   });
 
   const [participants, setParticipants] = useState<Participant[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_participants_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(p => !isDemoParticipant(p));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_participants_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialParticipants;
+    return [];
   });
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_registrations_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(r => !isDemoRegistration(r));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_registrations_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialRegistrations;
+    return [];
   });
 
   const [stages, setStages] = useState<Stage[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fest_stages_v2');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return initialStages;
-  });
-
-  const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fest_schedules_v2');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return initialSchedules;
-  });
-
-  const [markEntries, setMarkEntries] = useState<MarkEntry[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_mark_entries_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(m => !isDemoMarkEntry(m));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fest_mark_entries_v2');
+      const saved = localStorage.getItem('fest_stages_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialMarkEntries;
+    return [];
   });
+
+  const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
+    if (!isIsolatedDemoOrTest) {
+      return [];
+    }
+
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fest_schedules_v2');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return [];
+  });
+
+  const [rawJudgeAssignments, setRawJudgeAssignments] = useState<MarkEntry[]>([]);
+
+  // Show ONLY judge assignments and mark entries for competitions that actually exist in Firestore
+  const markEntries = useMemo(() => {
+    if (competitions.length === 0) return [];
+    const validCompIds = new Set(competitions.map(c => c.id));
+    return rawJudgeAssignments.filter(entry => validCompIds.has(entry.competitionId));
+  }, [rawJudgeAssignments, competitions]);
+
+  const setMarkEntries = useCallback((action: React.SetStateAction<MarkEntry[]>) => {
+    setRawJudgeAssignments(action);
+  }, []);
 
   const [resultRecords, setResults] = useState<CompetitionResult[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_results_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(res => !isDemoResult(res));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1611,17 +1602,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [pointsLedger, setPointsLedger] = useState<PointsLedgerEntry[]>(() => {
     if (!isIsolatedDemoOrTest) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('fest_points_ledger_v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              return parsed.filter(l => !isDemoPointsLedgerEntry(l));
-            }
-          } catch (e) { console.error(e); }
-        }
-      }
       return [];
     }
 
@@ -1682,38 +1662,20 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
-  // Purge stale mock fixtures from localStorage in live production
+  // Purge stale localStorage caches in live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
       try {
         localStorage.removeItem('fest_teams_v2');
-
-        const cleanse = (key: string, isDemoFn: (item: any) => boolean) => {
-          const val = localStorage.getItem(key);
-          if (val) {
-            try {
-              const parsed = JSON.parse(val);
-              if (Array.isArray(parsed)) {
-                const filtered = parsed.filter(item => !isDemoFn(item));
-                if (filtered.length > 0) {
-                  localStorage.setItem(key, JSON.stringify(filtered));
-                } else {
-                  localStorage.removeItem(key);
-                }
-              }
-            } catch {
-              localStorage.removeItem(key);
-            }
-          }
-        };
-
-        cleanse('fest_categories_v2', isDemoCategory);
-        cleanse('fest_competitions_v2', isDemoCompetition);
-        cleanse('fest_participants_v2', isDemoParticipant);
-        cleanse('fest_registrations_v2', isDemoRegistration);
-        cleanse('fest_mark_entries_v2', isDemoMarkEntry);
-        cleanse('fest_results_v2', isDemoResult);
-        cleanse('fest_points_ledger_v2', isDemoPointsLedgerEntry);
+        localStorage.removeItem('fest_categories_v2');
+        localStorage.removeItem('fest_competitions_v2');
+        localStorage.removeItem('fest_participants_v2');
+        localStorage.removeItem('fest_registrations_v2');
+        localStorage.removeItem('fest_stages_v2');
+        localStorage.removeItem('fest_schedules_v2');
+        localStorage.removeItem('fest_mark_entries_v2');
+        localStorage.removeItem('fest_results_v2');
+        localStorage.removeItem('fest_points_ledger_v2');
       } catch {}
     }
   }, [isIsolatedDemoOrTest]);
@@ -1774,7 +1736,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       unsubscribeResults = onSnapshot(source, snapshot => {
         if (stopped || currentGeneration !== generation) return;
         const records = snapshot.docs.map(item => readStoredResult(item.id, item.data()));
-        if (records.length || !isIsolatedDemoOrTest) setResults(records);
+        setResults(records);
       }, error => console.warn('[FestContext] Official results synchronization failed:', error));
       ready = true;
       void refreshPosters();
@@ -1853,23 +1815,25 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           catRef,
           (snapshot) => {
-            if (!snapshot.empty) {
-              const liveCategories: Category[] = snapshot.docs.map(d => {
-                const dt = d.data();
-                return {
-                  id: d.id,
-                  name: dt.name || '',
-                  code: dt.code || '',
-                  eligibility: dt.eligibility || '',
-                  ageRange: dt.ageRange || '',
-                  classRange: dt.classRange || '',
-                  enrolledCount: dt.enrolledCount || 0,
-                  competitionsCount: dt.competitionsCount || 0,
-                  status: dt.status || 'ACTIVE'
-                };
-              });
-              setCategories(liveCategories);
+            if (snapshot.empty) {
+              setCategories([]);
+              return;
             }
+            const liveCategories: Category[] = snapshot.docs.map(d => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                name: dt.name || '',
+                code: dt.code || '',
+                eligibility: dt.eligibility || '',
+                ageRange: dt.ageRange || '',
+                classRange: dt.classRange || '',
+                enrolledCount: dt.enrolledCount || 0,
+                competitionsCount: dt.competitionsCount || 0,
+                status: dt.status || 'ACTIVE'
+              };
+            });
+            setCategories(liveCategories);
           },
           (err) => {
             console.warn('[FestContext] Firestore categories sync warning:', err);
@@ -1891,30 +1855,32 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           compRef,
           (snapshot) => {
-            if (!snapshot.empty) {
-              const liveCompetitions: Competition[] = snapshot.docs.map(d => {
-                const dt = d.data();
-                return {
-                  id: d.id,
-                  code: dt.code || '',
-                  name: dt.name || '',
-                  categoryId: dt.categoryId || '',
-                  categoryName: dt.categoryName || '',
-                  type: dt.type || 'SOLO',
-                  entriesCount: dt.entriesCount || 0,
-                  stageId: dt.stageId || '',
-                  stageName: dt.stageName || '',
-                  assignedJudges: dt.assignedJudges || [],
-                  status: dt.status || 'SCHEDULED',
-                  date: dt.date || '',
-                  timeSlot: dt.timeSlot || '',
-                  durationMinutes: dt.durationMinutes || 60,
-                  maxEntriesPerTeam: dt.maxEntriesPerTeam || 1,
-                  criteria: dt.criteria || []
-                };
-              });
-              setCompetitions(liveCompetitions);
+            if (snapshot.empty) {
+              setCompetitions([]);
+              return;
             }
+            const liveCompetitions: Competition[] = snapshot.docs.map(d => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                code: dt.code || '',
+                name: dt.name || '',
+                categoryId: dt.categoryId || '',
+                categoryName: dt.categoryName || '',
+                type: dt.type || 'SOLO',
+                entriesCount: dt.entriesCount || 0,
+                stageId: dt.stageId || '',
+                stageName: dt.stageName || '',
+                assignedJudges: dt.assignedJudges || [],
+                status: dt.status || 'SCHEDULED',
+                date: dt.date || '',
+                timeSlot: dt.timeSlot || '',
+                durationMinutes: dt.durationMinutes || 60,
+                maxEntriesPerTeam: dt.maxEntriesPerTeam || 1,
+                criteria: dt.criteria || []
+              };
+            });
+            setCompetitions(liveCompetitions);
           },
           (err) => {
             console.warn('[FestContext] Firestore competitions sync warning:', err);
@@ -1924,6 +1890,155 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn('[FestContext] Could not subscribe to competitions:', e);
       }
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore stages synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      const firestore = db;
+      try {
+        const stagesRef = collection(firestore, 'stages');
+        const unsubscribe = onSnapshot(
+          stagesRef,
+          (snapshot) => {
+            if (snapshot.empty) {
+              setStages([]);
+              return;
+            }
+            const liveStages: Stage[] = snapshot.docs.map(d => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                code: dt.code || '',
+                name: dt.name || '',
+                venue: dt.venue || '',
+                capacity: dt.capacity || 0,
+                managerName: dt.managerName || '',
+                managerPhone: dt.managerPhone || '',
+                audioVisualStatus: dt.audioVisualStatus || 'OPERATIONAL',
+                currentEvent: dt.currentEvent,
+                nextEvent: dt.nextEvent
+              };
+            });
+            setStages(liveStages);
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore stages sync warning:', err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (e) {
+        console.warn('[FestContext] Could not subscribe to stages:', e);
+      }
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore schedules synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      const firestore = db;
+      try {
+        const schedulesRef = collection(firestore, 'schedules');
+        const unsubscribe = onSnapshot(
+          schedulesRef,
+          (snapshot) => {
+            if (snapshot.empty) {
+              setSchedules([]);
+              return;
+            }
+            const liveSchedules: ScheduleSlot[] = snapshot.docs.map(d => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                competitionId: dt.competitionId || '',
+                competitionName: dt.competitionName || '',
+                categoryName: dt.categoryName || '',
+                type: dt.type || 'SOLO',
+                stageId: dt.stageId || '',
+                stageName: dt.stageName || '',
+                date: dt.date || '',
+                startTime: dt.startTime || '',
+                endTime: dt.endTime || '',
+                status: dt.status || 'SCHEDULED'
+              };
+            });
+            setSchedules(liveSchedules);
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore schedules sync warning:', err);
+          }
+        );
+        return () => unsubscribe();
+      } catch (e) {
+        console.warn('[FestContext] Could not subscribe to schedules:', e);
+      }
+    }
+  }, [isIsolatedDemoOrTest]);
+
+  // Realtime Firestore points ledger synchronization for live production
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && db) {
+      const firestore = db;
+      let unsubscribeLedger: (() => void) | undefined;
+      let stopped = false;
+
+      const subscribe = async () => {
+        let isAdmin = false;
+        try {
+          const tokenResult = await auth?.currentUser?.getIdTokenResult();
+          isAdmin = tokenResult?.claims?.role === 'ADMIN';
+        } catch {}
+        if (stopped) return;
+
+        const ledgerRef = isAdmin
+          ? collection(firestore, 'pointsLedger')
+          : query(collection(firestore, 'pointsLedger'), where('status', '==', 'COMMITTED'));
+
+        unsubscribeLedger?.();
+        unsubscribeLedger = onSnapshot(
+          ledgerRef,
+          (snapshot) => {
+            if (stopped) return;
+            const liveEntries: PointsLedgerEntry[] = snapshot.docs.map(d => {
+              const dt = d.data();
+              return {
+                id: d.id,
+                resultId: dt.resultId || '',
+                competitionId: dt.competitionId || '',
+                competitionCode: dt.competitionCode || '',
+                competitionName: dt.competitionName || '',
+                competitionType: dt.competitionType || 'SOLO',
+                teamId: dt.teamId || '',
+                teamCode: dt.teamCode || '',
+                teamName: dt.teamName || '',
+                registrationId: dt.registrationId || '',
+                candidateName: dt.candidateName || '',
+                bib: dt.bib || '',
+                score: dt.score || 0,
+                rank: dt.rank,
+                grade: dt.grade,
+                points: dt.points || 0,
+                status: dt.status || 'COMMITTED',
+                publishedAt: dt.publishedAt || ''
+              };
+            });
+            setPointsLedger(liveEntries);
+          },
+          (err) => {
+            console.warn('[FestContext] Firestore pointsLedger sync warning:', err);
+          }
+        );
+      };
+
+      const unsubAuth = auth ? onAuthStateChanged(auth, () => { void subscribe(); }) : undefined;
+      void subscribe();
+
+      return () => {
+        stopped = true;
+        unsubAuth?.();
+        unsubscribeLedger?.();
+      };
     }
   }, [isIsolatedDemoOrTest]);
 
@@ -1950,7 +2065,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         unsubJudges = null;
       }
 
-      if (!user) return;
+      if (!user) {
+        setParticipants([]);
+        setRegistrations([]);
+        setMarkEntries([]);
+        return;
+      }
 
       try {
         const tokenResult = await user.getIdTokenResult(true);
@@ -1995,6 +2115,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           unsubRegs = onSnapshot(
             regsRef,
             (snapshot) => {
+              if (snapshot.empty) {
+                setRegistrations([]);
+                return;
+              }
               const liveRegs: Registration[] = snapshot.docs.map(d => {
                 const dt = d.data();
                 return {
@@ -2026,6 +2150,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           unsubJudges = onSnapshot(
             judgesRef,
             (snapshot) => {
+              if (snapshot.empty) {
+                setRawJudgeAssignments([]);
+                return;
+              }
               const liveAssignments: MarkEntry[] = snapshot.docs.map(d => {
                 const dt = d.data();
                 return {
@@ -2048,94 +2176,13 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   verificationHash: dt.verificationHash
                 };
               });
-              if (liveAssignments.length > 0) {
-                setMarkEntries(liveAssignments);
-              }
+              setRawJudgeAssignments(liveAssignments);
             },
             (err) => console.warn('[FestContext] Firestore judgeAssignments sync warning:', err)
           );
 
-          // 4. Auto-seed canonical categories if categories collection is currently empty
-          try {
-            const catCheck = collection(firestore, 'categories');
-            const catUnsub = onSnapshot(catCheck, (snap) => {
-              catUnsub();
-              if (snap.empty) {
-                const canonicalCategories: Category[] = [
-                  { id: 'cat-sj', name: 'Sub Junior', code: 'CAT-SJ', eligibility: 'Class 5 to 7', ageRange: '10 - 12 Years', classRange: 'Std 5 - 7', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
-                  { id: 'cat-jr', name: 'Junior', code: 'CAT-JR', eligibility: 'Class 8 to 10', ageRange: '13 - 15 Years', classRange: 'Std 8 - 10', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
-                  { id: 'cat-sr', name: 'Senior', code: 'CAT-SR', eligibility: 'Class 11 to 12', ageRange: '16 - 18 Years', classRange: 'Std 11 - 12', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' },
-                  { id: 'cat-gen', name: 'General', code: 'CAT-GEN', eligibility: 'All Eligible Students', ageRange: 'Open Tier', classRange: 'Campus Wide', enrolledCount: 0, competitionsCount: 0, status: 'ACTIVE' }
-                ];
-                for (const c of canonicalCategories) {
-                  setDoc(doc(firestore, 'categories', c.id), sanitizeForFirestore(c)).catch(() => {});
-                }
-              }
-            });
-          } catch {}
-
-          // 5. Auto-migrate existing local participants, registrations, and judge assignments to Firestore
-          if (typeof window !== 'undefined') {
-            try {
-              const saved = localStorage.getItem('fest_participants_v2');
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                  for (const p of parsed) {
-                    if (p && p.id && p.name && !isDemoParticipant(p)) {
-                      setDoc(doc(firestore, 'participants', p.id), sanitizeForFirestore(p), { merge: true }).catch(() => {});
-                    }
-                  }
-                }
-              }
-            } catch {}
-
-            try {
-              const savedRegs = localStorage.getItem('fest_registrations_v2');
-              if (savedRegs) {
-                const parsed = JSON.parse(savedRegs);
-                if (Array.isArray(parsed)) {
-                  for (const r of parsed) {
-                    if (r && r.id && !isDemoRegistration(r)) {
-                      setDoc(doc(firestore, 'registrations', r.id), sanitizeForFirestore(r), { merge: true }).catch(() => {});
-                    }
-                  }
-                }
-              }
-            } catch {}
-
-            try {
-              const savedMarks = localStorage.getItem('fest_mark_entries_v2');
-              if (savedMarks) {
-                const parsed = JSON.parse(savedMarks);
-                if (Array.isArray(parsed)) {
-                  for (const m of parsed) {
-                    if (m && m.id && m.accessCode && !isDemoMarkEntry(m)) {
-                      const record = {
-                        id: m.id,
-                        judgeName: m.judgeName || 'Juror',
-                        judgePhone: m.judgePhone || '',
-                        competitionId: m.competitionId || '',
-                        competitionCode: m.competitionCode || '',
-                        competitionName: m.competitionName || '',
-                        categoryName: m.categoryName || 'General',
-                        type: m.type || 'SOLO',
-                        stageName: m.stageName || 'Main Stage',
-                        accessCode: m.accessCode,
-                        secretHash: m.secretHash || '',
-                        salt: m.salt || '',
-                        issuedAt: m.issuedAt || new Date().toISOString(),
-                        expiresAt: m.expiresAt || new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
-                        revoked: m.revoked || false,
-                        status: m.revoked ? 'REVOKED' : (m.status === 'SUBMITTED' ? 'SUBMITTED' : 'ACTIVE')
-                      };
-                      setDoc(doc(firestore, 'judgeAssignments', m.id), sanitizeForFirestore(record), { merge: true }).catch(() => {});
-                    }
-                  }
-                }
-              }
-            } catch {}
-          }
+          // Automatic demo-data seeding and legacy background migration are disabled in production
+          // to ensure a clean database reset and require explicit migration approval.
         } else if (role === 'TEAM_MANAGER' && teamId) {
           // 1. Team Manager reads ONLY their own team's participants
           const partsQ = query(collection(firestore, 'participants'), where('teamId', '==', teamId));
@@ -2200,36 +2247,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             (err) => console.warn('[FestContext] Firestore team registrations sync warning:', err)
           );
 
-          // 3. Auto-migrate existing local participants for this team to Firestore
-          if (typeof window !== 'undefined') {
-            try {
-              const saved = localStorage.getItem('fest_participants_v2');
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                  for (const p of parsed) {
-                    if (p && p.id && p.name && p.teamId === teamId && !isDemoParticipant(p)) {
-                      setDoc(doc(firestore, 'participants', p.id), sanitizeForFirestore(p), { merge: true }).catch(() => {});
-                    }
-                  }
-                }
-              }
-            } catch {}
-
-            try {
-              const savedRegs = localStorage.getItem('fest_registrations_v2');
-              if (savedRegs) {
-                const parsed = JSON.parse(savedRegs);
-                if (Array.isArray(parsed)) {
-                  for (const r of parsed) {
-                    if (r && r.id && r.teamId === teamId && !isDemoRegistration(r)) {
-                      setDoc(doc(firestore, 'registrations', r.id), sanitizeForFirestore(r), { merge: true }).catch(() => {});
-                    }
-                  }
-                }
-              }
-            } catch {}
-          }
+          // Stale local participant/registration auto-migration is disabled to prevent accidental recreation.
         }
       } catch (authErr) {
         console.warn('[FestContext] Auth state token check warning:', authErr);
@@ -2244,30 +2262,39 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isIsolatedDemoOrTest, currentTeamUser?.id]);
 
-  // Sync state to localStorage
+  // Sync state to localStorage only in offline demo mode
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('fest_theme_settings_v2', JSON.stringify(theme));
-      localStorage.setItem('fest_categories_v2', JSON.stringify(categories));
       if (isIsolatedDemoOrTest) {
+        localStorage.setItem('fest_theme_settings_v2', JSON.stringify(theme));
+        localStorage.setItem('fest_categories_v2', JSON.stringify(categories));
         localStorage.setItem('fest_teams_v2', JSON.stringify(teams));
+        localStorage.setItem('fest_competitions_v2', JSON.stringify(competitions));
+        localStorage.setItem('fest_participants_v2', JSON.stringify(participants));
+        localStorage.setItem('fest_registrations_v2', JSON.stringify(registrations));
+        localStorage.setItem('fest_stages_v2', JSON.stringify(stages));
+        localStorage.setItem('fest_schedules_v2', JSON.stringify(schedules));
+        localStorage.setItem('fest_mark_entries_v2', JSON.stringify(markEntries));
+        localStorage.setItem('fest_results_v2', JSON.stringify(results.map(result => ({
+          ...result,
+          posterReleased: false,
+          posterConfig: undefined,
+          posterPublishedConfig: undefined,
+          posterDraftConfig: undefined,
+        }))));
+        localStorage.setItem('fest_points_ledger_v2', JSON.stringify(pointsLedger));
       } else {
+        localStorage.removeItem('fest_categories_v2');
         localStorage.removeItem('fest_teams_v2');
+        localStorage.removeItem('fest_competitions_v2');
+        localStorage.removeItem('fest_participants_v2');
+        localStorage.removeItem('fest_registrations_v2');
+        localStorage.removeItem('fest_stages_v2');
+        localStorage.removeItem('fest_schedules_v2');
+        localStorage.removeItem('fest_mark_entries_v2');
+        localStorage.removeItem('fest_results_v2');
+        localStorage.removeItem('fest_points_ledger_v2');
       }
-      localStorage.setItem('fest_competitions_v2', JSON.stringify(competitions));
-      localStorage.setItem('fest_participants_v2', JSON.stringify(participants));
-      localStorage.setItem('fest_registrations_v2', JSON.stringify(registrations));
-      localStorage.setItem('fest_stages_v2', JSON.stringify(stages));
-      localStorage.setItem('fest_schedules_v2', JSON.stringify(schedules));
-      localStorage.setItem('fest_mark_entries_v2', JSON.stringify(markEntries));
-      localStorage.setItem('fest_results_v2', JSON.stringify(results.map(result => ({
-        ...result,
-        posterReleased: false,
-        posterConfig: undefined,
-        posterPublishedConfig: undefined,
-        posterDraftConfig: undefined,
-      }))));
-      localStorage.setItem('fest_points_ledger_v2', JSON.stringify(pointsLedger));
       if (currentTeamUser) {
         localStorage.setItem('fest_current_team_user_v2', JSON.stringify(currentTeamUser));
       } else {
@@ -2276,9 +2303,16 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser, isIsolatedDemoOrTest]);
 
-  const updateTheme = (newTheme: Partial<PublicThemeSettings>) => {
+  const updateTheme = async (newTheme: Partial<PublicThemeSettings>) => {
     localThemeEdits.current = { ...localThemeEdits.current, ...newTheme };
     setTheme(prev => ({ ...prev, ...newTheme }));
+    if (!isIsolatedDemoOrTest && db) {
+      try {
+        await setDoc(doc(db, 'settings', 'publicTheme'), sanitizeForFirestore(newTheme), { merge: true });
+      } catch (err) {
+        console.warn('[FestContext] Firestore updateTheme error:', err);
+      }
+    }
   };
 
   const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
@@ -2289,34 +2323,59 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       enrolledCount: 0,
       competitionsCount: 0
     };
-    setCategories(prev => [...prev.filter(c => c.id !== newId), newCat]);
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db!, 'categories', newId), sanitizeForFirestore(newCat));
-      } catch (err) {
-        console.warn('[FestContext] Firestore addCategory error:', err);
-      }
+      await setDoc(doc(db, 'categories', newId), sanitizeForFirestore(newCat));
     }
+    setCategories(prev => [...prev.filter(c => c.id !== newId), newCat]);
   };
 
   const updateCategory = async (id: string, updated: Partial<Category>) => {
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await updateDoc(doc(db!, 'categories', id), sanitizeForFirestore(updated));
-      } catch (err) {
-        console.warn('[FestContext] Firestore updateCategory error:', err);
-      }
+      await updateDoc(doc(db, 'categories', id), sanitizeForFirestore(updated));
     }
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
   };
 
   const deleteCategory = async (id: string) => {
+    // 1. Client-side guard: verify no active competitions are assigned to this category
+    const dependentComps = competitions.filter(c => c.categoryId === id);
+    if (dependentComps.length > 0) {
+      const compNames = dependentComps.slice(0, 3).map(c => `"${c.name}"`).join(', ');
+      const moreText = dependentComps.length > 3 ? ` and ${dependentComps.length - 3} more` : '';
+      throw new Error(`Cannot delete category: ${dependentComps.length} active competition(s) (${compNames}${moreText}) are assigned to this category. Please reassign or delete them first.`);
+    }
+
+    // 2. In non-isolated mode, execute server deletion via Admin API
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to delete a category.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to delete category (HTTP ${res.status})`);
+      }
+    }
+
+    // 3. Update local state and localStorage cache only on success
     setCategories(prev => prev.filter(c => c.id !== id));
-    if (!isIsolatedDemoOrTest && db) {
+
+    if (typeof window !== 'undefined') {
       try {
-        await deleteDoc(doc(db!, 'categories', id));
-      } catch (err) {
-        console.warn('[FestContext] Firestore deleteCategory error:', err);
+        const cached = localStorage.getItem('fest_categories_v2');
+        if (cached) {
+          const list: Category[] = JSON.parse(cached);
+          localStorage.setItem('fest_categories_v2', JSON.stringify(list.filter(c => c.id !== id)));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached categories:', e);
       }
     }
   };
@@ -2336,11 +2395,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTeam = (teamData: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => {
+  const addTeam = async (teamData: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => {
     const customId = (teamData as any).id;
+    const newId = customId || ('team-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6));
     const newTeam: Team = {
       ...teamData,
-      id: customId || ('team-' + (teams.length + 1)),
+      id: newId,
       contestantsCount: (teamData as any).contestantsCount || 0,
       eventsCount: (teamData as any).eventsCount || 0,
       totalPoints: (teamData as any).totalPoints || 0,
@@ -2351,6 +2411,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       thirdCount: (teamData as any).thirdCount || 0,
       rank: (teamData as any).rank || (teams.length + 1)
     };
+    if (!isIsolatedDemoOrTest && db) {
+      await setDoc(doc(db, 'teams', newId), sanitizeForFirestore(newTeam), { merge: true });
+    }
     setTeams(prev => {
       const idx = prev.findIndex(t => t.id === newTeam.id);
       if (idx !== -1) {
@@ -2362,11 +2425,17 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateTeam = (id: string, updated: Partial<Team>) => {
+  const updateTeam = async (id: string, updated: Partial<Team>) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await updateDoc(doc(db, 'teams', id), sanitizeForFirestore(updated));
+    }
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t));
   };
 
-  const deleteTeam = (id: string) => {
+  const deleteTeam = async (id: string) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'teams', id));
+    }
     setTeams(prev => prev.filter(t => t.id !== id));
   };
 
@@ -2377,192 +2446,249 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       id: newId,
       entriesCount: 0
     };
-    setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db!, 'competitions', newId), sanitizeForFirestore(newComp));
-      } catch (err) {
-        console.warn('[FestContext] Firestore addCompetition error:', err);
-      }
+      await setDoc(doc(db, 'competitions', newId), sanitizeForFirestore(newComp));
     }
+    setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
   };
 
   const updateCompetition = async (id: string, updated: Partial<Competition>) => {
-    setCompetitions(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await updateDoc(doc(db!, 'competitions', id), sanitizeForFirestore(updated));
-      } catch (err) {
-        console.warn('[FestContext] Firestore updateCompetition error:', err);
-      }
+      await updateDoc(doc(db, 'competitions', id), sanitizeForFirestore(updated));
     }
+    setCompetitions(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
   };
 
   const deleteCompetition = async (id: string) => {
+    // 1. In non-isolated mode, execute server cascade deletion via Admin API first
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to delete a competition.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/competitions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to delete competition (HTTP ${res.status})`);
+      }
+    }
+
+    // 2. Safely update local state and cascade remove related records
     setCompetitions(prev => prev.filter(c => c.id !== id));
-    if (!isIsolatedDemoOrTest && db) {
+    setRawJudgeAssignments(prev => prev.filter(j => j.competitionId !== id));
+    setRegistrations(prev => prev.filter(r => r.competitionId !== id));
+    setSchedules(prev => prev.filter(s => s.competitionId !== id));
+    setResults(prev => prev.filter(r => r.competitionId !== id && r.id !== `res-${id}`));
+
+    // 3. Update points ledger and recalculate championship team points dynamically
+    const remainingLedger = pointsLedger.filter(p => p.competitionId !== id);
+    setPointsLedger(remainingLedger);
+    const aggregated = recalculateTeamChampionship(initialBaseTeams, remainingLedger);
+    setTeams(prev => prev.map(t => {
+      const agg = aggregated.find(a => a.teamId === t.id);
+      return agg ? {
+        ...t,
+        totalPoints: agg.totalPoints,
+        soloPoints: agg.soloPoints,
+        groupPoints: agg.groupPoints,
+        firstCount: agg.firstCount,
+        secondCount: agg.secondCount,
+        thirdCount: agg.thirdCount,
+        rank: agg.rank
+      } : t;
+    }));
+
+    if (typeof window !== 'undefined') {
       try {
-        await deleteDoc(doc(db!, 'competitions', id));
-      } catch (err) {
-        console.warn('[FestContext] Firestore deleteCompetition error:', err);
+        const cached = localStorage.getItem('fest_competitions_v2');
+        if (cached) {
+          const list: Competition[] = JSON.parse(cached);
+          localStorage.setItem('fest_competitions_v2', JSON.stringify(list.filter(c => c.id !== id)));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached competitions:', e);
       }
     }
   };
 
   const addParticipant = async (partData: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
-    let maxBibNum = 1000;
-    for (const p of participants) {
-      const num = parseInt((p.bib || '').replace('#', ''), 10);
-      if (!isNaN(num) && num > maxBibNum) {
-        maxBibNum = num;
-      }
-    }
-    const newBib = '#' + (maxBibNum + 1);
-    const newId = 'part-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
-    const newParticipant: Participant = {
-      ...partData,
-      id: newId,
-      bib: newBib,
-      idStatus: 'GENERATED'
-    };
-    setParticipants(prev => [...prev.filter(p => p.id !== newId), newParticipant]);
-    setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
+    let newParticipant: Participant;
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db!, 'participants', newId), sanitizeForFirestore(newParticipant));
-        if (partData.teamId) {
-          updateDoc(doc(db!, 'teams', partData.teamId), {
-            contestantsCount: (teams.find(t => t.id === partData.teamId)?.contestantsCount || 0) + 1
-          }).catch(() => {});
-        }
-      } catch (err) {
-        console.warn('[FestContext] Firestore addParticipant error:', err);
+      const user = auth?.currentUser;
+      if (!user) throw new Error('Unauthorized: Sign in before registering a participant.');
+      if (!partData.teamId) throw new Error('Validation Error: Participant team is required.');
+
+      const response = await fetch(`/api/team/${encodeURIComponent(partData.teamId)}/participants`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify(partData)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Could not register the participant.');
+      newParticipant = payload.participant as Participant;
+    } else {
+      let maxBibNum = 1000;
+      for (const participant of participants) {
+        const num = parseInt((participant.bib || '').replace('#', ''), 10);
+        if (!isNaN(num) && num > maxBibNum) maxBibNum = num;
       }
+      newParticipant = {
+        ...partData,
+        id: 'part-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+        bib: `#${maxBibNum + 1}`,
+        idStatus: 'GENERATED'
+      };
     }
+
+    setParticipants(prev => [...prev.filter(p => p.id !== newParticipant.id), newParticipant]);
+    setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
   };
 
   const updateParticipant = async (id: string, updated: Partial<Participant>) => {
-    setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await updateDoc(doc(db!, 'participants', id), sanitizeForFirestore(updated));
-      } catch (err) {
-        console.warn('[FestContext] Firestore updateParticipant error:', err);
-      }
+      await updateDoc(doc(db, 'participants', id), sanitizeForFirestore(updated));
     }
+    setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
   };
 
   const deleteParticipant = async (id: string) => {
     const partToDelete = participants.find(p => p.id === id);
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'participants', id));
+      if (partToDelete?.teamId) {
+        updateDoc(doc(db, 'teams', partToDelete.teamId), {
+          contestantsCount: Math.max(0, (teams.find(t => t.id === partToDelete.teamId)?.contestantsCount || 1) - 1)
+        }).catch(() => {});
+      }
+    }
     setParticipants(prev => prev.filter(p => p.id !== id));
     if (partToDelete?.teamId) {
       setTeams(prev => prev.map(t => t.id === partToDelete.teamId ? { ...t, contestantsCount: Math.max(0, t.contestantsCount - 1) } : t));
     }
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        await deleteDoc(doc(db!, 'participants', id));
-        if (partToDelete?.teamId) {
-          updateDoc(doc(db!, 'teams', partToDelete.teamId), {
-            contestantsCount: Math.max(0, (teams.find(t => t.id === partToDelete.teamId)?.contestantsCount || 1) - 1)
-          }).catch(() => {});
-        }
-      } catch (err) {
-        console.warn('[FestContext] Firestore deleteParticipant error:', err);
-      }
-    }
   };
 
   const addRegistration = async (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
-    let maxRegNum = 8820;
-    for (const r of registrations) {
-      const num = parseInt((r.code || '').replace('REG-', ''), 10);
-      if (!isNaN(num) && num > maxRegNum) {
-        maxRegNum = num;
-      }
-    }
-    const newId = 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
-    const newReg: Registration = {
-      ...regData,
-      id: newId,
-      code: 'REG-' + (maxRegNum + 1),
-      registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    };
-    setRegistrations(prev => [...prev.filter(r => r.id !== newId), newReg]);
-    setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
+    let newReg: Registration;
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db!, 'registrations', newId), sanitizeForFirestore(newReg));
-        if (regData.competitionId) {
-          updateDoc(doc(db!, 'competitions', regData.competitionId), {
-            entriesCount: (competitions.find(c => c.id === regData.competitionId)?.entriesCount || 0) + 1
-          }).catch(() => {});
-        }
-      } catch (err) {
-        console.warn('[FestContext] Firestore addRegistration error:', err);
+      const user = auth?.currentUser;
+      if (!user) throw new Error('Unauthorized: Sign in before registering for a competition.');
+      if (!regData.teamId) throw new Error('Validation Error: Registration team is required.');
+
+      const response = await fetch(`/api/team/${encodeURIComponent(regData.teamId)}/registrations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify({
+          competitionId: regData.competitionId,
+          participantId: regData.participantId,
+          participantName: regData.participantName,
+          groupMembers: regData.groupMembers
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Could not register for the competition.');
+      newReg = payload.registration as Registration;
+    } else {
+      let maxRegNum = 8820;
+      for (const registration of registrations) {
+        const num = parseInt((registration.code || '').replace('REG-', ''), 10);
+        if (!isNaN(num) && num > maxRegNum) maxRegNum = num;
       }
+      newReg = {
+        ...regData,
+        id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+        code: `REG-${maxRegNum + 1}`,
+        registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      };
     }
+
+    setRegistrations(prev => [...prev.filter(r => r.id !== newReg.id), newReg]);
+    setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
   };
 
   const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
-    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     if (!isIsolatedDemoOrTest && db) {
-      try {
-        await updateDoc(doc(db!, 'registrations', id), { status });
-      } catch (err) {
-        console.warn('[FestContext] Firestore updateRegistrationStatus error:', err);
-      }
+      await updateDoc(doc(db, 'registrations', id), { status });
     }
+    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
   const deleteRegistration = async (id: string) => {
     const regToDelete = registrations.find(r => r.id === id);
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'registrations', id));
+      if (regToDelete?.competitionId) {
+        updateDoc(doc(db, 'competitions', regToDelete.competitionId), {
+          entriesCount: Math.max(0, (competitions.find(c => c.id === regToDelete.competitionId)?.entriesCount || 1) - 1)
+        }).catch(() => {});
+      }
+    }
     setRegistrations(prev => prev.filter(r => r.id !== id));
     if (regToDelete?.competitionId) {
       setCompetitions(prev => prev.map(c => c.id === regToDelete.competitionId ? { ...c, entriesCount: Math.max(0, c.entriesCount - 1) } : c));
     }
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        await deleteDoc(doc(db!, 'registrations', id));
-        if (regToDelete?.competitionId) {
-          updateDoc(doc(db!, 'competitions', regToDelete.competitionId), {
-            entriesCount: Math.max(0, (competitions.find(c => c.id === regToDelete.competitionId)?.entriesCount || 1) - 1)
-          }).catch(() => {});
-        }
-      } catch (err) {
-        console.warn('[FestContext] Firestore deleteRegistration error:', err);
-      }
-    }
   };
 
-  const addStage = (stageData: Omit<Stage, 'id'>) => {
+  const addStage = async (stageData: Omit<Stage, 'id'>) => {
+    const newId = 'stg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newStage: Stage = {
       ...stageData,
-      id: 'stg-' + (stages.length + 1)
+      id: newId
     };
-    setStages(prev => [...prev, newStage]);
+    if (!isIsolatedDemoOrTest && db) {
+      await setDoc(doc(db, 'stages', newId), sanitizeForFirestore(newStage));
+    }
+    setStages(prev => [...prev.filter(s => s.id !== newId), newStage]);
   };
 
-  const updateStage = (id: string, updated: Partial<Stage>) => {
+  const updateStage = async (id: string, updated: Partial<Stage>) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await updateDoc(doc(db, 'stages', id), sanitizeForFirestore(updated));
+    }
     setStages(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
   };
 
-  const deleteStage = (id: string) => {
+  const deleteStage = async (id: string) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'stages', id));
+    }
     setStages(prev => prev.filter(s => s.id !== id));
   };
 
-  const addSchedule = (slotData: Omit<ScheduleSlot, 'id'>) => {
+  const addSchedule = async (slotData: Omit<ScheduleSlot, 'id'>) => {
+    const newId = 'sch-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newSlot: ScheduleSlot = {
       ...slotData,
-      id: 'sch-' + (schedules.length + 1)
+      id: newId
     };
-    setSchedules(prev => [...prev, newSlot]);
+    if (!isIsolatedDemoOrTest && db) {
+      await setDoc(doc(db, 'schedules', newId), sanitizeForFirestore(newSlot));
+    }
+    setSchedules(prev => [...prev.filter(s => s.id !== newId), newSlot]);
   };
 
-  const updateSchedule = (id: string, updated: Partial<ScheduleSlot>) => {
+  const updateSchedule = async (id: string, updated: Partial<ScheduleSlot>) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await updateDoc(doc(db, 'schedules', id), sanitizeForFirestore(updated));
+    }
     setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
   };
 
-  const deleteSchedule = (id: string) => {
+  const deleteSchedule = async (id: string) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await deleteDoc(doc(db, 'schedules', id));
+    }
     setSchedules(prev => prev.filter(s => s.id !== id));
   };
 
@@ -2572,51 +2698,80 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     judgeName: string;
     judgePhone: string;
     stageName?: string;
-  }): Promise<{ accessCode: string; oneTimeSecret: string; directUrl: string }> => {
+  }): Promise<{ assignmentId: string; accessCode: string; oneTimeSecret: string; directUrl: string }> => {
     const comp = competitions.find(c => c.id === params.competitionId);
-    const assignmentId = 'asgn-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
-    const creds = await createJudgeAssignment({
-      id: assignmentId,
-      judgeName: params.judgeName,
-      judgePhone: params.judgePhone,
-      competitionId: params.competitionId,
-      competitionCode: comp ? comp.code : 'CMP-X',
-      competitionName: comp ? comp.name : 'Unknown Competition',
-      stageName: params.stageName || (comp ? comp.stageName : 'Main Stage')
-    });
+    let assignment: MarkEntry;
+    let oneTimeSecret: string;
+    let directUrl: string;
 
-    const newEntry: MarkEntry = {
-      id: creds.assignment.id,
-      competitionId: params.competitionId,
-      competitionName: comp ? comp.name : 'Unknown Competition',
-      competitionCode: comp ? comp.code : 'CMP-X',
-      categoryName: comp ? comp.categoryName : 'General',
-      type: comp ? comp.type : 'SOLO',
-      judgeName: params.judgeName,
-      judgePhone: params.judgePhone,
-      accessCode: creds.assignment.accessCode,
-      secretHash: creds.assignment.secretHash,
-      salt: creds.assignment.salt,
-      expiresAt: creds.assignment.expiresAt,
-      revoked: false,
-      status: 'NOT_STARTED',
-      scores: []
-    };
-
-    setMarkEntries(prev => [...prev.filter(m => m.id !== creds.assignment.id), newEntry]);
-
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db, 'judgeAssignments', creds.assignment.id), sanitizeForFirestore(creds.assignment), { merge: true });
-      } catch (err) {
-        console.warn('[FestContext] Firestore addOrUpdateJudgeAssignment error:', err);
+    if (isIsolatedDemoOrTest || !db) {
+      const creds = await createJudgeAssignment({
+        id: 'asgn-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+        judgeName: params.judgeName,
+        judgePhone: params.judgePhone,
+        competitionId: params.competitionId,
+        competitionCode: comp ? comp.code : 'CMP-X',
+        competitionName: comp ? comp.name : 'Unknown Competition',
+        stageName: params.stageName || (comp ? comp.stageName : 'Main Stage')
+      });
+      assignment = {
+        id: creds.assignment.id,
+        competitionId: params.competitionId,
+        competitionName: comp ? comp.name : 'Unknown Competition',
+        competitionCode: comp ? comp.code : 'CMP-X',
+        categoryName: comp ? comp.categoryName : 'General',
+        type: comp ? comp.type : 'SOLO',
+        judgeName: params.judgeName,
+        judgePhone: params.judgePhone,
+        accessCode: creds.assignment.accessCode,
+        secretHash: creds.assignment.secretHash,
+        salt: creds.assignment.salt,
+        expiresAt: creds.assignment.expiresAt,
+        revoked: false,
+        status: 'NOT_STARTED',
+        scores: []
+      };
+      oneTimeSecret = creds.oneTimeSecret;
+      directUrl = creds.directLoginUrl;
+    } else {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Unauthorized: Sign in as an administrator before assigning judges.');
       }
+
+      const response = await fetch('/api/admin/judge-assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify({
+          competitionId: params.competitionId,
+          judgeName: params.judgeName,
+          judgePhone: params.judgePhone
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || 'Could not create the judge assignment.');
+      }
+
+      assignment = {
+        ...payload.assignment,
+        status: 'NOT_STARTED',
+        scores: []
+      } as MarkEntry;
+      oneTimeSecret = payload.oneTimeSecret;
+      directUrl = payload.directUrl;
     }
 
+    setMarkEntries(prev => [...prev.filter(m => m.id !== assignment.id), assignment]);
+
     return {
-      accessCode: creds.assignment.accessCode,
-      oneTimeSecret: creds.oneTimeSecret,
-      directUrl: creds.directLoginUrl
+      assignmentId: assignment.id,
+      accessCode: assignment.accessCode,
+      oneTimeSecret,
+      directUrl
     };
   };
 
@@ -2696,7 +2851,41 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setResults(prev => prev.map(r => r.id === resultId ? { ...r, resultStatus: status } : r));
   };
 
-  const confirmResultPositionsAndGrades = (resultId: string, ranks: ResultRank[]) => {
+  const postAdminResultAction = async (
+    resultId: string,
+    action: 'CONFIRM' | 'PUBLISH' | 'UNPUBLISH',
+    payload: Record<string, unknown> = {}
+  ) => {
+    const user = auth?.currentUser;
+    if (!user) {
+      throw new Error('Unauthorized: Sign in as an administrator before managing results.');
+    }
+
+    const response = await fetch(`/api/admin/results/${encodeURIComponent(resultId)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await user.getIdToken()}`
+      },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `Could not ${action.toLowerCase()} the result.`);
+    }
+    return result;
+  };
+
+  const confirmResultPositionsAndGrades = async (resultId: string, ranks: ResultRank[]) => {
+    if (!isIsolatedDemoOrTest && db) {
+      const response = await postAdminResultAction(resultId, 'CONFIRM', { ranks });
+      setResults(prev => prev.map(r => r.id === resultId
+        ? { ...r, resultStatus: 'READY_TO_PUBLISH', ranks: response.ranks || ranks }
+        : r
+      ));
+      return;
+    }
+
     setResults(prev => prev.map(r => {
       if (r.id === resultId) {
         return {
@@ -2710,7 +2899,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Official Result Publication: Commits points to Points Ledger and updates team championship points
-  const publishResult = (resultId: string) => {
+  const publishResult = async (resultId: string) => {
+    if (!isIsolatedDemoOrTest && db) {
+      await postAdminResultAction(resultId, 'PUBLISH');
+      return;
+    }
+
     const targetResult = results.find(r => r.id === resultId);
     if (!targetResult) return;
 
@@ -2774,7 +2968,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Result Unpublishing / Revision Reversal
-  const unpublishResult = (resultId: string, reason: string = 'Administrative review') => {
+  const unpublishResult = async (resultId: string, reason: string = 'Administrative review') => {
+    if (!isIsolatedDemoOrTest && db) {
+      await postAdminResultAction(resultId, 'UNPUBLISH', { reason });
+      return;
+    }
+
     // 1. Reverse ledger entries
     const newLedger = reverseResultInLedger(resultId, pointsLedger, reason);
     setPointsLedger(newLedger);
@@ -2825,6 +3024,55 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setPosterMedia(previous => ({ ...previous, [resultId]: poster }));
   };
 
+  const cleanupOrphanedJudgeAssignments = useCallback(async (options?: { dryRun?: boolean; confirm?: boolean }) => {
+    if (isIsolatedDemoOrTest || !auth?.currentUser) {
+      return {
+        success: true,
+        dryRun: options?.dryRun ?? true,
+        requiresConfirmation: false,
+        totalOrphaned: 0,
+        removedJudgeAssignments: 0,
+        removedMarkEntries: 0,
+        message: 'No actions performed in demo/unauthenticated mode.'
+      };
+    }
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const isDryRun = options?.dryRun ?? (!options?.confirm);
+      const isConfirmed = options?.confirm === true;
+
+      const res = await fetch('/api/admin/judge-assignments/cleanup-orphaned', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          dryRun: isDryRun,
+          confirm: isConfirmed
+        })
+      });
+
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to clean up orphaned assignments (HTTP ${res.status})`);
+      }
+
+      const data = await res.json();
+      if (data.confirmed && (data.removedJudgeAssignments > 0 || data.removedMarkEntries > 0)) {
+        setRawJudgeAssignments(prev => {
+          const validCompIds = new Set(competitions.map(c => c.id));
+          return prev.filter(entry => validCompIds.has(entry.competitionId));
+        });
+      }
+      return data;
+    } catch (err) {
+      console.warn('[FestContext] Cleanup orphaned judge assignments failed:', err);
+      throw err;
+    }
+  }, [isIsolatedDemoOrTest, competitions]);
+
   return (
     <FestContext.Provider
       value={{
@@ -2862,6 +3110,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         addOrUpdateJudgeAssignment,
         submitJudgeMarks,
         revokeJudgeAssignment,
+        cleanupOrphanedJudgeAssignments,
         results,
         pointsLedger,
         publishResult,

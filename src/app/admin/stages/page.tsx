@@ -59,7 +59,9 @@ export default function StagesPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !code || !venue) {
       setError('Please provide venue name, code and location.');
@@ -78,18 +80,28 @@ export default function StagesPage() {
       nextEvent
     };
 
-    if (editingStage) {
-      updateStage(editingStage.id, stageData);
-    } else {
-      addStage(stageData);
+    setSaving(true);
+    try {
+      if (editingStage) {
+        await updateStage(editingStage.id, stageData);
+      } else {
+        await addStage(stageData);
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save stage.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove stage venue "${name}"?`)) {
-      deleteStage(id);
+      try {
+        await deleteStage(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete stage.');
+      }
     }
   };
 

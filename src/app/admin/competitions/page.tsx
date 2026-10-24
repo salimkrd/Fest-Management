@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Trophy, MapPin, Calendar, Clock, Users } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Trophy, MapPin, Calendar, Clock, Users, AlertCircle } from 'lucide-react';
 
 export default function CompetitionsPage() {
   const { competitions, categories, stages, addCompetition, updateCompetition, deleteCompetition } = useFest();
@@ -19,6 +19,8 @@ export default function CompetitionsPage() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -73,7 +75,9 @@ export default function CompetitionsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -110,18 +114,32 @@ export default function CompetitionsPage() {
       ]
     };
 
-    if (editingComp) {
-      updateCompetition(editingComp.id, compData);
-    } else {
-      addCompetition(compData);
+    setSaving(true);
+    try {
+      if (editingComp) {
+        await updateCompetition(editingComp.id, compData);
+      } else {
+        await addCompetition(compData);
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save competition.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete competition "${name}"?`)) {
-      deleteCompetition(id);
+      setActionError(null);
+      setDeletingId(id);
+      try {
+        await deleteCompetition(id);
+      } catch (err: any) {
+        setActionError(err?.message || 'Failed to delete competition.');
+      } finally {
+        setDeletingId(null);
+      }
     }
   };
 
@@ -161,6 +179,19 @@ export default function CompetitionsPage() {
             Create Competition
           </Button>
         </div>
+
+        {/* Action Error Banner */}
+        {actionError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700 font-bold ml-4">
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Filter bar */}
         <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col md:flex-row items-center justify-between gap-4">
@@ -223,61 +254,79 @@ export default function CompetitionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredCompetitions.map((comp) => (
-                  <tr key={comp.id} className="hover:bg-[#F8FAFC] transition-colors">
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                          {comp.code}
-                        </span>
-                        <span className="font-bold text-[#111111] text-sm">{comp.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 font-semibold text-[#111111]">
-                      {comp.categoryName}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${comp.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                        {comp.type}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-center font-bold text-[#111111]">
-                      {comp.entriesCount}
-                    </td>
-                    <td className="py-4 px-6 text-[#526070]">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-[#526070] shrink-0" />
-                        <span className="truncate max-w-[150px]">{comp.stageName}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-[#526070]">
-                      {comp.assignedJudges.length > 0 ? comp.assignedJudges.join(', ') : 'Pending Assignment'}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      {getStatusBadge(comp.status)}
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(comp)}
-                          className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
-                          title="Edit Competition"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(comp.id, comp.name)}
-                          className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
-                          title="Delete Competition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                {filteredCompetitions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-xs text-[#526070]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Trophy className="w-8 h-8 text-[#94A3B8]" />
+                        <p className="font-semibold text-sm text-[#111111]">
+                          {competitions.length === 0 ? 'No competitions configured' : 'No competitions found'}
+                        </p>
+                        <p className="text-xs text-[#526070]">
+                          {competitions.length === 0
+                            ? "Use 'Create Competition' to configure competitions."
+                            : 'No competitions match your filter criteria.'}
+                        </p>
                       </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredCompetitions.map((comp) => (
+                    <tr key={comp.id} className="hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            {comp.code}
+                          </span>
+                          <span className="font-bold text-[#111111] text-sm">{comp.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 font-semibold text-[#111111]">
+                        {comp.categoryName}
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${comp.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
+                          {comp.type}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center font-bold text-[#111111]">
+                        {comp.entriesCount}
+                      </td>
+                      <td className="py-4 px-6 text-[#526070]">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-[#526070] shrink-0" />
+                          <span className="truncate max-w-[150px]">{comp.stageName}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-[#526070]">
+                        {comp.assignedJudges.length > 0 ? comp.assignedJudges.join(', ') : 'Pending Assignment'}
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        {getStatusBadge(comp.status)}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(comp)}
+                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
+                            title="Edit Competition"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(comp.id, comp.name)}
+                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                            title="Delete Competition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

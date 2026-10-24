@@ -227,13 +227,27 @@ export default function TeamsPage() {
     refreshTeams();
   }, []);
 
-  // When realtime context updates (e.g. from Firestore listener or emulator fixtures), synchronize
+  // Synchronize dynamicTeams with realtime Firestore teams from FestContext
   useEffect(() => {
-    if (teams.length > 0 && dynamicTeams.length === 0 && !connectionError) {
-      setDynamicTeams(teams);
-      setLoadingTeams(false);
+    if (teams) {
+      setDynamicTeams(prev => {
+        return teams.map(t => {
+          const existing = prev.find(p => p.id === t.id);
+          return {
+            ...t,
+            managerName: existing?.managerName || t.managerName || '',
+            managerEmail: existing?.managerEmail || t.managerEmail || '',
+            managerPhone: existing?.managerPhone || t.managerPhone || '',
+            provisioningStatus: existing?.provisioningStatus || t.provisioningStatus,
+            invitationStatus: existing?.invitationStatus || t.invitationStatus
+          };
+        });
+      });
+      if (teams.length > 0) {
+        setLoadingTeams(false);
+      }
     }
-  }, [teams, connectionError]);
+  }, [teams]);
 
   const filteredTeams = dynamicTeams.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||

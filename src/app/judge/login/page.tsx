@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
@@ -14,19 +14,15 @@ function JudgeLoginForm() {
   const searchParams = useSearchParams();
   const { competitions, markEntries, theme } = useFest();
 
-  const urlCode = searchParams.get('code') || searchParams.get('token') || '';
+  const urlCode = searchParams.get('code') || '';
+  const urlSecret = searchParams.get('token') || '';
   const urlCompId = searchParams.get('competitionId') || '';
 
   const [accessCode, setAccessCode] = useState(urlCode);
-  const [sessionSecret, setSessionSecret] = useState('');
+  const [sessionSecret, setSessionSecret] = useState(urlSecret);
   const [competitionId, setCompetitionId] = useState(urlCompId || competitions[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (urlCode) setAccessCode(urlCode);
-    if (urlCompId) setCompetitionId(urlCompId);
-  }, [urlCode, urlCompId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +95,7 @@ function JudgeLoginForm() {
 
       setError(errData?.error || 'Invalid Access Code. Please check the WhatsApp invitation or contact fest conveners.');
       setLoading(false);
-    } catch (err: any) {
+    } catch {
       // Fallback for test environments without network
       const localMatch = markEntries.find(
         m => (m.accessCode && m.accessCode.toUpperCase() === cleanCode) ||

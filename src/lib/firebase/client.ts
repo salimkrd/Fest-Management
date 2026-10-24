@@ -14,7 +14,8 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
-const isEmulatorEnabled = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+const isEmulatorEnabled = !isProduction && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
 const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
 
 if (typeof window !== 'undefined' || isFirebaseConfigured()) {

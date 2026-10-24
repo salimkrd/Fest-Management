@@ -55,7 +55,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       }
 
       try {
-        const tokenResult = await user.getIdTokenResult();
+        let tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.role !== 'ADMIN') {
+          try {
+            const syncRes = await fetch('/api/auth/sync-claims', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+            });
+            if (syncRes.ok) {
+              tokenResult = await user.getIdTokenResult(true);
+            }
+          } catch (syncErr) {
+            console.warn('[AdminLayout] Claims auto-sync attempt error:', syncErr);
+          }
+        }
+
         if (tokenResult.claims.role !== 'ADMIN') {
           console.warn('[AdminLayout] User is missing ADMIN custom claim.');
           if (auth) await signOut(auth);

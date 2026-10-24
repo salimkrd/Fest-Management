@@ -123,6 +123,31 @@ Run tests with coverage:
 npm run test:coverage
 ```
 
+### Full Fest Emulator Simulation
+
+With the Firebase Emulator Suite and the development server running, execute the end-to-end scale simulation from PowerShell:
+
+```powershell
+$env:FEST_SIM_ADMIN_EMAIL = "admin@sahithyolsav.com"
+$env:FEST_SIM_ADMIN_PASSWORD = "<local emulator admin password>"
+npm run simulate:fest
+Remove-Item Env:FEST_SIM_ADMIN_PASSWORD
+```
+
+The runner is hard-pinned to the `demo-sahithyolsav-2025` project and local emulator ports. It creates 4 teams, 40 participants, 100 competitions, 400 registrations, 10 judges, submitted marks, published results, and live listeners in two independent Firestore clients. It verifies category eligibility, generated bib/chest and registration codes, scoring, ledger totals, leaderboard totals, and subscribed team standings. Result publication is batched through the trusted admin API and recalculates global standings once per run.
+
+Simulation records are retained in the emulator for inspection and use unique run-prefixed IDs; the runner does not clear or reset existing emulator data. It reports per-endpoint request counts and p95/max latency. It never targets the production Firebase project.
+
+To resume publication and final realtime/ledger checks for an interrupted run, set its exact run ID (for example, `sim-20261023124356-lkq2`) and run:
+
+```powershell
+$env:FEST_SIM_RESUME_ID = "sim-20261023124356-lkq2"
+$env:FEST_SIM_ADMIN_EMAIL = "admin@sahithyolsav.com"
+$env:FEST_SIM_ADMIN_PASSWORD = "<local emulator admin password>"
+npm run simulate:resume:fest
+Remove-Item Env:FEST_SIM_RESUME_ID, Env:FEST_SIM_ADMIN_PASSWORD
+```
+
 ---
 
 ## Production Deployment & Operational Safeguards

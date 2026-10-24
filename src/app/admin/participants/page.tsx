@@ -33,6 +33,7 @@ export default function ParticipantsPage() {
   const [dob, setDob] = useState('2008-05-10');
   const [photoUrl, setPhotoUrl] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const filteredParticipants = participants.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +74,7 @@ export default function ParticipantsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -105,18 +106,28 @@ export default function ParticipantsPage() {
       registeredEventIds: editingPart ? editingPart.registeredEventIds : ['cmp-1']
     };
 
-    if (editingPart) {
-      updateParticipant(editingPart.id, partData);
-    } else {
-      addParticipant(partData);
+    setSaving(true);
+    try {
+      if (editingPart) {
+        await updateParticipant(editingPart.id, partData);
+      } else {
+        await addParticipant(partData);
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save participant.');
+    } finally {
+      setSaving(false);
     }
-
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove participant "${name}"?`)) {
-      deleteParticipant(id);
+      try {
+        await deleteParticipant(id);
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete participant.');
+      }
     }
   };
 
