@@ -18,9 +18,9 @@ import {
   codeLetterToIndex,
   isValidCodeLetter,
   getNextAvailableCodeLetter,
-  parseParticipantQrPayload,
-  verifyQrVerificationToken
+  parseParticipantQrPayload
 } from '@/domain/greenRoom';
+import { QrSignerService } from './qrSignerService';
 import { GreenRoomAssignment, GreenRoomContestantStatus } from '@/types/fest';
 import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firestore';
 
@@ -81,9 +81,9 @@ export class GreenRoomService {
     // 2. Parse identifier (supports QR code payloads, bibs, IDs, registration codes)
     const parsedQr = parseParticipantQrPayload(participantIdentifier);
 
-    // If QR payload is a JSON payload with verification token, verify token authenticity
+    // If QR payload is a JSON payload with verification token, verify token authenticity via server signer
     if (parsedQr.format === 'JSON_PAYLOAD') {
-      if (!parsedQr.token || !verifyQrVerificationToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
+      if (!parsedQr.token || !QrSignerService.verifyParticipantQrToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
         throw new Error('Validation Error: Invalid or tampered QR verification token. Participant credentials could not be authenticated.');
       }
     }
@@ -353,10 +353,22 @@ export class GreenRoomService {
     const assignmentRef = db.collection('greenRoomAssignments').doc(assignmentDocId);
     const counterRef = db.collection('greenRoomCounters').doc(competitionId);
     const auditLogRef = db.collection('auditLogs').doc(`audit-${randomUUID()}`);
+    const lockRef = db.collection('competitionMarkingLocks').doc(competitionId);
 
     let updatedAssignment: FirestoreGreenRoomAssignment | null = null;
 
     await db.runTransaction(async (transaction) => {
+      // 1. Transactionally verify shared competition marking lock
+      const lockDoc = await transaction.get(lockRef);
+      if (lockDoc.exists) {
+        const lockData = lockDoc.data();
+        if (lockData?.locked || lockData?.markingStarted || lockData?.finalized) {
+          throw new Error(
+            `Lock Error: Code Letter reassignment is locked. Judge draft marking has begun or scorecards have been submitted for this competition. Reassigning Code Letters during or after evaluation is prohibited to prevent score misattribution.`
+          );
+        }
+      }
+
       const assignmentDoc = await transaction.get(assignmentRef);
       if (!assignmentDoc.exists) {
         throw new Error(`Not Found: No Green Room assignment found for registration "${registrationId}".`);
@@ -378,6 +390,13 @@ export class GreenRoomService {
 
       const now = new Date().toISOString();
       const newIndex = codeLetterToIndex(cleanNewCode);
+
+      // Set lock flag indicating reassignment transaction is committing
+      transaction.set(lockRef, {
+        competitionId,
+        reassignmentInProgress: true,
+        updatedAt: now
+      }, { merge: true });
 
       updatedAssignment = {
         ...currentData,
@@ -421,6 +440,13 @@ export class GreenRoomService {
         timestamp: now
       };
       transaction.set(auditLogRef, auditEntry);
+
+      // Release reassignmentInProgress flag
+      transaction.set(lockRef, {
+        competitionId,
+        reassignmentInProgress: false,
+        updatedAt: now
+      }, { merge: true });
     });
 
     return updatedAssignment!;

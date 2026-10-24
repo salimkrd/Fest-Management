@@ -93,8 +93,6 @@ export interface ParticipantQrPayload {
   version: 3;
 }
 
-export const QR_SIGNING_PEPPER = 'INSPIRATH_GREEN_ROOM_SECURE_PEPPER_2025';
-
 function rotr(n: number, x: number): number {
   return (x >>> n) | (x << (32 - n));
 }
@@ -195,12 +193,16 @@ export function hmacSha256Hex(keyBytes: Uint8Array, messageBytes: Uint8Array): s
 
 /**
  * Generates an opaque cryptographic HMAC-SHA256 verification token for participant credentials.
+ * Requires an explicit secretKey. Never falls back to a public or hardcoded key.
  */
 export function generateQrVerificationToken(
   participantId: string,
   bib: string,
-  secretKey: string = QR_SIGNING_PEPPER
+  secretKey: string
 ): string {
+  if (!secretKey) {
+    throw new Error('Cryptographic Error: secretKey is required to generate QR verification token.');
+  }
   const enc = new TextEncoder();
   const keyBytes = enc.encode(secretKey);
   const messageBytes = enc.encode(`${(participantId || '').trim()}:${(bib || '').trim().toUpperCase()}`);
@@ -209,14 +211,15 @@ export function generateQrVerificationToken(
 
 /**
  * Verifies the authenticity and integrity of a participant's QR verification token.
+ * Requires an explicit secretKey. Performs constant-time comparison to prevent timing side-channels.
  */
 export function verifyQrVerificationToken(
   participantId: string,
   bib: string,
   token: string,
-  secretKey: string = QR_SIGNING_PEPPER
+  secretKey: string
 ): boolean {
-  if (!participantId || !bib || !token || typeof token !== 'string') return false;
+  if (!participantId || !bib || !token || typeof token !== 'string' || !secretKey) return false;
   const expected = generateQrVerificationToken(participantId, bib, secretKey);
   if (expected.length !== token.trim().length) return false;
   let mismatch = 0;
@@ -229,20 +232,22 @@ export function verifyQrVerificationToken(
 
 /**
  * Encodes participant credentials into an opaque, securely signed JSON QR payload.
- * Does NOT leak participant names or team affiliations in the QR code.
+ * Requires a verified server-issued token. Does NOT leak participant names or team affiliations.
  */
 export function encodeParticipantQrPayload(participant: {
   id: string;
   bib: string;
-  secretKey?: string;
+  token: string;
 }): string {
-  const token = generateQrVerificationToken(participant.id, participant.bib, participant.secretKey);
+  if (!participant.token) {
+    throw new Error('Validation Error: A verified server-issued token is required to encode participant QR payload.');
+  }
   const payload: ParticipantQrPayload = {
     app: 'INSPIRATH',
     type: 'PARTICIPANT_ID',
     id: participant.id,
     bib: participant.bib,
-    token,
+    token: participant.token,
     version: 3
   };
   return JSON.stringify(payload);

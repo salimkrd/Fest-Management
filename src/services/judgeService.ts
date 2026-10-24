@@ -136,14 +136,32 @@ export class JudgeService {
       );
     }
 
-    // Invariant 4: Detect ambiguous registration aliases and map each alias to its registration document ID
-    const aliasToRegId = new Map<string, string>();
+    // Invariant 4: Detect direct contestant identifiers and map ineligible keys
     const ineligibleKeys = new Map<string, string>(); // key -> ineligible reason
+    const directContestantIdentifiers = new Set<string>();
+    const eligibleRegIds = new Set<string>(eligibleRegs.map(doc => doc.id));
 
-    // Collect all ineligible keys to give precise rejection reasons
+    // Collect all ineligible keys and direct contestant identifiers
     regsSnap.docs.forEach(doc => {
       const data = doc.data();
       const rawStatus = data.status;
+      const regId = doc.id.trim();
+
+      directContestantIdentifiers.add(regId);
+      if (data.participantId) directContestantIdentifiers.add(data.participantId.toString().trim());
+      if (data.bib) {
+        directContestantIdentifiers.add(data.bib.toString().trim());
+        directContestantIdentifiers.add(data.bib.toString().trim().toUpperCase());
+      }
+      if (data.chestNumber) {
+        directContestantIdentifiers.add(data.chestNumber.toString().trim());
+        directContestantIdentifiers.add(data.chestNumber.toString().trim().toUpperCase());
+      }
+      if (data.code) {
+        directContestantIdentifiers.add(data.code.toString().trim());
+        directContestantIdentifiers.add(data.code.toString().trim().toUpperCase());
+      }
+
       if (!isExplicitlyApproved(rawStatus)) {
         const displayStatus = (typeof rawStatus === 'string' && rawStatus.trim() !== '')
           ? rawStatus.trim().toUpperCase()
@@ -157,59 +175,69 @@ export class JudgeService {
       }
     });
 
-    // Map eligible aliases and detect conflicts
-    eligibleRegs.forEach(doc => {
-      const data = doc.data();
-      const regId = doc.id;
-
-      const aliases = [regId, data.participantId, data.bib, data.chestNumber, data.code].filter(Boolean) as string[];
-      aliases.forEach(alias => {
-        if (aliasToRegId.has(alias) && aliasToRegId.get(alias) !== regId) {
-          throw new Error(
-            `Validation Error: Ambiguous registration alias detected. Identifier "${alias}" resolves to multiple registrations ("${aliasToRegId.get(alias)}" and "${regId}").`
-          );
-        }
-        aliasToRegId.set(alias, regId);
-      });
-    });
-
-    // Invariant 4B: Query Green Room assignments to map anonymous Code Letters (A..Z, AA..ZZ)
-    const grSnap = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', competitionId)
-      .get();
-
-    if (!grSnap.empty) {
-      grSnap.docs.forEach(grDoc => {
-        const grData = grDoc.data();
-        if (grData.codeLetter && grData.registrationId) {
-          const cleanCode = grData.codeLetter.trim().toUpperCase();
-          aliasToRegId.set(cleanCode, grData.registrationId);
-        }
-      });
-    }
-
-    // Invariant 5: Verify every score key corresponds to an eligible registration,
-    // and no registration is scored multiple times under different aliases.
-    const scoredRegistrationIds = new Set<string>();
-    const resolvedRegistrations = new Map<string, string>(); // scoreKey -> regId
-
-    for (const [scoreKey, scoreVal] of Object.entries(scores)) {
-      // Check if this key corresponds to an ineligible registration (e.g. CANCELLED, PENDING, REJECTED)
+    // Invariant 4B: Prioritize rejecting ineligible registrations and direct contestant identifiers
+    for (const [scoreKey] of Object.entries(scores)) {
       if (ineligibleKeys.has(scoreKey)) {
         throw new Error(
           `Validation Error: Participant or registration "${scoreKey}" is an ${ineligibleKeys.get(scoreKey)}. Only APPROVED registrations can be scored.`
         );
       }
 
-      // Check if key resolves to an eligible registration
-      const resolvedRegId = aliasToRegId.get(scoreKey);
+      const cleanKey = scoreKey.trim();
+      const cleanUpperKey = cleanKey.toUpperCase();
+      if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
+        throw new Error(
+          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number). Direct contestant identifiers are strictly rejected. Judges must submit scores using ONLY assigned Green Room Code Letters (e.g. "A", "B", "C").`
+        );
+      }
+    }
+
+    // Invariant 4C: Query Green Room assignments to map anonymous Code Letters (A..Z, AA..ZZ)
+    // Judges are strictly required to score ONLY by actual assigned Code Letters.
+    const grSnap = await db.collection('greenRoomAssignments')
+      .where('competitionId', '==', competitionId)
+      .get();
+
+    if (grSnap.empty) {
+      throw new Error(
+        `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". Scoring cannot proceed until contestants are checked in.`
+      );
+    }
+
+    const assignedCodeToRegId = new Map<string, string>();
+    grSnap.docs.forEach(grDoc => {
+      const grData = grDoc.data();
+      if (grData.codeLetter && grData.registrationId) {
+        const cleanCode = grData.codeLetter.trim().toUpperCase();
+        assignedCodeToRegId.set(cleanCode, grData.registrationId);
+      }
+    });
+
+    // Invariant 5: Verify every score key corresponds to an eligible registration via assigned Code Letter,
+    // and no registration is scored multiple times under different aliases.
+    const scoredRegistrationIds = new Set<string>();
+    const resolvedRegistrations = new Map<string, string>(); // scoreKey -> regId
+
+    for (const [scoreKey, scoreVal] of Object.entries(scores)) {
+      const cleanKey = scoreKey.trim();
+      const cleanUpperKey = cleanKey.toUpperCase();
+
+      // 3. Verify key is an actual Code Letter assigned in greenRoomAssignments for this competition
+      const resolvedRegId = assignedCodeToRegId.get(cleanUpperKey);
       if (!resolvedRegId) {
         throw new Error(
-          `Validation Error: Participant or registration "${scoreKey}" is not assigned to an eligible registration for competition "${competitionId}". Arbitrary participant entries are strictly rejected.`
+          `Validation Error: Identifier "${scoreKey}" is not a valid assigned Green Room Code Letter (not assigned to an eligible registration) for competition "${competitionId}". Judges must score ONLY actual Code Letters assigned to checked-in contestants.`
         );
       }
 
-      // Check duplicate scoring: ensuring every score key resolves to exactly one distinct eligible registration
+      // 4. Verify resolved registration is approved
+      if (!eligibleRegIds.has(resolvedRegId)) {
+        throw new Error(
+          `Validation Error: Contestant with Code Letter "${cleanUpperKey}" is not assigned to an eligible APPROVED registration for competition "${competitionId}".`
+        );
+      }
+
+      // 5. Check duplicate scoring: ensuring every score key resolves to exactly one distinct eligible registration
       if (scoredRegistrationIds.has(resolvedRegId)) {
         throw new Error(
           `Validation Error: Duplicate score entry detected. Score key "${scoreKey}" resolves to registration "${resolvedRegId}", which has already been scored in this scorecard.`
@@ -327,19 +355,38 @@ export class JudgeService {
 
     const updatedAt = new Date().toISOString();
     const markEntryId = `me-${params.assignmentId}`;
+    const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
+    const markEntryRef = db.collection('markEntries').doc(markEntryId);
 
-    await db.collection('markEntries').doc(markEntryId).set({
-      id: markEntryId,
-      assignmentId: params.assignmentId,
-      competitionId: params.competitionId,
-      competitionName: assignment.competitionName || '',
-      judgeName: assignment.judgeName || '',
-      status: 'DRAFT',
-      submitted: false,
-      isFinal: false,
-      scores: normalizedScores,
-      remarks: params.remarks || '',
-      updatedAt
+    await db.runTransaction(async (transaction) => {
+      const lockDoc = await transaction.get(lockRef);
+      if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
+        throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
+      }
+
+      transaction.set(lockRef, {
+        competitionId: params.competitionId,
+        locked: true,
+        markingStarted: true,
+        draftActive: true,
+        lastDraftAt: updatedAt,
+        lastMarkedBy: assignment.judgeName || params.assignmentId,
+        updatedAt
+      }, { merge: true });
+
+      transaction.set(markEntryRef, {
+        id: markEntryId,
+        assignmentId: params.assignmentId,
+        competitionId: params.competitionId,
+        competitionName: assignment.competitionName || '',
+        judgeName: assignment.judgeName || '',
+        status: 'DRAFT',
+        submitted: false,
+        isFinal: false,
+        scores: normalizedScores,
+        remarks: params.remarks || '',
+        updatedAt
+      });
     });
 
     return {
@@ -513,30 +560,48 @@ export class JudgeService {
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
     const markEntryId = `me-${params.assignmentId}`;
 
-    // Atomically persist finalized scorecard and update assignment status
-    const batch = db.batch();
+    const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
+    const markEntryRef = db.collection('markEntries').doc(markEntryId);
+    const assignRef = db.collection('judgeAssignments').doc(params.assignmentId);
 
-    batch.set(db.collection('markEntries').doc(markEntryId), {
-      id: markEntryId,
-      assignmentId: params.assignmentId,
-      competitionId: params.competitionId,
-      competitionName: assignment.competitionName || '',
-      judgeName: assignment.judgeName || '',
-      status: 'SUBMITTED',
-      submitted: true,
-      isFinal: true,
-      scores: normalizedScores,
-      submittedAt,
-      verificationHash
+    // Atomically persist finalized scorecard, update assignment status, and lock reassignment
+    await db.runTransaction(async (transaction) => {
+      const lockDoc = await transaction.get(lockRef);
+      if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
+        throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
+      }
+
+      transaction.set(lockRef, {
+        competitionId: params.competitionId,
+        locked: true,
+        markingStarted: true,
+        finalized: true,
+        lastSubmissionAt: submittedAt,
+        lastMarkedBy: assignment.judgeName || params.assignmentId,
+        updatedAt: submittedAt
+      }, { merge: true });
+
+      transaction.set(markEntryRef, {
+        id: markEntryId,
+        assignmentId: params.assignmentId,
+        competitionId: params.competitionId,
+        competitionName: assignment.competitionName || '',
+        judgeName: assignment.judgeName || '',
+        status: 'SUBMITTED',
+        submitted: true,
+        isFinal: true,
+        scores: normalizedScores,
+        submittedAt,
+        verificationHash
+      });
+
+      transaction.update(assignRef, {
+        status: 'SUBMITTED',
+        submittedAt,
+        verificationHash
+      });
     });
 
-    batch.update(db.collection('judgeAssignments').doc(params.assignmentId), {
-      status: 'SUBMITTED',
-      submittedAt,
-      verificationHash
-    });
-
-    await batch.commit();
     await this.updateResultForCompetition(db, params.competitionId);
 
     return {

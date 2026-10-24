@@ -5,7 +5,6 @@
 
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
 import QRCode from 'qrcode';
-import { encodeParticipantQrPayload, generateQrVerificationToken } from '@/domain/greenRoom';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -44,7 +43,8 @@ export async function exportPosterAsPng(
  */
 export async function exportDigitalIdAsPng(
   participant: Participant,
-  festivalName: string = 'SAHITHYOLSAV 2025'
+  festivalName: string = 'SAHITHYOLSAV 2025',
+  options?: { token?: string; qrPayload?: string }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -183,23 +183,29 @@ export async function exportDigitalIdAsPng(
   ctx.font = '600 13px Montserrat, sans-serif';
   ctx.fillText('Scan at Venue Entrance & Stage Gate', 70, 790);
 
-  const token = generateQrVerificationToken(participant.id, participant.bib);
+  const tokenText = options?.token
+    ? `TOKEN: ${options.token.slice(0, 16).toUpperCase()}`
+    : `ID: ${participant.bib}-AUTH`;
 
   ctx.fillStyle = '#111111';
   ctx.font = '700 16px monospace';
-  ctx.fillText(`TOKEN: ${token.slice(0, 16).toUpperCase()}`, 70, 825);
+  ctx.fillText(tokenText, 70, 825);
 
-  // Generate and draw genuine scannable QR Code
+  // Generate and draw scannable QR Code from server-issued payload
   const qrX = width - 180;
   const qrY = 755;
   const qrSize = 100;
 
   try {
-    const payload = encodeParticipantQrPayload({
+    const payloadToDraw = options?.qrPayload || JSON.stringify({
+      app: 'INSPIRATH',
+      type: 'PARTICIPANT_ID',
       id: participant.id,
-      bib: participant.bib
+      bib: participant.bib,
+      version: 3
     });
-    const qrDataUrl = await QRCode.toDataURL(payload, {
+
+    const qrDataUrl = await QRCode.toDataURL(payloadToDraw, {
       width: 300,
       margin: 1,
       errorCorrectionLevel: 'M',

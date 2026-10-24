@@ -59,7 +59,8 @@ export async function DELETE(
       resultDocDirect,
       pointsSnap,
       greenRoomSnap,
-      greenRoomCounterDoc
+      greenRoomCounterDoc,
+      markingLockDoc
     ] = await Promise.all([
       db.collection('judgeAssignments').where('competitionId', '==', id).get(),
       db.collection('markEntries').where('competitionId', '==', id).get(),
@@ -69,7 +70,8 @@ export async function DELETE(
       db.collection('results').doc(`res-${id}`).get(),
       db.collection('pointsLedger').where('competitionId', '==', id).get(),
       db.collection('greenRoomAssignments').where('competitionId', '==', id).get(),
-      db.collection('greenRoomCounters').doc(id).get()
+      db.collection('greenRoomCounters').doc(id).get(),
+      db.collection('competitionMarkingLocks').doc(id).get()
     ]);
 
     // 3. Assemble and deduplicate all child document references
@@ -82,7 +84,8 @@ export async function DELETE(
       ...(resultDocDirect.exists ? [resultDocDirect.ref] : []),
       ...pointsSnap.docs.map(doc => doc.ref),
       ...greenRoomSnap.docs.map(doc => doc.ref),
-      ...(greenRoomCounterDoc.exists ? [greenRoomCounterDoc.ref] : [])
+      ...(greenRoomCounterDoc.exists ? [greenRoomCounterDoc.ref] : []),
+      ...(markingLockDoc.exists ? [markingLockDoc.ref] : [])
     ];
 
     const seenDocPaths = new Set<string>();
@@ -124,7 +127,8 @@ export async function DELETE(
         results: resultsSnap.size + (resultDocDirect.exists ? 1 : 0),
         pointsLedger: pointsSnap.size,
         greenRoomAssignments: greenRoomSnap.size,
-        greenRoomCounters: greenRoomCounterDoc.exists ? 1 : 0
+        greenRoomCounters: greenRoomCounterDoc.exists ? 1 : 0,
+        competitionMarkingLocks: markingLockDoc.exists ? 1 : 0
       }
     });
   } catch (error) {

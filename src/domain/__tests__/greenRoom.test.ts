@@ -85,17 +85,21 @@ describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
     });
 
     it('rejects tampered participant IDs or altered bib numbers', () => {
-      const token = generateQrVerificationToken('part-1042', '#1042');
-      expect(verifyQrVerificationToken('part-1042', '#1042', token)).toBe(true);
-      expect(verifyQrVerificationToken('part-9999', '#1042', token)).toBe(false);
-      expect(verifyQrVerificationToken('part-1042', '#9999', token)).toBe(false);
-      expect(verifyQrVerificationToken('part-1042', '#1042', 'forged-token-abc')).toBe(false);
+      const secret = 'TEST_SECRET_KEY_12345';
+      const token = generateQrVerificationToken('part-1042', '#1042', secret);
+      expect(verifyQrVerificationToken('part-1042', '#1042', token, secret)).toBe(true);
+      expect(verifyQrVerificationToken('part-9999', '#1042', token, secret)).toBe(false);
+      expect(verifyQrVerificationToken('part-1042', '#9999', token, secret)).toBe(false);
+      expect(verifyQrVerificationToken('part-1042', '#1042', 'forged-token-abc', secret)).toBe(false);
     });
 
     it('encodes participant data without leaking personal names or team names', () => {
+      const secret = 'TEST_SECRET_KEY_12345';
+      const token = generateQrVerificationToken('p-1042', '#1042', secret);
       const encoded = encodeParticipantQrPayload({
         id: 'p-1042',
-        bib: '#1042'
+        bib: '#1042',
+        token
       });
 
       const parsed = JSON.parse(encoded);
@@ -112,9 +116,12 @@ describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
     });
 
     it('parses JSON QR payload correctly and preserves token', () => {
+      const secret = 'TEST_SECRET_KEY_12345';
+      const token = generateQrVerificationToken('p-8821', '#8821', secret);
       const raw = encodeParticipantQrPayload({
         id: 'p-8821',
-        bib: '#8821'
+        bib: '#8821',
+        token
       });
 
       const res = parseParticipantQrPayload(raw);

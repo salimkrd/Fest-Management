@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
-import { encodeParticipantQrPayload } from '@/domain/greenRoom';
+import { auth } from '@/lib/firebase/client';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -21,32 +21,75 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   onClose
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [signedToken, setSignedToken] = useState<string>('');
+  const [signedPayload, setSignedPayload] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!participant) {
+    if (!participant || !isOpen) {
       setQrDataUrl('');
+      setSignedToken('');
+      setSignedPayload('');
+      setFetchError(null);
       return;
     }
 
-    const payload = encodeParticipantQrPayload({
-      id: participant.id,
-      bib: participant.bib
-    });
+    let isMounted = true;
+    setLoading(true);
+    setFetchError(null);
 
-    QRCode.toDataURL(payload, {
-      width: 180,
-      margin: 1,
-      errorCorrectionLevel: 'M',
-      color: {
-        dark: '#111111',
-        light: '#FFFFFF'
+    const fetchQrBadge = async () => {
+      try {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : '';
+        if (!idToken) {
+          throw new Error('Authentication required to retrieve participant accreditation badge.');
+        }
+
+        const res = await fetch(`/api/participants/${participant.id}/qr`, {
+          headers: { Authorization: `Bearer ${idToken}` }
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to retrieve signed QR accreditation code.');
+        }
+
+        const data = await res.json();
+        if (!isMounted) return;
+
+        setSignedToken(data.token);
+        setSignedPayload(data.payload);
+
+        const url = await QRCode.toDataURL(data.payload, {
+          width: 180,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+          color: {
+            dark: '#111111',
+            light: '#FFFFFF'
+          }
+        });
+
+        if (isMounted) {
+          setQrDataUrl(url);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('[DigitalIdCard] QR generation error:', err);
+          setFetchError(err.message || 'Error generating QR badge');
+          setLoading(false);
+        }
       }
-    })
-      .then(url => setQrDataUrl(url))
-      .catch(err => {
-        console.error('[DigitalIdCard] QR generation error:', err);
-      });
-  }, [participant]);
+    };
+
+    fetchQrBadge();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [participant, isOpen]);
 
   if (!participant) return null;
 
@@ -71,11 +114,15 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               variant="secondary"
               size="sm"
               leftIcon={<Download className="w-4 h-4" />}
-              onClick={() => exportDigitalIdAsPng(participant)}
+              onClick={() => exportDigitalIdAsPng(participant, participant.teamName, {
+                token: signedToken,
+                qrPayload: signedPayload
+              })}
+              disabled={loading || !qrDataUrl}
             >
               Download PNG
             </Button>
-            <Button variant="primary" size="sm" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
+            <Button variant="primary" size="sm" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint} disabled={loading}>
               Print ID Badge
             </Button>
           </div>
@@ -143,7 +190,9 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="p-4 bg-white flex items-center justify-between">
             <div className="text-left">
               <span className="text-[9px] text-[#526070] uppercase font-medium block">Scan at Venue Gate &amp; Green Room</span>
-              <span className="text-[10px] font-mono text-[#111111]">HASH: {participant.bib}-2025-AUTH-V2</span>
+              <span className="text-[10px] font-mono text-[#111111]">
+                {fetchError ? 'AUTH ERROR' : signedToken ? `TOKEN: ${signedToken.slice(0, 16).toUpperCase()}` : 'VERIFYING...'}
+              </span>
             </div>
             <div className="w-14 h-14 bg-white border border-[#E1E7EF] rounded-lg p-0.5 flex items-center justify-center shadow-xs">
               {qrDataUrl ? (
