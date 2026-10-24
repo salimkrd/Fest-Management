@@ -358,6 +358,7 @@ export class AuthService {
         displayName: params.displayName,
         role: 'ADMIN',
         status: 'ACTIVE',
+        disabled: false,
         createdAt: now,
         updatedAt: now
       };
