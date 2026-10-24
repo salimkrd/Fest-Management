@@ -115,6 +115,18 @@ export class AuthService {
       }
     }
 
+    // 7. Privileged operations: GREEN_ROOM_STAFF
+    if (tokenRole === 'GREEN_ROOM_STAFF' || userData.role === 'GREEN_ROOM_STAFF') {
+      if (tokenRole !== 'GREEN_ROOM_STAFF' || userData.role !== 'GREEN_ROOM_STAFF') {
+        throw new Error(
+          `Security Violation: Role mismatch for Green Room Staff authorization (token: "${tokenRole}", firestore: "${userData.role}"). Exact agreement required.`
+        );
+      }
+      if (userData.status !== 'ACTIVE' || userData.disabled) {
+        throw new Error(`Unauthorized: Green Room Staff account "${decoded.uid}" is not active or disabled.`);
+      }
+    }
+
     return {
       uid: decoded.uid,
       email: decoded.email || userData.email || '',
@@ -131,6 +143,28 @@ export class AuthService {
     const user = await this.verifySession(idToken);
     if (user.role !== 'ADMIN') {
       throw new Error(`Unauthorized: Operation requires ADMIN role. Current role: ${user.role}`);
+    }
+    return user;
+  }
+
+  /**
+   * Asserts caller possesses verified ADMIN or GREEN_ROOM_STAFF role.
+   */
+  static async assertAdminOrGreenRoom(idToken: string): Promise<VerifiedUserContext> {
+    const user = await this.verifySession(idToken);
+    if (user.role !== 'ADMIN' && user.role !== 'GREEN_ROOM_STAFF') {
+      throw new Error(`Unauthorized: Operation requires ADMIN or GREEN_ROOM_STAFF role. Current role: ${user.role}`);
+    }
+    return user;
+  }
+
+  /**
+   * Asserts caller possesses verified GREEN_ROOM_STAFF role.
+   */
+  static async assertGreenRoomStaff(idToken: string): Promise<VerifiedUserContext> {
+    const user = await this.verifySession(idToken);
+    if (user.role !== 'GREEN_ROOM_STAFF') {
+      throw new Error(`Unauthorized: Operation requires GREEN_ROOM_STAFF role. Current role: ${user.role}`);
     }
     return user;
   }
@@ -528,5 +562,65 @@ export class AuthService {
     );
 
     return true;
+  }
+
+  /**
+   * Provision a new Green Room Staff account.
+   * Can ONLY be called by a verified administrator.
+   */
+  static async provisionGreenRoomStaff(
+    adminIdToken: string,
+    params: {
+      email: string;
+      password: string;
+      displayName: string;
+    }
+  ): Promise<{ uid: string; email: string }> {
+    await this.assertAdmin(adminIdToken);
+
+    const auth = getAdminAuth();
+    const db = getAdminDb();
+
+    if (!auth || !db) {
+      throw new Error('Service Unavailable: Firebase Admin SDK not initialized.');
+    }
+
+    let uid = '';
+    try {
+      const userRecord = await auth.createUser({
+        email: params.email,
+        password: params.password,
+        displayName: params.displayName
+      });
+      uid = userRecord.uid;
+    } catch (err: any) {
+      if (err.code === 'auth/email-already-exists') {
+        const existing = await auth.getUserByEmail(params.email);
+        uid = existing.uid;
+      } else {
+        throw err;
+      }
+    }
+
+    await auth.setCustomUserClaims(uid, {
+      role: 'GREEN_ROOM_STAFF'
+    });
+
+    const now = new Date().toISOString();
+    const userDoc: FirestoreUser = {
+      id: uid,
+      email: params.email,
+      displayName: params.displayName,
+      role: 'GREEN_ROOM_STAFF',
+      status: 'ACTIVE',
+      disabled: false,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await db.collection('users').doc(uid).set(userDoc);
+    console.log(`[AuthService] Provisioned Green Room Staff: ${params.email} (${uid})`);
+
+    return { uid, email: params.email };
   }
 }

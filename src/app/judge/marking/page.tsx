@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { useFest } from '@/context/FestContext';
-import { Registration } from '@/types/fest';
 import { calculateGrade } from '@/domain/scoring';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -21,15 +20,22 @@ import {
   ShieldCheck,
   Award
 } from 'lucide-react';
+import { indexToCodeLetter } from '@/domain/greenRoom';
 
 interface LocalScore {
   [criterionId: string]: number;
 }
 
+interface AnonymousContestant {
+  codeLetter: string;
+  codeIndex: number;
+  status?: string;
+}
+
 function JudgeMarkingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { competitions, registrations } = useFest();
+  const { competitions } = useFest();
 
   const compId = searchParams.get('competitionId') || 'cmp-1';
   const token = searchParams.get('token') || 'JRY-9921-EN';
@@ -45,8 +51,26 @@ function JudgeMarkingContent() {
   });
 
   const competition = competitions.find(c => c.id === compId) || sessionData?.competition || competitions[0];
-  const contextRegs = registrations.filter(r => r.competitionId === competition?.id);
-  const compRegistrations: Registration[] = (contextRegs.length > 0 ? contextRegs : (sessionData?.registrations || [])) as Registration[];
+
+  // Anonymized contestants strictly derived from server session or anonymous codes (ZERO personal details)
+  const contestants: AnonymousContestant[] = useMemo(() => {
+    const rawList = sessionData?.contestants || sessionData?.registrations || [];
+    if (Array.isArray(rawList) && rawList.length > 0) {
+      return rawList.map((item: any, idx: number) => ({
+        codeLetter: item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id) ? item.id : indexToCodeLetter(idx)),
+        codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx,
+        status: item.status || 'CHECKED_IN'
+      })).sort((a, b) => a.codeIndex - b.codeIndex);
+    }
+
+    // Default fallback: If zero seeded session contestants, provide anonymous codes based on entry count
+    const count = competition?.entriesCount || 4;
+    return Array.from({ length: count }, (_, idx) => ({
+      codeLetter: indexToCodeLetter(idx),
+      codeIndex: idx,
+      status: 'CHECKED_IN'
+    }));
+  }, [sessionData, competition]);
 
   // Criteria setup
   const criteria: Array<{ id: string; name: string; maxMarks: number }> = competition?.criteria && competition.criteria.length > 0
@@ -58,13 +82,12 @@ function JudgeMarkingContent() {
         { id: 'cr-4', name: 'Time Adherence (5 mins)', maxMarks: 20 }
       ];
 
-  // Initialize scores state for all registered participants
+  // Initialize clean scores state with ZERO demonstration prefill (Production readiness requirement)
   const [scores, setScores] = useState<Record<string, LocalScore>>(() => {
     const initial: Record<string, LocalScore> = {};
-    compRegistrations.forEach((registration, index) => {
-      const percentage = index === 0 ? 0.95 : index === 1 ? 0.85 : 0.75;
-      initial[registration.id] = Object.fromEntries(
-        criteria.map(criterion => [criterion.id, Math.round(criterion.maxMarks * percentage)])
+    contestants.forEach(c => {
+      initial[c.codeLetter] = Object.fromEntries(
+        criteria.map(criterion => [criterion.id, 0])
       );
     });
     return initial;
@@ -101,24 +124,24 @@ function JudgeMarkingContent() {
     return result;
   };
 
-  // Handler to adjust score with +/- steppers
-  const adjustScore = (regId: string, criterionId: string, delta: number, max: number) => {
+  // Adjust score stepper
+  const adjustScore = (codeLetter: string, criterionId: string, delta: number, max: number) => {
     setScores(prev => {
-      const currentVal = prev[regId]?.[criterionId] || 0;
+      const currentVal = prev[codeLetter]?.[criterionId] || 0;
       const newVal = Math.max(0, Math.min(max, currentVal + delta));
       return {
         ...prev,
-        [regId]: {
-          ...prev[regId],
+        [codeLetter]: {
+          ...prev[codeLetter],
           [criterionId]: newVal
         }
       };
     });
   };
 
-  const calculateTotal = (regId: string) => {
-    const participantScores = scores[regId] || {};
-    return Object.values(participantScores).reduce((acc, val) => acc + val, 0);
+  const calculateTotal = (codeLetter: string) => {
+    const contestantScores = scores[codeLetter] || {};
+    return Object.values(contestantScores).reduce((acc, val) => acc + val, 0);
   };
 
   const getGrade = (total: number) => {
@@ -162,7 +185,7 @@ function JudgeMarkingContent() {
   return (
     <JudgeLayout competitionTitle={`${competition.name} (${competition.categoryName})`}>
       <div className="space-y-6">
-        {/* Stage Roster Header */}
+        {/* Stage Header */}
         <div className="bg-white rounded-2xl border border-[#E1E7EF] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -197,6 +220,17 @@ function JudgeMarkingContent() {
           </div>
         </div>
 
+        {/* Anonymity Banner */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-semibold">
+            <ShieldCheck className="w-4 h-4 text-[#2563EB] shrink-0" />
+            <span>Strict Jury Anonymity Active: Contestants are identified solely by their Green Room Code Letter.</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold text-blue-700 bg-white/80 px-2 py-0.5 rounded border border-blue-200">
+            Blind Evaluation
+          </span>
+        </div>
+
         {draftSavedNotice && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 font-semibold flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-4 h-4 text-[#2563EB]" />
@@ -209,9 +243,9 @@ function JudgeMarkingContent() {
           </div>
         )}
 
-        {/* Participant Scoring Cards */}
+        {/* Anonymous Contestant Scoring Cards */}
         <div className="space-y-4">
-          {compRegistrations.length === 0 ? (
+          {contestants.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-2xl border border-[#E1E7EF]">
               <Clock className="w-8 h-8 text-[#526070] mx-auto mb-2" />
               <h4 className="text-sm font-bold text-[#111111]">Awaiting Contestant Check-In</h4>
@@ -220,30 +254,32 @@ function JudgeMarkingContent() {
               </p>
             </div>
           ) : (
-            compRegistrations.map((reg, rIndex) => {
-              const total = calculateTotal(reg.id);
+            contestants.map((contestant, cIndex) => {
+              const total = calculateTotal(contestant.codeLetter);
               const { grade, color: gradeColor } = getGrade(total);
 
               return (
                 <div
-                  key={reg.id}
+                  key={contestant.codeLetter}
                   className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs hover:border-neutral-300 transition-all"
                 >
-                  {/* Card Top Banner */}
+                  {/* Card Top Banner: ANONYMOUS ONLY */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E1E7EF]">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-neutral-900 text-white flex items-center justify-center font-mono font-bold text-sm shadow-xs">
-                        {reg.chestNumber}
+                      <div className="w-12 h-12 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-mono font-black text-2xl shadow-xs">
+                        {contestant.codeLetter}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-[#111111]">{reg.participantName}</h3>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#F8FAFC] border border-[#E1E7EF] text-[#526070]">
-                            {reg.teamName} ({reg.teamCode})
+                          <h3 className="text-base font-extrabold text-[#111111]">
+                            Contestant Code Letter {contestant.codeLetter}
+                          </h3>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-[#2563EB]">
+                            ANONYMOUS
                           </span>
                         </div>
                         <span className="text-[11px] text-[#526070]">
-                          Order of Appearance: Stage Entry #{rIndex + 1}
+                          Stage Entry Order #{cIndex + 1}
                         </span>
                       </div>
                     </div>
@@ -265,7 +301,7 @@ function JudgeMarkingContent() {
                   {/* Criteria Sliders & Steppers */}
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {criteria.map((cr) => {
-                      const currentVal = scores[reg.id]?.[cr.id] || 0;
+                      const currentVal = scores[contestant.codeLetter]?.[cr.id] || 0;
                       return (
                         <div
                           key={cr.id}
@@ -280,7 +316,7 @@ function JudgeMarkingContent() {
                             {/* Stepper Minus */}
                             <button
                               type="button"
-                              onClick={() => adjustScore(reg.id, cr.id, -1, cr.maxMarks)}
+                              onClick={() => adjustScore(contestant.codeLetter, cr.id, -1, cr.maxMarks)}
                               disabled={currentVal <= 0}
                               className="w-8 h-8 rounded-lg bg-white border border-[#E1E7EF] text-[#111111] flex items-center justify-center font-bold hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                               aria-label="Decrease score"
@@ -294,14 +330,14 @@ function JudgeMarkingContent() {
                               min={0}
                               max={cr.maxMarks}
                               value={currentVal}
-                              onChange={(e) => adjustScore(reg.id, cr.id, Number(e.target.value) - currentVal, cr.maxMarks)}
+                              onChange={(e) => adjustScore(contestant.codeLetter, cr.id, Number(e.target.value) - currentVal, cr.maxMarks)}
                               className="flex-1 accent-[#2563EB] cursor-pointer"
                             />
 
                             {/* Stepper Plus */}
                             <button
                               type="button"
-                              onClick={() => adjustScore(reg.id, cr.id, 1, cr.maxMarks)}
+                              onClick={() => adjustScore(contestant.codeLetter, cr.id, 1, cr.maxMarks)}
                               disabled={currentVal >= cr.maxMarks}
                               className="w-8 h-8 rounded-lg bg-white border border-[#E1E7EF] text-[#111111] flex items-center justify-center font-bold hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                               aria-label="Increase score"
@@ -309,8 +345,8 @@ function JudgeMarkingContent() {
                               <Plus className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Current Score Tag */}
-                            <span className="w-9 text-right font-mono font-bold text-sm text-[#111111]">
+                            {/* Score Display Value */}
+                            <span className="w-8 text-right font-mono font-extrabold text-sm text-[#111111]">
                               {currentVal}
                             </span>
                           </div>
@@ -318,34 +354,26 @@ function JudgeMarkingContent() {
                       );
                     })}
                   </div>
-
-                  {/* Remarks Input */}
-                  <div className="mt-4">
-                    <input
-                      type="text"
-                      placeholder="Optional adjudicator feedback / stage remarks..."
-                      value={remarks[reg.id] || ''}
-                      onChange={(e) => setRemarks({ ...remarks, [reg.id]: e.target.value })}
-                      className="w-full text-xs px-3 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] placeholder:text-[#8E9CAE] focus:outline-none focus:bg-white focus:border-[#2563EB]"
-                    />
-                  </div>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Bottom Submission Action Bar */}
-        <div className="p-4 rounded-xl bg-white border border-[#E1E7EF] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center gap-2 text-xs text-[#526070]">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Digital Cryptographic Juror Signing Protocol Active</span>
+        {/* Sticky Actions Bar */}
+        <div className="sticky bottom-4 bg-white/95 backdrop-blur-md rounded-2xl border border-[#E1E7EF] p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Gavel className="w-5 h-5 text-[#2563EB]" />
+            <span className="text-xs font-semibold text-[#111111]">
+              Signed in with Juror Credential · Anonymous Stage Evaluation
+            </span>
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="md"
-              leftIcon={<Save className="w-4 h-4" />}
+              leftIcon={<Save className="w-4 h-4 text-[#526070]" />}
               onClick={handleSaveDraft}
             >
               Save Draft
@@ -404,7 +432,7 @@ function JudgeMarkingContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#526070]">Audited Contestants:</span>
-                <span className="font-bold text-[#111111]">{compRegistrations.length}</span>
+                <span className="font-bold text-[#111111]">{contestants.length} (Anonymous Code Letters)</span>
               </div>
             </div>
           </div>

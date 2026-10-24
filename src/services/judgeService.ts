@@ -163,16 +163,39 @@ export class JudgeService {
       const regId = doc.id;
 
       const aliases = [regId, data.participantId, data.bib, data.chestNumber, data.code].filter(Boolean) as string[];
-      for (const alias of aliases) {
+      aliases.forEach(alias => {
         if (aliasToRegId.has(alias) && aliasToRegId.get(alias) !== regId) {
-          // Ambiguous alias: two different registrations share the same identifier string!
           throw new Error(
             `Validation Error: Ambiguous registration alias detected. Identifier "${alias}" resolves to multiple registrations ("${aliasToRegId.get(alias)}" and "${regId}").`
           );
         }
         aliasToRegId.set(alias, regId);
-      }
+      });
     });
+
+    // Invariant 4B: Query Green Room assignments to map anonymous Code Letters (A..Z, AA..ZZ)
+    const grSnap = await db.collection('greenRoomAssignments')
+      .where('competitionId', '==', competitionId)
+      .get();
+
+    if (!grSnap.empty) {
+      grSnap.docs.forEach(grDoc => {
+        const grData = grDoc.data();
+        if (grData.codeLetter && grData.registrationId) {
+          const cleanCode = grData.codeLetter.trim().toUpperCase();
+          aliasToRegId.set(cleanCode, grData.registrationId);
+        }
+      });
+    } else {
+      // Fallback: If no Green Room assignments were created yet, map sequential codes A, B, C...
+      const { indexToCodeLetter } = await import('@/domain/greenRoom');
+      eligibleRegs.forEach((doc, idx) => {
+        const fallbackCode = indexToCodeLetter(idx);
+        if (!aliasToRegId.has(fallbackCode)) {
+          aliasToRegId.set(fallbackCode, doc.id);
+        }
+      });
+    }
 
     // Invariant 5: Verify every score key corresponds to an eligible registration,
     // and no registration is scored multiple times under different aliases.
@@ -306,7 +329,10 @@ export class JudgeService {
       throw new Error(`Unauthorized: Judge authentication failed (${authResult.reason}).`);
     }
 
-    await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const { resolvedRegistrations } = await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const normalizedScores = Object.fromEntries(
+      Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key) || key, value])
+    );
 
     const updatedAt = new Date().toISOString();
     const markEntryId = `me-${params.assignmentId}`;
@@ -320,7 +346,7 @@ export class JudgeService {
       status: 'DRAFT',
       submitted: false,
       isFinal: false,
-      scores: params.scores,
+      scores: normalizedScores,
       remarks: params.remarks || '',
       updatedAt
     });

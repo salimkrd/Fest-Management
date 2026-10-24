@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Participant } from '@/types/fest';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
+import QRCode from 'qrcode';
+import { encodeParticipantQrPayload } from '@/domain/greenRoom';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -18,6 +20,36 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   isOpen,
   onClose
 }) => {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!participant) {
+      setQrDataUrl('');
+      return;
+    }
+
+    const payload = encodeParticipantQrPayload({
+      id: participant.id,
+      bib: participant.bib,
+      name: participant.name,
+      teamCode: participant.teamCode
+    });
+
+    QRCode.toDataURL(payload, {
+      width: 180,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#111111',
+        light: '#FFFFFF'
+      }
+    })
+      .then(url => setQrDataUrl(url))
+      .catch(err => {
+        console.error('[DigitalIdCard] QR generation error:', err);
+      });
+  }, [participant]);
+
   if (!participant) return null;
 
   const handlePrint = () => {
@@ -112,11 +144,19 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           {/* QR Code & Barcode */}
           <div className="p-4 bg-white flex items-center justify-between">
             <div className="text-left">
-              <span className="text-[9px] text-[#526070] uppercase font-medium block">Scan at Venue Gate</span>
-              <span className="text-[10px] font-mono text-[#111111]">HASH: {participant.bib}-2025-V2</span>
+              <span className="text-[9px] text-[#526070] uppercase font-medium block">Scan at Venue Gate &amp; Green Room</span>
+              <span className="text-[10px] font-mono text-[#111111]">HASH: {participant.bib}-2025-AUTH-V2</span>
             </div>
-            <div className="w-12 h-12 bg-[#F8FAFC] border border-[#E1E7EF] rounded p-1 flex items-center justify-center text-[#111111]">
-              <QrCode className="w-9 h-9" />
+            <div className="w-14 h-14 bg-white border border-[#E1E7EF] rounded-lg p-0.5 flex items-center justify-center shadow-xs">
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt={`QR Verification for ${participant.bib}`}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <QrCode className="w-8 h-8 text-neutral-400 animate-pulse" />
+              )}
             </div>
           </div>
         </div>

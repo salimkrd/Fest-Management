@@ -132,12 +132,36 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const regsSnap = await db.collection('registrations')
+        const grSnap = await db.collection('greenRoomAssignments')
           .where('competitionId', '==', effectiveCompId)
           .get();
-        registrations = regsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (!grSnap.empty) {
+          const sorted = grSnap.docs.map(d => d.data());
+          sorted.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
+          registrations = sorted.map(item => ({
+            id: item.codeLetter,
+            codeLetter: item.codeLetter,
+            codeIndex: item.codeIndex,
+            status: item.status || 'CHECKED_IN'
+          }));
+        } else {
+          // If green room check-ins have not occurred yet, generate anonymous Code Letters A, B, C...
+          // for approved registrations without exposing any participant/team data
+          const regsSnap = await db.collection('registrations')
+            .where('competitionId', '==', effectiveCompId)
+            .get();
+          const approved = regsSnap.docs.filter(d => (d.data().status || '').toUpperCase() === 'APPROVED');
+          const { indexToCodeLetter } = await import('@/domain/greenRoom');
+          registrations = approved.map((_, idx) => ({
+            id: indexToCodeLetter(idx),
+            codeLetter: indexToCodeLetter(idx),
+            codeIndex: idx,
+            status: 'CHECKED_IN'
+          }));
+        }
       } catch (e) {
-        console.warn('[JudgeLogin] Could not fetch registrations:', e);
+        console.warn('[JudgeLogin] Could not fetch anonymous contestants:', e);
       }
     }
 
@@ -162,6 +186,7 @@ export async function POST(req: NextRequest) {
       success: true,
       assignment: sanitizedAssignment,
       competition: competitionData,
+      contestants: registrations,
       registrations
     }, { status: 200 });
 

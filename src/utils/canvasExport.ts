@@ -4,6 +4,8 @@
  */
 
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
+import QRCode from 'qrcode';
+import { encodeParticipantQrPayload } from '@/domain/greenRoom';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -40,10 +42,10 @@ export async function exportPosterAsPng(
 /**
  * Generates and downloads a printable Participant Digital ID Card (PNG)
  */
-export function exportDigitalIdAsPng(
+export async function exportDigitalIdAsPng(
   participant: Participant,
   festivalName: string = 'SAHITHYOLSAV 2025'
-): void {
+): Promise<void> {
   if (typeof window === 'undefined') return;
 
   const width = 640;
@@ -185,21 +187,37 @@ export function exportDigitalIdAsPng(
   ctx.font = '700 16px monospace';
   ctx.fillText(`HASH: ${participant.bib}-2025-AUTH-V2`, 70, 825);
 
-  // Draw simulated QR matrix block
+  // Generate and draw genuine scannable QR Code
   const qrX = width - 180;
   const qrY = 755;
   const qrSize = 100;
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(qrX, qrY, qrSize, qrSize);
 
-  // Inner white squares
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(qrX + 10, qrY + 10, qrSize - 20, qrSize - 20);
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(qrX + 22, qrY + 22, 24, 24);
-  ctx.fillRect(qrX + 54, qrY + 22, 24, 24);
-  ctx.fillRect(qrX + 22, qrY + 54, 24, 24);
-  ctx.fillRect(qrX + 54, qrY + 54, 12, 12);
+  try {
+    const payload = encodeParticipantQrPayload({
+      id: participant.id,
+      bib: participant.bib,
+      name: participant.name,
+      teamCode: participant.teamCode
+    });
+    const qrDataUrl = await QRCode.toDataURL(payload, {
+      width: 300,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#111111',
+        light: '#FFFFFF'
+      }
+    });
+
+    const qrImg = new Image();
+    qrImg.src = qrDataUrl;
+    await qrImg.decode();
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+  } catch (qrErr) {
+    console.error('[canvasExport] QR rendering error:', qrErr);
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(qrX, qrY, qrSize, qrSize);
+  }
 
   // Trigger Download
   canvas.toBlob((blob) => {

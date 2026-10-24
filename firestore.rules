@@ -23,6 +23,19 @@ service cloud.firestore {
         (!('disabled' in getUserData()) || getUserData().disabled != true);
     }
 
+    function isGreenRoomStaff() {
+      return isSignedIn() &&
+        request.auth.token.role == 'GREEN_ROOM_STAFF' &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'GREEN_ROOM_STAFF' &&
+        getUserData().status == 'ACTIVE' &&
+        (!('disabled' in getUserData()) || getUserData().disabled != true);
+    }
+
+    function isAdminOrGreenRoomStaff() {
+      return isAdmin() || isGreenRoomStaff();
+    }
+
     function isTeamManager(teamId) {
       return isSignedIn() &&
         (request.auth.token.role == 'TEAM_MANAGER' && request.auth.token.teamId == teamId) &&
@@ -95,7 +108,7 @@ service cloud.firestore {
     // Public reads strictly prohibited to protect student personal data (phone, email, DOB, photo).
     // ==========================================
     match /participants/{participantId} {
-      allow read: if isAdmin() || (
+      allow read: if isAdminOrGreenRoomStaff() || (
         isSignedIn() && isTeamManager(resource.data.teamId)
       );
       allow create: if isAdmin() || (
@@ -127,7 +140,7 @@ service cloud.firestore {
     // Public reads strictly prohibited.
     // ==========================================
     match /registrations/{registrationId} {
-      allow read: if isAdmin() || (
+      allow read: if isAdminOrGreenRoomStaff() || (
         isSignedIn() && isTeamManager(resource.data.teamId)
       );
       allow create: if isAdmin() || (
@@ -141,6 +154,17 @@ service cloud.firestore {
       allow delete: if isAdmin() || (
         isSignedIn() && isTeamManager(resource.data.teamId)
       );
+    }
+
+    // ==========================================
+    // GREEN ROOM ASSIGNMENTS (ANONYMOUS CODE LETTERS)
+    // Read: Admin and Green Room Staff ONLY.
+    // Judges, Team Managers, and Public CANNOT read this mapping.
+    // Client writes strictly prohibited; managed via server transactions.
+    // ==========================================
+    match /greenRoomAssignments/{assignmentId} {
+      allow read: if isAdminOrGreenRoomStaff();
+      allow write: if false;
     }
 
     // ==========================================
