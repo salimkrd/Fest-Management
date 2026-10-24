@@ -35,6 +35,41 @@ export default function MarkEntryPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [savingAssignment, setSavingAssignment] = useState(false);
 
+  // Admin-authorized Dry-Run & Confirmed Orphan Inspection State
+  const [inspectModalOpen, setInspectModalOpen] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [inspectResult, setInspectResult] = useState<any>(null);
+  const [inspectError, setInspectError] = useState<string | null>(null);
+
+  const handleInspectDryRun = async () => {
+    setInspecting(true);
+    setInspectError(null);
+    setInspectResult(null);
+    setInspectModalOpen(true);
+    try {
+      const res = await cleanupOrphanedJudgeAssignments({ dryRun: true });
+      setInspectResult(res);
+    } catch (err: any) {
+      setInspectError(err?.message || 'Failed to inspect orphaned records.');
+    } finally {
+      setInspecting(false);
+    }
+  };
+
+  const handleConfirmPurge = async () => {
+    setPurging(true);
+    setInspectError(null);
+    try {
+      const res = await cleanupOrphanedJudgeAssignments({ confirm: true });
+      setInspectResult(res);
+    } catch (err: any) {
+      setInspectError(err?.message || 'Failed to clean up orphaned records.');
+    } finally {
+      setPurging(false);
+    }
+  };
+
   // Filter mark entries to strictly show only those belonging to existing Firestore competitions
   const validMarkEntries = React.useMemo(() => {
     if (competitions.length === 0) return [];
@@ -137,14 +172,24 @@ export default function MarkEntryPage() {
               Issue secure evaluation links to stage judges via WhatsApp and monitor live score submission status
             </p>
           </div>
-          <Button
-            variant="primary"
-            size="md"
-            leftIcon={<UserPlus className="w-4 h-4" />}
-            onClick={handleOpenAssign}
-          >
-            Assign Judge &amp; Generate Link
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
+              onClick={handleInspectDryRun}
+            >
+              Inspect Orphan Records
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<UserPlus className="w-4 h-4" />}
+              onClick={handleOpenAssign}
+            >
+              Assign Judge &amp; Generate Link
+            </Button>
+          </div>
         </div>
 
         {/* 3 Status KPI Pills */}
@@ -361,6 +406,111 @@ export default function MarkEntryPage() {
               required
             />
           </form>
+        </Modal>
+
+        {/* Admin-Authorized Dry-Run & Confirmed Orphan Inspection Modal */}
+        <Modal
+          isOpen={inspectModalOpen}
+          onClose={() => setInspectModalOpen(false)}
+          title="Database Integrity &amp; Orphan Inspection"
+          description="Admin-authorized preview and cleanup of orphaned judge assignments and score records"
+          maxWidth="lg"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="outline" size="sm" onClick={() => setInspectModalOpen(false)}>
+                Close
+              </Button>
+              {inspectResult?.dryRun && (inspectResult?.totalOrphaned || 0) > 0 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleConfirmPurge}
+                  disabled={purging}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {purging ? 'Purging Records...' : `Confirm & Purge ${inspectResult.totalOrphaned} Orphans`}
+                </Button>
+              )}
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {inspecting && (
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                <Clock className="w-8 h-8 text-blue-600 animate-spin" />
+                <p className="text-sm font-medium text-[#111111]">Scanning database records...</p>
+                <p className="text-xs text-[#526070]">Comparing judge assignments and mark entries against active competitions.</p>
+              </div>
+            )}
+
+            {inspectError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-2 text-xs">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{inspectError}</span>
+              </div>
+            )}
+
+            {!inspecting && inspectResult && (
+              <div className="space-y-4">
+                {inspectResult.dryRun ? (
+                  (inspectResult.totalOrphaned || 0) === 0 ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-bold text-emerald-900">Database Clean &amp; Fully Synchronized</h4>
+                        <p className="text-xs text-emerald-700 mt-1">
+                          Dry-run verification completed successfully. All judge assignments and mark entries map to valid active competitions. No orphaned records exist.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-bold text-amber-900">
+                            Dry-Run Preview: {inspectResult.totalOrphaned} Orphaned Records Detected
+                          </h4>
+                          <p className="text-xs text-amber-700 mt-1">
+                            Found {inspectResult.orphanedJudgeAssignmentsCount || 0} judge assignment(s) and {inspectResult.orphanedMarkEntriesCount || 0} mark entry/entries referencing deleted competitions. No records have been modified.
+                          </p>
+                        </div>
+                      </div>
+
+                      {inspectResult.orphanedJudgeDetails && inspectResult.orphanedJudgeDetails.length > 0 && (
+                        <div className="border border-[#E1E7EF] rounded-xl p-3 bg-neutral-50 max-h-48 overflow-y-auto space-y-2">
+                          <p className="text-xs font-bold text-[#111111]">Detected Orphaned Assignments:</p>
+                          {inspectResult.orphanedJudgeDetails.slice(0, 10).map((item: any) => (
+                            <div key={item.id} className="text-xs text-[#526070] flex justify-between border-b border-[#E1E7EF] pb-1 last:border-0">
+                              <span className="font-medium text-[#111111]">{item.judgeName}</span>
+                              <span className="font-mono text-[10px] text-neutral-500">Comp ID: {item.competitionId}</span>
+                            </div>
+                          ))}
+                          {inspectResult.orphanedJudgeDetails.length > 10 && (
+                            <p className="text-[11px] text-[#526070] italic">...and {inspectResult.orphanedJudgeDetails.length - 10} more</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-800">
+                        <strong>Explicit Confirmation Required:</strong> Deletion is permanent and removes these unlinked records to prevent stale submissions.
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-bold text-emerald-900">Cleanup Successfully Executed</h4>
+                      <p className="text-xs text-emerald-700 mt-1">
+                        Permanently removed {inspectResult.removedJudgeAssignments || 0} judge assignment(s) and {inspectResult.removedMarkEntries || 0} mark entry/entries. Database integrity restored.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Modal>
       </div>
     </AdminLayout>

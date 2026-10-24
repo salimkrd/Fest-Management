@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { AuthService } from '@/services/authService';
 import { handleApiError } from '@/lib/apiErrorHelper';
+import { PointsLedgerService } from '@/services/pointsLedgerService';
 
 export async function DELETE(
   req: NextRequest,
@@ -38,65 +39,83 @@ export async function DELETE(
       );
     }
 
-    // 1. Delete competition document
+    // 1. Verify parent competition document exists before doing any deletion
     const compRef = db.collection('competitions').doc(id);
     const compDoc = await compRef.get();
-    if (compDoc.exists) {
-      await compRef.delete();
+    if (!compDoc.exists) {
+      return NextResponse.json(
+        { error: `Competition with ID "${id}" was not found.` },
+        { status: 404 }
+      );
     }
 
-    // 2. Cascade delete all judgeAssignments for this competition
-    const judgeAssignSnap = await db.collection('judgeAssignments').where('competitionId', '==', id).get();
-    const batch = db.batch();
-    judgeAssignSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
+    // 2. Fetch all dependent child collections
+    const [
+      judgeAssignSnap,
+      markEntriesSnap,
+      registrationsSnap,
+      schedulesSnap,
+      resultsSnap,
+      resultDocDirect,
+      pointsSnap
+    ] = await Promise.all([
+      db.collection('judgeAssignments').where('competitionId', '==', id).get(),
+      db.collection('markEntries').where('competitionId', '==', id).get(),
+      db.collection('registrations').where('competitionId', '==', id).get(),
+      db.collection('schedules').where('competitionId', '==', id).get(),
+      db.collection('results').where('competitionId', '==', id).get(),
+      db.collection('results').doc(`res-${id}`).get(),
+      db.collection('pointsLedger').where('competitionId', '==', id).get()
+    ]);
 
-    // 3. Cascade delete all markEntries for this competition
-    const markEntriesSnap = await db.collection('markEntries').where('competitionId', '==', id).get();
-    markEntriesSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
+    // 3. Assemble and deduplicate all child document references
+    const rawChildDocs: FirebaseFirestore.DocumentReference[] = [
+      ...judgeAssignSnap.docs.map(doc => doc.ref),
+      ...markEntriesSnap.docs.map(doc => doc.ref),
+      ...registrationsSnap.docs.map(doc => doc.ref),
+      ...schedulesSnap.docs.map(doc => doc.ref),
+      ...resultsSnap.docs.map(doc => doc.ref),
+      ...(resultDocDirect.exists ? [resultDocDirect.ref] : []),
+      ...pointsSnap.docs.map(doc => doc.ref)
+    ];
 
-    // 4. Cascade delete all registrations for this competition
-    const registrationsSnap = await db.collection('registrations').where('competitionId', '==', id).get();
-    registrationsSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // 5. Cascade delete all schedules for this competition
-    const schedulesSnap = await db.collection('schedules').where('competitionId', '==', id).get();
-    schedulesSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // 6. Cascade delete results and pointsLedger for this competition
-    const resultsSnap = await db.collection('results').where('competitionId', '==', id).get();
-    resultsSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    const resultDocDirect = db.collection('results').doc(`res-${id}`);
-    const directResultSnap = await resultDocDirect.get();
-    if (directResultSnap.exists) {
-      batch.delete(resultDocDirect);
+    const seenDocPaths = new Set<string>();
+    const childDocsToDelete: FirebaseFirestore.DocumentReference[] = [];
+    for (const ref of rawChildDocs) {
+      if (!seenDocPaths.has(ref.path)) {
+        seenDocPaths.add(ref.path);
+        childDocsToDelete.push(ref);
+      }
     }
 
-    const pointsSnap = await db.collection('pointsLedger').where('competitionId', '==', id).get();
-    pointsSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
+    // 4. Safely delete all child records in batches of 400 (handles large collections without exceeding 500 ops limit)
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < childDocsToDelete.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = childDocsToDelete.slice(i, i + BATCH_SIZE);
+      chunk.forEach(ref => batch.delete(ref));
+      await batch.commit();
+    }
 
-    await batch.commit();
+    // 5. If committed points were deleted, recalculate championship leaderboard and team totals
+    const hadCommittedPoints = pointsSnap.docs.some(doc => doc.data()?.status === 'COMMITTED');
+    if (hadCommittedPoints) {
+      await PointsLedgerService.syncLeaderboardFromLedger();
+    }
+
+    // 6. ONLY AFTER all child records and points are safely handled, delete the parent competition document
+    await compRef.delete();
 
     return NextResponse.json({
       success: true,
       deletedCompetitionId: id,
+      recalculatedLeaderboard: hadCommittedPoints,
       cascadeDeleted: {
         judgeAssignments: judgeAssignSnap.size,
         markEntries: markEntriesSnap.size,
         registrations: registrationsSnap.size,
         schedules: schedulesSnap.size,
-        results: resultsSnap.size + (directResultSnap.exists ? 1 : 0),
+        results: resultsSnap.size + (resultDocDirect.exists ? 1 : 0),
         pointsLedger: pointsSnap.size
       }
     });

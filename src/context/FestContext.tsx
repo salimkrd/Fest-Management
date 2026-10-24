@@ -87,7 +87,17 @@ interface FestContextType {
   }) => Promise<{ assignmentId: string; accessCode: string; oneTimeSecret: string; directUrl: string }>;
   submitJudgeMarks: (markEntryId: string, scores: MarkEntry['scores'], verificationHash?: string) => void;
   revokeJudgeAssignment: (markEntryId: string) => void;
-  cleanupOrphanedJudgeAssignments: () => Promise<{ removedJudgeAssignments: number; removedMarkEntries: number }>;
+  cleanupOrphanedJudgeAssignments: (options?: { dryRun?: boolean; confirm?: boolean }) => Promise<{
+    success: boolean;
+    dryRun?: boolean;
+    requiresConfirmation?: boolean;
+    totalOrphaned?: number;
+    removedJudgeAssignments?: number;
+    removedMarkEntries?: number;
+    message?: string;
+    orphanedJudgeDetails?: Array<{ id: string; competitionId: string; judgeName: string }>;
+    orphanedMarkDetails?: Array<{ id: string; competitionId: string }>;
+  }>;
 
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
@@ -2327,11 +2337,35 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCategory = async (id: string) => {
-    let previousCategories: Category[] = [];
-    setCategories(prev => {
-      previousCategories = prev;
-      return prev.filter(c => c.id !== id);
-    });
+    // 1. Client-side guard: verify no active competitions are assigned to this category
+    const dependentComps = competitions.filter(c => c.categoryId === id);
+    if (dependentComps.length > 0) {
+      const compNames = dependentComps.slice(0, 3).map(c => `"${c.name}"`).join(', ');
+      const moreText = dependentComps.length > 3 ? ` and ${dependentComps.length - 3} more` : '';
+      throw new Error(`Cannot delete category: ${dependentComps.length} active competition(s) (${compNames}${moreText}) are assigned to this category. Please reassign or delete them first.`);
+    }
+
+    // 2. In non-isolated mode, execute server deletion via Admin API
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to delete a category.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to delete category (HTTP ${res.status})`);
+      }
+    }
+
+    // 3. Update local state and localStorage cache only on success
+    setCategories(prev => prev.filter(c => c.id !== id));
 
     if (typeof window !== 'undefined') {
       try {
@@ -2342,38 +2376,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         console.warn('[FestContext] Error updating cached categories:', e);
-      }
-    }
-
-    if (!isIsolatedDemoOrTest) {
-      try {
-        let apiSucceeded = false;
-        if (auth?.currentUser) {
-          try {
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            });
-            if (res.ok) {
-              apiSucceeded = true;
-            } else {
-              const errPayload = await res.json().catch(() => ({}));
-              console.warn('[FestContext] Admin API category deletion warning:', errPayload.error);
-            }
-          } catch (apiErr) {
-            console.warn('[FestContext] Admin API category deletion fetch failed:', apiErr);
-          }
-        }
-
-        if (!apiSucceeded && db) {
-          await deleteDoc(doc(db, 'categories', id));
-        }
-      } catch (err) {
-        setCategories(previousCategories);
-        throw err;
       }
     }
   };
@@ -2458,14 +2460,49 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCompetition = async (id: string) => {
-    let previousCompetitions: Competition[] = [];
-    setCompetitions(prev => {
-      previousCompetitions = prev;
-      return prev.filter(c => c.id !== id);
-    });
+    // 1. In non-isolated mode, execute server cascade deletion via Admin API first
+    if (!isIsolatedDemoOrTest) {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Authentication required: Administrator sign-in is required to delete a competition.');
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/competitions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to delete competition (HTTP ${res.status})`);
+      }
+    }
+
+    // 2. Safely update local state and cascade remove related records
+    setCompetitions(prev => prev.filter(c => c.id !== id));
     setRawJudgeAssignments(prev => prev.filter(j => j.competitionId !== id));
     setRegistrations(prev => prev.filter(r => r.competitionId !== id));
     setSchedules(prev => prev.filter(s => s.competitionId !== id));
+    setResults(prev => prev.filter(r => r.competitionId !== id && r.id !== `res-${id}`));
+
+    // 3. Update points ledger and recalculate championship team points dynamically
+    const remainingLedger = pointsLedger.filter(p => p.competitionId !== id);
+    setPointsLedger(remainingLedger);
+    const aggregated = recalculateTeamChampionship(initialBaseTeams, remainingLedger);
+    setTeams(prev => prev.map(t => {
+      const agg = aggregated.find(a => a.teamId === t.id);
+      return agg ? {
+        ...t,
+        totalPoints: agg.totalPoints,
+        soloPoints: agg.soloPoints,
+        groupPoints: agg.groupPoints,
+        firstCount: agg.firstCount,
+        secondCount: agg.secondCount,
+        thirdCount: agg.thirdCount,
+        rank: agg.rank
+      } : t;
+    }));
 
     if (typeof window !== 'undefined') {
       try {
@@ -2476,38 +2513,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         console.warn('[FestContext] Error updating cached competitions:', e);
-      }
-    }
-
-    if (!isIsolatedDemoOrTest) {
-      try {
-        let apiSucceeded = false;
-        if (auth?.currentUser) {
-          try {
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch(`/api/admin/competitions/${encodeURIComponent(id)}`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            });
-            if (res.ok) {
-              apiSucceeded = true;
-            } else {
-              const errPayload = await res.json().catch(() => ({}));
-              console.warn('[FestContext] Admin API cascade competition deletion warning:', errPayload.error);
-            }
-          } catch (apiErr) {
-            console.warn('[FestContext] Admin API cascade competition deletion fetch failed:', apiErr);
-          }
-        }
-
-        if (!apiSucceeded && db) {
-          await deleteDoc(doc(db, 'competitions', id));
-        }
-      } catch (err) {
-        setCompetitions(previousCompetitions);
-        throw err;
       }
     }
   };
@@ -3019,47 +3024,54 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setPosterMedia(previous => ({ ...previous, [resultId]: poster }));
   };
 
-  const cleanupOrphanedJudgeAssignments = useCallback(async (): Promise<{ removedJudgeAssignments: number; removedMarkEntries: number }> => {
+  const cleanupOrphanedJudgeAssignments = useCallback(async (options?: { dryRun?: boolean; confirm?: boolean }) => {
     if (isIsolatedDemoOrTest || !auth?.currentUser) {
-      return { removedJudgeAssignments: 0, removedMarkEntries: 0 };
+      return {
+        success: true,
+        dryRun: options?.dryRun ?? true,
+        requiresConfirmation: false,
+        totalOrphaned: 0,
+        removedJudgeAssignments: 0,
+        removedMarkEntries: 0,
+        message: 'No actions performed in demo/unauthenticated mode.'
+      };
     }
 
     try {
       const token = await auth.currentUser.getIdToken();
+      const isDryRun = options?.dryRun ?? (!options?.confirm);
+      const isConfirmed = options?.confirm === true;
+
       const res = await fetch('/api/admin/judge-assignments/cleanup-orphaned', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          dryRun: isDryRun,
+          confirm: isConfirmed
+        })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.removedJudgeAssignments > 0 || data.removedMarkEntries > 0) {
-          setRawJudgeAssignments(prev => {
-            const validCompIds = new Set(competitions.map(c => c.id));
-            return prev.filter(entry => validCompIds.has(entry.competitionId));
-          });
-        }
-        return data;
-      }
-    } catch (err) {
-      console.warn('[FestContext] Cleanup orphaned judge assignments failed:', err);
-    }
-    return { removedJudgeAssignments: 0, removedMarkEntries: 0 };
-  }, [isIsolatedDemoOrTest, competitions]);
 
-  // Auto-cleanup orphaned judge assignments in Firestore when Admin is connected
-  useEffect(() => {
-    if (!isIsolatedDemoOrTest && auth?.currentUser && rawJudgeAssignments.length > 0) {
-      const activeCompIds = new Set(competitions.map(c => c.id));
-      const hasOrphans = rawJudgeAssignments.some(r => !activeCompIds.has(r.competitionId));
-      if (hasOrphans) {
-        cleanupOrphanedJudgeAssignments().catch(e => {
-          console.warn('[FestContext] Auto-cleanup of orphaned assignments warning:', e);
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        throw new Error(errPayload.error || `Failed to clean up orphaned assignments (HTTP ${res.status})`);
+      }
+
+      const data = await res.json();
+      if (data.confirmed && (data.removedJudgeAssignments > 0 || data.removedMarkEntries > 0)) {
+        setRawJudgeAssignments(prev => {
+          const validCompIds = new Set(competitions.map(c => c.id));
+          return prev.filter(entry => validCompIds.has(entry.competitionId));
         });
       }
+      return data;
+    } catch (err) {
+      console.warn('[FestContext] Cleanup orphaned judge assignments failed:', err);
+      throw err;
     }
-  }, [isIsolatedDemoOrTest, competitions, rawJudgeAssignments, cleanupOrphanedJudgeAssignments]);
+  }, [isIsolatedDemoOrTest, competitions]);
 
   return (
     <FestContext.Provider
