@@ -33,11 +33,20 @@ export async function POST(
 
     const result = resultSnapshot.data()!;
     if (body.action === 'CONFIRM') {
-      if (!Array.isArray(body.ranks)) {
+      if (!['READY_FOR_REVIEW', 'REVISION_REQUIRED'].includes(result.resultStatus)) {
+        return NextResponse.json({ error: 'Validation Error: Result is not eligible for rank confirmation.' }, { status: 400 });
+      }
+      if (result.marksStatus !== 'COMPLETE') {
+        return NextResponse.json({ error: 'Validation Error: Submitted marks must be complete before confirmation.' }, { status: 400 });
+      }
+      if (!Array.isArray(body.ranks) || body.ranks.length === 0) {
         return NextResponse.json({ error: 'Validation Error: Result ranks must be an array.' }, { status: 400 });
       }
 
       const competitionSnapshot = await db.collection('competitions').doc(result.competitionId).get();
+      if (!competitionSnapshot.exists) {
+        return NextResponse.json({ error: 'Validation Error: Competition no longer exists.' }, { status: 400 });
+      }
       const competition = competitionSnapshot.data();
       const criteria = Array.isArray(competition?.criteria) ? competition.criteria : [];
       const maxMarks = Number(competition?.maxMarks) ||
@@ -100,7 +109,7 @@ export async function POST(
     }
 
     if (body.action === 'PUBLISH') {
-      if (!['READY_TO_PUBLISH', 'READY_FOR_REVIEW'].includes(result.resultStatus)) {
+      if (result.resultStatus !== 'READY_TO_PUBLISH') {
         return NextResponse.json({ error: 'Validation Error: Result is not ready for publication.' }, { status: 400 });
       }
       const resultRanks = Array.isArray(result.ranks) ? result.ranks : [];
@@ -119,6 +128,9 @@ export async function POST(
     }
 
     if (body.action === 'UNPUBLISH') {
+      if (result.resultStatus !== 'PUBLISHED') {
+        return NextResponse.json({ error: 'Validation Error: Only published results can be unpublished.' }, { status: 400 });
+      }
       const success = await PointsLedgerService.reverseResultPoints(
         id,
         typeof body.reason === 'string' && body.reason.trim()
