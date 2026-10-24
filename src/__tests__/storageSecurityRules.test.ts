@@ -10,6 +10,7 @@ import {
   getAuth,
   connectAuthEmulator,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   Auth
 } from 'firebase/auth';
@@ -30,7 +31,7 @@ import {
   deleteObject,
   FirebaseStorage
 } from 'firebase/storage';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/lib/firebase/admin';
 
 describe('Storage Security Rules - Authoritative Ownership & Privacy Enforcement', () => {
   let clientApp: FirebaseApp;
@@ -322,4 +323,152 @@ describe('Storage Security Rules - Authoritative Ownership & Privacy Enforcement
       await expect(deleteObject(storageRef)).resolves.not.toThrow();
     });
   });
+
+  // =========================================================================
+  // 8. AUTHORITATIVE ACTIVE/NON-DISABLED USER STATUS (2-DOCUMENT LOOKUP LIMIT)
+  // =========================================================================
+  describe('8. Authoritative Active User Status & 2-Document Lookup Limit', () => {
+    const disabledTmUid = `tm-disabled-${Date.now()}`;
+    const disabledAdminUid = `admin-disabled-${Date.now()}`;
+
+    afterAll(async () => {
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        await adminDb.collection('users').doc(disabledTmUid).delete().catch(() => {});
+        await adminDb.collection('users').doc(disabledAdminUid).delete().catch(() => {});
+      }
+    });
+
+    it('8.1 Disabled Team Manager in Firestore is REJECTED from uploading or reading photos', async () => {
+      const adminAuth = getAdminAuth()!;
+      const adminDb = getAdminDb()!;
+
+      // Create disabled user in Firestore with matching claims
+      await adminDb.collection('users').doc(disabledTmUid).set({
+        id: disabledTmUid,
+        email: 'disabled.manager@sahithyolsav.com',
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        disabled: true // Disabled flag set
+      });
+
+      const token = await adminAuth.createCustomToken(disabledTmUid, {
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1'
+      });
+
+      await signInWithCustomToken(clientAuth, token);
+
+      const storageRef = ref(clientStorage, `participants/${testPartTeam1}/disabled-attempt.jpg`);
+      await expect(
+        uploadBytes(storageRef, dummyImageBytes, { contentType: 'image/jpeg' })
+      ).rejects.toThrow();
+
+      await expect(getBytes(storageRef)).rejects.toThrow();
+    });
+
+    it('8.2 Inactive status (status != ACTIVE) Team Manager in Firestore is REJECTED', async () => {
+      const adminAuth = getAdminAuth()!;
+      const adminDb = getAdminDb()!;
+
+      // Change status to PENDING
+      await adminDb.collection('users').doc(disabledTmUid).set({
+        id: disabledTmUid,
+        email: 'disabled.manager@sahithyolsav.com',
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1',
+        status: 'PENDING',
+        disabled: false
+      });
+
+      const token = await adminAuth.createCustomToken(disabledTmUid, {
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1'
+      });
+
+      await signInWithCustomToken(clientAuth, token);
+
+      const storageRef = ref(clientStorage, `participants/${testPartTeam1}/pending-attempt.jpg`);
+      await expect(
+        uploadBytes(storageRef, dummyImageBytes, { contentType: 'image/jpeg' })
+      ).rejects.toThrow();
+    });
+
+    it('8.3 Team Manager whose Firestore users/{uid} document is missing is REJECTED', async () => {
+      const adminAuth = getAdminAuth()!;
+      const adminDb = getAdminDb()!;
+
+      await adminDb.collection('users').doc(disabledTmUid).delete();
+
+      const token = await adminAuth.createCustomToken(disabledTmUid, {
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1'
+      });
+
+      await signInWithCustomToken(clientAuth, token);
+
+      const storageRef = ref(clientStorage, `participants/${testPartTeam1}/missing-user-attempt.jpg`);
+      await expect(
+        uploadBytes(storageRef, dummyImageBytes, { contentType: 'image/jpeg' })
+      ).rejects.toThrow();
+    });
+
+    it('8.4 Disabled Administrator in Firestore is REJECTED from admin operations', async () => {
+      const adminAuth = getAdminAuth()!;
+      const adminDb = getAdminDb()!;
+
+      await adminDb.collection('users').doc(disabledAdminUid).set({
+        id: disabledAdminUid,
+        email: 'disabled.admin@sahithyolsav.com',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        disabled: true
+      });
+
+      const token = await adminAuth.createCustomToken(disabledAdminUid, {
+        role: 'ADMIN'
+      });
+
+      await signInWithCustomToken(clientAuth, token);
+
+      const storageRef = ref(clientStorage, `participants/${testPartTeam1}/admin-disabled.jpg`);
+      await expect(
+        uploadBytes(storageRef, dummyImageBytes, { contentType: 'image/jpeg' })
+      ).rejects.toThrow();
+    });
+
+    it('8.5 Re-activated user with ACTIVE and disabled=false SUCCEEDS within 2-document limit', async () => {
+      const adminAuth = getAdminAuth()!;
+      const adminDb = getAdminDb()!;
+
+      // Restore active status
+      await adminDb.collection('users').doc(disabledTmUid).set({
+        id: disabledTmUid,
+        email: 'activated.manager@sahithyolsav.com',
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        disabled: false
+      });
+
+      const token = await adminAuth.createCustomToken(disabledTmUid, {
+        role: 'TEAM_MANAGER',
+        teamId: 'team-1'
+      });
+
+      await signInWithCustomToken(clientAuth, token);
+
+      const storageRef = ref(clientStorage, `participants/${testPartTeam1}/activated-ok.jpg`);
+      const uploadRes = await uploadBytes(storageRef, dummyImageBytes, { contentType: 'image/jpeg' });
+      expect(uploadRes.ref.fullPath).toBe(`participants/${testPartTeam1}/activated-ok.jpg`);
+
+      const bytes = await getBytes(storageRef);
+      expect(bytes.byteLength).toBe(dummyImageBytes.byteLength);
+
+      // Clean up uploaded file
+      await deleteObject(storageRef);
+    });
+  });
 });
+

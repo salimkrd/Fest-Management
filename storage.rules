@@ -6,8 +6,29 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isUserActive() {
+      return isSignedIn() &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+             getUserData().status == 'ACTIVE' &&
+             getUserData().disabled != true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && request.auth.token.role == 'ADMIN';
+      return isUserActive() &&
+             request.auth.token.role == 'ADMIN' &&
+             getUserData().role == 'ADMIN';
+    }
+
+    function isAuthorizedTeamManager() {
+      return isUserActive() &&
+             request.auth.token.role == 'TEAM_MANAGER' &&
+             getUserData().role == 'TEAM_MANAGER' &&
+             request.auth.token.teamId != null &&
+             getUserData().teamId == request.auth.token.teamId;
     }
 
     function isImageFile() {
@@ -21,9 +42,7 @@ service firebase.storage {
     }
 
     function isParticipantOwner(participantId) {
-      return isSignedIn() &&
-             request.auth.token.role == 'TEAM_MANAGER' &&
-             request.auth.token.teamId != null &&
+      return isAuthorizedTeamManager() &&
              firestore.exists(/databases/(default)/documents/participants/$(participantId)) &&
              getParticipantData(participantId).teamId == request.auth.token.teamId;
     }
