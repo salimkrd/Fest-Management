@@ -1,9 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
@@ -87,6 +87,7 @@ interface FestContextType {
   }) => Promise<{ assignmentId: string; accessCode: string; oneTimeSecret: string; directUrl: string }>;
   submitJudgeMarks: (markEntryId: string, scores: MarkEntry['scores'], verificationHash?: string) => void;
   revokeJudgeAssignment: (markEntryId: string) => void;
+  cleanupOrphanedJudgeAssignments: () => Promise<{ removedJudgeAssignments: number; removedMarkEntries: number }>;
 
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
@@ -1440,10 +1441,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_categories_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialCategories;
+    return [];
   });
 
   const [competitions, setCompetitions] = useState<Competition[]>(() => {
@@ -1454,10 +1460,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_competitions_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialCompetitions;
+    return [];
   });
 
   const [participants, setParticipants] = useState<Participant[]>(() => {
@@ -1468,10 +1479,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_participants_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialParticipants;
+    return [];
   });
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
@@ -1482,10 +1498,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_registrations_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialRegistrations;
+    return [];
   });
 
   const [stages, setStages] = useState<Stage[]>(() => {
@@ -1496,10 +1517,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_stages_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialStages;
+    return [];
   });
 
   const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
@@ -1510,25 +1536,29 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_schedules_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
-    return initialSchedules;
+    return [];
   });
 
-  const [markEntries, setMarkEntries] = useState<MarkEntry[]>(() => {
-    if (!isIsolatedDemoOrTest) {
-      return [];
-    }
+  const [rawJudgeAssignments, setRawJudgeAssignments] = useState<MarkEntry[]>([]);
 
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fest_mark_entries_v2');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return initialMarkEntries;
-  });
+  // Show ONLY judge assignments and mark entries for competitions that actually exist in Firestore
+  const markEntries = useMemo(() => {
+    if (competitions.length === 0) return [];
+    const validCompIds = new Set(competitions.map(c => c.id));
+    return rawJudgeAssignments.filter(entry => validCompIds.has(entry.competitionId));
+  }, [rawJudgeAssignments, competitions]);
+
+  const setMarkEntries = useCallback((action: React.SetStateAction<MarkEntry[]>) => {
+    setRawJudgeAssignments(action);
+  }, []);
 
   const [resultRecords, setResults] = useState<CompetitionResult[]>(() => {
     if (!isIsolatedDemoOrTest) {
@@ -1775,6 +1805,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           catRef,
           (snapshot) => {
+            if (snapshot.empty) {
+              setCategories([]);
+              return;
+            }
             const liveCategories: Category[] = snapshot.docs.map(d => {
               const dt = d.data();
               return {
@@ -1811,6 +1845,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           compRef,
           (snapshot) => {
+            if (snapshot.empty) {
+              setCompetitions([]);
+              return;
+            }
             const liveCompetitions: Competition[] = snapshot.docs.map(d => {
               const dt = d.data();
               return {
@@ -1854,6 +1892,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           stagesRef,
           (snapshot) => {
+            if (snapshot.empty) {
+              setStages([]);
+              return;
+            }
             const liveStages: Stage[] = snapshot.docs.map(d => {
               const dt = d.data();
               return {
@@ -1891,6 +1933,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onSnapshot(
           schedulesRef,
           (snapshot) => {
+            if (snapshot.empty) {
+              setSchedules([]);
+              return;
+            }
             const liveSchedules: ScheduleSlot[] = snapshot.docs.map(d => {
               const dt = d.data();
               return {
@@ -2059,6 +2105,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           unsubRegs = onSnapshot(
             regsRef,
             (snapshot) => {
+              if (snapshot.empty) {
+                setRegistrations([]);
+                return;
+              }
               const liveRegs: Registration[] = snapshot.docs.map(d => {
                 const dt = d.data();
                 return {
@@ -2090,6 +2140,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           unsubJudges = onSnapshot(
             judgesRef,
             (snapshot) => {
+              if (snapshot.empty) {
+                setRawJudgeAssignments([]);
+                return;
+              }
               const liveAssignments: MarkEntry[] = snapshot.docs.map(d => {
                 const dt = d.data();
                 return {
@@ -2112,7 +2166,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   verificationHash: dt.verificationHash
                 };
               });
-              setMarkEntries(liveAssignments);
+              setRawJudgeAssignments(liveAssignments);
             },
             (err) => console.warn('[FestContext] Firestore judgeAssignments sync warning:', err)
           );
@@ -2273,10 +2327,55 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!isIsolatedDemoOrTest && db) {
-      await deleteDoc(doc(db, 'categories', id));
+    let previousCategories: Category[] = [];
+    setCategories(prev => {
+      previousCategories = prev;
+      return prev.filter(c => c.id !== id);
+    });
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fest_categories_v2');
+        if (cached) {
+          const list: Category[] = JSON.parse(cached);
+          localStorage.setItem('fest_categories_v2', JSON.stringify(list.filter(c => c.id !== id)));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached categories:', e);
+      }
     }
-    setCategories(prev => prev.filter(c => c.id !== id));
+
+    if (!isIsolatedDemoOrTest) {
+      try {
+        let apiSucceeded = false;
+        if (auth?.currentUser) {
+          try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            });
+            if (res.ok) {
+              apiSucceeded = true;
+            } else {
+              const errPayload = await res.json().catch(() => ({}));
+              console.warn('[FestContext] Admin API category deletion warning:', errPayload.error);
+            }
+          } catch (apiErr) {
+            console.warn('[FestContext] Admin API category deletion fetch failed:', apiErr);
+          }
+        }
+
+        if (!apiSucceeded && db) {
+          await deleteDoc(doc(db, 'categories', id));
+        }
+      } catch (err) {
+        setCategories(previousCategories);
+        throw err;
+      }
+    }
   };
 
   const handleSetCurrentTeamUser = (teamUser: Team | null) => {
@@ -2359,10 +2458,58 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCompetition = async (id: string) => {
-    if (!isIsolatedDemoOrTest && db) {
-      await deleteDoc(doc(db, 'competitions', id));
+    let previousCompetitions: Competition[] = [];
+    setCompetitions(prev => {
+      previousCompetitions = prev;
+      return prev.filter(c => c.id !== id);
+    });
+    setRawJudgeAssignments(prev => prev.filter(j => j.competitionId !== id));
+    setRegistrations(prev => prev.filter(r => r.competitionId !== id));
+    setSchedules(prev => prev.filter(s => s.competitionId !== id));
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fest_competitions_v2');
+        if (cached) {
+          const list: Competition[] = JSON.parse(cached);
+          localStorage.setItem('fest_competitions_v2', JSON.stringify(list.filter(c => c.id !== id)));
+        }
+      } catch (e) {
+        console.warn('[FestContext] Error updating cached competitions:', e);
+      }
     }
-    setCompetitions(prev => prev.filter(c => c.id !== id));
+
+    if (!isIsolatedDemoOrTest) {
+      try {
+        let apiSucceeded = false;
+        if (auth?.currentUser) {
+          try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/api/admin/competitions/${encodeURIComponent(id)}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            });
+            if (res.ok) {
+              apiSucceeded = true;
+            } else {
+              const errPayload = await res.json().catch(() => ({}));
+              console.warn('[FestContext] Admin API cascade competition deletion warning:', errPayload.error);
+            }
+          } catch (apiErr) {
+            console.warn('[FestContext] Admin API cascade competition deletion fetch failed:', apiErr);
+          }
+        }
+
+        if (!apiSucceeded && db) {
+          await deleteDoc(doc(db, 'competitions', id));
+        }
+      } catch (err) {
+        setCompetitions(previousCompetitions);
+        throw err;
+      }
+    }
   };
 
   const addParticipant = async (partData: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
@@ -2872,6 +3019,48 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setPosterMedia(previous => ({ ...previous, [resultId]: poster }));
   };
 
+  const cleanupOrphanedJudgeAssignments = useCallback(async (): Promise<{ removedJudgeAssignments: number; removedMarkEntries: number }> => {
+    if (isIsolatedDemoOrTest || !auth?.currentUser) {
+      return { removedJudgeAssignments: 0, removedMarkEntries: 0 };
+    }
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/admin/judge-assignments/cleanup-orphaned', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.removedJudgeAssignments > 0 || data.removedMarkEntries > 0) {
+          setRawJudgeAssignments(prev => {
+            const validCompIds = new Set(competitions.map(c => c.id));
+            return prev.filter(entry => validCompIds.has(entry.competitionId));
+          });
+        }
+        return data;
+      }
+    } catch (err) {
+      console.warn('[FestContext] Cleanup orphaned judge assignments failed:', err);
+    }
+    return { removedJudgeAssignments: 0, removedMarkEntries: 0 };
+  }, [isIsolatedDemoOrTest, competitions]);
+
+  // Auto-cleanup orphaned judge assignments in Firestore when Admin is connected
+  useEffect(() => {
+    if (!isIsolatedDemoOrTest && auth?.currentUser && rawJudgeAssignments.length > 0) {
+      const activeCompIds = new Set(competitions.map(c => c.id));
+      const hasOrphans = rawJudgeAssignments.some(r => !activeCompIds.has(r.competitionId));
+      if (hasOrphans) {
+        cleanupOrphanedJudgeAssignments().catch(e => {
+          console.warn('[FestContext] Auto-cleanup of orphaned assignments warning:', e);
+        });
+      }
+    }
+  }, [isIsolatedDemoOrTest, competitions, rawJudgeAssignments, cleanupOrphanedJudgeAssignments]);
+
   return (
     <FestContext.Provider
       value={{
@@ -2909,6 +3098,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         addOrUpdateJudgeAssignment,
         submitJudgeMarks,
         revokeJudgeAssignment,
+        cleanupOrphanedJudgeAssignments,
         results,
         pointsLedger,
         publishResult,

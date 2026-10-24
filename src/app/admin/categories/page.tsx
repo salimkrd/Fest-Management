@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Layers, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Layers, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function CategoriesPage() {
   const { categories, addCategory, updateCategory, deleteCategory } = useFest();
@@ -17,6 +17,8 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -98,10 +100,14 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete category "${name}"?`)) {
+      setActionError(null);
+      setDeletingId(id);
       try {
         await deleteCategory(id);
       } catch (err: any) {
-        alert(err?.message || 'Failed to delete category.');
+        setActionError(err?.message || 'Failed to delete category.');
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -128,6 +134,19 @@ export default function CategoriesPage() {
             Add Division Tier
           </Button>
         </div>
+
+        {/* Action Error Banner */}
+        {actionError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700 font-bold ml-4">
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Filter bar */}
         <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#E1E7EF]">
@@ -168,8 +187,18 @@ export default function CategoriesPage() {
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filteredCategories.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-[#526070]">
-                      No categories found matching your query.
+                    <td colSpan={6} className="py-12 text-center text-xs text-[#526070]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Layers className="w-8 h-8 text-[#94A3B8]" />
+                        <p className="font-semibold text-sm text-[#111111]">
+                          {categories.length === 0 ? 'No categories configured' : 'No categories found'}
+                        </p>
+                        <p className="text-xs text-[#526070]">
+                          {categories.length === 0
+                            ? "Use 'Add Division Tier' to create categories."
+                            : 'No categories match your search query.'}
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (

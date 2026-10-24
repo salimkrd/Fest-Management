@@ -26,7 +26,7 @@ import {
 import Link from 'next/link';
 
 export default function MarkEntryPage() {
-  const { markEntries, competitions, addOrUpdateJudgeAssignment } = useFest();
+  const { markEntries, competitions, addOrUpdateJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -35,13 +35,20 @@ export default function MarkEntryPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [savingAssignment, setSavingAssignment] = useState(false);
 
+  // Filter mark entries to strictly show only those belonging to existing Firestore competitions
+  const validMarkEntries = React.useMemo(() => {
+    if (competitions.length === 0) return [];
+    const activeCompIds = new Set(competitions.map(c => c.id));
+    return markEntries.filter(m => activeCompIds.has(m.competitionId));
+  }, [markEntries, competitions]);
+
   // Assignment Form State
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [judgeName, setJudgeName] = useState('');
   const [judgePhone, setJudgePhone] = useState('+91 9847');
   const [error, setError] = useState('');
 
-  const filteredEntries = markEntries.filter(m => {
+  const filteredEntries = validMarkEntries.filter(m => {
     const matchesSearch = m.competitionName.toLowerCase().includes(search.toLowerCase()) ||
                           m.competitionCode.toLowerCase().includes(search.toLowerCase()) ||
                           m.judgeName.toLowerCase().includes(search.toLowerCase());
@@ -49,9 +56,9 @@ export default function MarkEntryPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const notStartedCount = markEntries.filter(m => m.status === 'NOT_STARTED').length;
-  const inProgressCount = markEntries.filter(m => m.status === 'IN_PROGRESS').length;
-  const submittedCount = markEntries.filter(m => m.status === 'SUBMITTED').length;
+  const notStartedCount = validMarkEntries.filter(m => m.status === 'NOT_STARTED').length;
+  const inProgressCount = validMarkEntries.filter(m => m.status === 'IN_PROGRESS').length;
+  const submittedCount = validMarkEntries.filter(m => m.status === 'SUBMITTED').length;
 
   const handleOpenAssign = () => {
     setCompetitionId(competitions[0]?.id || '');
@@ -220,63 +227,79 @@ export default function MarkEntryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-[#F8FAFC] transition-colors">
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                          {entry.competitionCode}
-                        </span>
-                        <div>
-                          <span className="font-bold text-[#111111] text-sm block">{entry.competitionName}</span>
-                          {entry.submittedAt && (
-                            <span className="text-[11px] text-[#526070]">Submitted: {entry.submittedAt}</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 font-semibold text-[#111111]">
-                      {entry.categoryName} · {entry.type}
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-semibold text-[#111111] block">{entry.judgeName}</span>
-                      <span className="text-[11px] text-[#526070]">{entry.judgePhone}</span>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      {getStatusBadge(entry.status)}
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* WhatsApp Dispatch Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          leftIcon={<MessageSquare className="w-3.5 h-3.5 text-emerald-600" />}
-                          onClick={() => {
-                            setDispatchCredentials(null);
-                            setSelectedForDispatch(entry);
-                          }}
-                        >
-                          Dispatch Link
-                        </Button>
-
-                        {/* Open as Judge Simulator link */}
-                        <Link
-                          href={`/judge/marking?code=${entry.accessCode}&competitionId=${entry.competitionId}`}
-                          target="_blank"
-                        >
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
-                          >
-                            Open Sheet
-                          </Button>
-                        </Link>
+                {filteredEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-xs text-[#526070]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <FileSpreadsheet className="w-8 h-8 text-[#94A3B8]" />
+                        <p className="font-semibold text-sm text-[#111111]">No mark entries found</p>
+                        <p className="text-xs text-[#526070]">
+                          {competitions.length === 0
+                            ? 'No competitions exist in the festival database. Create competitions before assigning judges.'
+                            : 'No active competition judge assignments match your filter criteria.'}
+                        </p>
                       </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredEntries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            {entry.competitionCode}
+                          </span>
+                          <div>
+                            <span className="font-bold text-[#111111] text-sm block">{entry.competitionName}</span>
+                            {entry.submittedAt && (
+                              <span className="text-[11px] text-[#526070]">Submitted: {entry.submittedAt}</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 font-semibold text-[#111111]">
+                        {entry.categoryName} · {entry.type}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="font-semibold text-[#111111] block">{entry.judgeName}</span>
+                        <span className="text-[11px] text-[#526070]">{entry.judgePhone}</span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        {getStatusBadge(entry.status)}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* WhatsApp Dispatch Button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<MessageSquare className="w-3.5 h-3.5 text-emerald-600" />}
+                            onClick={() => {
+                              setDispatchCredentials(null);
+                              setSelectedForDispatch(entry);
+                            }}
+                          >
+                            Dispatch Link
+                          </Button>
+
+                          {/* Open as Judge Simulator link */}
+                          <Link
+                            href={`/judge/marking?code=${entry.accessCode}&competitionId=${entry.competitionId}`}
+                            target="_blank"
+                          >
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                            >
+                              Open Sheet
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
