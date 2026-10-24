@@ -109,7 +109,7 @@ export async function POST(
     }
 
     if (body.action === 'PUBLISH') {
-      if (!['READY_TO_PUBLISH', 'READY_FOR_REVIEW'].includes(result.resultStatus)) {
+      if (result.resultStatus !== 'READY_TO_PUBLISH') {
         return NextResponse.json({ error: 'Validation Error: Result is not ready for publication.' }, { status: 400 });
       }
       const resultRanks = Array.isArray(result.ranks) ? result.ranks : [];
