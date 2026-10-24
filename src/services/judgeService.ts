@@ -186,15 +186,6 @@ export class JudgeService {
           aliasToRegId.set(cleanCode, grData.registrationId);
         }
       });
-    } else {
-      // Fallback: If no Green Room assignments were created yet, map sequential codes A, B, C...
-      const { indexToCodeLetter } = await import('@/domain/greenRoom');
-      eligibleRegs.forEach((doc, idx) => {
-        const fallbackCode = indexToCodeLetter(idx);
-        if (!aliasToRegId.has(fallbackCode)) {
-          aliasToRegId.set(fallbackCode, doc.id);
-        }
-      });
     }
 
     // Invariant 5: Verify every score key corresponds to an eligible registration,

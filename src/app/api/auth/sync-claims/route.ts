@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const targetRole = userData.role;
     const targetTeamId = userData.teamId;
 
-    if (!targetRole || !['ADMIN', 'TEAM_MANAGER', 'JUDGE', 'PUBLIC'].includes(targetRole)) {
+    if (!targetRole || !['ADMIN', 'TEAM_MANAGER', 'GREEN_ROOM_STAFF', 'JUDGE', 'PUBLIC'].includes(targetRole)) {
       return NextResponse.json({ error: 'Invalid authoritative role specification.' }, { status: 400 });
     }
 

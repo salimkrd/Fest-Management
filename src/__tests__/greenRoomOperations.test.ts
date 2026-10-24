@@ -33,9 +33,14 @@ import {
   codeLetterToIndex,
   getNextAvailableCodeLetter,
   encodeParticipantQrPayload,
-  parseParticipantQrPayload
+  parseParticipantQrPayload,
+  generateQrVerificationToken,
+  verifyQrVerificationToken
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
+import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
+import { POST as syncClaimsHandler } from '@/app/api/auth/sync-claims/route';
+import { POST as provisionStaffHandler } from '@/app/api/admin/green-room/provision-staff/route';
 import { NextRequest } from 'next/server';
 
 describe('Green Room Management & Anonymous Judging Workflow', () => {
@@ -191,16 +196,27 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       registeredAt: new Date().toISOString()
     });
 
-    // 6. Clean any existing green room assignments for test competitions
+    // 6. Clean any existing green room assignments, mark entries, and counters for test competitions
     const existingSnap = await db.collection('greenRoomAssignments')
       .where('competitionId', 'in', [testCompId, testGroupCompId])
       .get();
+    const existingMarks = await db.collection('markEntries')
+      .where('competitionId', 'in', [testCompId, testGroupCompId])
+      .get();
+    const existingJudges = await db.collection('judgeAssignments')
+      .where('competitionId', 'in', [testCompId, testGroupCompId])
+      .get();
+
     const batch = db.batch();
     existingSnap.docs.forEach(doc => batch.delete(doc.ref));
+    existingMarks.docs.forEach(doc => batch.delete(doc.ref));
+    existingJudges.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
 
     await db.collection('greenRoomCounters').doc(testCompId).delete().catch(() => {});
     await db.collection('greenRoomCounters').doc(testGroupCompId).delete().catch(() => {});
+    await db.collection('results').doc(`res-${testCompId}`).delete().catch(() => {});
+    await db.collection('results').doc(`res-${testGroupCompId}`).delete().catch(() => {});
   });
 
   afterAll(async () => {
@@ -209,13 +225,11 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     }
   });
 
-  describe('1. QR Payload Generation & Decoding', () => {
-    it('generates a verified JSON QR payload with authentication hash', () => {
+  describe('1. QR Payload Generation, Verification & Tamper Resistance', () => {
+    it('generates an opaque JSON QR payload with HMAC token and zero leaked names or teams', () => {
       const payload = encodeParticipantQrPayload({
         id: 'p-gr-101',
-        bib: '#101',
-        name: 'Fathima Zahra',
-        teamCode: 'ABH'
+        bib: '#101'
       });
 
       const parsed = parseParticipantQrPayload(payload);
@@ -223,6 +237,32 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(parsed.format).toBe('JSON_PAYLOAD');
       expect(parsed.participantId).toBe('p-gr-101');
       expect(parsed.bib).toBe('#101');
+      expect(typeof parsed.token).toBe('string');
+      expect(parsed.token!.length).toBe(64);
+
+      // Verify privacy: raw JSON must not have name or team
+      const rawJson = JSON.parse(payload);
+      expect(rawJson.name).toBeUndefined();
+      expect(rawJson.teamCode).toBeUndefined();
+    });
+
+    it('rejects check-in when a QR payload token is forged or tampered with', async () => {
+      const tamperedPayload = JSON.stringify({
+        app: 'INSPIRATH',
+        type: 'PARTICIPANT_ID',
+        id: 'p-gr-101',
+        bib: '#101',
+        token: 'forged_fake_token_000000000000000000000000000000000000000000000000',
+        version: 3
+      });
+
+      await expect(
+        GreenRoomService.checkInContestant({
+          competitionId: testCompId,
+          participantIdentifier: tamperedPayload,
+          operatorIdToken: adminIdToken
+        })
+      ).rejects.toThrow(/Invalid or tampered QR verification token/);
     });
 
     it('gracefully parses manual string fallbacks', () => {
@@ -237,7 +277,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     });
   });
 
-  describe('2. GREEN_ROOM_STAFF Role Provisioning & RBAC', () => {
+  describe('2. GREEN_ROOM_STAFF Role Provisioning, Sync & RBAC', () => {
     it('allows Chief Admin to provision a new Green Room Staff account', async () => {
       const staffEmail = `greenroom.staff.${Date.now()}@sahithyolsav.com`;
       const result = await AuthService.provisionGreenRoomStaff(adminIdToken, {
@@ -268,6 +308,43 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       await expect(AuthService.assertAdminOrGreenRoom(staffIdToken)).resolves.toBeDefined();
     });
 
+    it('rejects provisioning when email already belongs to an existing account (Conflict Error)', async () => {
+      // Attempting to provision using existing Chief Admin email
+      await expect(
+        AuthService.provisionGreenRoomStaff(adminIdToken, {
+          email: 'admin@sahithyolsav.com',
+          password: 'NewPassword123!',
+          displayName: 'Duplicate Admin'
+        })
+      ).rejects.toThrow(/Conflict Error: An account with email.*already exists/i);
+
+      // Also verify via HTTP POST endpoint
+      const req = new NextRequest('http://localhost:3000/api/admin/green-room/provision-staff', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${adminIdToken}` },
+        body: JSON.stringify({
+          email: 'admin@sahithyolsav.com',
+          password: 'NewPassword123!',
+          displayName: 'Duplicate Admin'
+        })
+      });
+      const res = await provisionStaffHandler(req);
+      expect(res.status).toBe(409);
+      const data = await res.json();
+      expect(data.error).toMatch(/already exists/i);
+    });
+
+    it('synchronizes custom claims for GREEN_ROOM_STAFF via POST /api/auth/sync-claims', async () => {
+      const req = new NextRequest('http://localhost:3000/api/auth/sync-claims', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${staffIdToken}` }
+      });
+      const res = await syncClaimsHandler(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.role).toBe('GREEN_ROOM_STAFF');
+    });
+
     it('denies non-admin accounts from provisioning Green Room Staff', async () => {
       await expect(
         AuthService.provisionGreenRoomStaff(staffIdToken, {
@@ -276,6 +353,15 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           displayName: 'Unauthorized'
         })
       ).rejects.toThrow(/Operation requires ADMIN role/);
+    });
+
+    it('denies Green Room Staff from executing Admin-only operations (e.g. deleting competitions)', async () => {
+      const req = new NextRequest(`http://localhost:3000/api/admin/competitions/${testCompId}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${staffIdToken}` }
+      });
+      const res = await deleteCompetitionHandler(req, { params: Promise.resolve({ id: testCompId }) });
+      expect(res.status).toBe(403);
     });
   });
 
@@ -522,6 +608,271 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(resData?.ranks[1].score).toBe(82);
       expect(resData?.ranks[1].grade).toBe('A');
       expect(resData?.ranks[1].rank).toBe(2);
+    });
+  });
+
+  describe('7. Code Reassignment Lock Protection', () => {
+    it('strictly locks Code Letter reassignment once judge marks or results exist (Lock Error)', async () => {
+      // testCompId now has submitted marks and official results generated in previous test
+      await expect(
+        GreenRoomService.reassignCodeLetter({
+          competitionId: testCompId,
+          registrationId: 'reg-gr-solo-01',
+          newCodeLetter: 'D',
+          reason: 'Attempted reassignment after judging completed',
+          operatorIdToken: staffIdToken
+        })
+      ).rejects.toThrow(/Lock Error: Code Letter reassignment is locked/i);
+    });
+
+    it('returns HTTP 423 Locked when reassignment is attempted via API on an evaluated competition', async () => {
+      const { POST: reassignHandler } = await import('@/app/api/admin/green-room/reassign/route');
+      const req = new NextRequest('http://localhost:3000/api/admin/green-room/reassign', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${staffIdToken}` },
+        body: JSON.stringify({
+          competitionId: testCompId,
+          registrationId: 'reg-gr-solo-01',
+          newCodeLetter: 'D',
+          reason: 'Late swap attempt'
+        })
+      });
+
+      const res = await reassignHandler(req);
+      expect(res.status).toBe(423);
+      const data = await res.json();
+      expect(data.error).toMatch(/Lock Error/i);
+    });
+  });
+
+  describe('8. Absent Green Room Assignments & Strict Judge PIN Verification', () => {
+    const emptyCompId = 'cmp-gr-empty-test';
+    const emptyJudgeCode = 'JRY-EMPTY-TEST';
+    const emptySecret = 'pass5678';
+    const emptyAsgnId = 'asgn-gr-empty-test';
+
+    beforeAll(async () => {
+      await db.collection('competitions').doc(emptyCompId).set({
+        id: emptyCompId,
+        code: 'CMP-EMPTY',
+        name: 'Empty Stage Competition',
+        categoryId: 'cat-senior',
+        categoryName: 'Senior',
+        type: 'SOLO',
+        criteria: [{ id: 'cr-1', name: 'General', maxMarks: 100 }],
+        createdAt: new Date().toISOString()
+      });
+
+      // Seed unapproved and approved registrations without checking them into Green Room
+      await db.collection('registrations').doc('reg-empty-01').set({
+        id: 'reg-empty-01',
+        competitionId: emptyCompId,
+        participantName: 'Unchecked Participant',
+        status: 'APPROVED'
+      });
+
+      const { hashSecret } = await import('@/domain/judgeAuth');
+      const secretHash = await hashSecret(emptySecret, 'salt_empty');
+      await db.collection('judgeAssignments').doc(emptyAsgnId).set({
+        id: emptyAsgnId,
+        judgeName: 'Juror Empty',
+        competitionId: emptyCompId,
+        accessCode: emptyJudgeCode,
+        secretHash,
+        salt: 'salt_empty',
+        status: 'ACTIVE'
+      });
+    });
+
+    it('rejects Judge login without secret when credentials exist (401)', async () => {
+      const req = new NextRequest('http://localhost:3000/api/judge/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          accessCode: emptyJudgeCode,
+          competitionId: emptyCompId
+          // secret omitted
+        })
+      });
+
+      const res = await judgeLoginHandler(req);
+      expect(res.status).toBe(401);
+      const data = await res.json();
+      expect(data.error).toMatch(/Juror PIN or Secret is required/i);
+    });
+
+    it('rejects Judge login with wrong secret (401)', async () => {
+      const req = new NextRequest('http://localhost:3000/api/judge/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          accessCode: emptyJudgeCode,
+          competitionId: emptyCompId,
+          secret: 'wrong-secret'
+        })
+      });
+
+      const res = await judgeLoginHandler(req);
+      expect(res.status).toBe(401);
+    });
+
+    it('returns empty contestants array when no Green Room check-ins exist (ZERO fallback codes)', async () => {
+      const req = new NextRequest('http://localhost:3000/api/judge/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          accessCode: emptyJudgeCode,
+          competitionId: emptyCompId,
+          secret: emptySecret
+        })
+      });
+
+      const res = await judgeLoginHandler(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.contestants).toEqual([]);
+    });
+
+    it('rejects Judge scoring when contestant Code Letter has not been checked in to Green Room', async () => {
+      await expect(
+        JudgeService.submitMarks({
+          assignmentId: emptyAsgnId,
+          competitionId: emptyCompId,
+          secret: emptySecret,
+          scores: { 'A': { 'cr-1': 85 } }
+        })
+      ).rejects.toThrow(/Validation Error.*"A"/i);
+    });
+  });
+
+  describe('9. High-Concurrency Transactional Check-ins', () => {
+    const concurrentCompId = 'cmp-gr-concurrent-test';
+
+    beforeAll(async () => {
+      await db.collection('competitions').doc(concurrentCompId).set({
+        id: concurrentCompId,
+        code: 'CMP-CONC',
+        name: 'Concurrent Stage Check-in Test',
+        categoryId: 'cat-senior',
+        categoryName: 'Senior',
+        type: 'SOLO',
+        criteria: [{ id: 'cr-1', name: 'General', maxMarks: 100 }],
+        createdAt: new Date().toISOString()
+      });
+
+      // Seed 4 approved registrations
+      for (let i = 1; i <= 4; i++) {
+        await db.collection('registrations').doc(`reg-conc-${i}`).set({
+          id: `reg-conc-${i}`,
+          competitionId: concurrentCompId,
+          participantId: `part-conc-${i}`,
+          chestNumber: `CONC-${i}`,
+          status: 'APPROVED',
+          registeredAt: new Date().toISOString()
+        });
+      }
+    });
+
+    it('allocates distinct, non-colliding Code Letters under concurrent load', async () => {
+      const checkInPromises = [1, 2, 3, 4].map(i =>
+        GreenRoomService.checkInContestant({
+          competitionId: concurrentCompId,
+          participantIdentifier: `CONC-${i}`,
+          operatorIdToken: staffIdToken
+        })
+      );
+
+      const results = await Promise.all(checkInPromises);
+      const assignedCodes = results.map(r => r.assignment.codeLetter);
+
+      // Verify all 4 succeeded
+      results.forEach(r => expect(r.success).toBe(true));
+
+      // Verify 4 unique code letters were assigned without collision
+      const uniqueCodes = new Set(assignedCodes);
+      expect(uniqueCodes.size).toBe(4);
+      expect(uniqueCodes).toEqual(new Set(['A', 'B', 'C', 'D']));
+
+      // Verify counter document matches exactly
+      const counterSnap = await db.collection('greenRoomCounters').doc(concurrentCompId).get();
+      expect(counterSnap.data()?.totalCheckedIn).toBe(4);
+      expect(counterSnap.data()?.assignedCodes).toHaveLength(4);
+    });
+  });
+
+  describe('10. Competition Cascade Deletion of Green Room Records', () => {
+    const cascadeCompId = 'cmp-gr-cascade-test';
+
+    beforeAll(async () => {
+      await db.collection('competitions').doc(cascadeCompId).set({
+        id: cascadeCompId,
+        code: 'CMP-CASCADE',
+        name: 'Cascade Deletion Target',
+        categoryId: 'cat-senior',
+        categoryName: 'Senior',
+        type: 'SOLO',
+        createdAt: new Date().toISOString()
+      });
+
+      await db.collection('registrations').doc('reg-cascade-01').set({
+        id: 'reg-cascade-01',
+        competitionId: cascadeCompId,
+        participantId: 'part-cascade-01',
+        chestNumber: 'CAS-01',
+        status: 'APPROVED'
+      });
+
+      // Check contestant into Green Room
+      await GreenRoomService.checkInContestant({
+        competitionId: cascadeCompId,
+        participantIdentifier: 'CAS-01',
+        operatorIdToken: adminIdToken
+      });
+
+      // Verify assignment and counter exist prior to deletion
+      const asgnSnap = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', cascadeCompId)
+        .get();
+      expect(asgnSnap.empty).toBe(false);
+
+      const counterSnap = await db.collection('greenRoomCounters').doc(cascadeCompId).get();
+      expect(counterSnap.exists).toBe(true);
+    });
+
+    it('deletes Green Room assignments and counters for target competition without affecting other competitions', async () => {
+      // Ensure group competition records still exist
+      const groupBeforeSnap = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', testGroupCompId)
+        .get();
+      expect(groupBeforeSnap.empty).toBe(false);
+
+      // Delete cascadeCompId via DELETE /api/admin/competitions/[id]
+      const req = new NextRequest(`http://localhost:3000/api/admin/competitions/${cascadeCompId}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${adminIdToken}` }
+      });
+
+      const res = await deleteCompetitionHandler(req, { params: Promise.resolve({ id: cascadeCompId }) });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.cascadeDeleted.greenRoomAssignments).toBeGreaterThanOrEqual(1);
+      expect(data.cascadeDeleted.greenRoomCounters).toBe(1);
+
+      // Verify target competition Green Room records are wiped
+      const targetAsgnSnap = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', cascadeCompId)
+        .get();
+      expect(targetAsgnSnap.empty).toBe(true);
+
+      const targetCounterSnap = await db.collection('greenRoomCounters').doc(cascadeCompId).get();
+      expect(targetCounterSnap.exists).toBe(false);
+
+      // Verify isolated competition records are preserved
+      const groupAfterSnap = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', testGroupCompId)
+        .get();
+      expect(groupAfterSnap.empty).toBe(false);
+
+      const groupCounterSnap = await db.collection('greenRoomCounters').doc(testGroupCompId).get();
+      expect(groupCounterSnap.exists).toBe(true);
     });
   });
 });

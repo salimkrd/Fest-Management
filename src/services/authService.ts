@@ -585,22 +585,23 @@ export class AuthService {
       throw new Error('Service Unavailable: Firebase Admin SDK not initialized.');
     }
 
-    let uid = '';
-    try {
-      const userRecord = await auth.createUser({
-        email: params.email,
-        password: params.password,
-        displayName: params.displayName
-      });
-      uid = userRecord.uid;
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-exists') {
-        const existing = await auth.getUserByEmail(params.email);
-        uid = existing.uid;
-      } else {
-        throw err;
-      }
+    // Reject provisioning if email already belongs to an existing account (never overwrite roles)
+    const existingAuthUser = await auth.getUserByEmail(params.email).catch(() => null);
+    if (existingAuthUser) {
+      throw new Error(`Conflict Error: An account with email "${params.email}" already exists. Overwriting existing user accounts or roles is strictly prohibited.`);
     }
+
+    const existingUserDoc = await db.collection('users').where('email', '==', params.email).limit(1).get();
+    if (!existingUserDoc.empty) {
+      throw new Error(`Conflict Error: An account with email "${params.email}" already exists. Overwriting existing user accounts or roles is strictly prohibited.`);
+    }
+
+    const userRecord = await auth.createUser({
+      email: params.email,
+      password: params.password,
+      displayName: params.displayName
+    });
+    const uid = userRecord.uid;
 
     await auth.setCustomUserClaims(uid, {
       role: 'GREEN_ROOM_STAFF'

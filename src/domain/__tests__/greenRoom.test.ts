@@ -6,8 +6,11 @@ import {
   getNextAvailableCodeLetter,
   encodeParticipantQrPayload,
   parseParticipantQrPayload,
+  generateQrVerificationToken,
+  verifyQrVerificationToken,
   MAX_CODE_LETTER_INDEX
 } from '../greenRoom';
+import { createHmac } from 'crypto';
 
 describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
   describe('Bijective Code Letter Calculations (A-Z, AA-ZZ)', () => {
@@ -66,13 +69,33 @@ describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
     });
   });
 
-  describe('QR Payload Encoding & Parsing', () => {
-    it('encodes participant data into JSON payload containing verification hash', () => {
+  describe('Cryptographic QR Verification Token & Payload Privacy', () => {
+    it('generates standard RFC 2104 compliant HMAC-SHA256 tokens matching Node crypto', () => {
+      const participantId = 'part-1042';
+      const bib = '#1042';
+      const customSecret = 'TEST_SECRET_KEY_12345';
+      const token = generateQrVerificationToken(participantId, bib, customSecret);
+
+      const nodeExpected = createHmac('sha256', customSecret)
+        .update(`${participantId}:${bib}`)
+        .digest('hex');
+
+      expect(token).toBe(nodeExpected);
+      expect(verifyQrVerificationToken(participantId, bib, token, customSecret)).toBe(true);
+    });
+
+    it('rejects tampered participant IDs or altered bib numbers', () => {
+      const token = generateQrVerificationToken('part-1042', '#1042');
+      expect(verifyQrVerificationToken('part-1042', '#1042', token)).toBe(true);
+      expect(verifyQrVerificationToken('part-9999', '#1042', token)).toBe(false);
+      expect(verifyQrVerificationToken('part-1042', '#9999', token)).toBe(false);
+      expect(verifyQrVerificationToken('part-1042', '#1042', 'forged-token-abc')).toBe(false);
+    });
+
+    it('encodes participant data without leaking personal names or team names', () => {
       const encoded = encodeParticipantQrPayload({
         id: 'p-1042',
-        bib: '#1042',
-        name: 'Zahra Fatima',
-        teamCode: 'BSH'
+        bib: '#1042'
       });
 
       const parsed = JSON.parse(encoded);
@@ -80,15 +103,18 @@ describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
       expect(parsed.type).toBe('PARTICIPANT_ID');
       expect(parsed.id).toBe('p-1042');
       expect(parsed.bib).toBe('#1042');
-      expect(parsed.hash).toBe('#1042-2025-AUTH-V2');
+      expect(typeof parsed.token).toBe('string');
+      expect(parsed.token.length).toBe(64);
+      // Privacy invariant: Must NOT contain name or team
+      expect(parsed.name).toBeUndefined();
+      expect(parsed.teamCode).toBeUndefined();
+      expect(parsed.teamName).toBeUndefined();
     });
 
-    it('parses JSON QR payload correctly', () => {
+    it('parses JSON QR payload correctly and preserves token', () => {
       const raw = encodeParticipantQrPayload({
         id: 'p-8821',
-        bib: '#8821',
-        name: 'Ahmad Bilal',
-        teamCode: 'KAH'
+        bib: '#8821'
       });
 
       const res = parseParticipantQrPayload(raw);
@@ -96,15 +122,17 @@ describe('Green Room Domain: Code Letter Math & QR Payload Utilities', () => {
       expect(res.format).toBe('JSON_PAYLOAD');
       expect(res.participantId).toBe('p-8821');
       expect(res.bib).toBe('#8821');
-      expect(res.name).toBe('Ahmad Bilal');
+      expect(typeof res.token).toBe('string');
+      expect(res.token!.length).toBe(64);
     });
 
-    it('parses URI string fallback format INSPIRATH:PARTICIPANT:id:bib', () => {
-      const res = parseParticipantQrPayload('INSPIRATH:PARTICIPANT:part-44:#44');
+    it('parses URI string format INSPIRATH:PARTICIPANT:id:bib:token', () => {
+      const res = parseParticipantQrPayload('INSPIRATH:PARTICIPANT:part-44:#44:tok123');
       expect(res.isValid).toBe(true);
       expect(res.format).toBe('URI_STRING');
       expect(res.participantId).toBe('part-44');
       expect(res.bib).toBe('#44');
+      expect(res.token).toBe('tok123');
     });
 
     it('parses plain identifier fallback (#1042 or p-1042)', () => {

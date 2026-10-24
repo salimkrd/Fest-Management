@@ -109,12 +109,27 @@ describe('POST /api/judge/login Endpoint Verification', () => {
     expect(body.error).toMatch(/invalid access code/i);
   });
 
-  it('3. Successfully authenticates valid access code without PIN (cross-browser juror entry)', async () => {
-    const req = new NextRequest('http://localhost:3000/api/judge/login', {
+  it('3. Rejects with 401 when juror PIN/secret is missing for credentials-configured assignment, and authenticates with valid PIN', async () => {
+    // 3a. Missing PIN returns 401
+    const reqWithoutPin = new NextRequest('http://localhost:3000/api/judge/login', {
       method: 'POST',
       body: JSON.stringify({
         accessCode: 'JRY-TEST1',
         competitionId: 'cmp-1'
+      })
+    });
+    const resWithoutPin = await judgeLoginHandler(reqWithoutPin);
+    expect(resWithoutPin.status).toBe(401);
+    const bodyWithoutPin = await resWithoutPin.json();
+    expect(bodyWithoutPin.error).toMatch(/juror pin or secret is required/i);
+
+    // 3b. Supplying valid PIN returns 200
+    const req = new NextRequest('http://localhost:3000/api/judge/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        accessCode: 'JRY-TEST1',
+        competitionId: 'cmp-1',
+        secret: 'jury9999'
       })
     });
     const res = await judgeLoginHandler(req);
@@ -204,7 +219,8 @@ describe('POST /api/judge/login Endpoint Verification', () => {
       method: 'POST',
       body: JSON.stringify({
         accessCode: 'JRY-LL4X',
-        competitionId: 'cmp-1'
+        competitionId: 'cmp-1',
+        secret: 'jury9999'
       })
     });
     const res = await judgeLoginHandler(req);

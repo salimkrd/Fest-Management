@@ -18,7 +18,8 @@ import {
   codeLetterToIndex,
   isValidCodeLetter,
   getNextAvailableCodeLetter,
-  parseParticipantQrPayload
+  parseParticipantQrPayload,
+  verifyQrVerificationToken
 } from '@/domain/greenRoom';
 import { GreenRoomAssignment, GreenRoomContestantStatus } from '@/types/fest';
 import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firestore';
@@ -79,6 +80,14 @@ export class GreenRoomService {
 
     // 2. Parse identifier (supports QR code payloads, bibs, IDs, registration codes)
     const parsedQr = parseParticipantQrPayload(participantIdentifier);
+
+    // If QR payload is a JSON payload with verification token, verify token authenticity
+    if (parsedQr.format === 'JSON_PAYLOAD') {
+      if (!parsedQr.token || !verifyQrVerificationToken(parsedQr.participantId || '', parsedQr.bib || '', parsedQr.token)) {
+        throw new Error('Validation Error: Invalid or tampered QR verification token. Participant credentials could not be authenticated.');
+      }
+    }
+
     const candidateIdentifiers = [
       parsedQr.participantId,
       parsedQr.bib,
@@ -286,6 +295,58 @@ export class GreenRoomService {
     const cleanNewCode = newCodeLetter.trim().toUpperCase();
     if (!isValidCodeLetter(cleanNewCode)) {
       throw new Error(`Validation Error: Invalid Code Letter "${newCodeLetter}". Must be A-Z or AA-ZZ.`);
+    }
+
+    // Invariant: Lock Code Letter reassignment once judge draft marking begins, marks are submitted, or results are finalized.
+    // 1. Check if official results exist or have been published
+    const resDoc = await db.collection('results').doc(`res-${competitionId}`).get();
+    if (resDoc.exists) {
+      const resData = resDoc.data();
+      if (['PUBLISHED', 'READY_TO_PUBLISH', 'SEALED'].includes(resData?.resultStatus) || resData?.published === true) {
+        throw new Error(
+          `Lock Error: Code Letter reassignment is locked. Official results have already been finalized or published for this competition.`
+        );
+      }
+    }
+
+    // 2. Check if draft mark entries or submitted scorecards exist with marks
+    const markEntriesSnap = await db.collection('markEntries')
+      .where('competitionId', '==', competitionId)
+      .get();
+    const hasActiveMarks = markEntriesSnap.docs.some(doc => {
+      const data = doc.data();
+      return (
+        data.status === 'SUBMITTED' ||
+        data.submitted === true ||
+        (data.scores && Object.keys(data.scores).length > 0)
+      );
+    });
+
+    if (hasActiveMarks) {
+      throw new Error(
+        `Lock Error: Code Letter reassignment is locked. Judge draft marking has begun or scorecards have been submitted for this competition. Reassigning Code Letters during or after evaluation is prohibited to prevent score misattribution.`
+      );
+    }
+
+    // 3. Check if any judge assignment has status SUBMITTED
+    const judgeAssignSnap = await db.collection('judgeAssignments')
+      .where('competitionId', '==', competitionId)
+      .where('status', '==', 'SUBMITTED')
+      .limit(1)
+      .get();
+
+    if (!judgeAssignSnap.empty) {
+      throw new Error(
+        `Lock Error: Code Letter reassignment is locked. A juror has already submitted official marks for this competition.`
+      );
+    }
+
+    // 4. Check if competition is marked COMPLETED
+    const compDoc = await db.collection('competitions').doc(competitionId).get();
+    if (compDoc.exists && compDoc.data()?.status === 'COMPLETED') {
+      throw new Error(
+        `Lock Error: Code Letter reassignment is locked. Competition status is marked as COMPLETED.`
+      );
     }
 
     const assignmentDocId = `${competitionId}_${registrationId}`;

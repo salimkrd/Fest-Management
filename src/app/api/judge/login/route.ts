@@ -105,18 +105,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. PIN / Secret check (if secret is provided)
-    if (secret && typeof secret === 'string' && secret.trim().length > 0) {
-      const authResult = await verifyJudgeAssignment(assignment, secret.trim());
+    // 5. PIN / Secret check (Mandatory verification to prevent exposure of contestant data)
+    const cleanSecret = (secret || '').trim();
+    if (assignment.secretHash || (assignment as any).pin) {
+      if (!cleanSecret) {
+        return NextResponse.json(
+          { error: 'Juror PIN or Secret is required for authentication.' },
+          { status: 401 }
+        );
+      }
+      const authResult = await verifyJudgeAssignment(assignment, cleanSecret);
       if (!authResult.valid) {
         return NextResponse.json(
           { error: `Invalid Juror Secret / PIN (${authResult.reason || 'Verification Failed'}).` },
           { status: 401 }
         );
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'This juror assignment has no security credentials configured. Please contact the administrator.' },
+        { status: 403 }
+      );
     }
 
-    // 6. Fetch competition metadata and approved registrations for offline/cross-browser support
+    // 6. Fetch competition metadata and actual Green Room assignments
     let competitionData: any = null;
     let registrations: any[] = [];
 
@@ -146,19 +158,9 @@ export async function POST(req: NextRequest) {
             status: item.status || 'CHECKED_IN'
           }));
         } else {
-          // If green room check-ins have not occurred yet, generate anonymous Code Letters A, B, C...
-          // for approved registrations without exposing any participant/team data
-          const regsSnap = await db.collection('registrations')
-            .where('competitionId', '==', effectiveCompId)
-            .get();
-          const approved = regsSnap.docs.filter(d => (d.data().status || '').toUpperCase() === 'APPROVED');
-          const { indexToCodeLetter } = await import('@/domain/greenRoom');
-          registrations = approved.map((_, idx) => ({
-            id: indexToCodeLetter(idx),
-            codeLetter: indexToCodeLetter(idx),
-            codeIndex: idx,
-            status: 'CHECKED_IN'
-          }));
+          // Requirement 1: Remove all fake/fallback Judge Code Letter generation.
+          // Judges must see only actual Green Room assignments from Firestore. Show an empty state until check-in.
+          registrations = [];
         }
       } catch (e) {
         console.warn('[JudgeLogin] Could not fetch anonymous contestants:', e);

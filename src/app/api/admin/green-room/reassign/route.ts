@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, assignment: updated }, { status: 200 });
   } catch (error: any) {
+    if (error?.message?.includes('Lock Error')) {
+      return NextResponse.json({ error: error.message }, { status: 423 });
+    }
     if (error?.message?.includes('Conflict Error')) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }

@@ -5,7 +5,7 @@
 
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
 import QRCode from 'qrcode';
-import { encodeParticipantQrPayload } from '@/domain/greenRoom';
+import { encodeParticipantQrPayload, generateQrVerificationToken } from '@/domain/greenRoom';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -183,9 +183,11 @@ export async function exportDigitalIdAsPng(
   ctx.font = '600 13px Montserrat, sans-serif';
   ctx.fillText('Scan at Venue Entrance & Stage Gate', 70, 790);
 
+  const token = generateQrVerificationToken(participant.id, participant.bib);
+
   ctx.fillStyle = '#111111';
   ctx.font = '700 16px monospace';
-  ctx.fillText(`HASH: ${participant.bib}-2025-AUTH-V2`, 70, 825);
+  ctx.fillText(`TOKEN: ${token.slice(0, 16).toUpperCase()}`, 70, 825);
 
   // Generate and draw genuine scannable QR Code
   const qrX = width - 180;
@@ -195,9 +197,7 @@ export async function exportDigitalIdAsPng(
   try {
     const payload = encodeParticipantQrPayload({
       id: participant.id,
-      bib: participant.bib,
-      name: participant.name,
-      teamCode: participant.teamCode
+      bib: participant.bib
     });
     const qrDataUrl = await QRCode.toDataURL(payload, {
       width: 300,

@@ -32,17 +32,15 @@ function ConfirmationContent() {
   const contestants = useMemo(() => {
     const rawList = sessionData?.contestants || sessionData?.registrations || [];
     if (Array.isArray(rawList) && rawList.length > 0) {
-      return rawList.map((item: any, idx: number) => ({
-        codeLetter: item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id) ? item.id : indexToCodeLetter(idx)),
-        codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx
-      }));
+      return rawList
+        .filter((item: any) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
+        .map((item: any, idx: number) => ({
+          codeLetter: item.codeLetter || item.id,
+          codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx
+        }));
     }
-    const count = competition?.entriesCount || 4;
-    return Array.from({ length: count }, (_, idx) => ({
-      codeLetter: indexToCodeLetter(idx),
-      codeIndex: idx
-    }));
-  }, [sessionData, competition]);
+    return [];
+  }, [sessionData]);
 
   const timestamp = new Date().toLocaleDateString('en-US', {
     month: 'short',

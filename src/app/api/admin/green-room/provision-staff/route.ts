@@ -44,6 +44,9 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    if (error?.message?.includes('Conflict Error')) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return handleApiError(error);
   }
 }

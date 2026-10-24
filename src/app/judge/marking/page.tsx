@@ -56,21 +56,20 @@ function JudgeMarkingContent() {
   const contestants: AnonymousContestant[] = useMemo(() => {
     const rawList = sessionData?.contestants || sessionData?.registrations || [];
     if (Array.isArray(rawList) && rawList.length > 0) {
-      return rawList.map((item: any, idx: number) => ({
-        codeLetter: item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id) ? item.id : indexToCodeLetter(idx)),
-        codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx,
-        status: item.status || 'CHECKED_IN'
-      })).sort((a, b) => a.codeIndex - b.codeIndex);
+      return rawList
+        .filter((item: any) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
+        .map((item: any, idx: number) => ({
+          codeLetter: item.codeLetter || item.id,
+          codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx,
+          status: item.status || 'CHECKED_IN'
+        }))
+        .sort((a, b) => a.codeIndex - b.codeIndex);
     }
 
-    // Default fallback: If zero seeded session contestants, provide anonymous codes based on entry count
-    const count = competition?.entriesCount || 4;
-    return Array.from({ length: count }, (_, idx) => ({
-      codeLetter: indexToCodeLetter(idx),
-      codeIndex: idx,
-      status: 'CHECKED_IN'
-    }));
-  }, [sessionData, competition]);
+    // Requirement 1: Remove all fake/fallback Judge Code Letter generation.
+    // Judges must see only actual Green Room assignments from Firestore. Show an empty state until check-in.
+    return [];
+  }, [sessionData]);
 
   // Criteria setup
   const criteria: Array<{ id: string; name: string; maxMarks: number }> = competition?.criteria && competition.criteria.length > 0

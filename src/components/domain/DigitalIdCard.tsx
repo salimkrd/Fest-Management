@@ -30,9 +30,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     const payload = encodeParticipantQrPayload({
       id: participant.id,
-      bib: participant.bib,
-      name: participant.name,
-      teamCode: participant.teamCode
+      bib: participant.bib
     });
 
     QRCode.toDataURL(payload, {
