@@ -2,6 +2,11 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 
 async function seedCategories() {
+  if (process.env.CONFIRM_PRODUCTION_SEED !== 'YES_I_WANT_TO_SEED_PRODUCTION') {
+    console.error('[SAFETY ABORT] seedProduction requires explicit CONFIRM_PRODUCTION_SEED=YES_I_WANT_TO_SEED_PRODUCTION environment variable.');
+    process.exit(1);
+  }
+
   const serviceAccountPath = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
   const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 

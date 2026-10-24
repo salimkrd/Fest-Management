@@ -97,19 +97,19 @@ export async function DELETE(
       await batch.commit();
     }
 
-    // 5. If committed points were deleted, recalculate championship leaderboard and team totals
-    const hadCommittedPoints = pointsSnap.docs.some(doc => doc.data()?.status === 'COMMITTED');
-    if (hadCommittedPoints) {
-      await PointsLedgerService.syncLeaderboardFromLedger();
-    }
+    // 5. Always synchronize and recalculate championship leaderboard and team totals.
+    // This makes recovery completely idempotent: if child records or points were deleted
+    // on a prior attempt that failed during recalculation or parent deletion,
+    // retrying will always reconcile the festival ledger and restore exact championship totals.
+    await PointsLedgerService.syncLeaderboardFromLedger();
 
-    // 6. ONLY AFTER all child records and points are safely handled, delete the parent competition document
+    // 6. ONLY AFTER all child records and points are safely handled and leaderboard reconciled, delete the parent competition document
     await compRef.delete();
 
     return NextResponse.json({
       success: true,
       deletedCompetitionId: id,
-      recalculatedLeaderboard: hadCommittedPoints,
+      recalculatedLeaderboard: true,
       cascadeDeleted: {
         judgeAssignments: judgeAssignSnap.size,
         markEntries: markEntriesSnap.size,

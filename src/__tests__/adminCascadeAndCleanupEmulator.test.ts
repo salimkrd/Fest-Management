@@ -9,7 +9,7 @@
  * 5. Admin-authorized dry-run inspection vs confirmed orphan cleanup.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { initializeApp, deleteApp, FirebaseApp } from 'firebase/app';
 import {
   getAuth as getClientAuth,
@@ -272,10 +272,18 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
 
       const compAId = 'cmp-cascade-alpha';
       const compBId = 'cmp-cascade-beta';
+      const team1Id = 'team-cascade-1';
+      const team2Id = 'team-cascade-2';
+
+      // Clean up any stale records from previous aborted runs
+      const oldPts1 = await db.collection('pointsLedger').where('teamId', '==', team1Id).get();
+      for (const d of oldPts1.docs) await d.ref.delete();
+      const oldPts2 = await db.collection('pointsLedger').where('teamId', '==', team2Id).get();
+      for (const d of oldPts2.docs) await d.ref.delete();
 
       // 1. Seed base teams in Firestore
-      await db.collection('teams').doc('team-test-1').set({
-        id: 'team-test-1',
+      await db.collection('teams').doc(team1Id).set({
+        id: team1Id,
         name: 'Team Alpha',
         code: 'TMA',
         color: '#2563EB',
@@ -288,8 +296,8 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
         rank: 1
       });
 
-      await db.collection('teams').doc('team-test-2').set({
-        id: 'team-test-2',
+      await db.collection('teams').doc(team2Id).set({
+        id: team2Id,
         name: 'Team Beta',
         code: 'TMB',
         color: '#059669',
@@ -341,7 +349,7 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
         competitionCode: 'CMP-A',
         competitionName: 'Competition Alpha',
         competitionType: 'SOLO',
-        teamId: 'team-test-1',
+        teamId: team1Id,
         teamCode: 'TMA',
         teamName: 'Team Alpha',
         registrationId: `reg-${compAId}`,
@@ -395,7 +403,7 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
         competitionCode: 'CMP-B',
         competitionName: 'Competition Beta',
         competitionType: 'SOLO',
-        teamId: 'team-test-2',
+        teamId: team2Id,
         teamCode: 'TMB',
         teamName: 'Team Beta',
         registrationId: `reg-${compBId}`,
@@ -414,8 +422,8 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
       await PointsLedgerService.syncLeaderboardFromLedger();
 
       // Verify initial points: Team 1 has 10 points, Team 2 has 15 points
-      const team1Pre = await db.collection('teams').doc('team-test-1').get();
-      const team2Pre = await db.collection('teams').doc('team-test-2').get();
+      const team1Pre = await db.collection('teams').doc(team1Id).get();
+      const team2Pre = await db.collection('teams').doc(team2Id).get();
       expect(team1Pre.data()?.totalPoints).toBe(10);
       expect(team2Pre.data()?.totalPoints).toBe(15);
 
@@ -454,7 +462,7 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
       expect(pointsACheck.exists).toBe(false);
 
       // 7. Verify Score Recalculation: Team 1 points from Competition A are removed
-      const team1Post = await db.collection('teams').doc('team-test-1').get();
+      const team1Post = await db.collection('teams').doc(team1Id).get();
       expect(team1Post.data()?.totalPoints).toBe(0);
 
       // 8. Verify Multi-Competition Isolation: Competition B and its records are 100% UNTOUCHED
@@ -479,7 +487,7 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
       const pointsBCheck = await db.collection('pointsLedger').doc(pointsEntryB.id).get();
       expect(pointsBCheck.exists).toBe(true);
 
-      const team2Post = await db.collection('teams').doc('team-test-2').get();
+      const team2Post = await db.collection('teams').doc(team2Id).get();
       expect(team2Post.data()?.totalPoints).toBe(15);
 
       // Fast cleanup of test records in a single batch
@@ -491,9 +499,176 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
       cleanupBatch.delete(db.collection('schedules').doc(`sched-${compBId}`));
       cleanupBatch.delete(db.collection('results').doc(`res-${compBId}`));
       cleanupBatch.delete(db.collection('pointsLedger').doc(pointsEntryB.id));
-      cleanupBatch.delete(db.collection('teams').doc('team-test-1'));
-      cleanupBatch.delete(db.collection('teams').doc('team-test-2'));
+      cleanupBatch.delete(db.collection('teams').doc(team1Id));
+      cleanupBatch.delete(db.collection('teams').doc(team2Id));
       await cleanupBatch.commit();
+    }, 120000);
+
+    it('handles injected recalculation failure: preserves parent competition on failure and restores leaderboard on retry', async () => {
+      if (!db) throw new Error('Firestore DB unavailable');
+
+      const failCompId = 'cmp-fail-recalc';
+      const failPointsId = `points-${failCompId}-1`;
+
+      // 1. Seed dedicated team for this test
+      await db.collection('teams').doc('team-recalc-1').set({
+        id: 'team-recalc-1',
+        name: 'Team Recalc',
+        code: 'TRC',
+        color: '#2563EB',
+        totalPoints: 0,
+        soloPoints: 0,
+        groupPoints: 0,
+        firstCount: 0,
+        secondCount: 0,
+        thirdCount: 0,
+        rank: 1
+      });
+
+      // 2. Seed competition, child result, and committed points
+      await db.collection('competitions').doc(failCompId).set({
+        id: failCompId,
+        name: 'Recalc Failure Test Competition',
+        code: 'CMP-RFAIL',
+        type: 'SOLO',
+        status: 'PUBLISHED'
+      });
+      await db.collection('results').doc(`res-${failCompId}`).set({
+        id: `res-${failCompId}`,
+        competitionId: failCompId,
+        status: 'PUBLISHED'
+      });
+      const pointsEntry: PointsLedgerEntry = {
+        id: failPointsId,
+        resultId: `res-${failCompId}`,
+        competitionId: failCompId,
+        competitionCode: 'CMP-RFAIL',
+        competitionName: 'Recalc Failure Test Competition',
+        competitionType: 'SOLO',
+        teamId: 'team-recalc-1',
+        teamCode: 'TRC',
+        teamName: 'Team Recalc',
+        registrationId: `reg-${failCompId}`,
+        candidateName: 'Candidate Recalc',
+        bib: '301',
+        score: 98,
+        rank: 1,
+        grade: 'A',
+        points: 25,
+        status: 'COMMITTED',
+        publishedAt: new Date().toISOString()
+      };
+      await db.collection('pointsLedger').doc(pointsEntry.id).set(pointsEntry);
+
+      // 3. Sync leaderboard initially so team-recalc-1 reflects the 25 points
+      await PointsLedgerService.syncLeaderboardFromLedger();
+      const teamBefore = await db.collection('teams').doc('team-recalc-1').get();
+      expect(teamBefore.data()?.totalPoints).toBe(25);
+
+      // 4. Inject a failure into PointsLedgerService.syncLeaderboardFromLedger on Attempt 1
+      const syncSpy = vi.spyOn(PointsLedgerService, 'syncLeaderboardFromLedger')
+        .mockRejectedValueOnce(new Error('Simulated transient error during championship recalculation'));
+
+      const req1 = new NextRequest(`http://localhost/api/admin/competitions/${failCompId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminIdToken}` }
+      });
+      const res1 = await deleteCompetitionHandler(req1, { params: Promise.resolve({ id: failCompId }) });
+      expect(res1.status).toBeGreaterThanOrEqual(400);
+
+      // 5. Verify Failure-Safety:
+      // - The child points were deleted in attempt 1
+      const pointsCheck = await db.collection('pointsLedger').doc(failPointsId).get();
+      expect(pointsCheck.exists).toBe(false);
+      // - BUT the parent competition document was NOT deleted!
+      const parentCompCheck = await db.collection('competitions').doc(failCompId).get();
+      expect(parentCompCheck.exists).toBe(true);
+
+      // 6. Attempt 2 (Retry): Re-attempt deletion now that the transient failure is resolved
+      syncSpy.mockRestore();
+      const req2 = new NextRequest(`http://localhost/api/admin/competitions/${failCompId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminIdToken}` }
+      });
+      const res2 = await deleteCompetitionHandler(req2, { params: Promise.resolve({ id: failCompId }) });
+      expect(res2.status).toBe(200);
+      const data2 = await res2.json();
+      expect(data2.success).toBe(true);
+      expect(data2.deletedCompetitionId).toBe(failCompId);
+
+      // 7. Verify Idempotent Recovery:
+      // - Leaderboard was recalculated on retry: team-recalc-1 points reduced to 0!
+      const teamAfter = await db.collection('teams').doc('team-recalc-1').get();
+      expect(teamAfter.data()?.totalPoints).toBe(0);
+      // - Parent competition document is now safely deleted
+      const parentAfter = await db.collection('competitions').doc(failCompId).get();
+      expect(parentAfter.exists).toBe(false);
+
+      // Cleanup
+      await db.collection('teams').doc('team-recalc-1').delete();
+    }, 120000);
+
+    it('handles injected batch deletion failure: preserves parent competition on failure and cleans up on retry', async () => {
+      if (!db) throw new Error('Firestore DB unavailable');
+
+      const failBatchCompId = 'cmp-fail-batch';
+
+      // 1. Seed competition and judge assignment
+      await db.collection('competitions').doc(failBatchCompId).set({
+        id: failBatchCompId,
+        name: 'Batch Failure Test Competition',
+        code: 'CMP-BFAIL',
+        type: 'SOLO'
+      });
+      await db.collection('judgeAssignments').doc(`asgn-${failBatchCompId}`).set({
+        id: `asgn-${failBatchCompId}`,
+        competitionId: failBatchCompId,
+        judgeName: 'Judge Batch Fail'
+      });
+
+      // 2. Inject failure on first batch commit
+      const originalBatch = db.batch.bind(db);
+      let batchCommitCalls = 0;
+      const batchSpy = vi.spyOn(db, 'batch').mockImplementation(() => {
+        const b = originalBatch();
+        return {
+          ...b,
+          commit: async () => {
+            batchCommitCalls++;
+            if (batchCommitCalls === 1) {
+              throw new Error('Simulated Firestore batch commit failure');
+            }
+            return b.commit();
+          }
+        } as any;
+      });
+
+      // Attempt 1: Should fail during batch commit
+      const req1 = new NextRequest(`http://localhost/api/admin/competitions/${failBatchCompId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminIdToken}` }
+      });
+      const res1 = await deleteCompetitionHandler(req1, { params: Promise.resolve({ id: failBatchCompId }) });
+      expect(res1.status).toBeGreaterThanOrEqual(400);
+
+      // Verify Failure-Safety: Parent competition document was NOT deleted!
+      const compDocAttempt1 = await db.collection('competitions').doc(failBatchCompId).get();
+      expect(compDocAttempt1.exists).toBe(true);
+
+      // Attempt 2 (Retry): Restore batch and retry deletion
+      batchSpy.mockRestore();
+      const req2 = new NextRequest(`http://localhost/api/admin/competitions/${failBatchCompId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminIdToken}` }
+      });
+      const res2 = await deleteCompetitionHandler(req2, { params: Promise.resolve({ id: failBatchCompId }) });
+      expect(res2.status).toBe(200);
+
+      // Verify both parent and child are now deleted
+      const compDocFinal = await db.collection('competitions').doc(failBatchCompId).get();
+      expect(compDocFinal.exists).toBe(false);
+      const asgnDocFinal = await db.collection('judgeAssignments').doc(`asgn-${failBatchCompId}`).get();
+      expect(asgnDocFinal.exists).toBe(false);
     }, 120000);
   });
 
