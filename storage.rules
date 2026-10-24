@@ -11,37 +11,74 @@ service firebase.storage {
     }
 
     function isImageFile() {
-      return request.resource.contentType.matches('image/.*') &&
+      return request.resource != null &&
+             request.resource.contentType.matches('image/.*') &&
              request.resource.size < 5 * 1024 * 1024; // Max 5MB
     }
 
-    // Participant Profile Photos
-    match /participants/{participantId}/{fileName} {
-      allow read: if true;
-      allow write: if isSignedIn() && (
-        isAdmin() || 
-        (request.auth.token.role == 'TEAM_MANAGER' && request.resource.metadata.teamId == request.auth.token.teamId)
-      ) && isImageFile();
+    function getParticipantData(participantId) {
+      return firestore.get(/databases/(default)/documents/participants/$(participantId)).data;
     }
 
+    function isParticipantOwner(participantId) {
+      return isSignedIn() &&
+             request.auth.token.role == 'TEAM_MANAGER' &&
+             request.auth.token.teamId != null &&
+             firestore.exists(/databases/(default)/documents/participants/$(participantId)) &&
+             getParticipantData(participantId).teamId == request.auth.token.teamId;
+    }
+
+    function isMetadataConsistent() {
+      return request.resource.metadata == null ||
+             !('teamId' in request.resource.metadata) ||
+             request.resource.metadata.teamId == request.auth.token.teamId;
+    }
+
+    // Participant Profile Photos (Direct Participant Path)
+    // Protected from public read; strictly restricted to Admin & authoritative Team Manager
+    match /participants/{participantId}/{fileName} {
+      allow read: if isAdmin() || isParticipantOwner(participantId);
+      allow create, update: if (isAdmin() || (isParticipantOwner(participantId) && isMetadataConsistent())) && isImageFile();
+      allow delete: if isAdmin() || isParticipantOwner(participantId);
+    }
+
+    // Participant Profile Photos (Nested Team Path)
     match /teams/{teamId}/participants/{participantId}/{fileName} {
-      allow read: if true;
-      allow write: if isSignedIn() && (
-        isAdmin() || 
-        (request.auth.token.role == 'TEAM_MANAGER' && request.auth.token.teamId == teamId)
+      allow read: if isAdmin() || (
+        isSignedIn() &&
+        request.auth.token.role == 'TEAM_MANAGER' &&
+        request.auth.token.teamId == teamId &&
+        isParticipantOwner(participantId)
+      );
+      allow create, update: if (
+        isAdmin() || (
+          isSignedIn() &&
+          request.auth.token.role == 'TEAM_MANAGER' &&
+          request.auth.token.teamId == teamId &&
+          isParticipantOwner(participantId) &&
+          isMetadataConsistent()
+        )
       ) && isImageFile();
+      allow delete: if isAdmin() || (
+        isSignedIn() &&
+        request.auth.token.role == 'TEAM_MANAGER' &&
+        request.auth.token.teamId == teamId &&
+        isParticipantOwner(participantId)
+      );
     }
 
     // Festival Branding & Logos
     match /branding/{fileName} {
       allow read: if true;
-      allow write: if isAdmin() && isImageFile();
+      allow create, update: if isAdmin() && isImageFile();
+      allow delete: if isAdmin();
     }
 
     // Generated Result Posters & Certificates
     match /posters/{fileName} {
       allow read: if true;
-      allow write: if isAdmin() && isImageFile();
+      allow create, update: if isAdmin() && isImageFile();
+      allow delete: if isAdmin();
     }
 
     // Tabulation Register PDFs
