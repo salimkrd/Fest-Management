@@ -6,7 +6,7 @@
 import { Grade, CompetitionType } from '@/domain/scoring';
 import { ResultStatus } from '@/domain/ledger';
 
-export type UserRole = 'ADMIN' | 'TEAM_MANAGER' | 'JUDGE' | 'PUBLIC';
+export type UserRole = 'ADMIN' | 'TEAM_MANAGER' | 'JUDGE' | 'GREEN_ROOM_STAFF' | 'PUBLIC';
 
 export interface FirestoreUser {
   id: string; // Auth UID
@@ -355,4 +355,41 @@ export interface FirestoreAuditLog {
   targetDocId: string;
   details: Record<string, any>;
   timestamp: string;
+}
+
+export type GreenRoomContestantStatus = 'CHECKED_IN' | 'ON_STAGE' | 'COMPLETED' | 'ABSENT';
+
+export interface FirestoreGreenRoomAssignment {
+  id: string; // `${competitionId}_${registrationId}`
+  competitionId: string;
+  competitionCode: string;
+  competitionName: string;
+  categoryId: string;
+  categoryName: string;
+  stageId: string;
+  stageName: string;
+  registrationId: string;
+  registrationCode: string;
+  participantId?: string;
+  participantName: string;
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  chestNumber: string;
+  type: CompetitionType;
+  groupMembers?: string[];
+  codeLetter: string; // A..Z, AA..ZZ
+  codeIndex: number; // 0..701
+  status: GreenRoomContestantStatus;
+  checkedInAt: string;
+  checkedInBy: string; // UID
+  checkedInByRole: 'ADMIN' | 'GREEN_ROOM_STAFF';
+  notes?: string;
+  reassignedFrom?: string;
+  reassignedAt?: string;
+  reassignmentReason?: string;
+  checkInMethod?: 'QR_SCAN' | 'MANUAL_LOOKUP';
+  qrVerified?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

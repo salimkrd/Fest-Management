@@ -57,7 +57,10 @@ export async function DELETE(
       schedulesSnap,
       resultsSnap,
       resultDocDirect,
-      pointsSnap
+      pointsSnap,
+      greenRoomSnap,
+      greenRoomCounterDoc,
+      markingLockDoc
     ] = await Promise.all([
       db.collection('judgeAssignments').where('competitionId', '==', id).get(),
       db.collection('markEntries').where('competitionId', '==', id).get(),
@@ -65,7 +68,10 @@ export async function DELETE(
       db.collection('schedules').where('competitionId', '==', id).get(),
       db.collection('results').where('competitionId', '==', id).get(),
       db.collection('results').doc(`res-${id}`).get(),
-      db.collection('pointsLedger').where('competitionId', '==', id).get()
+      db.collection('pointsLedger').where('competitionId', '==', id).get(),
+      db.collection('greenRoomAssignments').where('competitionId', '==', id).get(),
+      db.collection('greenRoomCounters').doc(id).get(),
+      db.collection('competitionMarkingLocks').doc(id).get()
     ]);
 
     // 3. Assemble and deduplicate all child document references
@@ -76,7 +82,10 @@ export async function DELETE(
       ...schedulesSnap.docs.map(doc => doc.ref),
       ...resultsSnap.docs.map(doc => doc.ref),
       ...(resultDocDirect.exists ? [resultDocDirect.ref] : []),
-      ...pointsSnap.docs.map(doc => doc.ref)
+      ...pointsSnap.docs.map(doc => doc.ref),
+      ...greenRoomSnap.docs.map(doc => doc.ref),
+      ...(greenRoomCounterDoc.exists ? [greenRoomCounterDoc.ref] : []),
+      ...(markingLockDoc.exists ? [markingLockDoc.ref] : [])
     ];
 
     const seenDocPaths = new Set<string>();
@@ -116,7 +125,10 @@ export async function DELETE(
         registrations: registrationsSnap.size,
         schedules: schedulesSnap.size,
         results: resultsSnap.size + (resultDocDirect.exists ? 1 : 0),
-        pointsLedger: pointsSnap.size
+        pointsLedger: pointsSnap.size,
+        greenRoomAssignments: greenRoomSnap.size,
+        greenRoomCounters: greenRoomCounterDoc.exists ? 1 : 0,
+        competitionMarkingLocks: markingLockDoc.exists ? 1 : 0
       }
     });
   } catch (error) {

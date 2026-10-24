@@ -277,3 +277,38 @@ export interface PublicThemeSettings {
   heroBannerText: string;
 }
 
+export type GreenRoomContestantStatus = 'CHECKED_IN' | 'ON_STAGE' | 'COMPLETED' | 'ABSENT';
+
+export interface GreenRoomAssignment {
+  id: string; // `${competitionId}_${registrationId}`
+  competitionId: string;
+  competitionCode: string;
+  competitionName: string;
+  categoryId: string;
+  categoryName: string;
+  stageId: string;
+  stageName: string;
+  registrationId: string;
+  registrationCode: string;
+  participantId?: string;
+  participantName: string;
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  chestNumber: string;
+  type: CompetitionType;
+  groupMembers?: string[];
+  codeLetter: string; // A..Z, AA..ZZ
+  codeIndex: number; // 0..701
+  status: GreenRoomContestantStatus;
+  checkedInAt: string;
+  checkedInBy: string; // UID
+  checkedInByRole: 'ADMIN' | 'GREEN_ROOM_STAFF';
+  notes?: string;
+  reassignedFrom?: string;
+  reassignedAt?: string;
+  reassignmentReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

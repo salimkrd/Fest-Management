@@ -1,23 +1,46 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { CheckCircle2, Printer, ArrowRight, ShieldCheck, FileCheck, Hash } from 'lucide-react';
+import { CheckCircle2, Printer, ShieldCheck } from 'lucide-react';
+import { indexToCodeLetter } from '@/domain/greenRoom';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
-  const { competitions, registrations, theme } = useFest();
+  const { competitions } = useFest();
 
   const compId = searchParams.get('competitionId') || 'cmp-1';
   const hash = searchParams.get('hash') || 'SHA256:7e9b41a82f3c091d';
 
-  const competition = competitions.find(c => c.id === compId) || competitions[0];
-  const compRegistrations = registrations.filter(r => r.competitionId === competition?.id);
+  const [sessionData] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem('judge_session');
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const competition = competitions.find(c => c.id === compId) || sessionData?.competition || competitions[0];
+
+  const contestants = useMemo(() => {
+    const rawList = sessionData?.contestants || sessionData?.registrations || [];
+    if (Array.isArray(rawList) && rawList.length > 0) {
+      return rawList
+        .filter((item: any) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
+        .map((item: any, idx: number) => ({
+          codeLetter: item.codeLetter || item.id,
+          codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx
+        }));
+    }
+    return [];
+  }, [sessionData]);
 
   const timestamp = new Date().toLocaleDateString('en-US', {
     month: 'short',
@@ -44,7 +67,7 @@ function ConfirmationContent() {
             Official Adjudication Receipt
           </h1>
           <p className="text-xs text-[#526070] mt-1">
-            Scores for <strong className="text-[#111111]">{competition.name}</strong> ({competition.categoryName}) have been cryptographically signed and stored in the central fest ledger.
+            Anonymous evaluations for <strong className="text-[#111111]">{competition.name}</strong> ({competition.categoryName}) have been cryptographically signed and archived.
           </p>
 
           <div className="mt-6 p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E7EF] grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-left">
@@ -53,8 +76,8 @@ function ConfirmationContent() {
               <span className="font-bold text-[#111111]">{timestamp}</span>
             </div>
             <div>
-              <span className="text-[#526070] font-medium block">Verified Entries</span>
-              <span className="font-bold text-[#111111]">{compRegistrations.length} Contestants</span>
+              <span className="text-[#526070] font-medium block">Audited Contestants</span>
+              <span className="font-bold text-[#111111]">{contestants.length} Anonymous Codes</span>
             </div>
             <div className="col-span-2 sm:col-span-1">
               <span className="text-[#526070] font-medium block">Digital Verification Hash</span>
@@ -63,10 +86,13 @@ function ConfirmationContent() {
           </div>
         </div>
 
-        {/* Breakdown Table */}
+        {/* Breakdown Table: Strictly Anonymous */}
         <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-[#E1E7EF] bg-white flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Submitted Score Register</h3>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-sm font-bold text-[#111111]">Anonymous Evaluation Register</h3>
+            </div>
             <Badge variant="success" size="sm">LOCKED &amp; ARCHIVED</Badge>
           </div>
 
@@ -74,32 +100,30 @@ function ConfirmationContent() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Bib #</th>
-                  <th className="py-3 px-6">Participant Name</th>
-                  <th className="py-3 px-6">Representing Delegation</th>
-                  <th className="py-3 px-6 text-center">Submitted Score</th>
+                  <th className="py-3 px-6">Code Letter</th>
+                  <th className="py-3 px-6">Appearance Order</th>
+                  <th className="py-3 px-6 text-center">Scorecard Sealed</th>
                   <th className="py-3 px-6 text-right">Lock State</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {compRegistrations.map((r, idx) => (
-                  <tr key={r.id} className="hover:bg-[#F8FAFC]">
-                    <td className="py-3.5 px-6 font-mono font-bold text-[#111111]">
-                      {r.chestNumber}
+                {contestants.map((c) => (
+                  <tr key={c.codeLetter} className="hover:bg-[#F8FAFC]">
+                    <td className="py-3.5 px-6">
+                      <div className="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-mono font-black text-sm">
+                        {c.codeLetter}
+                      </div>
                     </td>
                     <td className="py-3.5 px-6 font-semibold text-[#111111]">
-                      {r.participantName}
+                      Stage Entry #{c.codeIndex + 1}
                     </td>
-                    <td className="py-3.5 px-6 text-[#526070]">
-                      {r.teamName} ({r.teamCode})
-                    </td>
-                    <td className="py-3.5 px-6 text-center font-black text-sm text-[#111111]">
-                      {idx === 0 ? 95 : idx === 1 ? 89 : idx === 2 ? 82 : 74} / 100
+                    <td className="py-3.5 px-6 text-center text-[#526070] font-mono text-xs">
+                      Cryptographically Recorded
                     </td>
                     <td className="py-3.5 px-6 text-right">
                       <span className="text-emerald-700 font-bold text-[11px] flex items-center justify-end gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Signed
+                        Sealed
                       </span>
                     </td>
                   </tr>

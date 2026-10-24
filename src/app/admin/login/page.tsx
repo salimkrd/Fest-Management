@@ -44,7 +44,7 @@ export default function AdminLoginPage() {
       let tokenResult = await user.getIdTokenResult(true);
       let role = tokenResult.claims.role;
 
-      if (role !== 'ADMIN') {
+      if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
         try {
           const syncRes = await fetch('/api/auth/sync-claims', {
             method: 'POST',
@@ -59,9 +59,9 @@ export default function AdminLoginPage() {
         }
       }
 
-      if (role !== 'ADMIN') {
+      if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
         await signOut(auth);
-        setError('Access denied: Your account does not possess administrator privileges.');
+        setError('Access denied: Your account does not possess administrator or green room staff privileges.');
         setLoading(false);
         return;
       }
@@ -72,14 +72,18 @@ export default function AdminLoginPage() {
           const userDocSnap = await getDoc(doc(db, 'users', user.uid));
           if (!userDocSnap.exists()) {
             await signOut(auth);
-            setError('Access denied: Authoritative administrator profile not found.');
+            setError('Access denied: Authoritative user profile not found.');
             setLoading(false);
             return;
           }
           const userData = userDocSnap.data();
-          if (userData?.role !== 'ADMIN' || userData?.status !== 'ACTIVE' || userData?.disabled === true) {
+          if (
+            (userData?.role !== 'ADMIN' && userData?.role !== 'GREEN_ROOM_STAFF') ||
+            userData?.status !== 'ACTIVE' ||
+            userData?.disabled === true
+          ) {
             await signOut(auth);
-            setError('Access denied: Administrator account is inactive or disabled.');
+            setError('Access denied: Account is inactive, disabled, or unauthorized.');
             setLoading(false);
             return;
           }
@@ -87,13 +91,17 @@ export default function AdminLoginPage() {
           console.warn('[Admin Login] Authoritative Firestore profile check warning:', dbErr);
           // If security rules or network blocked getDoc, fail closed
           await signOut(auth);
-          setError('Access denied: Could not verify authoritative administrator status. Please try again.');
+          setError('Access denied: Could not verify authoritative status. Please try again.');
           setLoading(false);
           return;
         }
       }
 
-      router.push('/admin');
+      if (role === 'GREEN_ROOM_STAFF') {
+        router.push('/admin/green-room');
+      } else {
+        router.push('/admin');
+      }
       return;
     } catch (authErr: any) {
       console.warn('[Admin Login] Authentication error:', authErr);

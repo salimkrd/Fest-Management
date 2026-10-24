@@ -42,3 +42,6 @@ delete process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
 // Test environment bootstrap secret default
 process.env.ADMIN_BOOTSTRAP_SECRET = process.env.ADMIN_BOOTSTRAP_SECRET || 'TestBootstrapSecret123!';
+
+// Server-only QR HMAC Signing Secret
+process.env.QR_SIGNING_SECRET = process.env.QR_SIGNING_SECRET || 'inspirath_production_safe_server_only_qr_hmac_secret_2026_super_secure';

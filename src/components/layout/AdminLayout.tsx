@@ -10,6 +10,7 @@ import {
   Trophy,
   UserCheck,
   ClipboardList,
+  DoorOpen,
   Edit3,
   Award,
   MapPin,
@@ -37,6 +38,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme } = useFest();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authorizedUser, setAuthorizedUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<'ADMIN' | 'GREEN_ROOM_STAFF' | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setAuthorizedUser(null);
+        setUserRole(null);
         setAuthChecking(false);
         router.replace('/admin/login');
         return;
@@ -56,7 +59,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
       try {
         let tokenResult = await user.getIdTokenResult();
-        if (tokenResult.claims.role !== 'ADMIN') {
+        let role = tokenResult.claims.role as string | undefined;
+
+        if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
           try {
             const syncRes = await fetch('/api/auth/sync-claims', {
               method: 'POST',
@@ -64,16 +69,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             });
             if (syncRes.ok) {
               tokenResult = await user.getIdTokenResult(true);
+              role = tokenResult.claims.role as string | undefined;
             }
           } catch (syncErr) {
             console.warn('[AdminLayout] Claims auto-sync attempt error:', syncErr);
           }
         }
 
-        if (tokenResult.claims.role !== 'ADMIN') {
-          console.warn('[AdminLayout] User is missing ADMIN custom claim.');
+        if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
+          console.warn('[AdminLayout] User is missing ADMIN or GREEN_ROOM_STAFF claim.');
           if (auth) await signOut(auth);
           setAuthorizedUser(null);
+          setUserRole(null);
           setAuthChecking(false);
           router.replace('/admin/login');
           return;
@@ -86,35 +93,50 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             console.warn('[AdminLayout] Authoritative user document missing.');
             if (auth) await signOut(auth);
             setAuthorizedUser(null);
+            setUserRole(null);
             setAuthChecking(false);
             router.replace('/admin/login');
             return;
           }
 
           const userData = userDocSnap.data();
-          if (userData?.role !== 'ADMIN' || userData?.status !== 'ACTIVE' || userData?.disabled === true) {
-            console.warn('[AdminLayout] User profile inactive, disabled, or not ADMIN.');
+          const docRole = userData?.role;
+          if (
+            (docRole !== 'ADMIN' && docRole !== 'GREEN_ROOM_STAFF') ||
+            userData?.status !== 'ACTIVE' ||
+            userData?.disabled === true
+          ) {
+            console.warn('[AdminLayout] User profile inactive, disabled, or unauthorized role.');
             if (auth) await signOut(auth);
             setAuthorizedUser(null);
+            setUserRole(null);
             setAuthChecking(false);
             router.replace('/admin/login');
             return;
           }
         }
 
+        const effectiveRole = role as 'ADMIN' | 'GREEN_ROOM_STAFF';
         setAuthorizedUser(user);
+        setUserRole(effectiveRole);
         setAuthChecking(false);
+
+        // If GREEN_ROOM_STAFF tries to access non-green-room routes, scope them to /admin/green-room
+        if (effectiveRole === 'GREEN_ROOM_STAFF' && pathname && !pathname.startsWith('/admin/green-room')) {
+          router.replace('/admin/green-room');
+        }
       } catch (authErr) {
         console.warn('[AdminLayout] Auth verification error:', authErr);
         if (auth) await signOut(auth);
         setAuthorizedUser(null);
+        setUserRole(null);
         setAuthChecking(false);
         router.replace('/admin/login');
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
 
   const handleSignOut = async () => {
     if (auth) {
@@ -127,14 +149,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     router.push('/admin/login');
   };
 
-  // Exact 12 Authoritative Sidebar Items from PRD / DESIGN v2.0
-  const navItems = [
+  // Authoritative Sidebar Navigation Items (with Green Room between Registration and Mark Entry)
+  const allNavItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Categories', href: '/admin/categories', icon: Layers },
     { name: 'Teams', href: '/admin/teams', icon: Users2 },
     { name: 'Competitions', href: '/admin/competitions', icon: Trophy },
     { name: 'Participants', href: '/admin/participants', icon: UserCheck },
     { name: 'Registration', href: '/admin/registration', icon: ClipboardList },
+    { name: 'Green Room', href: '/admin/green-room', icon: DoorOpen },
     { name: 'Mark Entry', href: '/admin/mark-entry', icon: Edit3 },
     { name: 'Result', href: '/admin/results', icon: Award },
     { name: 'Stages', href: '/admin/stages', icon: MapPin },
@@ -142,6 +165,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Media', href: '/admin/media', icon: ImageIcon },
     { name: 'Export', href: '/admin/export', icon: FileDown },
   ];
+
+  const navItems = userRole === 'GREEN_ROOM_STAFF'
+    ? allNavItems.filter(item => item.href === '/admin/green-room')
+    : allNavItems;
+
 
   if (authChecking) {
     return (

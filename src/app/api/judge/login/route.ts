@@ -105,18 +105,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. PIN / Secret check (if secret is provided)
-    if (secret && typeof secret === 'string' && secret.trim().length > 0) {
-      const authResult = await verifyJudgeAssignment(assignment, secret.trim());
+    // 5. PIN / Secret check (Mandatory verification to prevent exposure of contestant data)
+    const cleanSecret = (secret || '').trim();
+    if (assignment.secretHash || (assignment as any).pin) {
+      if (!cleanSecret) {
+        return NextResponse.json(
+          { error: 'Juror PIN or Secret is required for authentication.' },
+          { status: 401 }
+        );
+      }
+      const authResult = await verifyJudgeAssignment(assignment, cleanSecret);
       if (!authResult.valid) {
         return NextResponse.json(
           { error: `Invalid Juror Secret / PIN (${authResult.reason || 'Verification Failed'}).` },
           { status: 401 }
         );
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'This juror assignment has no security credentials configured. Please contact the administrator.' },
+        { status: 403 }
+      );
     }
 
-    // 6. Fetch competition metadata and approved registrations for offline/cross-browser support
+    // 6. Fetch competition metadata and actual Green Room assignments
     let competitionData: any = null;
     let registrations: any[] = [];
 
@@ -132,12 +144,26 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const regsSnap = await db.collection('registrations')
+        const grSnap = await db.collection('greenRoomAssignments')
           .where('competitionId', '==', effectiveCompId)
           .get();
-        registrations = regsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (!grSnap.empty) {
+          const sorted = grSnap.docs.map(d => d.data());
+          sorted.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
+          registrations = sorted.map(item => ({
+            id: item.codeLetter,
+            codeLetter: item.codeLetter,
+            codeIndex: item.codeIndex,
+            status: item.status || 'CHECKED_IN'
+          }));
+        } else {
+          // Requirement 1: Remove all fake/fallback Judge Code Letter generation.
+          // Judges must see only actual Green Room assignments from Firestore. Show an empty state until check-in.
+          registrations = [];
+        }
       } catch (e) {
-        console.warn('[JudgeLogin] Could not fetch registrations:', e);
+        console.warn('[JudgeLogin] Could not fetch anonymous contestants:', e);
       }
     }
 
@@ -162,6 +188,7 @@ export async function POST(req: NextRequest) {
       success: true,
       assignment: sanitizedAssignment,
       competition: competitionData,
+      contestants: registrations,
       registrations
     }, { status: 200 });
 

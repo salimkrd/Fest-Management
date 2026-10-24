@@ -883,7 +883,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: 'asgn-draft-service-test',
       competitionId: 'comp-1',
       secret: pin,
-      scores: { 'reg-01': 88 },
+      scores: { 'A': 88 },
       remarks: 'Saved draft'
     });
 
@@ -935,14 +935,32 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString()
     });
 
+    await adminDb.collection('greenRoomAssignments').doc(`${compId}_reg-service-1`).set({
+      id: `${compId}_reg-service-1`,
+      competitionId: compId,
+      registrationId: 'reg-service-1',
+      codeLetter: 'A',
+      codeIndex: 0,
+      status: 'CHECKED_IN'
+    });
+
+    await adminDb.collection('greenRoomAssignments').doc(`${compId}_reg-service-2`).set({
+      id: `${compId}_reg-service-2`,
+      competitionId: compId,
+      registrationId: 'reg-service-2',
+      codeLetter: 'B',
+      codeIndex: 1,
+      status: 'CHECKED_IN'
+    });
+
     // Submit marks via server-authoritative JudgeService
     const submitResult = await JudgeService.submitMarks({
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
       scores: {
-        'bib-service-1': 94,
-        'bib-service-2': { content: 45, delivery: 45 }
+        'A': 94,
+        'B': { content: 45, delivery: 45 }
       }
     });
 
@@ -1052,6 +1070,15 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString()
     });
 
+    await adminDb.collection('greenRoomAssignments').doc(`${compId}_reg-rubric-01`).set({
+      id: `${compId}_reg-rubric-01`,
+      competitionId: compId,
+      registrationId: 'reg-rubric-01',
+      codeLetter: 'A',
+      codeIndex: 0,
+      status: 'CHECKED_IN'
+    });
+
     // Criterion 'cr-subject' maxMarks is 30. Score of 35 must be strictly rejected!
     await expect(
       JudgeService.submitMarks({
@@ -1059,7 +1086,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         competitionId: compId,
         secret: pin,
         scores: {
-          'reg-rubric-01': {
+          'A': {
             'cr-subject': 35, // Exceeds rubric limit of 30!
             'cr-delivery': 15
           }
@@ -1328,11 +1355,20 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     ).rejects.toThrow(/ineligible registration \(status: WITHDRAWN\)/i);
 
     // 7. Legitimate APPROVED registration succeeds
+    await adminDb.collection('greenRoomAssignments').doc(`${compId}_reg-approved-1`).set({
+      id: `${compId}_reg-approved-1`,
+      competitionId: compId,
+      registrationId: 'reg-approved-1',
+      codeLetter: 'A',
+      codeIndex: 0,
+      status: 'CHECKED_IN'
+    });
+
     const approvedDraft = await JudgeService.saveDraftMarks({
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
-      scores: { 'BIB-APPROVED': 92 }
+      scores: { 'A': 92 }
     });
     expect(approvedDraft.success).toBe(true);
 
@@ -1406,18 +1442,27 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString()
     });
 
-    // Attempting to score the same participant twice via two different aliases ('reg-dupe-1' and 'BIB-DUPE-1')
+    await adminDb.collection('greenRoomAssignments').doc(`${compId}_reg-dupe-1`).set({
+      id: `${compId}_reg-dupe-1`,
+      competitionId: compId,
+      registrationId: 'reg-dupe-1',
+      codeLetter: 'A',
+      codeIndex: 0,
+      status: 'CHECKED_IN'
+    });
+
+    // Attempting to score the same participant twice via two different aliases ('A' and direct identifier 'reg-dupe-1')
     await expect(
       JudgeService.submitMarks({
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
         scores: {
-          'reg-dupe-1': 85,
-          'BIB-DUPE-1': 90
+          'A': 85,
+          'reg-dupe-1': 90
         }
       })
-    ).rejects.toThrow(/duplicate score entry/i);
+    ).rejects.toThrow(/direct contestant identifier|duplicate score entry/i);
   });
 
   it('38. Server API endpoint POST /api/judge/marks authenticates Judge, validates scope, and enforces JudgeService invariants', async () => {
@@ -1440,7 +1485,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-submit-service-test',
         competitionId: 'cmp-service-test',
         secret: 'WRONG-PIN',
-        scores: { 'reg-service-1': 90 }
+        scores: { 'A': 90 }
       })
     });
     const unauthRes = await marksApiHandler(unauthReq);
@@ -1454,7 +1499,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-draft-service-test',
         competitionId: 'comp-1',
         secret: '9911',
-        scores: { 'reg-01': 92 },
+        scores: { 'A': 92 },
         remarks: 'API draft test'
       })
     });

@@ -390,14 +390,143 @@ async function seed() {
     updatedBy: 'Chief Festival Admin'
   });
 
-  // 14. AUDIT LOGS
-  console.log('📜 Seeding Audit Logs...');
-  await db.collection('auditLogs').doc('log-init').set({
-    action: 'INITIAL_SEED',
-    performedBy: 'System Seeder',
-    target: 'ALL_COLLECTIONS',
-    details: 'Sahithyolsav 2025 initial dataset initialized successfully on local emulators',
-    timestamp: new Date().toISOString()
+  // 15. GREEN ROOM ASSIGNMENTS & COUNTERS
+  console.log('🚪 Seeding Green Room Assignments & Counters...');
+  const grAssignments = [
+    {
+      id: 'comp-1_reg-01',
+      competitionId: 'comp-1',
+      competitionName: 'Qur\'an Recitation (Murattal)',
+      registrationId: 'reg-01',
+      codeLetter: 'A',
+      codeIndex: 0,
+      participantId: 'part-101',
+      participantName: 'Ameen Farhan K.P.',
+      teamId: 'team-1',
+      teamName: 'Al-Shamama',
+      bib: 'BIB-101',
+      status: 'COMPLETED',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 4 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 4 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 4 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'comp-1_reg-02',
+      competitionId: 'comp-1',
+      competitionName: 'Qur\'an Recitation (Murattal)',
+      registrationId: 'reg-02',
+      codeLetter: 'B',
+      codeIndex: 1,
+      participantId: 'part-102',
+      participantName: 'Muhammad Sinan T.',
+      teamId: 'team-2',
+      teamName: 'An-Nawa',
+      bib: 'BIB-102',
+      status: 'COMPLETED',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 3.8 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 3.8 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 3.8 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'comp-1_reg-03',
+      competitionId: 'comp-1',
+      competitionName: 'Qur\'an Recitation (Murattal)',
+      registrationId: 'reg-03',
+      codeLetter: 'C',
+      codeIndex: 2,
+      participantId: 'part-103',
+      participantName: 'Bilal Shahid',
+      teamId: 'team-3',
+      teamName: 'Al-Ishraq',
+      bib: 'BIB-103',
+      status: 'COMPLETED',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 3.6 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 3.6 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 3.6 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'comp-1_reg-04',
+      competitionId: 'comp-1',
+      competitionName: 'Qur\'an Recitation (Murattal)',
+      registrationId: 'reg-04',
+      codeLetter: 'D',
+      codeIndex: 3,
+      participantId: 'part-104',
+      participantName: 'Rayyan Abdulla',
+      teamId: 'team-4',
+      teamName: 'Ar-Rawda',
+      bib: 'BIB-104',
+      status: 'COMPLETED',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 3.4 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 3.4 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 3.4 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'comp-2_reg-05',
+      competitionId: 'comp-2',
+      competitionName: 'Elocution (Malayalam)',
+      registrationId: 'reg-05',
+      codeLetter: 'A',
+      codeIndex: 0,
+      participantId: 'part-201',
+      participantName: 'Zayan Ahmed',
+      teamId: 'team-1',
+      teamName: 'Al-Shamama',
+      bib: 'BIB-201',
+      status: 'CHECKED_IN',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 1 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 1 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 1 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'comp-2_reg-06',
+      competitionId: 'comp-2',
+      competitionName: 'Elocution (Malayalam)',
+      registrationId: 'reg-06',
+      codeLetter: 'B',
+      codeIndex: 1,
+      participantId: 'part-202',
+      participantName: 'Hanan Mustafa',
+      teamId: 'team-2',
+      teamName: 'An-Nawa',
+      bib: 'BIB-202',
+      status: 'CHECKED_IN',
+      type: 'SOLO',
+      checkedInAt: new Date(now.getTime() - 0.8 * 3600 * 1000).toISOString(),
+      checkedInBy: 'admin-01',
+      createdAt: new Date(now.getTime() - 0.8 * 3600 * 1000).toISOString(),
+      updatedAt: new Date(now.getTime() - 0.8 * 3600 * 1000).toISOString()
+    }
+  ];
+
+  for (const gra of grAssignments) {
+    await db.collection('greenRoomAssignments').doc(gra.id).set(gra);
+  }
+
+  await db.collection('greenRoomCounters').doc('comp-1').set({
+    competitionId: 'comp-1',
+    assignedCodes: ['A', 'B', 'C', 'D'],
+    totalCheckedIn: 4,
+    lastAssignedCode: 'D',
+    updatedAt: now.toISOString()
+  });
+
+  await db.collection('greenRoomCounters').doc('comp-2').set({
+    competitionId: 'comp-2',
+    assignedCodes: ['A', 'B'],
+    totalCheckedIn: 2,
+    lastAssignedCode: 'B',
+    updatedAt: now.toISOString()
   });
 
   console.log('✅ Demo Data Seeding Completed Successfully! All 18 collections populated.');

@@ -4,6 +4,7 @@
  */
 
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
+import QRCode from 'qrcode';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -40,10 +41,11 @@ export async function exportPosterAsPng(
 /**
  * Generates and downloads a printable Participant Digital ID Card (PNG)
  */
-export function exportDigitalIdAsPng(
+export async function exportDigitalIdAsPng(
   participant: Participant,
-  festivalName: string = 'SAHITHYOLSAV 2025'
-): void {
+  festivalName: string = 'SAHITHYOLSAV 2025',
+  options?: { token?: string; qrPayload?: string }
+): Promise<void> {
   if (typeof window === 'undefined') return;
 
   const width = 640;
@@ -181,25 +183,47 @@ export function exportDigitalIdAsPng(
   ctx.font = '600 13px Montserrat, sans-serif';
   ctx.fillText('Scan at Venue Entrance & Stage Gate', 70, 790);
 
+  const tokenText = options?.token
+    ? `TOKEN: ${options.token.slice(0, 16).toUpperCase()}`
+    : `ID: ${participant.bib}-AUTH`;
+
   ctx.fillStyle = '#111111';
   ctx.font = '700 16px monospace';
-  ctx.fillText(`HASH: ${participant.bib}-2025-AUTH-V2`, 70, 825);
+  ctx.fillText(tokenText, 70, 825);
 
-  // Draw simulated QR matrix block
+  // Generate and draw scannable QR Code from server-issued payload
   const qrX = width - 180;
   const qrY = 755;
   const qrSize = 100;
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(qrX, qrY, qrSize, qrSize);
 
-  // Inner white squares
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(qrX + 10, qrY + 10, qrSize - 20, qrSize - 20);
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(qrX + 22, qrY + 22, 24, 24);
-  ctx.fillRect(qrX + 54, qrY + 22, 24, 24);
-  ctx.fillRect(qrX + 22, qrY + 54, 24, 24);
-  ctx.fillRect(qrX + 54, qrY + 54, 12, 12);
+  try {
+    const payloadToDraw = options?.qrPayload || JSON.stringify({
+      app: 'INSPIRATH',
+      type: 'PARTICIPANT_ID',
+      id: participant.id,
+      bib: participant.bib,
+      version: 3
+    });
+
+    const qrDataUrl = await QRCode.toDataURL(payloadToDraw, {
+      width: 300,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#111111',
+        light: '#FFFFFF'
+      }
+    });
+
+    const qrImg = new Image();
+    qrImg.src = qrDataUrl;
+    await qrImg.decode();
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+  } catch (qrErr) {
+    console.error('[canvasExport] QR rendering error:', qrErr);
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(qrX, qrY, qrSize, qrSize);
+  }
 
   // Trigger Download
   canvas.toBlob((blob) => {
