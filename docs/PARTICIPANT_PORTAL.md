@@ -2,15 +2,15 @@
 
 ## Participant identity and login
 
-- Route: `/participant/login`, credentials: exact full `participants/{id}` (for example `part-<uuid>`) and the `dob` value in ISO `YYYY-MM-DD` format.
+- Route: `/participant/login`, credentials: unique short Bib Number (for example `1042` or `#1042`) and the `dob` value in ISO `YYYY-MM-DD` format.
 - Every existing and future participant created by Admin or an authorized Team Manager automatically qualifies; **no participant Firebase Auth user is created**.
-- The shorter public bib number is intentionally **not** accepted as the login identifier.
+- The login uses the short public Bib Number. The server normalizes `1042` to `#1042`, queries the authoritative `participants` collection and **rejects missing or duplicate Bib numbers** instead of guessing an identity.
 - Sessions are HMAC-signed, scoped to `/api/participant`, HttpOnly, Secure in production, SameSite Strict, expiring after one hour.
-- Per-ID (five attempts / fifteen minutes) and per-IP (four hundred attempts / fifteen minutes; shared-campus NAT capacity) rate limits use authoritative Firestore transactions. Repeated legitimate successful logins also count toward the attempt cap in this first iteration.
+- Per-Bib (five attempts / fifteen minutes) and per-IP (one hundred attempts / fifteen minutes; shared-campus NAT capacity) rate limits use authoritative Firestore transactions. Repeated legitimate successful logins also count toward the attempt cap in this first iteration.
 - The private participant API never returns DOB, email, or phone and never accepts a client-supplied participant ID after login.
 - Access can be manually disabled for an individual by setting `participants/{id}.portalDisabled = true`. Removal of the participant also invalidates subsequent API requests.
 
-**Important:** DOB is not a true password and may be known to classmates/family. The login requested here is suitable only for a tightly limited **read-only, low-sensitivity portal**. For minors or any more-sensitive data, add a one-time activation PIN or verified guardian OTP before production release. Never grant `PARTICIPANT` access to privileged Firestore writes or unpublished marks.
+**Important — stronger authentication required before student rollout:** Bib Numbers are public, sequential, and guessable; DOB can be known to classmates/family. Together they are substantially weaker than a password. The login requested here is strictly **read-only** and exposes only a narrowly scoped personal profile and published competition details, but the portal should not be activated for real students without an additional one-time activation PIN or verified guardian OTP. Rate limiting alone cannot prevent distributed guessing. Never grant `PARTICIPANT` access to privileged Firestore writes or unpublished marks.
 
 ## Mandatory environment configuration
 
@@ -34,8 +34,8 @@ Do not commit the generated value to GitHub. Redeploy after setting the variable
 
 ## Required verification before merge
 
-1. In the Firebase emulator, test correct/wrong DOB, unknown participant IDs, brute-force lockout, tampered/expired cookies, logout, deleted/disabled profiles.
-2. With 2 participant accounts in separate browser sessions, confirm participant A cannot query B's profile, registrations or QR.
+1. In the Firebase emulator, test correct/wrong DOB, known/unknown Bib, inputs with and without `#`, duplicate Bib numbers, brute-force lockout, tampered/expired cookies, logout, deleted/disabled profiles.
+2. With 2 participant accounts in separate browser sessions, confirm participant A cannot query B's profile, registrations or QR. Audit production participant Bib numbers for collisions before rollout; resolve duplicates using authorized Admin workflows without resetting existing participants or competition data.
 3. Confirm SOLO published result points match official points ledger; GROUP wins appear with **team-only** points and do not increase individual totals.
 4. Confirm an unpublished/revised result disappears from the personal scoreboard and reappears only after official republishing.
 5. Confirm digitally signed ID card downloads and valid QR scans work with Staff Green Room check-in.
