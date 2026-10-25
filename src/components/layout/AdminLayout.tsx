@@ -245,7 +245,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               {userInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-bold text-[#111111] truncate block">Chief Administrator</span>
+              <span className="text-xs font-bold text-[#111111] truncate block">{userRole === 'GREEN_ROOM_STAFF' ? 'Green Room Staff' : 'Chief Administrator'}</span>
               <span className="text-[10px] text-[#526070] truncate block">{authorizedUser.email || 'admin@fest.institution.org'}</span>
             </div>
             <button
