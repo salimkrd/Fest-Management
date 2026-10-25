@@ -48,7 +48,10 @@ const fakeDatabase = {
     return output;
   }
 };
-vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => fakeDatabase }));
+vi.mock('@/lib/firebase/admin', () => ({
+  getAdminDb: () => fakeDatabase,
+  syncWorkloadIdentityToken: vi.fn().mockResolvedValue(null)
+}));
 
 const loginRequest = () => new NextRequest('http://localhost:3000/api/participant/login', {
   method: 'POST',

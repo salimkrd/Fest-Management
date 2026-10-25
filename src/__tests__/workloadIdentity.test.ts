@@ -10,12 +10,17 @@ import {
   buildWorkloadIdentityClient,
   createWorkloadIdentityCredential,
   getAdminApp,
+  getAdminDb,
+  getAdminAuth,
+  getAdminStorage,
   resetAdminApp,
   ALLOWED_WIF_BRANCH,
   STAGING_PROJECT_ID,
   PRODUCTION_PROJECT_ID,
   VERCEL_PROJECT_ID
 } from '@/lib/firebase/admin';
+import { initializeApp, deleteApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 describe('Workload Identity Federation for Firebase Admin', () => {
   const originalEnv = { ...process.env };
@@ -288,6 +293,56 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       expect(() => {
         getAdminApp();
       }).toThrow(/FAIL-CLOSED SAFETY/);
+    });
+  });
+
+  describe('Firestore SDK Credential Initialization Regression Test', () => {
+    it('catches original error: rejects custom Credential class when initializing Firestore client', async () => {
+      // Re-create the original bug: initializing Firebase Admin app with a custom Credential instance
+      const customCred = new WorkloadIdentityCredential({} as any);
+      const reproAppName = `repro-custom-cred-${Date.now()}`;
+      const reproApp = initializeApp(
+        {
+          credential: customCred,
+          projectId: STAGING_PROJECT_ID
+        },
+        reproAppName
+      );
+
+      try {
+        // Without mocking Firebase Admin SDK internals, calling getFirestore must fail with the exact runtime error
+        expect(() => {
+          getFirestore(reproApp);
+        }).toThrowError(
+          /Failed to initialize Google Cloud Firestore client with the available credentials\. Must initialize the SDK with a certificate credential or application default credentials to use Cloud Firestore API\./
+        );
+      } finally {
+        await deleteApp(reproApp);
+      }
+    });
+
+    it('successfully initializes Firestore via getAdminDb() with ADC-backed Workload Identity Federation', async () => {
+      process.env.ALLOW_STAGING_WIF_TEST = 'true';
+      delete process.env.FIRESTORE_EMULATOR_HOST;
+      delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+      delete process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR;
+
+      process.env.GCP_WORKLOAD_IDENTITY_PROVIDER = 'projects/123456/locations/global/workloadIdentityPools/p/providers/pr';
+      process.env.GCP_SERVICE_ACCOUNT_EMAIL = 'vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com';
+      process.env.FIREBASE_ADMIN_PROJECT_ID = STAGING_PROJECT_ID;
+
+      // Real getAdminDb() call without mocking Firebase Admin SDK internals
+      const db = getAdminDb();
+      expect(db).not.toBeNull();
+      expect(db?.constructor.name).toBe('Firestore');
+
+      const auth = getAdminAuth();
+      expect(auth).not.toBeNull();
+      expect(auth?.constructor.name).toBe('Auth');
+
+      const storage = getAdminStorage();
+      expect(storage).not.toBeNull();
+      expect(storage?.constructor.name).toBe('Storage');
     });
   });
 });

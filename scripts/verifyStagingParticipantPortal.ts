@@ -155,7 +155,7 @@ async function runStagingVerification() {
 
   // 5. Seed / Ensure Staging Test Participant #1042 Data
   const testPartId = 'part-staging-verify-1042';
-  const testDob = '2008-04-12';
+  const testDob = '2010-05-12';
   const testSoloCompId = 'staging-comp-solo-1042';
   const testGroupCompId = 'staging-comp-group-1042';
   const testSoloRegId = 'staging-reg-solo-1042';

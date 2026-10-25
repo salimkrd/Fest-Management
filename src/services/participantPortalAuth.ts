@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { NextRequest } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 
 /**
  * Participant access is server-only. Never sign a Firebase client user into an
@@ -95,6 +95,7 @@ function verifySession(token: string | undefined): string | null {
 export async function getParticipantSession(request: NextRequest) {
   const participantId = verifySession(request.cookies.get(COOKIE_NAME)?.value);
   if (!participantId) return null;
+  await syncWorkloadIdentityToken().catch(() => {});
   const db = getAdminDb();
   if (!db) return null;
   const snapshot = await db.collection('participants').doc(participantId).get();
@@ -142,6 +143,7 @@ export async function loginParticipant(request: NextRequest, bibInput: unknown, 
   if (!bib || !birthDate) {
     return { ok: false as const, limited: false };
   }
+  await syncWorkloadIdentityToken().catch(() => {});
   // Throttle even unknown Bib numbers to prevent account discovery.
   if (!await consumeAttempt(bib, request)) return { ok: false as const, limited: true };
 

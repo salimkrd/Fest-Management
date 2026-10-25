@@ -14,6 +14,8 @@ import { getStorage, Storage } from 'firebase-admin/storage';
 import type { Credential, GoogleOAuthAccessToken } from 'firebase-admin/app';
 import { IdentityPoolClient, BaseExternalAccountClient } from 'google-auth-library';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 export const ALLOWED_WIF_BRANCH = 'feature/participant-id-dob-portal';
 export const STAGING_PROJECT_ID = 'inspirath-staging';
@@ -23,9 +25,111 @@ export const VERCEL_PROJECT_ID = 'prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y';
 let adminApp: App | null = null;
 
 /**
+ * Returns the file path used to store the short-lived Vercel OIDC subject token
+ * for Google Cloud Security Token Service (STS) exchange.
+ */
+export function getWorkloadIdentityTokenFilePath(): string {
+  if (process.env.VERCEL_OIDC_TOKEN_FILE?.trim() && fs.existsSync(/*turbopackIgnore: true*/ process.env.VERCEL_OIDC_TOKEN_FILE.trim())) {
+    return process.env.VERCEL_OIDC_TOKEN_FILE.trim();
+  }
+  return path.join(os.tmpdir(), 'inspirath-staging-oidc-token.jwt');
+}
+
+/**
+ * Returns the file path where the Google Cloud External Account ADC configuration
+ * is written in the local serverless temporary storage.
+ */
+export function getWorkloadIdentityConfigFilePath(): string {
+  return path.join(os.tmpdir(), 'inspirath-staging-wif-adc.json');
+}
+
+/**
+ * Formats the normalized Google Cloud STS audience URI.
+ */
+export function getWorkloadIdentityAudience(): string {
+  if (process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE?.trim()) {
+    return process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE.trim();
+  }
+  const provider = process.env.GCP_WORKLOAD_IDENTITY_PROVIDER!.trim();
+  return provider.startsWith('//') ? provider : `//iam.googleapis.com/${provider.replace(/^\/+/, '')}`;
+}
+
+/**
+ * Generates the Google Cloud External Account credential configuration JSON
+ * adhering to Google Application Default Credentials (ADC) format for Workload Identity Federation.
+ */
+export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<string, any> {
+  if (process.env.GCP_WORKLOAD_IDENTITY_CONFIG?.trim()) {
+    let rawConfig = process.env.GCP_WORKLOAD_IDENTITY_CONFIG.trim();
+    if ((rawConfig.startsWith('"') && rawConfig.endsWith('"')) || (rawConfig.startsWith("'") && rawConfig.endsWith("'"))) {
+      rawConfig = rawConfig.slice(1, -1);
+    }
+    const parsed = JSON.parse(rawConfig);
+    if (!parsed.credential_source || !parsed.credential_source.file) {
+      parsed.credential_source = { file: tokenFilePath };
+    }
+    return parsed;
+  }
+
+  const provider = process.env.GCP_WORKLOAD_IDENTITY_PROVIDER!.trim();
+  const saEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL!.trim();
+  const impersonationUrl = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${saEmail}:generateAccessToken`;
+  const tokenUrl = process.env.GCP_WORKLOAD_IDENTITY_STS_URL?.trim() || 'https://sts.googleapis.com/v1/token';
+
+  return {
+    type: 'external_account',
+    audience: getWorkloadIdentityAudience(),
+    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    token_url: tokenUrl,
+    service_account_impersonation_url: impersonationUrl,
+    credential_source: {
+      file: tokenFilePath
+    }
+  };
+}
+
+/**
+ * Sets up Google Application Default Credentials (ADC) backed by Workload Identity Federation.
+ * Writes the ADC configuration file and initial token to secure temporary storage, then sets
+ * GOOGLE_APPLICATION_CREDENTIALS so that Firebase Admin's applicationDefault() and Cloud Firestore
+ * recognize and accept the credentials natively.
+ */
+export function setupWorkloadIdentityAdc(targetProjectId: string): string {
+  validateWorkloadIdentityScope(targetProjectId);
+
+  const tokenFilePath = getWorkloadIdentityTokenFilePath();
+
+  // If a subject token exists synchronously in the environment, ensure it is written to the file
+  const envToken = process.env.GCP_WORKLOAD_IDENTITY_TOKEN?.trim() || process.env.VERCEL_OIDC_TOKEN?.trim();
+  if (envToken) {
+    try {
+      fs.writeFileSync(tokenFilePath, envToken, { encoding: 'utf8', mode: 0o600 });
+    } catch (err) {
+      console.warn('[Firebase Admin WIF] Failed to write initial token file:', err);
+    }
+  } else if (!fs.existsSync(/*turbopackIgnore: true*/ tokenFilePath)) {
+    try {
+      fs.writeFileSync(tokenFilePath, '', { encoding: 'utf8', mode: 0o600 });
+    } catch {
+      // Ignore initial touch errors in restrictive test runners
+    }
+  }
+
+  const config = generateWorkloadIdentityConfig(tokenFilePath);
+  const configFilePath = getWorkloadIdentityConfigFilePath();
+  try {
+    fs.writeFileSync(configFilePath, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = configFilePath;
+  } catch (err) {
+    console.warn('[Firebase Admin WIF] Failed to write ADC config file:', err);
+  }
+
+  return configFilePath;
+}
+
+/**
  * Adapter implementing Firebase Admin's Credential interface using google-auth-library's
- * IdentityPoolClient / BaseExternalAccountClient. Fetches and refreshes short-lived Google Cloud
- * access tokens exchanged via Workload Identity Federation without private keys.
+ * IdentityPoolClient / BaseExternalAccountClient. Provided for programmatic and test usage.
  */
 export class WorkloadIdentityCredential implements Credential {
   constructor(private client: BaseExternalAccountClient | IdentityPoolClient) {}
@@ -87,12 +191,38 @@ export async function resolveOidcSubjectToken(): Promise<string | null> {
   if (process.env.VERCEL_OIDC_TOKEN_FILE?.trim()) {
     try {
       const filePath = process.env.VERCEL_OIDC_TOKEN_FILE.trim();
-      if (fs.existsSync(filePath)) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ filePath)) {
         return fs.readFileSync(filePath, 'utf8').trim();
       }
     } catch (err) {
       console.warn('[Firebase Admin WIF] Unable to read subject token from VERCEL_OIDC_TOKEN_FILE:', err);
     }
+  }
+
+  return null;
+}
+
+/**
+ * Synchronizes the latest Vercel OIDC token into the local file designated for Google Cloud STS exchange.
+ * In Vercel serverless environments, this pulls the current request's token from @vercel/oidc
+ * and updates the token file before Firestore operations execute.
+ */
+export async function syncWorkloadIdentityToken(): Promise<string | null> {
+  if (!isWorkloadIdentityConfigured()) {
+    return null;
+  }
+
+  try {
+    const targetProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || STAGING_PROJECT_ID;
+    const token = await resolveOidcSubjectToken();
+    if (token) {
+      const tokenFilePath = getWorkloadIdentityTokenFilePath();
+      fs.writeFileSync(tokenFilePath, token, { encoding: 'utf8', mode: 0o600 });
+      setupWorkloadIdentityAdc(targetProjectId);
+      return token;
+    }
+  } catch (err) {
+    console.warn('[Firebase Admin WIF] Failed to synchronize OIDC token:', err);
   }
 
   return null;
@@ -222,7 +352,7 @@ export function buildWorkloadIdentityClient(targetProjectId: string): IdentityPo
 }
 
 /**
- * Creates a WorkloadIdentityCredential for the staging Firebase Admin SDK.
+ * Creates a WorkloadIdentityCredential for testing and programmatic token acquisition.
  */
 export function createWorkloadIdentityCredential(targetProjectId: string): WorkloadIdentityCredential {
   const client = buildWorkloadIdentityClient(targetProjectId);
@@ -280,7 +410,12 @@ export function getAdminApp(): App | null {
   }
 
   // 2. Check for GOOGLE_APPLICATION_CREDENTIALS (Preferred secure local credential-file mechanism for live production)
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Ensures existing production credentials files take precedence over Workload Identity Federation
+  const generatedWifConfigPath = getWorkloadIdentityConfigFilePath();
+  const isCustomProductionGac = process.env.GOOGLE_APPLICATION_CREDENTIALS &&
+    process.env.GOOGLE_APPLICATION_CREDENTIALS !== generatedWifConfigPath;
+
+  if (isCustomProductionGac) {
     try {
       adminApp = initializeApp({
         credential: applicationDefault(),
@@ -343,14 +478,16 @@ export function getAdminApp(): App | null {
     }
   }
 
-  // 5. Workload Identity Federation (Keyless short-lived federated credentials for staging / preview)
+  // 5. Workload Identity Federation via Application Default Credentials (ADC)
+  // Backed by an external-account configuration pointing to the Vercel OIDC token file.
+  // Using applicationDefault() is strictly required by Cloud Firestore (getFirestore) to accept credentials.
   if (isWorkloadIdentityConfigured()) {
     try {
       const targetProjectId = projectId || STAGING_PROJECT_ID;
       validateWorkloadIdentityScope(targetProjectId);
-      const credential = createWorkloadIdentityCredential(targetProjectId);
+      setupWorkloadIdentityAdc(targetProjectId);
       adminApp = initializeApp({
-        credential,
+        credential: applicationDefault(),
         projectId: targetProjectId,
         storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
       });
@@ -359,7 +496,7 @@ export function getAdminApp(): App | null {
       if (err instanceof Error && err.message.startsWith('[FAIL-CLOSED SAFETY]')) {
         throw err;
       }
-      console.error('[Firebase Admin] Error initializing with Workload Identity Federation:', err);
+      console.error('[Firebase Admin] Error initializing with Workload Identity Federation ADC:', err);
     }
   }
 
@@ -380,6 +517,10 @@ export async function resetAdminApp(): Promise<void> {
     }
   }
   adminApp = null;
+  const generatedConfig = getWorkloadIdentityConfigFilePath();
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS === generatedConfig) {
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  }
 }
 
 export function getAdminDb(): Firestore | null {
@@ -403,3 +544,4 @@ export function getAdminStorage(): Storage | null {
   const app = getAdminApp();
   return app ? getStorage(app) : null;
 }
+
