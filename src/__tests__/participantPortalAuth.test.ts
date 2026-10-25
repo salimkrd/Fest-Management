@@ -54,7 +54,7 @@ describe('Participant Portal ID + DOB session protections', () => {
   it('issues a signed session only for matching ID + DOB', async () => {
     const invalid = await loginParticipant(loginRequest(), 'part-valid-1', '2010-05-13');
     expect(invalid.ok).toBe(false);
-    const correct = await loginParticipant(loginRequest(), 'part-valid-1', '2010-05-12');
+    const correct = await loginParticipant(loginRequest(), 'PART-VALID-1', '2010-05-12');
     expect(correct.ok).toBe(true);
     if (!correct.ok) return;
     const sessionReq = new NextRequest('http://localhost:3000/api/participant/me', {
