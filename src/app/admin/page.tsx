@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
             >
               Customize Public Theme
             </Button>
-            <Link href="/public" target="_blank">
+            <Link href="/" target="_blank">
               <Button
                 variant="primary"
                 size="sm"

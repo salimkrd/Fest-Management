@@ -15,7 +15,7 @@ function PublicNavLinks() {
   const { theme } = useFest();
 
   const navLinks = [
-    { name: 'Latest Results', href: '/public', icon: Sparkles },
+    { name: 'Latest Results', href: '/', icon: Sparkles },
     { name: 'Results Directory', href: '/public/directory', icon: FileText },
     { name: 'Team Championship', href: '/public/championship', icon: Trophy },
   ];
@@ -103,7 +103,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-18">
             {/* Brand Logo & Title */}
-            <Link href="/public" className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
               <div 
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-extrabold text-base shadow-sm"
                 style={{ backgroundColor: theme.primaryColor }}
@@ -153,7 +153,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
             </Suspense>
             <nav className="space-y-1 pt-2">
               <Link
-                href="/public"
+                href="/"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#111111] hover:bg-neutral-100"
               >
@@ -194,7 +194,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <span className="font-bold text-[#111111]">{theme.festivalName}</span> — {theme.tagline}
               <p className="text-[11px] mt-0.5">Results authenticated by the Central Board of Fest Adjudication</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Link href="/management" className="hover:text-[#111111] hover:underline font-semibold">
+                Management Hub
+              </Link>
+              <span>•</span>
               <Link href="/admin/login" className="hover:text-[#111111] hover:underline font-semibold">
                 Admin Portal
               </Link>

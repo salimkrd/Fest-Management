@@ -285,7 +285,7 @@ function TeamLoginForm() {
             Admin Control Center
           </Link>
           <span>•</span>
-          <Link href="/public" className="hover:text-[#111111] hover:underline font-medium">
+          <Link href="/" className="hover:text-[#111111] hover:underline font-medium">
             Public Website
           </Link>
         </div>
