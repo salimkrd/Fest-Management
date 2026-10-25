@@ -2187,6 +2187,47 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
           // Automatic demo-data seeding and legacy background migration are disabled in production
           // to ensure a clean database reset and require explicit migration approval.
+        } else if (role === 'GREEN_ROOM_STAFF') {
+          // Green Room Staff need to look up APPROVED competition registrations before
+          // assigning anonymous Code Letters. They must not receive Admin-only judge
+          // assignments or participant management data.
+          const approvedRegs = query(
+            collection(firestore, 'registrations'),
+            where('status', '==', 'APPROVED')
+          );
+          unsubRegs = onSnapshot(
+            approvedRegs,
+            (snapshot) => {
+              const assignedRegistrations: Registration[] = snapshot.docs.map(d => {
+                const dt = d.data();
+                return {
+                  id: d.id,
+                  code: dt.code || '',
+                  participantId: dt.participantId,
+                  groupLeaderId: dt.groupLeaderId,
+                  groupSize: dt.groupSize,
+                  participantName: dt.participantName || '',
+                  teamId: dt.teamId || '',
+                  teamCode: dt.teamCode || '',
+                  teamName: dt.teamName || '',
+                  categoryId: dt.categoryId || '',
+                  categoryName: dt.categoryName || '',
+                  competitionId: dt.competitionId || '',
+                  competitionName: dt.competitionName || '',
+                  type: dt.type || 'SOLO',
+                  chestNumber: dt.chestNumber || '',
+                  status: dt.status || 'PENDING',
+                  groupMembers: dt.groupMembers,
+                  registeredAt: dt.registeredAt || ''
+                };
+              });
+              setRegistrations(assignedRegistrations);
+            },
+            (err) => {
+              console.warn('[FestContext] Green Room Staff registrations sync failed:', err);
+              setRegistrations([]);
+            }
+          );
         } else if (role === 'TEAM_MANAGER' && teamId) {
           // 1. Team Manager reads ONLY their own team's participants
           const partsQ = query(collection(firestore, 'participants'), where('teamId', '==', teamId));
