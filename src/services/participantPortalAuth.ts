@@ -33,6 +33,10 @@ function sign(input: string): string {
 }
 
 export function normalizeBib(value: unknown): string | null {
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value < 1) return null;
+    return `#${value}`;
+  }
   if (typeof value !== 'string') return null;
   const clean = value.trim();
   // The input may be #1042 or 1042; reject names, group codes, and full IDs.
@@ -80,7 +84,7 @@ function verifySession(token: string | undefined): string | null {
     if (typeof parsed.participantId !== 'string' ||
         !/^part-[a-zA-Z0-9_-]{1,100}$/.test(parsed.participantId) ||
         typeof parsed.expiry !== 'number' || parsed.expiry <= Date.now() ||
-        parsed.expiry > Date.now() + SESSION_SECONDS * 1000 ||
+        parsed.expiry > Date.now() + (SESSION_SECONDS + 60) * 1000 ||
         typeof parsed.nonce !== 'string') return null;
     return parsed.participantId;
   } catch {

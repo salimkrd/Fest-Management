@@ -45,3 +45,6 @@ process.env.ADMIN_BOOTSTRAP_SECRET = process.env.ADMIN_BOOTSTRAP_SECRET || 'Test
 
 // Server-only QR HMAC Signing Secret
 process.env.QR_SIGNING_SECRET = process.env.QR_SIGNING_SECRET || 'inspirath_production_safe_server_only_qr_hmac_secret_2026_super_secure';
+
+// Server-only Participant Portal Session Secret
+process.env.PARTICIPANT_SESSION_SECRET = process.env.PARTICIPANT_SESSION_SECRET || 'inspirath_production_safe_server_only_participant_portal_session_secret_2026';
