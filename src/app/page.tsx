@@ -203,7 +203,7 @@ export default function HomePage() {
                 Participant Portal
               </h3>
               <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Sign in with your official Participant ID and Date of Birth to view your competitions, published results,
+                Sign in with your short Bib Number and Date of Birth to view your competitions, published results,
                 individual points, and digitally verified participant ID card.
               </p>
             </div>
