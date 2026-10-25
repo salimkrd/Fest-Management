@@ -298,7 +298,7 @@ function CompetitionDetailContent() {
                     </span>
                   </td>
                   <td className="py-4 px-6 text-right font-black text-emerald-600 text-sm">
-                    +{rk.totalEarnedPoints} pts
+                    +{rk.totalEarnedPoints} pts{result.type === 'GROUP' ? ' (Team only)' : ''}
                   </td>
                 </tr>
               ))}
