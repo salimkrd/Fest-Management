@@ -128,6 +128,7 @@ export class RegistrationService {
           : participant.bib,
         status: 'APPROVED',
         groupLeaderId: isGroup ? groupLeaderId : undefined,
+        groupSize: isGroup ? competition.groupSize : undefined,
         groupMembers: isGroup ? [groupLeaderId!] : undefined,
         registeredAt: new Date().toISOString()
       };
