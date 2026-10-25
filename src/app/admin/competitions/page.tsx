@@ -12,7 +12,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Plus, Search, Edit2, Trash2, Trophy, MapPin, Calendar, Clock, Users, AlertCircle } from 'lucide-react';
 
 export default function CompetitionsPage() {
-  const { competitions, categories, stages, addCompetition, updateCompetition, deleteCompetition } = useFest();
+  const { competitions, categories, stages, registrations, results, addCompetition, updateCompetition, deleteCompetition } = useFest();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -99,6 +99,12 @@ export default function CompetitionsPage() {
       setError('Please select a valid category. You must create at least one category before adding competitions.');
       return;
     }
+    if (editingComp && type !== editingComp.type && (
+      registrations.some(r => r.competitionId === editingComp.id) || results.some(r => r.competitionId === editingComp.id)
+    )) {
+      setError('Competition format cannot be changed after registrations or results exist.');
+      return;
+    }
     if (!performanceMode) {
       setError('Select Stage or Off Stage before saving the competition.');
       return;
@@ -125,7 +131,7 @@ export default function CompetitionsPage() {
       maxEntriesPerTeam: Number(maxEntriesPerTeam),
       assignedJudges: editingComp ? editingComp.assignedJudges : ['Prof. David Miller'],
       status,
-      criteria: [
+      criteria: editingComp ? editingComp.criteria : [
         { id: 'cr-1', name: 'Subject Mastery & Accuracy', maxMarks: 35 },
         { id: 'cr-2', name: 'Artistic Delivery & Articulation', maxMarks: 35 },
         { id: 'cr-3', name: 'Overall Impression & Timing', maxMarks: 30 }
