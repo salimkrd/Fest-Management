@@ -1868,6 +1868,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 categoryId: dt.categoryId || '',
                 categoryName: dt.categoryName || '',
                 type: dt.type || 'SOLO',
+                performanceMode: dt.performanceMode === 'STAGE' || dt.performanceMode === 'OFF_STAGE' ? dt.performanceMode : undefined,
+                groupSize: Number.isInteger(dt.groupSize) && dt.groupSize > 0 ? dt.groupSize : undefined,
                 entriesCount: dt.entriesCount || 0,
                 stageId: dt.stageId || '',
                 stageName: dt.stageName || '',
@@ -2125,6 +2127,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   id: d.id,
                   code: dt.code || '',
                   participantId: dt.participantId,
+                  groupLeaderId: dt.groupLeaderId,
                   participantName: dt.participantName || '',
                   teamId: dt.teamId || '',
                   teamCode: dt.teamCode || '',
@@ -2227,6 +2230,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   id: d.id,
                   code: dt.code || '',
                   participantId: dt.participantId,
+                  groupLeaderId: dt.groupLeaderId,
                   participantName: dt.participantName || '',
                   teamId: dt.teamId || '',
                   teamCode: dt.teamCode || '',
@@ -2677,6 +2681,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           competitionId: regData.competitionId,
           participantId: regData.participantId,
           participantName: regData.participantName,
+          groupLeaderId: regData.groupLeaderId,
           groupMembers: regData.groupMembers
         })
       });
