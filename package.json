@@ -21,8 +21,10 @@
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",
+    "@vercel/oidc": "^4.0.3",
     "firebase": "^13.0.0",
     "firebase-admin": "^13.10.0",
+    "google-auth-library": "^11.3.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.58.0",

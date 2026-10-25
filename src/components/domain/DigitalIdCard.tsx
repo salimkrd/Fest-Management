@@ -8,17 +8,20 @@ import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
+import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
   isOpen: boolean;
   onClose: () => void;
+  authMode?: 'firebase' | 'participant';
 }
 
 export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   participant,
   isOpen,
-  onClose
+  onClose,
+  authMode = 'firebase'
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [signedToken, setSignedToken] = useState<string>('');
@@ -41,14 +44,16 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     const fetchQrBadge = async () => {
       try {
-        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : '';
-        if (!idToken) {
+        const idToken = authMode === 'firebase' && auth?.currentUser
+          ? await auth.currentUser.getIdToken() : '';
+        if (authMode === 'firebase' && !idToken) {
           throw new Error('Authentication required to retrieve participant accreditation badge.');
         }
 
-        const res = await fetch(`/api/participants/${participant.id}/qr`, {
-          headers: { Authorization: `Bearer ${idToken}` }
-        });
+        const res = await fetch(
+          authMode === 'participant' ? '/api/participant/qr' : `/api/participants/${participant.id}/qr`,
+          { headers: authMode === 'firebase' ? { Authorization: `Bearer ${idToken}` } : {}, cache: 'no-store' }
+        );
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -89,7 +94,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [participant, isOpen]);
+  }, [participant, isOpen, authMode]);
 
   if (!participant) return null;
 
@@ -147,10 +152,12 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           {/* Photo & Bib */}
           <div className="p-5 flex flex-col items-center text-center bg-gradient-to-b from-blue-50/50 to-white">
             <div className="relative">
-              <img
-                src={participant.photoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
-                alt={participant.name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
+              <ParticipantPhoto
+                photoUrl={participant.photoUrl}
+                name={participant.name}
+                shape="circle"
+                size="lg"
+                className="border-4 border-white shadow-md"
               />
               <span className="absolute bottom-0 right-0 bg-[#111111] text-white text-[11px] font-bold px-2 py-0.5 rounded-full border border-white">
                 {participant.bib}
