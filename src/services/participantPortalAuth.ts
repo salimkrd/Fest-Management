@@ -122,7 +122,8 @@ async function consumeAttempt(participantId: string, request: NextRequest) {
 export async function loginParticipant(request: NextRequest, participantId: unknown, dob: unknown) {
   // Validate the configured HMAC secret before doing credential checks.
   getSecret();
-  const id = typeof participantId === 'string' ? participantId.trim() : '';
+  // Printed Digital ID Cards display the participant ID in uppercase.
+  const id = typeof participantId === 'string' ? participantId.trim().toLowerCase() : '';
   const birthDate = typeof dob === 'string' ? normalizeDob(dob) : null;
   if (!/^part-[a-zA-Z0-9_-]{1,100}$/.test(id) || !birthDate) {
     return { ok: false as const, limited: false };
