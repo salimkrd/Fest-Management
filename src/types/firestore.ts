@@ -166,6 +166,7 @@ export interface FirestoreRegistration {
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
   groupMembers?: string[];
   groupLeaderId?: string;
+  groupSize?: number;
   registeredAt: string;
 }
 
