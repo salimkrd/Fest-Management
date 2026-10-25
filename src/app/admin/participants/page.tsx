@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
+import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { Plus, Search, Edit2, Trash2, IdCard, Users2, Mail, Phone } from 'lucide-react';
 
 export default function ParticipantsPage() {
@@ -54,7 +55,7 @@ export default function ParticipantsPage() {
     setClassGrade('Std 11');
     setDivision('A');
     setDob('2008-05-10');
-    setPhotoUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80');
+    setPhotoUrl('');
     setError('');
     setModalOpen(true);
   };
@@ -102,7 +103,7 @@ export default function ParticipantsPage() {
       classGrade,
       division,
       dob,
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      photoUrl: photoUrl.trim(),
       registeredEventIds: editingPart ? editingPart.registeredEventIds : ['cmp-1']
     };
 
@@ -223,10 +224,12 @@ export default function ParticipantsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={p.photoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
-                          alt={p.name}
-                          className="w-8 h-8 rounded-full object-cover border border-[#E1E7EF]"
+                        <ParticipantPhoto
+                          photoUrl={p.photoUrl}
+                          name={p.name}
+                          size="sm"
+                          shape="circle"
+                          className="border border-[#E1E7EF]"
                         />
                         <div>
                           <span className="font-bold text-[#111111] text-sm block">{p.name}</span>

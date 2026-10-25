@@ -8,6 +8,7 @@ import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
+import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -151,10 +152,12 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           {/* Photo & Bib */}
           <div className="p-5 flex flex-col items-center text-center bg-gradient-to-b from-blue-50/50 to-white">
             <div className="relative">
-              <img
-                src={participant.photoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
-                alt={participant.name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
+              <ParticipantPhoto
+                photoUrl={participant.photoUrl}
+                name={participant.name}
+                shape="circle"
+                size="lg"
+                className="border-4 border-white shadow-md"
               />
               <span className="absolute bottom-0 right-0 bg-[#111111] text-white text-[11px] font-bold px-2 py-0.5 rounded-full border border-white">
                 {participant.bib}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Award, CalendarDays, CheckCircle2, Clock3, DoorOpen, IdCard, LogOut, Medal, Trophy, Users2 } from 'lucide-react';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
+import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import type { Participant } from '@/types/fest';
 
 type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'division' | 'photoUrl' | 'idStatus'>;
@@ -106,11 +107,13 @@ export default function ParticipantDashboard() {
       </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-6">
         <section className="rounded-2xl border border-[#E1E7EF] bg-white p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5">
-          {profile.photoUrl ? (
-            <img src={profile.photoUrl} alt={profile.name} className="h-24 w-24 object-cover rounded-2xl border border-[#E1E7EF]" />
-          ) : (
-            <div className="h-24 w-24 rounded-2xl bg-[#EFF6FF] flex items-center justify-center text-[#2563EB]"><IdCard className="h-10 w-10" /></div>
-          )}
+          <ParticipantPhoto
+            photoUrl={profile.photoUrl}
+            name={profile.name}
+            shape="rounded"
+            size="lg"
+            className="border border-[#E1E7EF] shrink-0"
+          />
           <div className="flex-1">
             <p className="text-xs font-semibold text-[#2563EB] uppercase tracking-widest">My Participant Profile</p>
             <h1 className="text-2xl font-extrabold text-[#111827] mt-1">{profile.name}</h1>
