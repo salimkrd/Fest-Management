@@ -4,6 +4,7 @@
  */
 
 import { Grade, CompetitionType } from '@/domain/scoring';
+import type { CompetitionPerformanceMode } from '@/types/fest';
 import { ResultStatus } from '@/domain/ledger';
 
 export type UserRole = 'ADMIN' | 'TEAM_MANAGER' | 'JUDGE' | 'GREEN_ROOM_STAFF' | 'PUBLIC';
@@ -135,6 +136,8 @@ export interface FirestoreCompetition {
   categoryId: string;
   categoryName: string;
   type: CompetitionType;
+  performanceMode?: CompetitionPerformanceMode;
+  groupSize?: number;
   stageId: string;
   stageName: string;
   status: 'SCHEDULED' | 'IN_PROGRESS' | 'MARKS_ENTERED' | 'PUBLISHED';
@@ -162,6 +165,7 @@ export interface FirestoreRegistration {
   chestNumber: string;
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
   groupMembers?: string[];
+  groupLeaderId?: string;
   registeredAt: string;
 }
 
