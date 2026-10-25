@@ -25,7 +25,6 @@ export default function RegistrationManagementPage() {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [participantId, setParticipantId] = useState('');
-  const [groupName, setGroupName] = useState('');
   const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
 
@@ -57,7 +56,6 @@ export default function RegistrationManagementPage() {
     const initialComps = competitions.filter(c => c.categoryId === initCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantId('');
-    setGroupName('');
     setChestNumber('');
     setError('');
     setModalOpen(true);
@@ -127,17 +125,19 @@ export default function RegistrationManagementPage() {
       }
       participantName = part.name;
     } else {
-      if (!groupName) {
-        setError('Please enter ensemble or group troupe name.');
+      const leader = availableParticipants.find(p => p.id === participantId);
+      if (!leader) {
+        setError('Select a registered participant to represent this group.');
         return;
       }
-      participantName = groupName;
+      participantName = `${leader.name} & Team`;
     }
 
     setSaving(true);
     try {
       await addRegistration({
         participantId: comp.type === 'SOLO' ? participantId : undefined,
+        groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
         participantName,
         teamId: team.id,
         teamCode: team.code,
@@ -364,13 +364,16 @@ export default function RegistrationManagementPage() {
             )}
 
             {isGroup ? (
-              <Input
-                label="Group Troupe / Ensemble Name"
-                placeholder="e.g. Al-Bayan Harmony Troupe"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                required
-              />
+              <div className="space-y-2">
+                <Select
+                  label="Group Leader (registered participant)"
+                  value={participantId}
+                  onChange={(e) => handleParticipantChange(e.target.value)}
+                  options={[{ value: '', label: '-- Select Group Leader --' }, ...availableParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib})` }))]}
+                  required
+                />
+                <p className="text-xs text-[#526070]">{selectedCompetition?.groupSize || 'Not set'} members per group. Only the leader is recorded. Unlimited groups per team; group marks count toward the team only.</p>
+              </div>
             ) : (
               <div>
                 <Select
