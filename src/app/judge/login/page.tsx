@@ -170,7 +170,7 @@ export default function JudgeLoginPage() {
 
         <div className="mt-6 text-center text-xs text-[#526070]">
           <span>Need convener assistance? </span>
-          <Link href="/public" className="text-[#2563EB] font-bold hover:underline">
+          <Link href="/" className="text-[#2563EB] font-bold hover:underline">
             Return to Public Results Portal
           </Link>
         </div>

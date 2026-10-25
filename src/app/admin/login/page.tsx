@@ -225,7 +225,7 @@ export default function AdminLoginPage() {
             Judge Secure Link
           </Link>
           <span>•</span>
-          <Link href="/public" className="hover:text-[#111111] hover:underline font-medium">
+          <Link href="/" className="hover:text-[#111111] hover:underline font-medium">
             Public Website
           </Link>
         </div>

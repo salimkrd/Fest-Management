@@ -290,7 +290,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="flex items-center gap-3">
             {/* Public View Button as required: Accessed through Dashboard/Header, not sidebar */}
             <Link
-              href="/public"
+              href="/"
               target="_blank"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg border border-[#E1E7EF] bg-white text-[#111111] hover:bg-[#F8FAFC] shadow-xs transition-colors"
             >
