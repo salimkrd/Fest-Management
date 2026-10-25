@@ -8,12 +8,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
-    const result = await loginParticipant(req, body.participantId, body.dob);
+    const result = await loginParticipant(req, body.bib, body.dob);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.limited
           ? 'Too many sign-in attempts. Please try again later.'
-          : 'Invalid Participant ID or Date of Birth.' },
+          : 'Invalid Bib Number or Date of Birth.' },
         { status: result.limited ? 429 : 401, headers: { 'Cache-Control': 'no-store' } }
       );
     }
