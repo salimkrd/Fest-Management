@@ -53,6 +53,7 @@ export interface Team {
 }
 
 export type CompetitionType = 'SOLO' | 'GROUP';
+export type CompetitionPerformanceMode = 'STAGE' | 'OFF_STAGE';
 export type CompetitionStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'MARKS_ENTERED' | 'PUBLISHED';
 
 export interface JudgingCriterion {
@@ -68,6 +69,8 @@ export interface Competition {
   categoryId: string;
   categoryName: string;
   type: CompetitionType;
+  performanceMode?: CompetitionPerformanceMode; // Explicit classification independent of venue
+  groupSize?: number; // Members per group; leader-only registration
   entriesCount: number;
   stageId: string;
   stageName: string;
@@ -115,7 +118,9 @@ export interface Registration {
   type: CompetitionType;
   chestNumber: string;
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
-  groupMembers?: string[];
+  groupMembers?: string[]; // Legacy full-roster groups remain readable
+  groupLeaderId?: string; // Member representing a group, no individual credit
+  groupSize?: number; // Declared member count at registration time
   registeredAt: string;
 }
 

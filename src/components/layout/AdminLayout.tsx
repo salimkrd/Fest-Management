@@ -164,6 +164,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Schedule', href: '/admin/schedule', icon: CalendarDays },
     { name: 'Media', href: '/admin/media', icon: ImageIcon },
     { name: 'Export', href: '/admin/export', icon: FileDown },
+    { name: 'Top Scorers', href: '/admin/top-scorers', icon: Trophy },
   ];
 
   const navItems = userRole === 'GREEN_ROOM_STAFF'

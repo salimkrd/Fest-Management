@@ -22,8 +22,6 @@ export default function TeamRegistrationPage() {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [participantId, setParticipantId] = useState('');
-  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
-  const [groupName, setGroupName] = useState('');
   const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,8 +52,6 @@ export default function TeamRegistrationPage() {
     const initialComps = competitions.filter(c => c.categoryId === initialCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantId('');
-    setGroupMemberIds([]);
-    setGroupName('');
     setChestNumber('');
     setError('');
     setModalOpen(true);
@@ -70,7 +66,6 @@ export default function TeamRegistrationPage() {
       setCompetitionId('');
     }
     setParticipantId('');
-    setGroupMemberIds([]);
     setChestNumber('');
   };
 
@@ -81,7 +76,6 @@ export default function TeamRegistrationPage() {
       setCategoryId(comp.categoryId);
     }
     setParticipantId('');
-    setGroupMemberIds([]);
     setChestNumber('');
   };
 
@@ -112,15 +106,12 @@ export default function TeamRegistrationPage() {
       }
       participantName = part.name;
     } else {
-      if (!groupName.trim()) {
-        setError('Please enter your ensemble or group troupe name.');
+      const leader = teamEligibleParticipants.find(p => p.id === participantId);
+      if (!leader) {
+        setError('Choose an eligible participant as this group’s leader.');
         return;
       }
-      if (groupMemberIds.length < 2) {
-        setError('Please select at least two eligible team members for this group registration.');
-        return;
-      }
-      participantName = groupName.trim();
+      participantName = `${leader.name} & Team`;
     }
 
     if (!team) {
@@ -133,6 +124,7 @@ export default function TeamRegistrationPage() {
     try {
       await addRegistration({
         participantId: comp.type === 'SOLO' ? participantId : undefined,
+        groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
         participantName,
         teamId: team.id,
         teamCode: team.code,
@@ -145,7 +137,6 @@ export default function TeamRegistrationPage() {
         chestNumber: chestNumber || (comp.type === 'SOLO'
           ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000')
           : `GRP-${team.code}-${comp.code}`),
-        groupMembers: comp.type === 'GROUP' ? groupMemberIds : undefined,
         status: 'APPROVED'
       });
       setModalOpen(false);
@@ -314,41 +305,16 @@ export default function TeamRegistrationPage() {
             )}
 
             {isGroup ? (
-              <>
-                <Input
-                  label="Team Ensemble / Troupe Name"
-                  placeholder={`e.g. ${team?.name} Voice Troupe`}
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
+              <div className="space-y-2">
+                <Select
+                  label="Group Leader (registered participant)"
+                  value={participantId}
+                  onChange={(e) => handleParticipantChange(e.target.value)}
+                  options={[{ value: '', label: '-- Select Group Leader --' }, ...teamEligibleParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib})` }))]}
                   required
                 />
-                <fieldset className="space-y-2">
-                  <legend className="text-xs font-semibold text-[#111111] uppercase tracking-wider">
-                    Group Members (select at least 2)
-                  </legend>
-                  {teamEligibleParticipants.length === 0 ? (
-                    <p className="text-xs text-amber-700">No eligible participants are available for this category.</p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto rounded-lg border border-[#E1E7EF] divide-y divide-[#E1E7EF]">
-                      {teamEligibleParticipants.map(participant => (
-                        <label key={participant.id} className="flex items-center gap-2 px-3 py-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={groupMemberIds.includes(participant.id)}
-                            onChange={event => {
-                              setGroupMemberIds(previous => event.target.checked
-                                ? [...previous, participant.id]
-                                : previous.filter(id => id !== participant.id)
-                              );
-                            }}
-                          />
-                          <span>{participant.name} ({participant.bib})</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </fieldset>
-              </>
+                <p className="text-xs text-[#526070]">{selectedCompetition?.groupSize || 'Not set'} members per group. Select one leader only; the entry will appear as &quot;Leader &amp; Team&quot;. Group points credit the team, not its leader.</p>
+              </div>
             ) : (
               <div>
                 <Select

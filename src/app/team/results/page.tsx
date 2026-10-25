@@ -16,6 +16,7 @@ export default function TeamResultsPage() {
 
   // Extract all ranks won by this team across all published results
   const teamRankings = results.flatMap(res => {
+    if (res.resultStatus !== 'PUBLISHED') return [];
     return res.ranks
       .filter(rk => rk.teamId === team?.id)
       .map(rk => ({
@@ -123,7 +124,7 @@ export default function TeamResultsPage() {
                   <th className="py-3 px-6 text-center">Score</th>
                   <th className="py-3 px-6 text-center">Official Grade</th>
                   <th className="py-3 px-6 text-center">Prize Rank</th>
-                  <th className="py-3 px-6 text-right">Points Earned</th>
+                  <th className="py-3 px-6 text-right">Team Championship Points</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
@@ -171,6 +172,7 @@ export default function TeamResultsPage() {
                       </td>
                       <td className="py-4 px-6 text-right font-extrabold text-emerald-600 text-sm">
                         +{r.totalEarnedPoints} pts
+                        {r.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
                       </td>
                     </tr>
                   ))
