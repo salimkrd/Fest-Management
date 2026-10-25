@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
-import { Competition, CompetitionType, CompetitionStatus } from '@/types/fest';
+import { Competition, CompetitionType, CompetitionStatus, CompetitionPerformanceMode } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -27,6 +27,8 @@ export default function CompetitionsPage() {
   const [code, setCode] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [type, setType] = useState<CompetitionType>('SOLO');
+  const [performanceMode, setPerformanceMode] = useState<CompetitionPerformanceMode | ''>('STAGE');
+  const [groupSize, setGroupSize] = useState(2);
   const [stageId, setStageId] = useState(stages[0]?.id || '');
   const [date, setDate] = useState('2025-11-15');
   const [timeSlot, setTimeSlot] = useState('09:30 AM - 11:00 AM');
@@ -49,6 +51,8 @@ export default function CompetitionsPage() {
     setCode('CMP-' + (competitions.length + 1).toString().padStart(2, '0'));
     setCategoryId(categories[0]?.id || '');
     setType('SOLO');
+    setPerformanceMode('STAGE');
+    setGroupSize(2);
     setStageId(stages[0]?.id || '');
     setDate('2025-11-15');
     setTimeSlot('10:00 AM - 11:30 AM');
@@ -65,6 +69,8 @@ export default function CompetitionsPage() {
     setCode(comp.code);
     setCategoryId(comp.categoryId);
     setType(comp.type);
+    setPerformanceMode(comp.performanceMode || '');
+    setGroupSize(comp.groupSize || 2);
     setStageId(comp.stageId);
     setDate(comp.date);
     setTimeSlot(comp.timeSlot);
@@ -91,6 +97,14 @@ export default function CompetitionsPage() {
       setError('Please select a valid category. You must create at least one category before adding competitions.');
       return;
     }
+    if (!performanceMode) {
+      setError('Select Stage or Off Stage before saving the competition.');
+      return;
+    }
+    if (type === 'GROUP' && (!Number.isInteger(groupSize) || groupSize < 2)) {
+      setError('Group members per entry must be at least 2.');
+      return;
+    }
     const stage = stages.find(s => s.id === stageId);
 
     const compData = {
@@ -99,6 +113,8 @@ export default function CompetitionsPage() {
       categoryId: category.id,
       categoryName: category.name,
       type,
+      performanceMode,
+      groupSize: type === 'GROUP' ? groupSize : 1,
       stageId,
       stageName: stage?.name || 'Main Auditorium',
       date,
@@ -246,6 +262,8 @@ export default function CompetitionsPage() {
                   <th className="py-3 px-6">Code &amp; Title</th>
                   <th className="py-3 px-6">Category</th>
                   <th className="py-3 px-6 text-center">Type</th>
+                  <th className="py-3 px-6 text-center">Performance</th>
+                  <th className="py-3 px-6 text-center">Group Size</th>
                   <th className="py-3 px-6 text-center">Entries</th>
                   <th className="py-3 px-6">Stage Assignment</th>
                   <th className="py-3 px-6">Assigned Judges</th>
@@ -256,7 +274,7 @@ export default function CompetitionsPage() {
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filteredCompetitions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-xs text-[#526070]">
+                    <td colSpan={10} className="py-12 text-center text-xs text-[#526070]">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <Trophy className="w-8 h-8 text-[#94A3B8]" />
                         <p className="font-semibold text-sm text-[#111111]">
@@ -289,6 +307,8 @@ export default function CompetitionsPage() {
                           {comp.type}
                         </span>
                       </td>
+                      <td className="py-4 px-6 text-center font-semibold text-[#526070]">{comp.performanceMode === 'STAGE' ? 'Stage' : comp.performanceMode === 'OFF_STAGE' ? 'Off Stage' : 'Unclassified'}</td>
+                      <td className="py-4 px-6 text-center font-semibold text-[#111111]">{comp.type === 'GROUP' ? (comp.groupSize || 'Not set') : '—'}</td>
                       <td className="py-4 px-6 text-center font-bold text-[#111111]">
                         {comp.entriesCount}
                       </td>
@@ -394,19 +414,30 @@ export default function CompetitionsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <Select
+                label="Performance Mode"
+                value={performanceMode}
+                onChange={(e) => setPerformanceMode(e.target.value as CompetitionPerformanceMode)}
+                options={[{ value: '', label: 'Select classification' }, { value: 'STAGE', label: 'Stage' }, { value: 'OFF_STAGE', label: 'Off Stage' }]}
+              />
+              {type === 'GROUP' && (
+                <Input label="Members Per Group" type="number" min={2} value={groupSize} onChange={(e) => setGroupSize(Number(e.target.value))} />
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Select
                 label="Assigned Stage Venue"
                 value={stageId}
                 onChange={(e) => setStageId(e.target.value)}
                 options={stages.map(s => ({ value: s.id, label: s.name }))}
               />
-              <Input
+              {type === 'SOLO' ? <Input
                 label="Max Registrations / Team"
                 type="number"
                 min={1}
                 max={5}
                 value={maxEntriesPerTeam}
                 onChange={(e) => setMaxEntriesPerTeam(Number(e.target.value))}
-              />
+              /> : <p className="self-center text-xs text-[#526070]">Unlimited groups per team. Register each group using its leader.</p>}
             </div>
 
             <div className="grid grid-cols-3 gap-3">
