@@ -174,4 +174,33 @@ describe('Result Publication Logic & Championship Points Ledger', () => {
     expect(abh.totalPoints).toBe(0);
     expect(abh.firstCount).toBe(0);
   });
+  it('Multiple groups from one team earn separate TEAM points, without individual attribution', () => {
+    const competition = { id: 'comp-group', code: 'CMP-Q', name: 'Quiz', type: 'GROUP' as const };
+    const groups: CompetitionRankInput[] = [
+      {
+        registrationId: 'reg-rafiq',
+        bib: 'GRP-A',
+        candidateName: 'Rafiq & Team',
+        teamId: 'team-1', teamCode: 'ABH', teamName: 'Al-Bayan House',
+        score: 95, rank: 1, grade: 'A+'
+      },
+      {
+        registrationId: 'reg-gafur',
+        bib: 'GRP-B',
+        candidateName: 'Gafur & Team',
+        teamId: 'team-1', teamCode: 'ABH', teamName: 'Al-Bayan House',
+        score: 85, rank: 2, grade: 'A'
+      }
+    ];
+    const published = commitResultToLedger('res-group', competition, groups, []);
+    expect(published).toHaveLength(2);
+    expect(published.every(entry => entry.competitionType === 'GROUP' && entry.teamId === 'team-1')).toBe(true);
+    expect(recalculateTeamChampionship(baseTeams, published).find(team => team.teamId === 'team-1'))
+      .toMatchObject({ totalPoints: 41, groupPoints: 41, soloPoints: 0 });
+    const reversed = reverseResultInLedger('res-group', published);
+    expect(recalculateTeamChampionship(baseTeams, reversed).find(team => team.teamId === 'team-1')?.totalPoints).toBe(0);
+    const republished = commitResultToLedger('res-group', competition, groups, reversed);
+    expect(recalculateTeamChampionship(baseTeams, republished).find(team => team.teamId === 'team-1')?.totalPoints).toBe(41);
+  });
+
 });
