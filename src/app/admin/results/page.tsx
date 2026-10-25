@@ -380,7 +380,7 @@ export default function ResultManagementPage() {
                         <th className="py-2.5 px-4">House</th>
                         <th className="py-2.5 px-4 text-center">Score</th>
                         <th className="py-2.5 px-4 text-center">Grade</th>
-                        <th className="py-2.5 px-4 text-right">Official Points</th>
+                        <th className="py-2.5 px-4 text-right">Team Points</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E1E7EF]">
@@ -407,6 +407,7 @@ export default function ResultManagementPage() {
                           </td>
                           <td className="py-3 px-4 text-right font-extrabold text-emerald-600 text-sm">
                             +{rk.officialPoints ?? rk.totalEarnedPoints} pts
+                            {selectedResult.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
                           </td>
                         </tr>
                       ))}
