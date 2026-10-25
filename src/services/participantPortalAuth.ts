@@ -12,7 +12,8 @@ const COOKIE_NAME = 'inspirath_participant_session';
 const SESSION_SECONDS = 60 * 60;
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS_ID = 5;
-const MAX_ATTEMPTS_IP = 25;
+// A whole campus may share one outbound IP; account-level limit remains strict.
+const MAX_ATTEMPTS_IP = 400;
 
 function getSecret(): string {
   const secret = process.env.PARTICIPANT_SESSION_SECRET || '';
@@ -101,7 +102,8 @@ async function consumeAttempt(participantId: string, request: NextRequest) {
     const snapshots = await Promise.all(refs.map(item => txn.get(item.ref)));
     const now = Date.now();
     const previous = snapshots.map(snap => snap.data());
-    if (previous.some((data, i) => data && data.windowStart + WINDOW_MS > now && data.count >= refs[i].limit)) {
+    if (previous.some((data, i) => data && typeof data.windowStart === 'number' &&
+        data.windowStart + WINDOW_MS > now && Number(data.count || 0) >= refs[i].limit)) {
       return false;
     }
     refs.forEach((item, i) => {
