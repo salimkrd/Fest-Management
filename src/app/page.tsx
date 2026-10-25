@@ -6,6 +6,7 @@ import { useFest } from '@/context/FestContext';
 import {
   ShieldAlert,
   Users2,
+  IdCard,
   Gavel,
   Sparkles,
   ArrowRight,
@@ -74,7 +75,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 4 Portals Grid */}
+        {/* Festival Portals Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* 1. Admin Portal */}
           <Link
@@ -180,6 +181,34 @@ export default function HomePage() {
             </div>
             <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-amber-700">
               <span>View Public Portal</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* 5. Participant Portal */}
+          <Link
+            href="/participant/login"
+            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-[#2563EB] hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-[#2563EB] group-hover:scale-105 transition-transform flex items-center justify-center">
+                  <IdCard className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                  Personal Access
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-[#2563EB] transition-colors">
+                Participant Portal
+              </h3>
+              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
+                Sign in with your official Participant ID and Date of Birth to view your competitions, published results,
+                individual points, and digitally verified participant ID card.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-[#2563EB]">
+              <span>Participant Login</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
