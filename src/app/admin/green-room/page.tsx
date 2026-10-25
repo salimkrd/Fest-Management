@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { db, auth } from '@/lib/firebase/client';
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { GreenRoomScanner } from '@/components/domain/GreenRoomScanner';
 import { GreenRoomCodeSlip } from '@/components/domain/GreenRoomCodeSlip';
@@ -36,6 +37,7 @@ export default function GreenRoomPage() {
   const [selectedCompId, setSelectedCompId] = useState<string>('');
   const [roster, setRoster] = useState<FirestoreGreenRoomAssignment[]>([]);
   const [loadingRoster, setLoadingRoster] = useState<boolean>(false);
+  const [canProvisionStaff, setCanProvisionStaff] = useState(false);
 
   // Manual search state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -61,9 +63,33 @@ export default function GreenRoomPage() {
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  // Select default competition once loaded
+  // Restrict staff provisioning UI to Chief Administrator. The API separately
+  // enforces this permission using authoritative Firestore role validation.
   useEffect(() => {
-    if (!selectedCompId && competitions.length > 0) {
+    if (!auth) return;
+    let active = true;
+    const unsubscribe = onAuthStateChanged(auth, async user => {
+      if (!user) {
+        if (active) setCanProvisionStaff(false);
+        return;
+      }
+      try {
+        const token = await user.getIdTokenResult();
+        if (active) setCanProvisionStaff(token.claims.role === 'ADMIN');
+      } catch {
+        if (active) setCanProvisionStaff(false);
+      }
+    });
+    return () => { active = false; unsubscribe(); };
+  }, []);
+
+  // Keep the selected competition valid after live Firestore updates/deletions.
+  useEffect(() => {
+    if (!competitions.length) {
+      if (selectedCompId) setSelectedCompId('');
+      return;
+    }
+    if (!competitions.some(comp => comp.id === selectedCompId)) {
       setSelectedCompId(competitions[0].id);
     }
   }, [competitions, selectedCompId]);
@@ -75,7 +101,7 @@ export default function GreenRoomPage() {
   // Approved registrations for current competition
   const currentCompRegistrations = useMemo(() => {
     if (!selectedCompetition) return [];
-    return registrations.filter(r => r.competitionId === selectedCompetition.id);
+    return registrations.filter(r => r.competitionId === selectedCompetition.id && r.status === 'APPROVED');
   }, [registrations, selectedCompetition]);
 
   // Realtime subscription to greenRoomAssignments for selected competition
@@ -83,6 +109,7 @@ export default function GreenRoomPage() {
     if (!selectedCompId || !db) return;
 
     setLoadingRoster(true);
+    setRoster([]);
     const q = query(
       collection(db, 'greenRoomAssignments'),
       where('competitionId', '==', selectedCompId)
@@ -98,7 +125,9 @@ export default function GreenRoomPage() {
       },
       (error) => {
         console.warn('[GreenRoomPage] onSnapshot error:', error);
+        setRoster([]);
         setLoadingRoster(false);
+        setFeedbackMessage({ type: 'error', text: `Could not load the Green Room lineup: ${error.message}` });
       }
     );
 
@@ -335,15 +364,17 @@ export default function GreenRoomPage() {
               </select>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => setProvisionStaffModalOpen(true)}
-              title="Provision Green Room Staff Account"
-            >
-              Add Staff
-            </Button>
+            {canProvisionStaff && (
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+                onClick={() => setProvisionStaffModalOpen(true)}
+                title="Provision Green Room Staff Account"
+              >
+                Add Staff
+              </Button>
+            )}
           </div>
         </div>
 
@@ -367,7 +398,7 @@ export default function GreenRoomPage() {
                 {selectedCompetition.status}
               </span>
               <span className="px-2.5 py-1 rounded-full bg-white/10 text-blue-100 font-medium">
-                Max {selectedCompetition.maxEntriesPerTeam} entries / team
+                {selectedCompetition.type === 'GROUP' ? 'Group entries / team: Unlimited' : `Max ${selectedCompetition.maxEntriesPerTeam} entries / team`}
               </span>
             </div>
           </div>
@@ -523,6 +554,12 @@ export default function GreenRoomPage() {
                     </Button>
                   </div>
                 </div>
+
+                {searchQuery.trim() && searchResults.length === 0 && (
+                  <p className="text-xs text-amber-700" role="status">
+                    No approved registrations match this competition. Verify competition selection, registration status and participant code.
+                  </p>
+                )}
 
                 <p className="text-[11px] text-[#526070]">
                   Leave manual code empty to automatically allocate the next available sequential letter (A, B, C... AA, AB...).

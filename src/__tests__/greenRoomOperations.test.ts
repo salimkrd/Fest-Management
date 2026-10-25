@@ -18,6 +18,7 @@ import { initializeApp, getApps, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp as initClientApp, deleteApp as deleteClientApp, FirebaseApp } from 'firebase/app';
+import { getFirestore as getClientFirestore, connectFirestoreEmulator, getDocs, collection as clientCollection, query as clientQuery, where as clientWhere } from 'firebase/firestore';
 import {
   getAuth as getClientAuth,
   connectAuthEmulator,
@@ -48,6 +49,7 @@ import { NextRequest } from 'next/server';
 describe('Green Room Management & Anonymous Judging Workflow', () => {
   let adminIdToken = '';
   let staffIdToken = '';
+  let staffAccountEmail = '';
   let team1ManagerToken = '';
   let team2ManagerToken = '';
   let clientApp: FirebaseApp;
@@ -427,6 +429,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
   describe('2. GREEN_ROOM_STAFF Role Provisioning, Sync & RBAC', () => {
     it('allows Chief Admin to provision a new Green Room Staff account', async () => {
       const staffEmail = `greenroom.staff.${Date.now()}@sahithyolsav.com`;
+      staffAccountEmail = staffEmail;
       const result = await AuthService.provisionGreenRoomStaff(adminIdToken, {
         email: staffEmail,
         password: 'StaffPassword123!',
@@ -453,6 +456,24 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       const session = await AuthService.verifySession(staffIdToken);
       expect(session.role).toBe('GREEN_ROOM_STAFF');
       await expect(AuthService.assertAdminOrGreenRoom(staffIdToken)).resolves.toBeDefined();
+    });
+
+    it('allows Staff to read approved registration lookup data without exposing judge assignments', async () => {
+      // Regression: previously FestContext subscribed to registrations only for ADMIN
+      // and TEAM_MANAGER; Staff login therefore received an empty Green Room lookup.
+      const staffSession = await signInWithEmailAndPassword(clientAuth, staffAccountEmail, 'StaffPassword123!');
+      try {
+        expect((await staffSession.user.getIdTokenResult()).claims.role).toBe('GREEN_ROOM_STAFF');
+        const clientDb = getClientFirestore(clientApp);
+        connectFirestoreEmulator(clientDb, '127.0.0.1', 8080);
+        const approved = await getDocs(clientQuery(clientCollection(clientDb, 'registrations'), clientWhere('status', '==', 'APPROVED')));
+        expect(approved.docs.some(d => d.id === 'reg-gr-solo-01')).toBe(true);
+        expect(approved.docs.some(d => d.id === 'reg-gr-solo-02')).toBe(true);
+        expect(approved.docs.some(d => d.id === 'reg-gr-solo-unapproved')).toBe(false);
+        await expect(getDocs(clientCollection(clientDb, 'judgeAssignments'))).rejects.toMatchObject({ code: 'permission-denied' });
+      } finally {
+        await signOut(clientAuth);
+      }
     });
 
     it('rejects provisioning when email already belongs to an existing account (Conflict Error)', async () => {
