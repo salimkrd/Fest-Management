@@ -17,6 +17,7 @@ export default function CompetitionsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [performanceFilter, setPerformanceFilter] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,7 +43,8 @@ export default function CompetitionsPage() {
                           comp.code.toLowerCase().includes(search.toLowerCase());
     const matchesCat = categoryFilter === 'ALL' || comp.categoryId === categoryFilter;
     const matchesType = typeFilter === 'ALL' || comp.type === typeFilter;
-    return matchesSearch && matchesCat && matchesType;
+    const matchesPerformance = performanceFilter === 'ALL' || (performanceFilter === 'UNCLASSIFIED' ? !comp.performanceMode : comp.performanceMode === performanceFilter);
+    return matchesSearch && matchesCat && matchesType && matchesPerformance;
   });
 
   const handleOpenAdd = () => {
@@ -244,6 +246,17 @@ export default function CompetitionsPage() {
               <option value="ALL">All Types</option>
               <option value="SOLO">Solo Contests</option>
               <option value="GROUP">Group Contests</option>
+            </select>
+            <select
+              aria-label="Filter by Performance Mode"
+              value={performanceFilter}
+              onChange={(e) => setPerformanceFilter(e.target.value)}
+              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+            >
+              <option value="ALL">All Performance Modes</option>
+              <option value="STAGE">Stage</option>
+              <option value="OFF_STAGE">Off Stage</option>
+              <option value="UNCLASSIFIED">Unclassified</option>
             </select>
           </div>
         </div>
