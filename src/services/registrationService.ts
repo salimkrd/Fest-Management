@@ -9,7 +9,8 @@ interface CreateRegistrationInput {
   competitionId: string;
   participantId?: string;
   participantName?: string;
-  groupMembers?: string[];
+  groupMembers?: string[]; // Read-only legacy compatibility
+  groupLeaderId?: string;
 }
 
 export class RegistrationService {
@@ -55,15 +56,18 @@ export class RegistrationService {
       const category = { id: categorySnapshot.id, ...categorySnapshot.data() } as Category;
 
       const isGroup = competition.type === 'GROUP';
-      const groupMemberIds = Array.isArray(input.groupMembers) ? [...new Set(input.groupMembers)] : [];
-      if (isGroup && groupMemberIds.length < 2) {
-        throw new Error('Validation Error: Group registrations require at least two eligible team members.');
+      const groupLeaderId = isGroup ? input.groupLeaderId : undefined;
+      if (isGroup && (!Number.isInteger(competition.groupSize) || competition.groupSize < 2)) {
+        throw new Error('Validation Error: Set a valid Members Per Group value (minimum 2) in the competition first.');
+      }
+      if (isGroup && !groupLeaderId) {
+        throw new Error('Validation Error: Select a registered team member as the group leader.');
       }
       if (!isGroup && !input.participantId) {
         throw new Error('Validation Error: A participant is required for an individual competition.');
       }
 
-      const participantIds = isGroup ? groupMemberIds : [input.participantId!];
+      const participantIds = [isGroup ? groupLeaderId! : input.participantId!];
       const participantSnapshots = await Promise.all(
         participantIds.map(id => transaction.get(db.collection('participants').doc(id)))
       );
@@ -83,16 +87,17 @@ export class RegistrationService {
 
       const currentTeamEntries = existingRegistrations.docs.filter(doc => doc.data().teamId === teamId);
       const maximumEntries = Number(competition.maxEntriesPerTeam) || 1;
-      if (currentTeamEntries.length >= maximumEntries) {
+      if (!isGroup && currentTeamEntries.length >= maximumEntries) {
         throw new Error(`Validation Error: Team has reached the ${maximumEntries}-entry limit for this competition.`);
       }
       if (!isGroup && currentTeamEntries.some(doc => doc.data().participantId === input.participantId)) {
         throw new Error('Validation Error: This participant is already registered for the competition.');
       }
       if (isGroup && currentTeamEntries.some(doc =>
-        groupMemberIds.some(id => (doc.data().groupMembers || []).includes(id))
+        doc.data().groupLeaderId === groupLeaderId ||
+        (Array.isArray(doc.data().groupMembers) && doc.data().groupMembers.includes(groupLeaderId))
       )) {
-        throw new Error('Validation Error: A selected participant is already registered in a group for this competition.');
+        throw new Error('Validation Error: This leader is already registered for a group in this competition.');
       }
 
       let lastCodeNumber = Number(counterSnapshot.data()?.value);
@@ -109,7 +114,7 @@ export class RegistrationService {
         id: registrationId,
         code: `REG-${lastCodeNumber + 1}`,
         participantId: isGroup ? undefined : participant.id,
-        participantName: isGroup ? input.participantName?.trim() || '' : participant.name,
+        participantName: isGroup ? `${participant.name} & Team` : participant.name,
         teamId,
         teamCode: team.code || '',
         teamName: team.name || '',
@@ -119,16 +124,13 @@ export class RegistrationService {
         competitionName: competition.name || '',
         type: isGroup ? 'GROUP' : 'SOLO',
         chestNumber: isGroup
-          ? `GRP-${team.code || teamId}-${competition.code || input.competitionId}`
+          ? `GRP-${team.code || teamId}-${registrationId.slice(-6)}`
           : participant.bib,
         status: 'APPROVED',
-        groupMembers: isGroup ? groupMemberIds : undefined,
+        groupLeaderId: isGroup ? groupLeaderId : undefined,
+        groupMembers: isGroup ? [groupLeaderId!] : undefined,
         registeredAt: new Date().toISOString()
       };
-      if (isGroup && !registration.participantName) {
-        throw new Error('Validation Error: A group name is required.');
-      }
-
       const now = new Date().toISOString();
       transaction.set(counterRef, { value: lastCodeNumber + 1, updatedAt: now }, { merge: true });
       transaction.create(registrationRef, registration);
