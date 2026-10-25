@@ -120,6 +120,7 @@ export interface Registration {
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
   groupMembers?: string[]; // Legacy full-roster groups remain readable
   groupLeaderId?: string; // Member representing a group, no individual credit
+  groupSize?: number; // Declared member count at registration time
   registeredAt: string;
 }
 
