@@ -78,13 +78,11 @@ export function calculateTopScorers(
     averagePercentage: Math.round((row.totalMarks / row.competitionsCount) * 100) / 100
   })).sort((a, b) => b.totalMarks - a.totalMarks || a.name.localeCompare(b.name));
 
-  return ordered.map((row, index) => ({
-    ...row,
-    position: index === 0 ? 1 :
-      (row.totalMarks === ordered[index - 1].totalMarks
-        ? 0 : index + 1)
-  })).map((row, index, ranked) => ({
-    ...row,
-    position: row.position || ranked[index - 1].position
-  }));
+  let position = 1;
+  return ordered.map((row, index) => {
+    if (index > 0 && row.totalMarks !== ordered[index - 1].totalMarks) {
+      position = index + 1;
+    }
+    return { ...row, position };
+  });
 }
