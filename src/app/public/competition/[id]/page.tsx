@@ -171,7 +171,7 @@ function CompetitionDetailContent() {
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-emerald-600 block">Grade {rank1.grade}</span>
-                  <span className="text-xs font-extrabold text-amber-700">+{rank1.totalEarnedPoints} pts</span>
+                  <span className="text-xs font-extrabold text-amber-700">+{rank1.totalEarnedPoints} pts{result.type === 'GROUP' ? ' (Team only)' : ''}</span>
                 </div>
               </div>
             </div>
@@ -207,7 +207,7 @@ function CompetitionDetailContent() {
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-emerald-600 block">Grade {rank2.grade}</span>
-                  <span className="text-xs font-extrabold text-[#2563EB]">+{rank2.totalEarnedPoints} pts</span>
+                  <span className="text-xs font-extrabold text-[#2563EB]">+{rank2.totalEarnedPoints} pts{result.type === 'GROUP' ? ' (Team only)' : ''}</span>
                 </div>
               </div>
             </div>
@@ -243,7 +243,7 @@ function CompetitionDetailContent() {
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-emerald-600 block">Grade {rank3.grade}</span>
-                  <span className="text-xs font-extrabold text-[#2563EB]">+{rank3.totalEarnedPoints} pts</span>
+                  <span className="text-xs font-extrabold text-[#2563EB]">+{rank3.totalEarnedPoints} pts{result.type === 'GROUP' ? ' (Team only)' : ''}</span>
                 </div>
               </div>
             </div>
