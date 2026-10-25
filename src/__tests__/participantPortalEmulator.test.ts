@@ -465,6 +465,61 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
       const res6 = await loginRoute(req6);
       expect(res6.status).toBe(429);
     });
+
+    it('enforces concurrency-safe rate-limiting when multiple incorrect attempts hit simultaneously', async () => {
+      const dedicatedIp = '10.99.88.80';
+      const targetBib = '7788';
+      await clearRateLimits('#7788', dedicatedIp);
+
+      // Launch 10 concurrent requests with wrong DOBs simultaneously
+      const concurrentRequests = Array.from({ length: 10 }, (_, i) =>
+        createPostRequest(
+          'http://localhost:3000/api/participant/login',
+          { bib: targetBib, dob: `2000-01-0${(i % 9) + 1}` },
+          dedicatedIp
+        )
+      );
+
+      const responses = await Promise.all(concurrentRequests.map(req => loginRoute(req)));
+      const statuses = responses.map(res => res.status);
+
+      const rejected401 = statuses.filter(s => s === 401).length;
+      const rateLimited429 = statuses.filter(s => s === 429).length;
+
+      // Exactly 5 attempts are allowed before lockout; all remaining concurrent requests are blocked (429)
+      expect(rejected401).toBe(5);
+      expect(rateLimited429).toBe(5);
+
+      // Subsequent 11th request must also be blocked
+      const req11 = createPostRequest(
+        'http://localhost:3000/api/participant/login',
+        { bib: targetBib, dob: '2008-04-12' },
+        dedicatedIp
+      );
+      const res11 = await loginRoute(req11);
+      expect(res11.status).toBe(429);
+    });
+
+    it('permits concurrent legitimate logins from the same participant without false-positive lockouts', async () => {
+      const dedicatedIp = '10.99.88.81';
+      await clearRateLimits('#1042', dedicatedIp);
+
+      // Send 4 simultaneous legitimate logins
+      const validRequests = Array.from({ length: 4 }, () =>
+        createPostRequest(
+          'http://localhost:3000/api/participant/login',
+          { bib: '1042', dob: '2008-04-12' },
+          dedicatedIp
+        )
+      );
+
+      const responses = await Promise.all(validRequests.map(req => loginRoute(req)));
+      for (const res of responses) {
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.success).toBe(true);
+      }
+    });
   });
 
   describe('4. Session Tampering & Invalidation Protections', () => {

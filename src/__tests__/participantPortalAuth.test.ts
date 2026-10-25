@@ -44,14 +44,17 @@ const fakeDatabase = {
   },
   async runTransaction<T>(callback: (transaction: {
     get: (ref: { get: () => Promise<unknown> }) => Promise<unknown>;
-    set: (ref: { key: string }, data: Record<string, unknown>) => void
+    set: (ref: { key: string }, data: Record<string, unknown>, options?: { merge?: boolean }) => void
   }) => Promise<T>) {
-    const pending: Array<{ key: string; data: Record<string, unknown> }> = [];
+    const pending: Array<{ key: string; data: Record<string, unknown>; options?: { merge?: boolean } }> = [];
     const output = await callback({
       get: ref => ref.get(),
-      set: (ref, data) => { pending.push({ key: ref.key, data }); }
+      set: (ref, data, options) => { pending.push({ key: ref.key, data, options }); }
     });
-    pending.forEach(change => documents.set(change.key, change.data));
+    pending.forEach(change => {
+      const current = change.options?.merge ? (documents.get(change.key) || {}) : {};
+      documents.set(change.key, { ...current, ...change.data });
+    });
     return output;
   }
 };
