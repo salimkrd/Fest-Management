@@ -13,7 +13,8 @@ import {
   resetAdminApp,
   ALLOWED_WIF_BRANCH,
   STAGING_PROJECT_ID,
-  PRODUCTION_PROJECT_ID
+  PRODUCTION_PROJECT_ID,
+  VERCEL_PROJECT_ID
 } from '@/lib/firebase/admin';
 
 describe('Workload Identity Federation for Firebase Admin', () => {
@@ -36,10 +37,12 @@ describe('Workload Identity Federation for Firebase Admin', () => {
     delete process.env.GCP_WORKLOAD_IDENTITY_STS_URL;
     delete process.env.GCP_WORKLOAD_IDENTITY_TOKEN;
     delete process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH;
+    delete process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID;
     delete process.env.VERCEL_OIDC_TOKEN;
     delete process.env.VERCEL_OIDC_TOKEN_FILE;
     delete process.env.VERCEL_ENV;
     delete process.env.VERCEL_GIT_COMMIT_REF;
+    delete process.env.VERCEL_PROJECT_ID;
     delete process.env.ALLOW_STAGING_WIF_TEST;
   });
 
@@ -57,32 +60,40 @@ describe('Workload Identity Federation for Firebase Admin', () => {
   });
 
   describe('resolveOidcSubjectToken', () => {
-    it('returns null when no OIDC token environment variables exist', () => {
-      expect(resolveOidcSubjectToken()).toBeNull();
+    it('returns null when no OIDC token environment variables or request headers exist', async () => {
+      const token = await resolveOidcSubjectToken();
+      expect(token).toBeNull();
     });
 
-    it('prioritizes explicit GCP_WORKLOAD_IDENTITY_TOKEN over others', () => {
+    it('prioritizes explicit GCP_WORKLOAD_IDENTITY_TOKEN override over others', async () => {
       process.env.GCP_WORKLOAD_IDENTITY_TOKEN = 'token-from-gcp-wif-override';
       process.env.VERCEL_OIDC_TOKEN = 'token-from-vercel-oidc';
-      expect(resolveOidcSubjectToken()).toBe('token-from-gcp-wif-override');
+      const token = await resolveOidcSubjectToken();
+      expect(token).toBe('token-from-gcp-wif-override');
     });
 
-    it('resolves standard VERCEL_OIDC_TOKEN when override is not set', () => {
-      process.env.VERCEL_OIDC_TOKEN = 'token-from-vercel-oidc';
-      expect(resolveOidcSubjectToken()).toBe('token-from-vercel-oidc');
+    it('resolves standard VERCEL_OIDC_TOKEN when override is not set', async () => {
+      const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
+      const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url');
+      process.env.VERCEL_OIDC_TOKEN = `${header}.${payload}.signature`;
+
+      const token = await resolveOidcSubjectToken();
+      expect(token).toBe(`${header}.${payload}.signature`);
     });
 
-    it('resolves token from VERCEL_OIDC_TOKEN_FILE path', () => {
+    it('resolves token from VERCEL_OIDC_TOKEN_FILE path', async () => {
       tempTokenFile = path.join(os.tmpdir(), `vercel-test-token-${Date.now()}.jwt`);
       fs.writeFileSync(tempTokenFile, 'token-from-file-content\n', 'utf8');
       process.env.VERCEL_OIDC_TOKEN_FILE = tempTokenFile;
 
-      expect(resolveOidcSubjectToken()).toBe('token-from-file-content');
+      const token = await resolveOidcSubjectToken();
+      expect(token).toBe('token-from-file-content');
     });
 
-    it('returns null gracefully if VERCEL_OIDC_TOKEN_FILE does not exist', () => {
+    it('returns null gracefully if VERCEL_OIDC_TOKEN_FILE does not exist', async () => {
       process.env.VERCEL_OIDC_TOKEN_FILE = path.join(os.tmpdir(), 'non-existent-token-file.jwt');
-      expect(resolveOidcSubjectToken()).toBeNull();
+      const token = await resolveOidcSubjectToken();
+      expect(token).toBeNull();
     });
   });
 
@@ -130,9 +141,19 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       }).toThrow(/FAIL-CLOSED SAFETY.*restricted to branch "feature\/participant-id-dob-portal"/);
     });
 
-    it('permits Vercel preview when branch matches the authorized Participant Portal branch', () => {
+    it('throws fail-closed error in Vercel preview if VERCEL_PROJECT_ID does not match prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y', () => {
       process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
+      process.env.VERCEL_PROJECT_ID = 'prj_unauthorized_other_project';
+      expect(() => {
+        validateWorkloadIdentityScope(STAGING_PROJECT_ID);
+      }).toThrow(/FAIL-CLOSED SAFETY.*restricted to Vercel Project ID "prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y"/);
+    });
+
+    it('permits Vercel preview when branch and project ID match', () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
+      process.env.VERCEL_PROJECT_ID = VERCEL_PROJECT_ID;
       expect(() => {
         validateWorkloadIdentityScope(STAGING_PROJECT_ID);
       }).not.toThrow();

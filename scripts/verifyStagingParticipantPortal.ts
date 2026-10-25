@@ -108,6 +108,25 @@ async function runStagingVerification() {
     );
   }
 
+  // 4. Verify Fail-Closed Rejection against Unauthorized Vercel Project ID
+  try {
+    process.env.VERCEL_PROJECT_ID = 'prj_unauthorized_attacker_project';
+    validateWorkloadIdentityScope(targetProjectId);
+    record(
+      'Fail-Closed Vercel Project ID Scoping',
+      false,
+      'FAILED: validateWorkloadIdentityScope did not reject unauthorized Vercel Project ID!'
+    );
+  } catch (err) {
+    record(
+      'Fail-Closed Vercel Project ID Scoping',
+      true,
+      'Successfully rejected unauthorized Vercel Project ID with [FAIL-CLOSED SAFETY] error.'
+    );
+  } finally {
+    delete process.env.VERCEL_PROJECT_ID;
+  }
+
   // 4. Verify Workload Identity Configuration & App Connection
   const wifActive = isWorkloadIdentityConfigured();
   console.log(`[Auth Configuration] Workload Identity Federation Active: ${wifActive}`);

@@ -18,6 +18,7 @@ import fs from 'fs';
 export const ALLOWED_WIF_BRANCH = 'feature/participant-id-dob-portal';
 export const STAGING_PROJECT_ID = 'inspirath-staging';
 export const PRODUCTION_PROJECT_ID = 'inspirath-d6778';
+export const VERCEL_PROJECT_ID = 'prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y';
 
 let adminApp: App | null = null;
 
@@ -52,20 +53,37 @@ export class WorkloadIdentityCredential implements Credential {
 
 /**
  * Resolves the Vercel OIDC JWT token used as the subject token for GCP STS exchange.
- * Checks GCP_WORKLOAD_IDENTITY_TOKEN, VERCEL_OIDC_TOKEN, and VERCEL_OIDC_TOKEN_FILE.
+ * 1. Checks explicit GCP_WORKLOAD_IDENTITY_TOKEN override (for tests/scripts).
+ * 2. Uses official @vercel/oidc integration to obtain token from request context (x-vercel-oidc-token)
+ *    or rotating token file, with proper token refresh behavior.
+ * 3. Falls back to VERCEL_OIDC_TOKEN or VERCEL_OIDC_TOKEN_FILE if outside Vercel request context.
  */
-export function resolveOidcSubjectToken(): string | null {
+export async function resolveOidcSubjectToken(): Promise<string | null> {
   // 1. Explicit override token (useful for manual scripting, CI testing, or offline emulation)
   if (process.env.GCP_WORKLOAD_IDENTITY_TOKEN?.trim()) {
     return process.env.GCP_WORKLOAD_IDENTITY_TOKEN.trim();
   }
 
-  // 2. Vercel standard OIDC token environment variable
+  // 2. Official @vercel/oidc integration: retrieves token from request context (x-vercel-oidc-token),
+  // rotating token file, and handles token refresh dynamically
+  try {
+    const { getVercelOidcToken } = await import('@vercel/oidc');
+    const token = await getVercelOidcToken({
+      expirationBufferMs: 5 * 60 * 1000 // refresh if expiring within 5 minutes
+    });
+    if (token?.trim()) {
+      return token.trim();
+    }
+  } catch {
+    // In local tests or fallback environments where Vercel request context is not present, fall through
+  }
+
+  // 3. Fallback: Vercel standard OIDC token environment variable
   if (process.env.VERCEL_OIDC_TOKEN?.trim()) {
     return process.env.VERCEL_OIDC_TOKEN.trim();
   }
 
-  // 3. Vercel OIDC token file path
+  // 4. Fallback: Vercel OIDC token file path
   if (process.env.VERCEL_OIDC_TOKEN_FILE?.trim()) {
     try {
       const filePath = process.env.VERCEL_OIDC_TOKEN_FILE.trim();
@@ -98,6 +116,7 @@ export function isWorkloadIdentityConfigured(): boolean {
  * 1. Prohibits WIF from ever connecting to the production project (inspirath-d6778).
  * 2. Prohibits WIF from being activated in Vercel production deployment.
  * 3. In Vercel preview environments, restricts access strictly to the Participant Portal branch.
+ * 4. Validates that the Vercel project ID matches prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y.
  */
 export function validateWorkloadIdentityScope(targetProjectId: string): void {
   // 1. Fail-closed: Never allow Workload Identity to connect to production
@@ -126,6 +145,17 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
       `but current branch is "${currentBranch}". Access to staging credentials denied.`
     );
   }
+
+  // 4. Fail-closed: Restrict federated access to the authorized Vercel Project ID
+  const expectedProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim() || VERCEL_PROJECT_ID;
+  const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
+
+  if (currentVercelProjectId && currentVercelProjectId !== expectedProjectId) {
+    throw new Error(
+      `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to Vercel Project ID "${expectedProjectId}", ` +
+      `but current environment VERCEL_PROJECT_ID is "${currentVercelProjectId}". Access denied.`
+    );
+  }
 }
 
 /**
@@ -145,11 +175,11 @@ export function buildWorkloadIdentityClient(targetProjectId: string): IdentityPo
     if (!parsed.subject_token_supplier && (!parsed.credential_source || !parsed.credential_source.file)) {
       parsed.subject_token_supplier = {
         getSubjectToken: async () => {
-          const token = resolveOidcSubjectToken();
+          const token = await resolveOidcSubjectToken();
           if (!token) {
             throw new Error(
               '[Firebase Admin Workload Identity] OIDC subject token not found. ' +
-              'Provide VERCEL_OIDC_TOKEN, VERCEL_OIDC_TOKEN_FILE, or GCP_WORKLOAD_IDENTITY_TOKEN.'
+              'Ensure @vercel/oidc is configured, or VERCEL_OIDC_TOKEN / GCP_WORKLOAD_IDENTITY_TOKEN is present in the environment.'
             );
           }
           return token;
@@ -178,11 +208,11 @@ export function buildWorkloadIdentityClient(targetProjectId: string): IdentityPo
     service_account_impersonation_url: impersonationUrl,
     subject_token_supplier: {
       getSubjectToken: async () => {
-        const token = resolveOidcSubjectToken();
+        const token = await resolveOidcSubjectToken();
         if (!token) {
           throw new Error(
             '[Firebase Admin Workload Identity] OIDC subject token not found. ' +
-            'Provide VERCEL_OIDC_TOKEN, VERCEL_OIDC_TOKEN_FILE, or GCP_WORKLOAD_IDENTITY_TOKEN.'
+            'Ensure @vercel/oidc is configured, or VERCEL_OIDC_TOKEN / GCP_WORKLOAD_IDENTITY_TOKEN is present in the environment.'
           );
         }
         return token;

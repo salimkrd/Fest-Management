@@ -1,66 +1,100 @@
-# Keyless Workload Identity Federation for INSPIRATH Staging
+# Secure, Keyless Workload Identity Federation for INSPIRATH Staging
 
 ## 1. Overview & Security Architecture
 
 Google Cloud Organization Policy enforces `iam.disableServiceAccountKeyCreation` to prevent downloading and storing service account JSON private keys.
 
-This document describes how **Vercel Preview** securely authenticates to Firebase Admin in the **`inspirath-staging`** environment without service account private keys, using **Vercel OIDC** and **Google Cloud Workload Identity Federation (WIF)**.
+This document describes how **Vercel Preview** securely authenticates to Firebase Admin in the **`inspirath-staging`** environment without service account private keys, using **Vercel OIDC (`@vercel/oidc`)** and **Google Cloud Workload Identity Federation (WIF)**.
 
 ```
-┌─────────────────────────┐
-│     Vercel Preview      │
-│  (feature/participant-  │
-│      id-dob-portal)     │
-└───────────┬─────────────┘
-            │ 1. OIDC Token (JWT issued by https://oidc.vercel.com)
-            ▼
-┌─────────────────────────┐
-│ Google Cloud Security   │
-│   Token Service (STS)   │
-│  (Workload Identity)    │
-└───────────┬─────────────┘
-            │ 2. Validates Issuer, Audience & CEL Branch/Repo Claims
-            ▼
-┌─────────────────────────┐
-│   IAM Credentials API   │
-│ (Impersonates Staging   │
-│    Service Account)     │
-└───────────┬─────────────┘
-            │ 3. Short-Lived OAuth2 Access Token (1 hour max lifetime)
-            ▼
-┌─────────────────────────┐
-│   Firebase Admin SDK    │
-│  (Firestore & Auth in   │
-│    inspirath-staging)   │
-└─────────────────────────┘
+┌──────────────────────────────────────┐
+│            Vercel Preview            │
+│ (feature/participant-id-dob-portal)  │
+│  Project: prj_MmRcs7gArslBmtJxmHG... │
+└──────────────────┬───────────────────┘
+                   │ 1. OIDC Token via @vercel/oidc (request context / rotating file)
+                   │    Claims: sub, project_id, owner_id, environment
+                   ▼
+┌──────────────────────────────────────┐
+│    Google Security Token Service     │
+│             (GCP STS)                │
+└──────────────────┬───────────────────┘
+                   │ 2. Validates Issuer, Audience & CEL Condition:
+                   │    project_id == "prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y" &&
+                   │    environment == "preview"
+                   ▼
+┌──────────────────────────────────────┐
+│         IAM Credentials API          │
+│   (Impersonates Staging SA via       │
+│    roles/iam.workloadIdentityUser)   │
+└──────────────────┬───────────────────┘
+                   │ 3. Short-Lived OAuth2 Access Token (1 hour max lifetime)
+                   ▼
+┌──────────────────────────────────────┐
+│          Firebase Admin SDK          │
+│   (Cloud Firestore data access in    │
+│          inspirath-staging)          │
+└──────────────────────────────────────┘
 ```
-
-### Security Invariants & Compliance
-1. **Zero Private Keys**: No service account keys are created, downloaded, or committed.
-2. **Production Isolation**: Production Firebase (`inspirath-d6778`) configuration is completely preserved. Automated fail-closed guards reject Workload Identity if configured against production.
-3. **Least Privilege & Strict Scoping**: Federated access is cryptographically restricted to:
-   - GitHub Repository: `salimkrd/Fest-Management`
-   - Git Branch: `feature/participant-id-dob-portal`
-   - Vercel Environment: `preview`
-   - Target GCP Project: `inspirath-staging`
 
 ---
 
-## 2. Google Cloud Configuration Instructions
+## 2. Key Technical Findings & Verified Specifications
 
-Perform these steps in the Google Cloud Console for project **`inspirath-staging`** (or via `gcloud` CLI):
+### 1. Vercel OIDC Token Retrieval (`@vercel/oidc`)
+- In Vercel serverless functions, the OIDC token is **not reliably exposed as `process.env.VERCEL_OIDC_TOKEN`** at runtime.
+- Instead, Vercel provides short-lived tokens per request via the `x-vercel-oidc-token` HTTP header and writes rotating tokens to a file path designated by `VERCEL_OIDC_TOKEN_FILE`.
+- The application uses the official **`@vercel/oidc`** package (`getVercelOidcToken({ expirationBufferMs: 300000 })`), which reads the token from the Vercel request context (via `AsyncLocalStorage`), reads from the token file, and handles automatic token refresh prior to expiration.
+- For local verification and test runners, the code provides clean fallback to `GCP_WORKLOAD_IDENTITY_TOKEN` or `VERCEL_OIDC_TOKEN`.
+
+### 2. Verified Vercel OIDC Claims
+Standard Vercel OIDC tokens contain the following verified claims:
+- **`sub`**: Subject formatted as `owner:[owner]:project:[project]:environment:[env]`
+- **`project_id`**: Unique Vercel project ID (**`prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y`**)
+- **`owner_id`**: Unique Vercel team/user account ID (`team_...` or user ID)
+- **`environment`**: Deployment environment (`preview`, `production`, `development`)
+- **`owner`**: Vercel team or user slug
+- **`project`**: Vercel project slug
+- **Important**: `assertion.repo` and `assertion.branch` are **not** standard documented Vercel OIDC claims. Google Cloud attribute mappings and CEL conditions must **only** reference verified claims (`assertion.sub`, `assertion.project_id`, `assertion.owner_id`, `assertion.environment`).
+
+### 3. Git Branch Isolation & Defense-in-Depth
+Because Vercel OIDC does not issue a Git branch claim in the JWT, Google Cloud cannot cryptographically verify the Git branch at the STS token boundary.
+Branch isolation is enforced through two layers:
+1. **Vercel Branch-Scoped Configuration**: In the Vercel Dashboard, all Workload Identity environment variables (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, etc.) are scoped exclusively to the **Preview** environment and filtered specifically to branch **`feature/participant-id-dob-portal`**.
+2. **Application Fail-Closed Boundary**: `validateWorkloadIdentityScope()` enforces that when `VERCEL_ENV === 'preview'`, `process.env.VERCEL_GIT_COMMIT_REF` must match `feature/participant-id-dob-portal`, immediately aborting with a `[FAIL-CLOSED SAFETY]` exception on unauthorized branches.
+
+### 4. Vercel OIDC Issuer Modes (Team vs Global)
+Vercel supports two issuer configurations under **Project Settings** > **Security** > **Secure backend access with OIDC federation**:
+
+| Configuration | Team Mode (Default & Recommended) | Global Mode |
+|---|---|---|
+| **Issuer URL (`iss`)** | `https://oidc.vercel.com/[TEAM_SLUG]` (e.g., `https://oidc.vercel.com/salimkrd`) | `https://oidc.vercel.com` |
+| **Audience (`aud`)** | `https://vercel.com/[TEAM_SLUG]` or Provider Resource Name | `https://vercel.com/[TEAM_SLUG]` or Provider Resource Name |
+| **Well-Known Discovery** | `https://oidc.vercel.com/[TEAM_SLUG]/.well-known/openid-configuration` | `https://oidc.vercel.com/.well-known/openid-configuration` |
+| **Security Benefit** | Rejects tokens from any other Vercel team at the issuer level | Requires evaluating `owner_id` and `project_id` in provider claims |
+
+*To determine which mode your Vercel project uses, navigate to **Settings** > **Security** on your Vercel project dashboard. If a team slug is shown in the OIDC configuration, use Team Mode.*
+
+### 5. Least-Privilege IAM Roles
+For the Participant Portal staging preview:
+- **Cloud Datastore User (`roles/datastore.user`)**: **REQUIRED**. Grants read/write access to Cloud Firestore documents (`participants`, `competitions`, `registrations`, `results`, and `participantLoginAttempts` rate limits).
+- **Firebase Authentication Admin (`roles/firebaseauth.admin`)**: **NOT NEEDED / OMITTED**. The Participant Portal authenticates using short Bib + DOB and issues server-signed HMAC session cookies (`inspirath_participant_session`). It does not create or manage Firebase Auth accounts.
+- **Service Account Token Creator (`roles/iam.serviceAccountTokenCreator`)**: **NOT NEEDED / OMITTED**. The federated identity receives `roles/iam.workloadIdentityUser` on the service account, which already includes `iam.serviceAccounts.getAccessToken`. Granting Token Creator on top of Workload Identity User is redundant.
+
+---
+
+## 3. Google Cloud Console Step-by-Step Instructions
+
+Perform these steps in Google Cloud Platform for project **`inspirath-staging`**:
 
 ### Step 1: Enable Required GCP APIs
-Ensure the following APIs are enabled in `inspirath-staging`:
-- **Identity and Access Management (IAM) API**: `iam.googleapis.com`
-- **IAM Service Account Credentials API**: `iamcredentials.googleapis.com`
-- **Security Token Service API**: `sts.googleapis.com`
-- **Cloud Firestore API**: `firestore.googleapis.com`
+Navigate to **APIs & Services** > **Library** and enable:
+- `iam.googleapis.com` (Identity and Access Management API)
+- `iamcredentials.googleapis.com` (IAM Service Account Credentials API)
+- `sts.googleapis.com` (Security Token Service API)
+- `firestore.googleapis.com` (Cloud Firestore API)
 
-**Console Navigation**:
-> *APIs & Services* > *Library* > Search and enable each API.
-
-**CLI Command**:
+*gcloud CLI:*
 ```bash
 gcloud services enable \
   iam.googleapis.com \
@@ -72,55 +106,44 @@ gcloud services enable \
 
 ---
 
-### Step 2: Create Staging Service Account
-Create a dedicated service account for Vercel Preview staging operations:
-- **Service Account Name**: `vercel-staging-sa`
-- **Service Account ID**: `vercel-staging-sa`
-- **Email**: `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com`
+### Step 2: Create Staging Service Account (Least-Privilege)
+1. Navigate to **IAM & Admin** > **Service Accounts** > **Create Service Account**.
+2. Settings:
+   - **Service account name**: `vercel-staging-sa`
+   - **Service account ID**: `vercel-staging-sa`
+   - **Email**: `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com`
+3. Grant **only** the following role:
+   - **Cloud Datastore User** (`roles/datastore.user`)
+4. Click **Done** (do **NOT** create or download keys).
 
-**Assign Least-Privilege IAM Roles**:
-- `roles/datastore.user` (Cloud Datastore User: provides read/write access to Firestore staging data)
-- `roles/firebaseauth.admin` (Firebase Authentication Admin: manages participant authentication)
-
-**Console Navigation**:
-> *IAM & Admin* > *Service Accounts* > *Create Service Account*
-> Name: `vercel-staging-sa`
-> Roles: `Cloud Datastore User`, `Firebase Authentication Admin`
-
-**CLI Command**:
+*gcloud CLI:*
 ```bash
 gcloud iam service-accounts create vercel-staging-sa \
-  --description="Service account for Vercel Preview staging deployments" \
+  --description="Service account for Vercel Preview staging operations" \
   --display-name="Vercel Staging Service Account" \
   --project=inspirath-staging
 
 gcloud projects add-iam-policy-binding inspirath-staging \
   --member="serviceAccount:vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com" \
   --role="roles/datastore.user"
-
-gcloud projects add-iam-policy-binding inspirath-staging \
-  --member="serviceAccount:vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com" \
-  --role="roles/firebaseauth.admin"
 ```
 
 ---
 
 ### Step 3: Create Workload Identity Pool & Provider
-Retrieve your GCP Project Number:
+Retrieve the GCP Project Number:
 ```bash
 gcloud projects describe inspirath-staging --format="value(projectNumber)"
-# Let PROJECT_NUMBER be your numerical project ID (e.g. 123456789012)
+# Let PROJECT_NUMBER be the numerical ID (e.g., 123456789012)
 ```
 
 #### A. Create the Workload Identity Pool
-- **Pool ID**: `vercel-pool`
-- **Display Name**: `Vercel Preview Deployments Pool`
+1. Navigate to **IAM & Admin** > **Workload Identity Federation** > **Create Pool**.
+   - **Pool Name**: `vercel-pool`
+   - **Display Name**: `Vercel Preview Deployments Pool`
+2. Click **Save**.
 
-**Console Navigation**:
-> *IAM & Admin* > *Workload Identity Federation* > *Create Pool*
-> Name: `vercel-pool`
-
-**CLI Command**:
+*gcloud CLI:*
 ```bash
 gcloud iam workload-identity-pools create vercel-pool \
   --location="global" \
@@ -130,133 +153,114 @@ gcloud iam workload-identity-pools create vercel-pool \
 ```
 
 #### B. Add OIDC Provider to the Pool
-- **Provider ID**: `vercel-provider`
-- **Display Name**: `Vercel OIDC Provider`
-- **Issuer (URL)**: `https://oidc.vercel.com`
-- **Allowed Audiences**: `https://vercel.com/salimkrd` (or your Vercel team/user slug)
-- **Attribute Mapping**:
-  | Google Attribute | OIDC Token Attribute |
-  |---|---|
-  | `google.subject` | `assertion.sub` |
-  | `attribute.owner` | `assertion.owner` |
-  | `attribute.project` | `assertion.project` |
-  | `attribute.environment` | `assertion.environment` |
-  | `attribute.branch` | `assertion.branch` |
-  | `attribute.repo` | `assertion.repo` |
+1. In the pool details, click **Add Provider**.
+2. **Provider Details**:
+   - **Provider Type**: `OpenID Connect (OIDC)`
+   - **Provider Name**: `vercel-provider`
+   - **Display Name**: `Vercel OIDC Provider`
+   - **Issuer (URL)**:
+     - For **Team Mode**: `https://oidc.vercel.com/[TEAM_SLUG]` (e.g. `https://oidc.vercel.com/salimkrd`)
+     - For **Global Mode**: `https://oidc.vercel.com`
+   - **Allowed Audiences**:
+     - `https://vercel.com/[TEAM_SLUG]` (e.g. `https://vercel.com/salimkrd`)
+     - Or add the provider resource URI: `//iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider`
+3. **Configure Attribute Mapping**:
+   | Google Cloud Attribute | OIDC Token Expression |
+   |---|---|
+   | `google.subject` | `assertion.sub` |
+   | `attribute.project_id` | `assertion.project_id` |
+   | `attribute.owner_id` | `assertion.owner_id` |
+   | `attribute.environment` | `assertion.environment` |
+   | `attribute.owner` | `assertion.owner` |
+   | `attribute.project` | `assertion.project` |
 
-- **Attribute Condition (CEL)**:
-  Enforces that tokens are ONLY accepted from the Participant Portal branch in the official repository:
-  ```cel
-  assertion.repo == "salimkrd/Fest-Management" && assertion.branch == "feature/participant-id-dob-portal" && assertion.environment == "preview"
-  ```
+4. **Attribute Condition (CEL)**:
+   Restrict access cryptographically to the exact Vercel project ID and preview environment:
+   ```cel
+   assertion.project_id == "prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y" && assertion.environment == "preview"
+   ```
+5. Click **Save**.
 
-**CLI Command**:
+*gcloud CLI (Team Mode example):*
 ```bash
 gcloud iam workload-identity-pools providers create-oidc vercel-provider \
   --location="global" \
   --workload-identity-pool="vercel-pool" \
-  --issuer-uri="https://oidc.vercel.com" \
+  --issuer-uri="https://oidc.vercel.com/salimkrd" \
   --allowed-audiences="https://vercel.com/salimkrd" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.owner=assertion.owner,attribute.project=assertion.project,attribute.environment=assertion.environment,attribute.branch=assertion.branch,attribute.repo=assertion.repo" \
-  --attribute-condition="assertion.repo == 'salimkrd/Fest-Management' && assertion.branch == 'feature/participant-id-dob-portal' && assertion.environment == 'preview'" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.project_id=assertion.project_id,attribute.owner_id=assertion.owner_id,attribute.environment=assertion.environment,attribute.owner=assertion.owner,attribute.project=assertion.project" \
+  --attribute-condition="assertion.project_id == 'prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y' && assertion.environment == 'preview'" \
   --project=inspirath-staging
 ```
 
 ---
 
-### Step 4: Grant Workload Identity Impersonation Permissions
-Bind the Workload Identity Pool principal set to the staging service account with the `Workload Identity User` role and `Service Account Token Creator` role:
+### Step 4: Grant Workload Identity Impersonation on Service Account
+Grant the federated principal set matching Vercel Project ID `prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y` permission to impersonate `vercel-staging-sa`:
 
-**CLI Command**:
+1. Navigate to **IAM & Admin** > **Service Accounts**.
+2. Click on `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com`.
+3. Go to the **Permissions** tab and click **Grant Access**.
+4. **New Principal**:
+   ```
+   principalSet://iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/attribute.project_id/prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y
+   ```
+5. **Role**: **Workload Identity User** (`roles/iam.workloadIdentityUser`).
+6. Click **Save**.
+
+*gcloud CLI:*
 ```bash
-# Allow the federated principal set matching the Participant Portal branch to impersonate the service account
 gcloud iam service-accounts add-iam-policy-binding vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com \
   --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/attribute.branch/feature/participant-id-dob-portal" \
-  --project=inspirath-staging
-
-# Allow token creation for impersonation
-gcloud iam service-accounts add-iam-policy-binding vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --member="principalSet://iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/attribute.branch/feature/participant-id-dob-portal" \
+  --member="principalSet://iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/attribute.project_id/prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y" \
   --project=inspirath-staging
 ```
 
 ---
 
-## 3. Vercel Project Environment Configuration
+## 4. Vercel Preview Environment Variables Configuration
 
-Configure the following environment variables in the **Vercel Dashboard**:
-> *Project Settings* > *Environment Variables*
+In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
+1. Navigate to **Settings** > **Environment Variables**.
+2. Add the following variables:
+   - **Environment**: Select **Preview** ONLY (uncheck Production and Development).
+   - **Branch Filter**: Set specifically to **`feature/participant-id-dob-portal`**.
 
-> [!IMPORTANT]
-> Scope these variables strictly to **Preview** environment and filter by branch `feature/participant-id-dob-portal`.
-> Do **NOT** set them in Production. Production credentials remain untouched.
-
-### Required Environment Variables
-
-| Variable | Value | Scope | Description |
-|---|---|---|---|
-| `FIREBASE_ADMIN_PROJECT_ID` | `inspirath-staging` | Preview | Target staging Firebase project |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `inspirath-staging` | Preview | Client staging project ID |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider` | Preview | Workload Identity Provider resource path |
-| `GCP_SERVICE_ACCOUNT_EMAIL` | `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com` | Preview | Staging service account to impersonate |
-| `GCP_WORKLOAD_IDENTITY_AUDIENCE` | `//iam.googleapis.com/projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider` | Preview | STS audience identifier |
-| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `feature/participant-id-dob-portal` | Preview | Fail-closed branch constraint |
-| `PARTICIPANT_SESSION_SECRET` | *(Random 32+ char secret string)* | Preview | Participant portal JWT signing secret |
-| `QR_SIGNING_SECRET` | *(Random 32+ char secret string)* | Preview | Cryptographic QR badge signing secret |
-
-*Note: Replace `[PROJECT_NUMBER]` with the numerical GCP Project Number of `inspirath-staging`.*
+| Variable Name | Example Value | Description |
+|---|---|---|
+| `FIREBASE_ADMIN_PROJECT_ID` | `inspirath-staging` | Target staging Firebase project |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `inspirath-staging` | Client staging project ID |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider` | Full provider resource path |
+| `GCP_SERVICE_ACCOUNT_EMAIL` | `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com` | Staging service account email |
+| `GCP_WORKLOAD_IDENTITY_AUDIENCE` | `https://vercel.com/[TEAM_SLUG]` (or `//iam.googleapis.com/...`) | OIDC audience configured in GCP |
+| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `feature/participant-id-dob-portal` | Application-level branch restriction |
+| `GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID`| `prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y` | Application-level project ID verification |
+| `PARTICIPANT_SESSION_SECRET` | *(Random 32+ character string)* | Session token signing secret |
+| `QR_SIGNING_SECRET` | *(Random 32+ character string)* | Digital ID QR cryptographic signing secret |
 
 ---
 
-## 4. Code Implementation Architecture
+## 5. Local Verification vs Live Vercel-to-GCP Verification
 
-### 1. `WorkloadIdentityCredential` (`src/lib/firebase/admin.ts`)
-Implements Firebase Admin SDK's `Credential` interface using `google-auth-library`'s `IdentityPoolClient`.
-- Resolves Vercel OIDC token from `process.env.VERCEL_OIDC_TOKEN`, `VERCEL_OIDC_TOKEN_FILE`, or `GCP_WORKLOAD_IDENTITY_TOKEN`.
-- Automatically handles Security Token Service (STS) token exchange and Service Account impersonation.
-- Obtains short-lived Google Cloud OAuth2 access tokens and calculates remaining validity.
+| Scope | What is Proven Locally | What Requires Live Vercel-to-GCP Verification |
+|---|---|---|
+| **OIDC Subject Token Retrieval** | Fallback to `GCP_WORKLOAD_IDENTITY_TOKEN`, `VERCEL_OIDC_TOKEN`, and `VERCEL_OIDC_TOKEN_FILE`; `@vercel/oidc` import and options format. | Live retrieval of `x-vercel-oidc-token` from the active Vercel Function request context and live token refresh. |
+| **GCP STS Token Exchange** | `IdentityPoolClient` construction, STS audience normalization, impersonation URL format, and custom `WorkloadIdentityCredential` adapter. | Live Google STS token exchange reaching `https://sts.googleapis.com/v1/token` with the Vercel-signed JWT. |
+| **IAM Impersonation & Scope** | Strict fail-closed safety guards rejecting production `inspirath-d6778`, non-preview environments, unauthorized branches, and mismatched Vercel project IDs. | Live `iamcredentials.googleapis.com` token issuance for `vercel-staging-sa` based on the GCP Workload Identity Pool binding. |
+| **Participant Portal Functionality** | End-to-end Bib (`1042` and `#1042`) + DOB authentication, rate limiting, participant dashboard isolation, individual points vs team points, and digital ID QR cryptographic signing. | Latency, cold-start performance, and network routing between Vercel Serverless Functions and live Cloud Firestore in `inspirath-staging`. |
 
-### 2. Strict Fail-Closed Safety Guards
-- `validateWorkloadIdentityScope(targetProjectId)`:
-  - Immediately throws `[FAIL-CLOSED SAFETY]` if `targetProjectId === 'inspirath-d6778'`.
-  - Immediately throws `[FAIL-CLOSED SAFETY]` if executed within Vercel production deployment (`VERCEL_ENV === 'production'`).
-  - Immediately throws `[FAIL-CLOSED SAFETY]` if running in Vercel preview on an unapproved branch (`VERCEL_GIT_COMMIT_REF !== 'feature/participant-id-dob-portal'`).
-
-### 3. Production Isolation Preservation
-The Firebase Admin initialization hierarchy in `getAdminApp()`:
-1. Local Firebase Emulator (if running).
-2. `GOOGLE_APPLICATION_CREDENTIALS` (production live).
-3. `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON` (production live).
-4. `FIREBASE_ADMIN_CLIENT_EMAIL` + `FIREBASE_ADMIN_PRIVATE_KEY` (production live).
-5. Workload Identity Federation (keyless staging/preview).
-
-Because steps 1-4 execute before step 5, production configurations and credentials are 100% preserved without any modification.
-
----
-
-## 5. Verification & Testing
-
-### Running the Staging Verification Script
-The dedicated verification script validates:
-- Target project isolation
-- WIF scope validation and fail-closed safety
-- Bib + DOB login with `1042` and `#1042`
-- Participant dashboard `/api/participant/me` with data isolation (DOB and phone protected)
-- Individual SOLO points vs group TEAM points isolation
-- Signed digital ID QR badge generation `/api/participant/qr` and cryptographic verification
+### Execution Commands
 
 ```bash
-node node_modules/tsx/dist/cli.mjs scripts/verifyStagingParticipantPortal.ts
-```
+# 1. Run Workload Identity unit & fail-closed safety tests
+node node_modules/vitest/vitest.mjs run src/__tests__/workloadIdentity.test.ts
 
-### Running the Full Regression Test Suite
-```bash
+# 2. Run full regression test suite (492 tests)
 node node_modules/vitest/vitest.mjs run
-```
 
-### Running Next.js Production Build
-```bash
+# 3. Run Participant Portal staging verification script
+node node_modules/tsx/dist/cli.mjs scripts/verifyStagingParticipantPortal.ts
+
+# 4. Run Next.js production build
 node node_modules/next/dist/bin/next build
 ```
