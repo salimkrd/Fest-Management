@@ -103,8 +103,8 @@ export async function getParticipantSession(request: NextRequest) {
   return { id: participantId, data: snapshot.data()!, db };
 }
 
-/** The limiter is keyed by normalized Bib, plus a separate shared network limit. */
-async function consumeAttempt(bib: string, request: NextRequest) {
+/** Checks whether the normalized Bib or client IP has exceeded the allowed attempt threshold. */
+async function isRateLimited(bib: string, request: NextRequest): Promise<boolean> {
   const db = getAdminDb();
   if (!db) throw new Error('Participant service unavailable.');
   const ip = (request.headers.get('x-real-ip') ||
@@ -114,25 +114,64 @@ async function consumeAttempt(bib: string, request: NextRequest) {
     { ref: db.collection('participantLoginAttempts').doc('bib-' + digest(bib)), limit: MAX_ATTEMPTS_BIB },
     { ref: db.collection('participantLoginAttempts').doc('ip-' + digest(ip)), limit: MAX_ATTEMPTS_IP }
   ];
-  return db.runTransaction(async txn => {
-    const snapshots = await Promise.all(refs.map(item => txn.get(item.ref)));
+  const snapshots = await Promise.all(refs.map(item => item.ref.get()));
+  const now = Date.now();
+  return snapshots.some((snap, i) => {
+    const data = snap.data();
+    return data && typeof data.windowStart === 'number' &&
+      data.windowStart + WINDOW_MS > now && Number(data.count || 0) >= refs[i].limit;
+  });
+}
+
+/** Records a failed attempt for the Bib and client IP in a transaction. */
+async function recordFailedAttempt(bib: string, request: NextRequest): Promise<void> {
+  const db = getAdminDb();
+  if (!db) return;
+  const ip = (request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',').at(-1) ||
+    'unknown').trim().slice(0, 120);
+  const refs = [
+    db.collection('participantLoginAttempts').doc('bib-' + digest(bib)),
+    db.collection('participantLoginAttempts').doc('ip-' + digest(ip))
+  ];
+  await db.runTransaction(async txn => {
+    const snapshots = await Promise.all(refs.map(ref => txn.get(ref)));
     const now = Date.now();
     const previous = snapshots.map(snap => snap.data());
-    if (previous.some((data, i) => data && typeof data.windowStart === 'number' &&
-        data.windowStart + WINDOW_MS > now && Number(data.count || 0) >= refs[i].limit)) {
-      return false;
-    }
-    refs.forEach((item, i) => {
+    refs.forEach((ref, i) => {
       const data = previous[i];
       const sameWindow = data && typeof data.windowStart === 'number' && data.windowStart + WINDOW_MS > now;
-      txn.set(item.ref, {
+      txn.set(ref, {
         windowStart: sameWindow ? data.windowStart : now,
-        count: sameWindow ? data.count + 1 : 1,
+        count: sameWindow ? Number(data.count || 0) + 1 : 1,
         updatedAt: now
-      });
+      }, { merge: true });
     });
-    return true;
-  });
+  }).catch(() => {});
+}
+
+/** Resets the failed attempt count on the Bib upon successful login so legitimate repeat logins are never blocked. */
+async function clearBibFailedAttempts(bib: string): Promise<void> {
+  const db = getAdminDb();
+  if (!db) return;
+  const bibRef = db.collection('participantLoginAttempts').doc('bib-' + digest(bib));
+  try {
+    if (typeof (bibRef as any).set === 'function') {
+      const snap = await bibRef.get();
+      if (snap.exists && (snap.data()?.count || 0) > 0) {
+        await (bibRef as any).set({ count: 0, updatedAt: Date.now() }, { merge: true });
+      }
+    } else if (typeof db.runTransaction === 'function') {
+      await db.runTransaction(async txn => {
+        const snap = await txn.get(bibRef as any);
+        if (snap && (snap as any).exists && ((snap as any).data()?.count || 0) > 0) {
+          txn.set(bibRef as any, { count: 0, updatedAt: Date.now() });
+        }
+      });
+    }
+  } catch {
+    // Non-critical reset
+  }
 }
 
 export async function loginParticipant(request: NextRequest, bibInput: unknown, dob: unknown) {
@@ -144,8 +183,11 @@ export async function loginParticipant(request: NextRequest, bibInput: unknown, 
     return { ok: false as const, limited: false };
   }
   await syncWorkloadIdentityToken().catch(() => {});
-  // Throttle even unknown Bib numbers to prevent account discovery.
-  if (!await consumeAttempt(bib, request)) return { ok: false as const, limited: true };
+
+  // Throttle brute-force DOB guessing, unknown Bib enumeration, and distributed attacks.
+  if (await isRateLimited(bib, request)) {
+    return { ok: false as const, limited: true };
+  }
 
   const db = getAdminDb();
   if (!db) throw new Error('Participant service unavailable.');
@@ -153,6 +195,7 @@ export async function loginParticipant(request: NextRequest, bibInput: unknown, 
   // Fail closed on duplicate Bib numbers. Never pick the first arbitrarily,
   // including when two participants have the same date of birth.
   if (matches.size !== 1) {
+    await recordFailedAttempt(bib, request);
     return { ok: false as const, limited: false };
   }
   const participantDoc = matches.docs[0];
@@ -162,7 +205,11 @@ export async function loginParticipant(request: NextRequest, bibInput: unknown, 
       record.portalDisabled === true ||
       !normalizeDob(String(record.dob || '')) ||
       record.dob !== birthDate) {
+    await recordFailedAttempt(bib, request);
     return { ok: false as const, limited: false };
   }
+
+  // Clear failed attempts counter for this Bib upon successful authentication
+  await clearBibFailedAttempts(bib);
   return { ok: true as const, token: createSession(participantId) };
 }

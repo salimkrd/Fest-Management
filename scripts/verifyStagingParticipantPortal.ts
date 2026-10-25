@@ -171,10 +171,13 @@ async function runStagingVerification() {
   const baselineParticipantsSnap = await db.collection('participants').get();
   const baselineCount = baselineParticipantsSnap.size;
   const baselineDocIds = new Set(baselineParticipantsSnap.docs.map(d => d.id));
+
+  const baselineAttemptsSnap = await db.collection('participantLoginAttempts').get();
+  const baselineAttemptIds = new Set(baselineAttemptsSnap.docs.map(d => d.id));
   record(
     'Baseline Data Inspection',
     true,
-    `Existing participant count: ${baselineCount}. Zero existing records will be deleted.`
+    `Existing participant count: ${baselineCount}, baseline rate-limit attempt records: ${baselineAttemptIds.size}. Zero existing records will be deleted.`
   );
 
   // 7. Non-Destructive Unique Test Fixture Setup
@@ -320,11 +323,18 @@ async function runStagingVerification() {
       `Created isolated fixture ${testPartId} (Bib ${testBib}) without overwriting or deleting any existing records.`
     );
 
-    // Track specific rate-limiting attempt document for this test bib
-    const bibAttemptRef = db.collection('participantLoginAttempts').doc('bib-' + digest(testBib));
-    createdDocRefs.push(bibAttemptRef);
-    const ipAttemptRef = db.collection('participantLoginAttempts').doc('ip-' + digest(testClientIp));
-    createdDocRefs.push(ipAttemptRef);
+    // Track rate-limiting attempt documents ONLY if they were not already pre-existing
+    const bibAttemptKey = 'bib-' + digest(testBib);
+    const ipAttemptKey = 'ip-' + digest(testClientIp);
+    const bibAttemptRef = db.collection('participantLoginAttempts').doc(bibAttemptKey);
+    const ipAttemptRef = db.collection('participantLoginAttempts').doc(ipAttemptKey);
+
+    if (!baselineAttemptIds.has(bibAttemptKey)) {
+      createdDocRefs.push(bibAttemptRef);
+    }
+    if (!baselineAttemptIds.has(ipAttemptKey)) {
+      createdDocRefs.push(ipAttemptRef);
+    }
 
     // 8. Test Login with unprefixed bib
     let sessionToken: string | undefined;
@@ -559,16 +569,19 @@ async function runStagingVerification() {
     }
 
   } finally {
-    // 16. Restrict Cleanup STRICTLY to documents created by this test
+    // 16. Restrict Cleanup STRICTLY to documents created by this test, never deleting pre-existing rate-limit records
     const cleanupBatch = db.batch();
     for (const ref of createdDocRefs) {
+      if (ref.parent.id === 'participantLoginAttempts' && baselineAttemptIds.has(ref.id)) {
+        // Non-destructive safeguard: Never delete a pre-existing rate-limit document
+        continue;
+      }
       cleanupBatch.delete(ref);
     }
     await cleanupBatch.commit().catch(() => {});
 
     // 17. Verify Baseline Participant Records Remain Intact
     const postCleanupParticipantsSnap = await db.collection('participants').get();
-    const postCleanupCount = postCleanupParticipantsSnap.size;
     const remainingBaselineCount = postCleanupParticipantsSnap.docs.filter(d => baselineDocIds.has(d.id)).length;
 
     const dataIntact = remainingBaselineCount === baselineCount;
@@ -583,6 +596,24 @@ async function runStagingVerification() {
         'Staging Data Preservation & Non-Destructive Integrity',
         false,
         `Integrity violation: expected ${baselineCount} original records, but found ${remainingBaselineCount}.`
+      );
+    }
+
+    // 18. Verify Pre-Existing Rate-Limit Attempt Records Were Never Deleted
+    const postCleanupAttemptsSnap = await db.collection('participantLoginAttempts').get();
+    const remainingBaselineAttempts = postCleanupAttemptsSnap.docs.filter(d => baselineAttemptIds.has(d.id)).length;
+    const rateLimitPreserved = remainingBaselineAttempts === baselineAttemptIds.size;
+    if (rateLimitPreserved) {
+      record(
+        'Rate-Limit Non-Destructive Preservation',
+        true,
+        `All ${baselineAttemptIds.size} baseline rate-limit records remain intact. Pre-existing rate-limit documents were never deleted.`
+      );
+    } else {
+      record(
+        'Rate-Limit Non-Destructive Preservation',
+        false,
+        `Rate-limit preservation failure: expected ${baselineAttemptIds.size} baseline attempt records, but found ${remainingBaselineAttempts}.`
       );
     }
   }

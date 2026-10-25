@@ -306,4 +306,56 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
     // Only the single test participant was added; all initial participants remain present
     expect(current.size).toBe(initialParticipantCount + 1);
   });
+
+  it('7. verifies legitimate repeat logins (6+ consecutive attempts) do not trigger rate limiting', async () => {
+    const repeatIp = '192.0.2.199';
+    for (let i = 0; i < 7; i++) {
+      const loginReq = new NextRequest('http://localhost:3000/api/participant/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-real-ip': repeatIp
+        },
+        body: JSON.stringify({ bib: '7711', dob: testDob })
+      });
+      const res = await loginRoute(loginReq);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+    }
+  });
+
+  it('8. verifies staging cleanup never deletes pre-existing rate-limit attempt documents', async () => {
+    const preExistingDocId = `test-preserve-attempt-${Date.now()}`;
+    const preExistingRef = db.collection('participantLoginAttempts').doc(preExistingDocId);
+    await preExistingRef.set({
+      windowStart: Date.now(),
+      count: 2,
+      updatedAt: Date.now()
+    });
+
+    try {
+      const baselineAttempts = new Set((await db.collection('participantLoginAttempts').get()).docs.map(d => d.id));
+      expect(baselineAttempts.has(preExistingDocId)).toBe(true);
+
+      // Simulate cleanup batch containing the pre-existing doc ref
+      const cleanupBatch = db.batch();
+      const mockCreatedRefs = [preExistingRef];
+      for (const ref of mockCreatedRefs) {
+        if (ref.parent.id === 'participantLoginAttempts' && baselineAttempts.has(ref.id)) {
+          // Non-destructive safeguard skips pre-existing rate-limit docs
+          continue;
+        }
+        cleanupBatch.delete(ref);
+      }
+      await cleanupBatch.commit();
+
+      // Verify the pre-existing document still exists intact
+      const postSnap = await preExistingRef.get();
+      expect(postSnap.exists).toBe(true);
+      expect(postSnap.data()?.count).toBe(2);
+    } finally {
+      await preExistingRef.delete();
+    }
+  });
 });

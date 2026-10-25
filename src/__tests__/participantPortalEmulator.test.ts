@@ -425,6 +425,46 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
         await db.collection('participants').doc(rateLimitPartId).delete();
       }
     });
+
+    it('permits legitimate repeat logins (6+ consecutive logins) without rate-limit lockout', async () => {
+      const dedicatedIp = '10.99.88.78';
+      await clearRateLimits('#1042', dedicatedIp);
+
+      // Execute 8 consecutive legitimate logins with correct Bib and DOB
+      for (let i = 0; i < 8; i++) {
+        const req = createPostRequest('http://localhost:3000/api/participant/login', {
+          bib: '1042',
+          dob: '2008-04-12'
+        }, dedicatedIp);
+        const res = await loginRoute(req);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.success).toBe(true);
+      }
+    });
+
+    it('throttles unknown Bib enumeration after 5 failed attempts', async () => {
+      const dedicatedIp = '10.99.88.79';
+      const unknownBib = '99999';
+      await clearRateLimits('#99999', dedicatedIp);
+
+      for (let i = 0; i < 5; i++) {
+        const req = createPostRequest('http://localhost:3000/api/participant/login', {
+          bib: unknownBib,
+          dob: '2008-04-12'
+        }, dedicatedIp);
+        const res = await loginRoute(req);
+        expect(res.status).toBe(401);
+      }
+
+      // 6th attempt is throttled
+      const req6 = createPostRequest('http://localhost:3000/api/participant/login', {
+        bib: unknownBib,
+        dob: '2008-04-12'
+      }, dedicatedIp);
+      const res6 = await loginRoute(req6);
+      expect(res6.status).toBe(429);
+    });
   });
 
   describe('4. Session Tampering & Invalidation Protections', () => {

@@ -12,6 +12,13 @@ const fakeDatabase = {
           key,
           async get() {
             return { exists: documents.has(key), data: () => documents.get(key) };
+          },
+          async set(data: Record<string, unknown>, options?: { merge?: boolean }) {
+            const current = options?.merge ? (documents.get(key) || {}) : {};
+            documents.set(key, { ...current, ...data });
+          },
+          async delete() {
+            documents.delete(key);
           }
         };
       },
