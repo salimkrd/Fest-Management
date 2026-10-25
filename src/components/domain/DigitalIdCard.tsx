@@ -13,12 +13,14 @@ interface DigitalIdCardProps {
   participant: Participant | null;
   isOpen: boolean;
   onClose: () => void;
+  authMode?: 'firebase' | 'participant';
 }
 
 export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   participant,
   isOpen,
-  onClose
+  onClose,
+  authMode = 'firebase'
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [signedToken, setSignedToken] = useState<string>('');
@@ -41,14 +43,16 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     const fetchQrBadge = async () => {
       try {
-        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : '';
-        if (!idToken) {
+        const idToken = authMode === 'firebase' && auth?.currentUser
+          ? await auth.currentUser.getIdToken() : '';
+        if (authMode === 'firebase' && !idToken) {
           throw new Error('Authentication required to retrieve participant accreditation badge.');
         }
 
-        const res = await fetch(`/api/participants/${participant.id}/qr`, {
-          headers: { Authorization: `Bearer ${idToken}` }
-        });
+        const res = await fetch(
+          authMode === 'participant' ? '/api/participant/qr' : `/api/participants/${participant.id}/qr`,
+          { headers: authMode === 'firebase' ? { Authorization: `Bearer ${idToken}` } : {}, cache: 'no-store' }
+        );
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -89,7 +93,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [participant, isOpen]);
+  }, [participant, isOpen, authMode]);
 
   if (!participant) return null;
 
