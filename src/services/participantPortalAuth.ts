@@ -5,15 +5,16 @@ import { getAdminDb } from '@/lib/firebase/admin';
 /**
  * Participant access is server-only. Never sign a Firebase client user into an
  * invented ADMIN or TEAM_MANAGER account. Participant DOB is a low-entropy
- * shared secret, therefore use unpredictable full Participant IDs and persistent
- * rate limits; recommend secondary activation PIN for stronger protection.
+ * shared secret and Bib numbers are publicly visible and easily enumerable.
+ * Enforce strict per-Bib and network limits, reject ambiguous Bib matches,
+ * and strongly recommend a secondary activation PIN before a real rollout.
  */
 const COOKIE_NAME = 'inspirath_participant_session';
 const SESSION_SECONDS = 60 * 60;
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS_ID = 5;
-// A whole campus may share one outbound IP; account-level limit remains strict.
-const MAX_ATTEMPTS_IP = 400;
+const MAX_ATTEMPTS_BIB = 5;
+// Balances short Bib enumeration protection with schools sharing a single gateway.
+const MAX_ATTEMPTS_IP = 100;
 
 function getSecret(): string {
   const secret = process.env.PARTICIPANT_SESSION_SECRET || '';
@@ -29,6 +30,16 @@ function digest(value: string): string {
 
 function sign(input: string): string {
   return createHmac('sha256', getSecret()).update(input).digest('base64url');
+}
+
+export function normalizeBib(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim();
+  // The input may be #1042 or 1042; reject names, group codes, and full IDs.
+  if (!/^#?[0-9]{1,9}$/.test(clean)) return null;
+  const numeric = Number(clean.replace(/^#/, ''));
+  if (!Number.isSafeInteger(numeric) || numeric < 1) return null;
+  return `#${numeric}`;
 }
 
 function normalizeDob(value: string): string | null {
@@ -87,15 +98,15 @@ export async function getParticipantSession(request: NextRequest) {
   return { id: participantId, data: snapshot.data()!, db };
 }
 
-/** The limiter is keyed independently by full ID and client network address. */
-async function consumeAttempt(participantId: string, request: NextRequest) {
+/** The limiter is keyed by normalized Bib, plus a separate shared network limit. */
+async function consumeAttempt(bib: string, request: NextRequest) {
   const db = getAdminDb();
   if (!db) throw new Error('Participant service unavailable.');
   const ip = (request.headers.get('x-real-ip') ||
     request.headers.get('x-forwarded-for')?.split(',').at(-1) ||
     'unknown').trim().slice(0, 120);
   const refs = [
-    { ref: db.collection('participantLoginAttempts').doc('id-' + digest(participantId)), limit: MAX_ATTEMPTS_ID },
+    { ref: db.collection('participantLoginAttempts').doc('bib-' + digest(bib)), limit: MAX_ATTEMPTS_BIB },
     { ref: db.collection('participantLoginAttempts').doc('ip-' + digest(ip)), limit: MAX_ATTEMPTS_IP }
   ];
   return db.runTransaction(async txn => {
@@ -119,25 +130,33 @@ async function consumeAttempt(participantId: string, request: NextRequest) {
   });
 }
 
-export async function loginParticipant(request: NextRequest, participantId: unknown, dob: unknown) {
-  // Validate the configured HMAC secret before doing credential checks.
+export async function loginParticipant(request: NextRequest, bibInput: unknown, dob: unknown) {
+  // Validate the signing key before checking credentials.
   getSecret();
-  // Printed Digital ID Cards display the participant ID in uppercase.
-  const id = typeof participantId === 'string' ? participantId.trim().toLowerCase() : '';
+  const bib = normalizeBib(bibInput);
   const birthDate = typeof dob === 'string' ? normalizeDob(dob) : null;
-  if (!/^part-[a-zA-Z0-9_-]{1,100}$/.test(id) || !birthDate) {
+  if (!bib || !birthDate) {
     return { ok: false as const, limited: false };
   }
-  if (!await consumeAttempt(id, request)) return { ok: false as const, limited: true };
+  // Throttle even unknown Bib numbers to prevent account discovery.
+  if (!await consumeAttempt(bib, request)) return { ok: false as const, limited: true };
 
   const db = getAdminDb();
   if (!db) throw new Error('Participant service unavailable.');
-  const snapshot = await db.collection('participants').doc(id).get();
-  const record = snapshot.data();
-  if (!snapshot.exists || record?.portalDisabled === true ||
-      !normalizeDob(String(record?.dob || '')) ||
-      record!.dob !== birthDate) {
+  const matches = await db.collection('participants').where('bib', '==', bib).limit(2).get();
+  // Fail closed on duplicate Bib numbers. Never pick the first arbitrarily,
+  // including when two participants have the same date of birth.
+  if (matches.size !== 1) {
     return { ok: false as const, limited: false };
   }
-  return { ok: true as const, token: createSession(id) };
+  const participantDoc = matches.docs[0];
+  const participantId = participantDoc.id;
+  const record = participantDoc.data();
+  if (!/^part-[a-zA-Z0-9_-]{1,100}$/.test(participantId) ||
+      record.portalDisabled === true ||
+      !normalizeDob(String(record.dob || '')) ||
+      record.dob !== birthDate) {
+    return { ok: false as const, limited: false };
+  }
+  return { ok: true as const, token: createSession(participantId) };
 }
