@@ -104,7 +104,7 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
     });
     createdDocRefs.push(groupRegRef);
 
-    // Solo Result: PUBLISHED, Rank 1 -> 10 official points
+    // Solo Result: PUBLISHED, Rank 1 -> 11 official points (Grade A+ for 95 marks in SOLO is 11 points)
     const soloResRef = db.collection('results').doc(testSoloResultDocId);
     batch.set(soloResRef, {
       competitionId: testSoloCompId,
@@ -114,14 +114,14 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
           rank: 1,
           registrationId: testSoloRegId,
           score: 95,
-          grade: 'A',
-          officialPoints: 10
+          grade: 'A+',
+          officialPoints: 11
         }
       ]
     });
     createdDocRefs.push(soloResRef);
 
-    // Group Result: PUBLISHED, Rank 1 -> 15 team official points
+    // Group Result: PUBLISHED, Rank 1 -> 23 team official points (Grade A+ for 92 marks in GROUP is 23 points)
     const groupResRef = db.collection('results').doc(testGroupResultDocId);
     batch.set(groupResRef, {
       competitionId: testGroupCompId,
@@ -131,8 +131,8 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
           rank: 1,
           registrationId: testGroupRegId,
           score: 92,
-          grade: 'A',
-          officialPoints: 15
+          grade: 'A+',
+          officialPoints: 23
         }
       ]
     });
@@ -234,7 +234,9 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
     expect(soloEvent).toBeDefined();
     expect(soloEvent.type).toBe('SOLO');
     expect(soloEvent.published).toBe(true);
-    expect(soloEvent.individualPoints).toBe(10);
+    expect(soloEvent.score).toBe(95);
+    expect(soloEvent.grade).toBe('A+');
+    expect(soloEvent.individualPoints).toBe(11);
     expect(soloEvent.groupTeamPoints).toBe(0);
   });
 
@@ -249,11 +251,13 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
     expect(groupEvent).toBeDefined();
     expect(groupEvent.type).toBe('GROUP');
     expect(groupEvent.published).toBe(true);
-    expect(groupEvent.groupTeamPoints).toBe(15);
+    expect(groupEvent.score).toBe(92);
+    expect(groupEvent.grade).toBe('A+');
+    expect(groupEvent.groupTeamPoints).toBe(23);
     expect(groupEvent.individualPoints).toBe(0); // Team only - zero individual points
 
-    // Total individual points reflect only SOLO points (10), NOT 25
-    expect(data.summary.individualPoints).toBe(10);
+    // Total individual points reflect only SOLO points (11), NOT 34
+    expect(data.summary.individualPoints).toBe(11);
   });
 
   it('4. verifies unpublished results do not contribute to the visible points total', async () => {
@@ -289,11 +293,12 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
 
     expect(soloEvent.published).toBe(true);
     expect(soloEvent.score).toBe(95);
+    expect(soloEvent.grade).toBe('A+');
     expect(soloEvent.position).toBe(1);
-    expect(soloEvent.individualPoints).toBe(10);
+    expect(soloEvent.individualPoints).toBe(11);
 
-    // Total individual points accurately restored to 10 (not duplicated to 20)
-    expect(data.summary.individualPoints).toBe(10);
+    // Total individual points accurately restored to 11 (not duplicated to 22)
+    expect(data.summary.individualPoints).toBe(11);
   });
 
   it('6. verifies participant records and existing staging data remain intact', async () => {

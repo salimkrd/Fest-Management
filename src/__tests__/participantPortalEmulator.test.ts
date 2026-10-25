@@ -163,13 +163,13 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
           score: 95,
           grade: 'A+',
           rank: 1,
-          officialPoints: 10,
-          totalEarnedPoints: 10
+          officialPoints: 11,
+          totalEarnedPoints: 11
         }
       ]
     });
 
-    // Group Result: PUBLISHED, Rank 1 -> 10 team points
+    // Group Result: PUBLISHED, Rank 1 -> 23 team points (Grade A+ for 92 marks in GROUP is 23 points)
     await db.collection('results').doc(testResultGroupId).set({
       id: testResultGroupId,
       competitionId: testCompGroupId,
@@ -182,15 +182,15 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
           teamId: 'team-1',
           teamCode: 'SHA',
           score: 92,
-          grade: 'A',
+          grade: 'A+',
           rank: 1,
-          officialPoints: 10,
-          totalEarnedPoints: 10
+          officialPoints: 23,
+          totalEarnedPoints: 23
         }
       ]
     });
 
-    // Draft Result: READY_FOR_REVIEW (Unpublished), score 88
+    // Draft Result: READY_FOR_REVIEW (Unpublished), score 88 -> Grade A, Rank 2 -> 8 points
     await db.collection('results').doc(testResultDraftId).set({
       id: testResultDraftId,
       competitionId: testCompDraftId,
@@ -205,8 +205,8 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
           score: 88,
           grade: 'A',
           rank: 2,
-          officialPoints: 7,
-          totalEarnedPoints: 7
+          officialPoints: 8,
+          totalEarnedPoints: 8
         }
       ]
     });
@@ -551,7 +551,7 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
       expect(soloEvent.score).toBe(95);
       expect(soloEvent.grade).toBe('A+');
       expect(soloEvent.position).toBe(1);
-      expect(soloEvent.individualPoints).toBe(10);
+      expect(soloEvent.individualPoints).toBe(11);
       expect(soloEvent.groupTeamPoints).toBe(0);
     });
 
@@ -564,12 +564,14 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
       expect(groupEvent).toBeDefined();
       expect(groupEvent.published).toBe(true);
       expect(groupEvent.type).toBe('GROUP');
+      expect(groupEvent.score).toBe(92);
+      expect(groupEvent.grade).toBe('A+');
       expect(groupEvent.position).toBe(1);
       expect(groupEvent.individualPoints).toBe(0); // MUST BE 0 FOR INDIVIDUAL
-      expect(groupEvent.groupTeamPoints).toBe(10); // Team points credited
+      expect(groupEvent.groupTeamPoints).toBe(23); // Team points credited
 
-      // Overall summary individual points must reflect ONLY the SOLO points (10), NOT 20
-      expect(data.summary.individualPoints).toBe(10);
+      // Overall summary individual points must reflect ONLY the SOLO points (11), NOT 34
+      expect(data.summary.individualPoints).toBe(11);
     });
 
     it('hides unpublished/draft scores and marks from the participant portal', async () => {
@@ -607,7 +609,8 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
       soloEvent = data.events.find((e: { registrationId: string }) => e.registrationId === testRegSoloId);
       expect(soloEvent.published).toBe(true);
       expect(soloEvent.score).toBe(95);
-      expect(data.summary.individualPoints).toBe(10);
+      expect(soloEvent.grade).toBe('A+');
+      expect(data.summary.individualPoints).toBe(11);
     });
   });
 

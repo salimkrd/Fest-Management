@@ -279,7 +279,7 @@ async function runStagingVerification() {
     });
     createdDocRefs.push(groupRegRef);
 
-    // Solo Result: PUBLISHED, Rank 1 -> 10 official points
+    // Solo Result: PUBLISHED, Rank 1 -> 11 official points (Grade A+ for 95 marks in SOLO is 11 points)
     const soloResRef = db.collection('results').doc(testSoloResultDocId);
     batch.set(soloResRef, {
       competitionId: testSoloCompId,
@@ -289,14 +289,14 @@ async function runStagingVerification() {
           rank: 1,
           registrationId: testSoloRegId,
           score: 95,
-          grade: 'A',
-          officialPoints: 10
+          grade: 'A+',
+          officialPoints: 11
         }
       ]
     });
     createdDocRefs.push(soloResRef);
 
-    // Group Result: PUBLISHED, Rank 1 -> 15 team official points
+    // Group Result: PUBLISHED, Rank 1 -> 23 team official points (Grade A+ for 92 marks in GROUP is 23 points)
     const groupResRef = db.collection('results').doc(testGroupResultDocId);
     batch.set(groupResRef, {
       competitionId: testGroupCompId,
@@ -306,8 +306,8 @@ async function runStagingVerification() {
           rank: 1,
           registrationId: testGroupRegId,
           score: 92,
-          grade: 'A',
-          officialPoints: 15
+          grade: 'A+',
+          officialPoints: 23
         }
       ]
     });
@@ -472,10 +472,10 @@ async function runStagingVerification() {
     const totalPoints = dashboardData.summary?.individualPoints;
 
     const scoringInvariantsCorrect =
-      soloPoints === 10 &&
-      groupTeamPoints === 15 &&
+      soloPoints === 11 &&
+      groupTeamPoints === 23 &&
       groupIndividualPoints === 0 &&
-      totalPoints === 10;
+      totalPoints === 11;
 
     if (scoringInvariantsCorrect) {
       record(
@@ -539,15 +539,16 @@ async function runStagingVerification() {
     const repubPointsCorrect =
       repubSoloEvent?.published === true &&
       repubSoloEvent?.score === 95 &&
+      repubSoloEvent?.grade === 'A+' &&
       repubSoloEvent?.position === 1 &&
-      repubSoloEvent?.individualPoints === 10 &&
-      repubData.summary?.individualPoints === 10; // Exactly 10, not 20
+      repubSoloEvent?.individualPoints === 11 &&
+      repubData.summary?.individualPoints === 11; // Exactly 11, not 22
 
     if (repubPointsCorrect) {
       record(
         'Republishing Points Restoration & Anti-Duplication',
         true,
-        'Republishing restored eligible points to exactly 10 without duplicate score accumulation.'
+        'Republishing restored eligible points to exactly 11 without duplicate score accumulation.'
       );
     } else {
       record(
