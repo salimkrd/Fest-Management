@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
@@ -131,9 +132,7 @@ export default function AdminLoginPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Brand Icon */}
         <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#2563EB] flex items-center justify-center text-white font-extrabold text-xl shadow-md">
-            S
-          </div>
+          <FestivalLogo size={48} />
         </div>
 
         <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#111111]">
@@ -142,6 +141,7 @@ export default function AdminLoginPage() {
         <p className="mt-1 text-center text-xs text-[#526070]">
           {theme.festivalName} · {theme.institutionName}
         </p>
+        <div className="flex justify-center mt-3"><FestivalStatusBadge /></div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">

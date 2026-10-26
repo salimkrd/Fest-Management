@@ -11,7 +11,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Fest Management System | Sahithyolsav 2025",
+  title: "Festival Management | Official Festival Portal",
   description: "Enterprise Festival Operations, Participant Management, Live Scoring & Results Verification",
 };
 

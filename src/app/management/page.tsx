@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import {
   ShieldAlert,
   Users2,
@@ -28,9 +29,7 @@ export default function HomePage() {
       <header className="bg-white border-b border-[#E1E7EF] py-4 px-6 sm:px-12">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-extrabold text-base shadow-xs">
-              S
-            </div>
+            <FestivalLogo size={40} />
             <div>
               <h1 className="text-base font-extrabold text-[#111111] tracking-tight leading-tight">
                 {theme.festivalName}
@@ -39,9 +38,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-              FESTIVAL LIVE · DAY 2
-            </span>
+            <FestivalStatusBadge />
           </div>
         </div>
       </header>

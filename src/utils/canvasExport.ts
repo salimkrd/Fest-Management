@@ -44,7 +44,7 @@ export async function exportPosterAsPng(
 export async function exportDigitalIdAsPng(
   participant: Participant,
   festivalName: string = 'SAHITHYOLSAV 2025',
-  options?: { token?: string; qrPayload?: string; photoBlob?: Blob }
+  options?: { token?: string; qrPayload?: string; photoBlob?: Blob; logoBlob?: Blob }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -75,6 +75,21 @@ export async function exportDigitalIdAsPng(
   // Top Header Banner
   ctx.fillStyle = '#2563EB';
   ctx.fillRect(15, 15, width - 30, 160);
+
+  // Render the same published festival logo as the on-screen Digital ID.
+  if (options?.logoBlob) {
+    const logoObjectUrl = URL.createObjectURL(options.logoBlob);
+    try {
+      const logo = new Image();
+      logo.src = logoObjectUrl;
+      await logo.decode();
+      ctx.drawImage(logo, 30, 25, 44, 44);
+    } catch (error) {
+      console.warn('[canvasExport] Festival logo unavailable in PNG:', error);
+    } finally {
+      URL.revokeObjectURL(logoObjectUrl);
+    }
+  }
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#BFDBFE';

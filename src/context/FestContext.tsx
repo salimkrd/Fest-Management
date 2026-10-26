@@ -1422,26 +1422,38 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     initialPointsLedger.some(init => init.id === l.id) || DEMO_TEAM_IDS.includes(l.teamId);
 
   const [theme, setTheme] = useState<PublicThemeSettings>(() => {
-    if (typeof window !== 'undefined') {
+    if (isIsolatedDemoOrTest && typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_theme_settings_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        try { return { ...defaultTheme, ...JSON.parse(saved) }; } catch (e) { console.error(e); }
       }
     }
+    // Never use stale browser localStorage as an override on live settings.
     return defaultTheme;
   });
-  const localThemeEdits = useRef<Partial<PublicThemeSettings>>({});
 
   useEffect(() => {
     if (!db) return;
     return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
-      if (snapshot.exists()) {
-        setTheme(previous => ({ ...previous, ...snapshot.data(), ...localThemeEdits.current }));
-      } else {
-        setTheme(defaultTheme);
-      }
-    }, error => console.warn('[FestContext] Published theme synchronization failed:', error));
+      setTheme(snapshot.exists() ? { ...defaultTheme, ...snapshot.data() } : defaultTheme);
+    }, error => console.warn('[FestContext] Festival settings synchronization failed:', error));
   }, []);
+
+  // Browser title and favicon follow the published festival identity.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.title = theme.festivalName + ' | Festival Management';
+    const existing = document.querySelector<HTMLLinkElement>('link[data-festival-icon="true"]');
+    if (theme.logoUrl?.trim()) {
+      const icon = existing || document.createElement('link');
+      icon.rel = 'icon';
+      icon.href = theme.logoUrl.trim();
+      icon.dataset.festivalIcon = 'true';
+      if (!existing) document.head.appendChild(icon);
+    } else {
+      existing?.remove();
+    }
+  }, [theme.festivalName, theme.logoUrl]);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
@@ -2351,15 +2363,16 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   }, [theme, categories, teams, competitions, participants, registrations, stages, schedules, markEntries, results, pointsLedger, currentTeamUser, isIsolatedDemoOrTest]);
 
   const updateTheme = async (newTheme: Partial<PublicThemeSettings>) => {
-    localThemeEdits.current = { ...localThemeEdits.current, ...newTheme };
-    setTheme(prev => ({ ...prev, ...newTheme }));
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        await setDoc(doc(db, 'settings', 'publicTheme'), sanitizeForFirestore(newTheme), { merge: true });
-      } catch (err) {
-        console.warn('[FestContext] Firestore updateTheme error:', err);
-      }
+    if (isIsolatedDemoOrTest) {
+      setTheme(prev => ({ ...prev, ...newTheme }));
+      return;
     }
+    if (!db || !auth?.currentUser) {
+      throw new Error('Chief Administrator authentication is required to save settings.');
+    }
+    // Firestore rules enforce ADMIN. Await the actual write and propagate failure.
+    // The public Firestore listener publishes the authoritative values to all portals.
+    await setDoc(doc(db, 'settings', 'publicTheme'), sanitizeForFirestore(newTheme), { merge: true });
   };
 
   const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {

@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Award, CalendarDays, CheckCircle2, Clock3, DoorOpen, IdCard, LogOut, Medal, Trophy, Users2 } from 'lucide-react';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
+import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import type { Participant } from '@/types/fest';
 
 type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'division' | 'photoUrl' | 'idStatus'>;
@@ -22,6 +24,7 @@ type PortalData = { profile: Profile; events: Entry[]; summary: {
 
 export default function ParticipantDashboard() {
   const router = useRouter();
+  const { theme } = useFest();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,12 +96,13 @@ export default function ParticipantDashboard() {
       <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#2563EB] text-white font-black rounded-xl flex items-center justify-center">I</div>
+            <FestivalLogo size={40} />
             <div>
-              <span className="block text-sm font-extrabold text-[#111827]">INSPIRATH</span>
+              <span className="block text-sm font-extrabold text-[#111827]">{theme.festivalName}</span>
               <span className="block text-[11px] text-[#526070]">Participant Dashboard</span>
             </div>
           </div>
+          <div className="hidden sm:block"><FestivalStatusBadge /></div>
           <button type="button" onClick={() => void logout()}
             className="inline-flex items-center gap-1.5 text-xs font-bold border border-[#E1E7EF] rounded-lg px-3 py-2 text-[#526070] hover:bg-[#F8FAFC]">
             <LogOut className="w-4 h-4" /> Logout

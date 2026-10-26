@@ -9,6 +9,8 @@ import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
 import { ParticipantPhoto, isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
+import { useFest } from '@/context/FestContext';
+import { FestivalLogo } from '@/components/domain/FestivalBrand';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -23,6 +25,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   onClose,
   authMode = 'firebase'
 }) => {
+  const { theme } = useFest();
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [signedToken, setSignedToken] = useState<string>('');
   const [signedPayload, setSignedPayload] = useState<string>('');
@@ -134,10 +137,17 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         }
       }
 
-      await exportDigitalIdAsPng(participant, 'SAHITHYOLSAV 2025', {
+      let logoBlob: Blob | undefined;
+      if (theme.logoUrl?.trim()) {
+        // Configured logo is publicly readable; fetch same-origin for untainted PNG.
+        const logoResponse = await fetch('/api/festival/logo', { cache: 'no-store' });
+        if (logoResponse.ok) logoBlob = await logoResponse.blob();
+      }
+      await exportDigitalIdAsPng(participant, theme.festivalName, {
         token: signedToken,
         qrPayload: signedPayload,
-        photoBlob
+        photoBlob,
+        logoBlob
       });
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Unable to export Digital ID Card.');
@@ -186,10 +196,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         <div className="w-[320px] rounded-2xl border-2 border-[#111111] overflow-hidden shadow-lg bg-white flex flex-col">
           {/* Top Banner */}
           <div className="bg-[#2563EB] text-white p-4 text-center relative">
+            {theme.logoUrl && <span className="absolute top-2 left-2"><FestivalLogo size={26} /></span>}
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-200 block">
               OFFICIAL FESTIVAL PASS
             </span>
-            <h4 className="text-base font-bold tracking-tight">SAHITHYOLSAV 2025</h4>
+            <h4 className="text-base font-bold tracking-tight">{theme.festivalName}</h4>
             <p className="text-[11px] text-blue-100">Annual Cultural &amp; Literary Festival</p>
             <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-white text-[#2563EB] text-[10px] font-bold">
               {participant.categoryName.toUpperCase()}

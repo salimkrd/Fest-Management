@@ -24,6 +24,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -202,9 +203,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         {/* Brand Header */}
         <div className="h-16 px-6 border-b border-[#E1E7EF] flex items-center justify-between">
           <Link href="/admin" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center text-white font-bold text-sm shadow-xs">
-              S
-            </div>
+            <FestivalLogo size={32} />
             <div>
               <span className="font-bold text-[#111111] text-sm tracking-tight block leading-tight">
                 {theme.festivalName}
@@ -274,14 +273,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Live · Day 2 of 3
-                </span>
-              </div>
+              <FestivalStatusBadge className="hidden sm:inline-flex" />
               <span className="text-xs text-[#526070] hidden md:inline">
-                Institutional Arts &amp; Cultural Championship
+                {theme.institutionName}
               </span>
             </div>
           </div>
