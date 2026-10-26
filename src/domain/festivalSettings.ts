@@ -38,8 +38,8 @@ export function getFestivalStatus(
   dates: Pick<PublicThemeSettings, 'festivalStartDate' | 'festivalEndDate'>,
   today: string = indiaCalendarDate()
 ): FestivalStatus {
-  const a = dates.festivalStartDate && dayNumber(dates.festivalStartDate);
-  const b = dates.festivalEndDate && dayNumber(dates.festivalEndDate);
+  const a = dayNumber(dates.festivalStartDate || '');
+  const b = dayNumber(dates.festivalEndDate || '');
   const now = dayNumber(today);
   if (a == null || b == null || now == null || a > b) return { phase: 'UNCONFIGURED', label: 'DATES NOT SET' };
   const totalDays = b - a + 1;
@@ -52,7 +52,7 @@ export function getFestivalStatus(
 export function normalizeFestivalSettings(form: {
   festivalName: string; institutionName: string; logoUrl: string;
   festivalStartDate: string; festivalEndDate: string;
-}): Pick<PublicThemeSettings, 'festivalName' | 'institutionName' | 'logoUrl' | 'festivalStartDate' | 'festivalEndDate' | 'year'> {
+}): { festivalName: string; institutionName: string; logoUrl: string; festivalStartDate: string; festivalEndDate: string; year: string } {
   const festivalName = form.festivalName.trim();
   const institutionName = form.institutionName.trim();
   const logoUrl = form.logoUrl.trim();
