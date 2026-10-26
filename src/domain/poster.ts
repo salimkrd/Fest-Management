@@ -1,4 +1,5 @@
 import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PublicThemeSettings } from '@/types/fest';
+import { festivalNameFontFamily } from '@/domain/festivalFonts';
 
 export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
   { value: 'text', label: 'Custom text' }, { value: 'festivalName', label: 'Festival name' },
@@ -168,7 +169,12 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
     const anchor = element.align === 'left' ? 'start' : element.align === 'right' ? 'end' : 'middle';
     const tx = x + (element.align === 'center' ? w / 2 : element.align === 'right' ? w : 0);
     const ty = y + Math.max(size, (h - lines.length * size * 1.2) / 2 + size);
-    return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${POSTER_FONTS[element.fontFamily] ?? POSTER_FONTS.sans}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}">${lines.map((line, index) => `<tspan x="${tx}" y="${ty + index * size * 1.2}">${escapeXml(line)}</tspan>`).join('')}</text>`;
+    // The official Festival Name layer follows festival branding; other poster
+    // text layers retain their independently configured typography.
+    const font = element.field === 'festivalName'
+      ? festivalNameFontFamily(theme.festivalNameFont).replaceAll('"', '').replace('var(--font-montserrat), ', '')
+      : POSTER_FONTS[element.fontFamily] ?? POSTER_FONTS.sans;
+    return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${escapeXml(font)}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}">${lines.map((line, index) => `<tspan x="${tx}" y="${ty + index * size * 1.2}">${escapeXml(line)}</tspan>`).join('')}</text>`;
   }).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${background}"/>${config.backgroundImage && isPosterImage(config.backgroundImage) ? `<image width="100%" height="100%" href="${config.backgroundImage}" opacity="${Math.max(0, Math.min(1, config.backgroundOpacity ?? 1))}" preserveAspectRatio="xMidYMid slice"/>` : ''}${decoration}${layers}</svg>`;
 }

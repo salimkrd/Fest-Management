@@ -181,6 +181,13 @@ describe('Poster result bindings and shared rendering', () => {
     expect(resolvePosterField(textLayer('rank1.grade'), noGrade, theme)).toBe('');
   });
 
+  it('uses festival-name-only font for the branded poster layer', () => {
+    const branded = renderPosterSvg(result(), { ...theme, festivalNameFont: 'Cinzel' },
+      withElements(textLayer('festivalName'), textLayer('competitionName')));
+    expect(branded).toContain('font-family="Cinzel, serif"');
+    expect(branded).toContain('font-family="Arial, sans-serif"');
+  });
+
   it.each(['text', 'festivalName', 'competitionName', 'rank1.name'] as const)('escapes markup from %s without losing the displayed text', field => {
     const content = '<script>"&\'</script>';
     const sample = { ...result([winner({ candidateName: content })]), competitionName: content };
