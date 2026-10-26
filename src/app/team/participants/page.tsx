@@ -5,34 +5,21 @@ import { TeamLayout } from '@/components/layout/TeamLayout';
 import { useFest } from '@/context/FestContext';
 import { Participant } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
+import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
-import { Plus, Search, Edit2, Trash2, IdCard, Users } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
 
 export default function TeamParticipantsPage() {
   const { currentTeamUser, teams, participants, categories, addParticipant, updateParticipant, deleteParticipant } = useFest();
-  const team = currentTeamUser || teams[0];
+  const team = currentTeamUser;
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<Participant | null>(null);
   const [selectedIdCard, setSelectedIdCard] = useState<Participant | null>(null);
-
-  // Form State
-  const [name, setName] = useState('');
-  const [dob, setDob] = useState('2008-04-12');
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
-  const [classGrade, setClassGrade] = useState('Std 11');
-  const [division, setDivision] = useState('A');
-  const [phone, setPhone] = useState('+91 98470 ');
-  const [remarks, setRemarks] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
 
   // Scoped to team only!
   const myParticipants = participants.filter(p => p.teamId === team?.id);
@@ -45,75 +32,28 @@ export default function TeamParticipantsPage() {
   });
 
   const handleOpenAdd = () => {
+    if (!team) return;
     setEditingPart(null);
-    setName('');
-    setDob('2008-04-12');
-    setCategoryId(categories[0]?.id || '');
-    setClassGrade('Std 11');
-    setDivision('A');
-    setPhone('+91 98470 ');
-    setRemarks('');
-    setError('');
     setModalOpen(true);
   };
 
-  const handleOpenEdit = (p: Participant) => {
-    setEditingPart(p);
-    setName(p.name);
-    setDob(p.dob);
-    setCategoryId(p.categoryId);
-    setClassGrade(p.classGrade);
-    setDivision(p.division);
-    setPhone(p.phone);
-    setRemarks(p.remarks || '');
-    setError('');
+  const handleOpenEdit = (participant: Participant) => {
+    if (!team || participant.teamId !== team.id) return;
+    setEditingPart(participant);
     setModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) {
-      setError('Please provide contestant full name.');
-      return;
+  const handleSave = async (data: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
+    if (!team || data.teamId !== team.id || (editingPart && editingPart.teamId !== team.id)) {
+      throw new Error('You can only manage participants belonging to your assigned team.');
     }
-
-    if (!team) {
-      setError('No active team assigned to this manager session.');
-      return;
-    }
-
-    const cat = categories.find(c => c.id === categoryId);
-
-    const partData = {
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.')}@student.institution.org`,
-      phone,
-      teamId: team.id,
-      teamCode: team.code,
-      teamName: team.name,
-      categoryId,
-      categoryName: cat?.name || 'Senior',
-      classGrade,
-      division,
-      dob,
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      registeredEventIds: editingPart ? editingPart.registeredEventIds : [],
-      remarks
-    };
-
-    setSaving(true);
-    setError('');
-    try {
-      if (editingPart) {
-        await updateParticipant(editingPart.id, partData);
-      } else {
-        await addParticipant(partData);
-      }
-      setModalOpen(false);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save participant.');
-    } finally {
-      setSaving(false);
+    if (editingPart) {
+      // Do not replace competition registrations when editing profile fields.
+      const profileUpdates: Partial<Participant> = { ...data };
+      delete profileUpdates.registeredEventIds;
+      await updateParticipant(editingPart.id, profileUpdates);
+    } else {
+      await addParticipant(data);
     }
   };
 
@@ -145,6 +85,7 @@ export default function TeamParticipantsPage() {
             size="md"
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={handleOpenAdd}
+            disabled={!team}
           >
             Add Team Participant
           </Button>
@@ -272,75 +213,17 @@ export default function TeamParticipantsPage() {
           </div>
         </div>
 
-        {/* Add/Edit Modal */}
-        <Modal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          title={editingPart ? `Edit Participant (${editingPart.name})` : 'Add Team Participant'}
-          description={`Register a new contestant belonging to ${team?.name}`}
-          maxWidth="lg"
-          footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Contestant'}
-              </Button>
-            </div>
-          }
-        >
-          <form onSubmit={handleSave} className="space-y-4">
-            {error && (
-              <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
-            )}
-
-            <Input
-              label="Student Full Name"
-              placeholder="e.g. Zayd Al-Ansari"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                label="Assigned Category Tier"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                options={categories.map(c => ({ value: c.id, label: c.name }))}
-              />
-              <Input
-                label="Date of Birth"
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Academic Class &amp; Division"
-                placeholder="Std 11 - A"
-                value={classGrade}
-                onChange={(e) => setClassGrade(e.target.value)}
-              />
-              <Input
-                label="Contact Phone (WhatsApp)"
-                placeholder="+91 98470 00000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-
-            <Input
-              label="Medical / Stage Remarks"
-              placeholder="Any stage accommodations or dietary notes"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-            />
-          </form>
-        </Modal>
+        {/* Shared editor; team selection is locked to the signed-in manager's team. */}
+        {modalOpen && (
+          <ParticipantEditorModal
+            participant={editingPart}
+            teams={teams}
+            categories={categories}
+            lockedTeam={team}
+            onSave={handleSave}
+            onClose={() => setModalOpen(false)}
+          />
+        )}
 
         {/* Digital ID Card Preview */}
         <DigitalIdCard
