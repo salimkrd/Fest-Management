@@ -27,7 +27,7 @@ export default function PublicChampionshipPage() {
         <div className="text-center max-w-2xl mx-auto">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold uppercase tracking-wider">
             <Trophy className="w-3.5 h-3.5 text-amber-600" />
-            Official {theme.festivalName} Trophy Race
+            Official <span className="festival-name">{theme.festivalName}</span> Trophy Race
           </span>
           <h1 className="text-3xl sm:text-4xl font-black text-[#111111] tracking-tight mt-3">
             Team Championship Standings
