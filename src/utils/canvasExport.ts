@@ -48,6 +48,12 @@ export async function exportDigitalIdAsPng(
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
+  // Do not silently substitute an initial when a genuine preview photo exists.
+  const realPhotoUrl = participant.photoUrl?.trim();
+  if (realPhotoUrl && !realPhotoUrl.includes('1534528741775-53994a69daeb') && !options?.photoBlob) {
+    throw new Error('Participant photo must be loaded before the PNG can be exported.');
+  }
+
   const width = 640;
   const height = 960;
 
