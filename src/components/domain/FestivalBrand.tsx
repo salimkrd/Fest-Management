@@ -6,12 +6,17 @@ import { getFestivalStatus, type FestivalStatus } from '@/domain/festivalSetting
 
 export function FestivalLogo({ size = 36, className = '' }: { size?: number; className?: string }) {
   const { theme } = useFest();
-  const [error, setError] = useState(false);
-  useEffect(() => { setError(false); }, [theme.logoUrl]);
+  const url = theme.logoUrl?.trim() || '';
+  const [failed, setFailed] = useState<'proxy' | 'direct' | null>(null);
+  useEffect(() => { setFailed(null); }, [url]);
   const initials = theme.festivalName.trim().charAt(0).toUpperCase() || 'F';
-  if (theme.logoUrl?.trim() && !error) {
-    return <img src={theme.logoUrl.trim()} alt={theme.festivalName + ' logo'}
-      onError={() => setError(true)} loading="eager"
+  if (url && failed !== 'direct') {
+    // Same-origin proxy first: avoids hotlink protection and external image restrictions.
+    // If this provider does not support the format, retry the saved direct URL.
+    const proxySource = '/api/festival/logo?v=' + encodeURIComponent(url.slice(-64));
+    const source = failed === 'proxy' ? url : proxySource;
+    return <img key={url + ':' + (failed || '')} src={source} alt={theme.festivalName + ' logo'}
+      onError={() => setFailed(failed === 'proxy' ? 'direct' : 'proxy')} loading="eager"
       className={'shrink-0 object-contain rounded-lg bg-white ' + className}
       style={{ width: size, height: size }} />;
   }

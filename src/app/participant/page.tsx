@@ -98,7 +98,7 @@ export default function ParticipantDashboard() {
           <div className="flex items-center gap-3">
             <FestivalLogo size={40} />
             <div>
-              <span className="block text-sm font-extrabold text-[#111827]">{theme.festivalName}</span>
+              <span className="block text-sm font-extrabold text-[#111827]"><span className="festival-name">{theme.festivalName}</span></span>
               <span className="block text-[11px] text-[#526070]">Participant Dashboard</span>
             </div>
           </div>

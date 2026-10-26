@@ -96,7 +96,7 @@ function TeamActivateForm() {
             <KeyRound className="w-7 h-7" />
           </div>
           <p className="text-xs font-bold tracking-widest uppercase text-blue-600 mb-1">
-            {theme.festivalName} · {theme.institutionName}
+            <span className="festival-name">{theme.festivalName}</span> · {theme.institutionName}
           </p>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             Team Manager Activation
@@ -236,7 +236,7 @@ function TeamActivateForm() {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>End-to-End Cryptographically Secured Activation</span>
           </div>
-          <p>{theme.festivalName} · Fest Management System</p>
+          <p><span className="festival-name">{theme.festivalName}</span> · Fest Management System</p>
         </div>
       </div>
     </div>

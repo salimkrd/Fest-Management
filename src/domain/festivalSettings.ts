@@ -1,4 +1,5 @@
 import type { PublicThemeSettings } from '@/types/fest';
+import { DEFAULT_FESTIVAL_NAME_FONT, isFestivalNameFont } from '@/domain/festivalFonts';
 
 const DAY_MS = 86400000;
 export type FestivalPhase = 'UNCONFIGURED' | 'UPCOMING' | 'LIVE' | 'COMPLETED';
@@ -52,10 +53,13 @@ export function getFestivalStatus(
 export function normalizeFestivalSettings(form: {
   festivalName: string; institutionName: string; logoUrl: string;
   festivalStartDate: string; festivalEndDate: string;
-}): { festivalName: string; institutionName: string; logoUrl: string; festivalStartDate: string; festivalEndDate: string; year: string } {
+  festivalNameFont?: string;
+}): { festivalName: string; festivalNameFont: string; institutionName: string; logoUrl: string; festivalStartDate: string; festivalEndDate: string; year: string } {
   const festivalName = form.festivalName.trim();
   const institutionName = form.institutionName.trim();
   const logoUrl = form.logoUrl.trim();
+  const festivalNameFont = form.festivalNameFont || DEFAULT_FESTIVAL_NAME_FONT;
+  if (!isFestivalNameFont(festivalNameFont)) throw new Error('Choose a font from the available Festival Name fonts.');
   if (!festivalName || festivalName.length > 100) throw new Error('Festival Name is required (maximum 100 characters).');
   if (!institutionName || institutionName.length > 150) throw new Error('Institution Name is required (maximum 150 characters).');
   if (logoUrl) {
@@ -68,7 +72,7 @@ export function normalizeFestivalSettings(form: {
   }
   validateFestivalDates(form.festivalStartDate, form.festivalEndDate);
   return {
-    festivalName, institutionName, logoUrl,
+    festivalName, festivalNameFont, institutionName, logoUrl,
     festivalStartDate: form.festivalStartDate,
     festivalEndDate: form.festivalEndDate,
     year: form.festivalStartDate.slice(0, 4)

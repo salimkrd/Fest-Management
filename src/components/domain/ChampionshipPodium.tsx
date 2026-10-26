@@ -28,7 +28,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
         </div>
         <div className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
           <Trophy className="w-4 h-4 text-amber-600" />
-          <span>{theme.festivalName} Trophy Race</span>
+          <span><span className="festival-name">{theme.festivalName}</span> Trophy Race</span>
           <FestivalStatusBadge />
         </div>
       </div>

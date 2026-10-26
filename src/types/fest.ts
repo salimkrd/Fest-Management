@@ -267,6 +267,8 @@ export interface PosterTemplate {
 
 export interface PublicThemeSettings {
   festivalName: string;
+  /** Only the official festival name text uses this font. */
+  festivalNameFont?: string;
   institutionName: string;
   /** Inclusive local calendar dates in Asia/Kolkata (YYYY-MM-DD). */
   festivalStartDate?: string;

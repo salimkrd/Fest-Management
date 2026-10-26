@@ -147,7 +147,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         token: signedToken,
         qrPayload: signedPayload,
         photoBlob,
-        logoBlob
+        logoBlob,
+        festivalNameFont: theme.festivalNameFont
       });
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Unable to export Digital ID Card.');
@@ -200,7 +201,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-200 block">
               OFFICIAL FESTIVAL PASS
             </span>
-            <h4 className="text-base font-bold tracking-tight">{theme.festivalName}</h4>
+            <h4 className="text-base font-bold tracking-tight"><span className="festival-name">{theme.festivalName}</span></h4>
             <p className="text-[11px] text-blue-100">Annual Cultural &amp; Literary Festival</p>
             <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-white text-[#2563EB] text-[10px] font-bold">
               {participant.categoryName.toUpperCase()}

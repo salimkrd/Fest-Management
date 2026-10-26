@@ -6,6 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
+import { festivalNameFontFamily, festivalFontStylesheet } from '@/domain/festivalFonts';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
 import {
   Category,
@@ -1438,6 +1439,28 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       setTheme(snapshot.exists() ? { ...defaultTheme, ...snapshot.data() } : defaultTheme);
     }, error => console.warn('[FestContext] Festival settings synchronization failed:', error));
   }, []);
+
+  // Only branded festival name text changes fonts; no portal body/control typography is modified.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const font = theme.festivalNameFont || 'Montserrat';
+    document.documentElement.style.setProperty('--festival-name-font', festivalNameFontFamily(font));
+    const href = festivalFontStylesheet([font]);
+    const old = document.getElementById('festival-name-selected-font') as HTMLLinkElement | null;
+    if (href) {
+      if (!old) {
+        const link = document.createElement('link');
+        link.id = 'festival-name-selected-font';
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      } else if (old.href !== href) {
+        old.href = href;
+      }
+    } else {
+      old?.remove();
+    }
+  }, [theme.festivalNameFont]);
 
   // Browser title and favicon follow the published festival identity.
   useEffect(() => {

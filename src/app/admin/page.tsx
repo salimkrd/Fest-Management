@@ -52,7 +52,7 @@ export default function AdminDashboardPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
-                {theme.festivalName} Workspace
+                <span className="festival-name">{theme.festivalName}</span> Workspace
               </h1>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
                 ACTIVE

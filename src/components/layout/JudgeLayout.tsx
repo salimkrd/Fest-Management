@@ -28,7 +28,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
             <FestivalLogo size={32} />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#111111]">{theme.festivalName}</span>
+                <span className="text-xs font-bold text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
                   SECURE JURY SESSION
                 </span>

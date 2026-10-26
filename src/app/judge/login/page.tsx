@@ -158,7 +158,7 @@ export default function JudgeLoginPage() {
           Secure Jury Access
         </h2>
         <p className="mt-1 text-center text-xs text-[#526070]">
-          {theme.festivalName} · Adjudicator Session Portal
+          <span className="festival-name">{theme.festivalName}</span> · Adjudicator Session Portal
         </p>
         <div className="mt-3 flex justify-center"><FestivalStatusBadge /></div>
       </div>

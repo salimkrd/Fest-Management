@@ -32,7 +32,7 @@ export default function HomePage() {
             <FestivalLogo size={40} />
             <div>
               <h1 className="text-base font-extrabold text-[#111111] tracking-tight leading-tight">
-                {theme.festivalName}
+                <span className="festival-name">{theme.festivalName}</span>
               </h1>
               <p className="text-xs text-[#526070] font-medium">{theme.institutionName} · Single-Fest System</p>
             </div>
@@ -214,7 +214,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-[#E1E7EF] py-4 text-center text-xs text-[#526070]">
-        <span>{theme.institutionName} · {theme.festivalName} · Single-Organization Fest v2.0</span>
+        <span>{theme.institutionName} · <span className="festival-name">{theme.festivalName}</span> · Single-Organization Fest v2.0</span>
       </footer>
     </div>
   );

@@ -50,7 +50,7 @@ export default function ParticipantLoginPage() {
             <div className="flex items-center gap-2.5 mb-5">
               <FestivalLogo size={44} />
               <div>
-                <p className="text-xs font-semibold text-blue-100">{theme.festivalName} · Participant Portal</p>
+                <p className="text-xs font-semibold text-blue-100"><span className="festival-name">{theme.festivalName}</span> · Participant Portal</p>
                 <h1 className="text-2xl font-extrabold tracking-tight">Participant Login</h1>
               </div>
             </div>

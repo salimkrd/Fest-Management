@@ -116,7 +116,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   </span>
                 </div>
                 <span className="text-[11px] text-[#526070] font-medium">
-                  {theme.festivalName} · {theme.institutionName}
+                  <span className="festival-name">{theme.festivalName}</span> · {theme.institutionName}
                 </span>
               </div>
             </div>

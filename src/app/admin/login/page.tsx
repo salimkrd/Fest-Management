@@ -139,7 +139,7 @@ export default function AdminLoginPage() {
           Fest Control Center
         </h2>
         <p className="mt-1 text-center text-xs text-[#526070]">
-          {theme.festivalName} · {theme.institutionName}
+          <span className="festival-name">{theme.festivalName}</span> · {theme.institutionName}
         </p>
         <div className="flex justify-center mt-3"><FestivalStatusBadge /></div>
       </div>
