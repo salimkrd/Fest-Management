@@ -147,7 +147,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         token: signedToken,
         qrPayload: signedPayload,
         photoBlob,
-        logoBlob
+        logoBlob,
+        festivalNameFont: theme.festivalNameFont
       });
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Unable to export Digital ID Card.');

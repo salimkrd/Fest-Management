@@ -5,6 +5,7 @@
 
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
 import QRCode from 'qrcode';
+import { FESTIVAL_NAME_FONTS, DEFAULT_FESTIVAL_NAME_FONT } from '@/domain/festivalFonts';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -44,7 +45,7 @@ export async function exportPosterAsPng(
 export async function exportDigitalIdAsPng(
   participant: Participant,
   festivalName: string = 'SAHITHYOLSAV 2025',
-  options?: { token?: string; qrPayload?: string; photoBlob?: Blob; logoBlob?: Blob }
+  options?: { token?: string; qrPayload?: string; photoBlob?: Blob; logoBlob?: Blob; festivalNameFont?: string }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -98,7 +99,14 @@ export async function exportDigitalIdAsPng(
   ctx.fillText('OFFICIAL FESTIVAL PASS', width / 2, 55);
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 34px Montserrat, sans-serif';
+  const fontChoice = FESTIVAL_NAME_FONTS.find(font => font.name === options?.festivalNameFont)
+    || FESTIVAL_NAME_FONTS.find(font => font.name === DEFAULT_FESTIVAL_NAME_FONT)!;
+  const canvasFont = fontChoice.name === 'Montserrat' ? 'Montserrat, sans-serif' : fontChoice.family;
+  if (typeof document !== 'undefined' && document.fonts?.load) {
+    try { await document.fonts.load('800 34px "' + fontChoice.name + '"'); }
+    catch { /* A built-in fallback is available if remote fonts cannot load. */ }
+  }
+  ctx.font = '800 34px ' + canvasFont;
   ctx.letterSpacing = '0px';
   ctx.fillText(festivalName.toUpperCase(), width / 2, 105);
 
