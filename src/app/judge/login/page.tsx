@@ -3,6 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -150,9 +151,7 @@ export default function JudgeLoginPage() {
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#111111] flex items-center justify-center text-white font-extrabold text-xl shadow-md">
-            <Gavel className="w-6 h-6" />
-          </div>
+          <FestivalLogo size={48} />
         </div>
 
         <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#111111]">
@@ -161,6 +160,7 @@ export default function JudgeLoginPage() {
         <p className="mt-1 text-center text-xs text-[#526070]">
           {theme.festivalName} · Adjudicator Session Portal
         </p>
+        <div className="mt-3 flex justify-center"><FestivalStatusBadge /></div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">

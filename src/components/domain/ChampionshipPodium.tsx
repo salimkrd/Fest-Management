@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { Team } from '@/types/fest';
+import { useFest } from '@/context/FestContext';
+import { FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Trophy, Award, Medal } from 'lucide-react';
 
 interface ChampionshipPodiumProps {
@@ -9,6 +11,7 @@ interface ChampionshipPodiumProps {
 }
 
 export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams }) => {
+  const { theme } = useFest();
   const sorted = [...teams].sort((a, b) => b.totalPoints - a.totalPoints);
   const first = sorted[0];
   const second = sorted[1];
@@ -25,7 +28,8 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
         </div>
         <div className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
           <Trophy className="w-4 h-4 text-amber-600" />
-          <span>Live Sahithyolsav Trophy Race</span>
+          <span>{theme.festivalName} Trophy Race</span>
+          <FestivalStatusBadge />
         </div>
       </div>
 

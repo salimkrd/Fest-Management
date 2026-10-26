@@ -6,8 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, Lock, Mail, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 
 function TeamActivateForm() {
+  const { theme } = useFest();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -93,7 +96,7 @@ function TeamActivateForm() {
             <KeyRound className="w-7 h-7" />
           </div>
           <p className="text-xs font-bold tracking-widest uppercase text-blue-600 mb-1">
-            Sahithyolsav 2025 · Markaz Knowledge City
+            {theme.festivalName} · {theme.institutionName}
           </p>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             Team Manager Activation
@@ -233,7 +236,7 @@ function TeamActivateForm() {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>End-to-End Cryptographically Secured Activation</span>
           </div>
-          <p>Sahithyolsav Fest Management System · Single-Fest Architecture</p>
+          <p>{theme.festivalName} · Fest Management System</p>
         </div>
       </div>
     </div>

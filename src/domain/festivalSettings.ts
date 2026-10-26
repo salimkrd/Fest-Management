@@ -61,7 +61,7 @@ export function normalizeFestivalSettings(form: {
   if (logoUrl) {
     let url: URL;
     try { url = new URL(logoUrl); } catch { throw new Error('Enter a valid direct image URL for the festival logo.'); }
-    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password ||
+    if (url.protocol !== 'https:' || url.username || url.password ||
         logoUrl.length > 2048 || /(?:chatgpt\.com|chat\.openai\.com)$/i.test(url.hostname) && url.pathname.startsWith('/c/')) {
       throw new Error('Use a public direct image URL, not a ChatGPT conversation link.');
     }

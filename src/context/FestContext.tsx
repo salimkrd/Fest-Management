@@ -1439,6 +1439,22 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }, error => console.warn('[FestContext] Festival settings synchronization failed:', error));
   }, []);
 
+  // Browser title and favicon follow the published festival identity.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.title = theme.festivalName + ' | Festival Management';
+    const existing = document.querySelector<HTMLLinkElement>('link[data-festival-icon="true"]');
+    if (theme.logoUrl?.trim()) {
+      const icon = existing || document.createElement('link');
+      icon.rel = 'icon';
+      icon.href = theme.logoUrl.trim();
+      icon.dataset.festivalIcon = 'true';
+      if (!existing) document.head.appendChild(icon);
+    } else {
+      existing?.remove();
+    }
+  }, [theme.festivalName, theme.logoUrl]);
+
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
