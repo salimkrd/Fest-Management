@@ -61,7 +61,6 @@ async function getPhoto(source: string, redirects: number): Promise<{ bytes: Buf
       // Pin to the already-validated public address; do not re-resolve during TLS.
       // Node 22's default family auto-selection can ask for an array of DNS
       // candidates, so handle both lookup callback shapes correctly.
-      autoSelectFamily: false,
       lookup: (_host, options, callback) => {
         const answer = pinnedLookupAnswer(pinned, Boolean(options.all));
         if (typeof answer === 'string') callback(null, answer, 4);
