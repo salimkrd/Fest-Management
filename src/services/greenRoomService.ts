@@ -11,13 +11,12 @@
  */
 
 import { randomUUID } from 'crypto';
+import { getRandomAvailableCodeLetter } from './greenRoomCodeAllocator';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { AuthService } from './authService';
 import {
-  indexToCodeLetter,
   codeLetterToIndex,
   isValidCodeLetter,
-  getNextAvailableCodeLetter,
   parseParticipantQrPayload
 } from '@/domain/greenRoom';
 import { QrSignerService } from './qrSignerService';
@@ -188,6 +187,12 @@ export class GreenRoomService {
       );
     }
 
+    // The code pool has exactly one letter per APPROVED competition entry.
+    // A group counts once, regardless of how many members it contains.
+    const eligibleCount = regsSnap.docs.filter(doc =>
+      String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
+    ).length;
+
     // 5. Transactional Code Letter Assignment
     const assignmentDocId = `${competitionId}_${registrationId}`;
     const assignmentRef = db.collection('greenRoomAssignments').doc(assignmentDocId);
@@ -218,6 +223,9 @@ export class GreenRoomService {
         if (!isValidCodeLetter(cleanManual)) {
           throw new Error(`Validation Error: Invalid manual Code Letter "${manualCodeLetter}". Must be A-Z or AA-ZZ.`);
         }
+        if (codeLetterToIndex(cleanManual) >= eligibleCount) {
+          throw new Error(`Validation Error: Code Letter "${cleanManual}" is outside the A..N range for ${eligibleCount} approved entries.`);
+        }
         if (assignedCodes.includes(cleanManual)) {
           throw new Error(
             `Conflict Error: Code Letter "${cleanManual}" has already been assigned in competition "${compData.name}". Choose another code or use automatic assignment.`
@@ -225,7 +233,8 @@ export class GreenRoomService {
         }
         assignedCode = cleanManual;
       } else {
-        assignedCode = getNextAvailableCodeLetter(assignedCodes);
+        // Crypto-secure random selection, transactionally reserving the chosen code.
+        assignedCode = getRandomAvailableCodeLetter(assignedCodes, eligibleCount);
       }
 
       const codeIndex = codeLetterToIndex(assignedCode);
@@ -386,6 +395,15 @@ export class GreenRoomService {
       throw new Error(
         `Lock Error: Code Letter reassignment is locked. Competition status is marked as COMPLETED.`
       );
+    }
+
+    const eligibleSnapshot = await db.collection('registrations')
+      .where('competitionId', '==', competitionId).get();
+    const eligibleCount = eligibleSnapshot.docs.filter(doc =>
+      String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
+    ).length;
+    if (codeLetterToIndex(cleanNewCode) >= eligibleCount) {
+      throw new Error(`Validation Error: Code Letter "${cleanNewCode}" is outside the A..N range for ${eligibleCount} approved entries.`);
     }
 
     const assignmentDocId = `${competitionId}_${registrationId}`;
