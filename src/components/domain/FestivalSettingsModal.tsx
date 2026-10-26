@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useFest } from '@/context/FestContext';
-import { auth, storage } from '@/lib/firebase/client';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth } from '@/lib/firebase/client';
 import { normalizeFestivalSettings } from '@/domain/festivalSettings';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -55,11 +54,16 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       const changes = normalizeFestivalSettings(logoFile ? { ...form, logoUrl: '' } : form);
       setSaving(true); setError(''); setSaved(false);
       if (logoFile) {
-        if (!storage || !auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
-        const suffix = logoFile.type === 'image/png' ? 'png' : logoFile.type === 'image/jpeg' ? 'jpg' : 'webp';
-        const fileRef = ref(storage, `branding/festival-logo-${crypto.randomUUID()}.${suffix}`);
-        await uploadBytes(fileRef, logoFile, { contentType: logoFile.type, cacheControl: 'public,max-age=3600' });
-        changes.logoUrl = await getDownloadURL(fileRef);
+        if (!auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
+        const token = await auth.currentUser.getIdToken(true);
+        const response = await fetch('/api/admin/festival-logo', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': logoFile.type },
+          body: logoFile
+        });
+        const data = await response.json();
+        if (!response.ok || !data.url) throw new Error(data.error || 'Could not upload festival logo.');
+        changes.logoUrl = data.url;
       }
       // A share-page URL is not an image. Validate the actual browser-renderable
       // image before publishing so every portal won't fall back to an initial.
