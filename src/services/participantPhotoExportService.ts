@@ -23,6 +23,17 @@ export function isPublicIpv4(address: string): boolean {
     (a === 203 && b === 0));
 }
 
+/**
+ * Node.js 22 may request all DNS candidates while auto-selecting address families.
+ * In that mode, lookup MUST return [{address,family}], not a plain IPv4 string;
+ * otherwise net.connect throws "Invalid IP address: undefined".
+ */
+export function pinnedLookupAnswer(address: string, all: boolean):
+  string | Array<{ address: string; family: number }> {
+  if (!isPublicIpv4(address)) throw new Error('Unsafe resolved participant-photo IP.');
+  return all ? [{ address, family: 4 }] : address;
+}
+
 export function validatePhotoSource(source: string): URL {
   if (!source || source.length > 4096) throw new Error('Invalid participant photo URL.');
   const url = new URL(source);
@@ -47,7 +58,15 @@ async function getPhoto(source: string, redirects: number): Promise<{ bytes: Buf
       method: 'GET',
       timeout: 9000,
       headers: { Accept: 'image/jpeg,image/png,image/webp,image/gif,image/avif' },
-      lookup: (_host, _options, callback) => callback(null, pinned, 4)
+      // Pin to the already-validated public address; do not re-resolve during TLS.
+      // Node 22's default family auto-selection can ask for an array of DNS
+      // candidates, so handle both lookup callback shapes correctly.
+      autoSelectFamily: false,
+      lookup: (_host, options, callback) => {
+        const answer = pinnedLookupAnswer(pinned, Boolean(options.all));
+        if (typeof answer === 'string') callback(null, answer, 4);
+        else callback(null, answer);
+      }
     }, response => {
       const status = response.statusCode || 0;
       if (status >= 300 && status < 400 && response.headers.location && redirects < 2) {
