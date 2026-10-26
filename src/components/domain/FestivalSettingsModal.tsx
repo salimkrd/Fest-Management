@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useFest } from '@/context/FestContext';
+import { auth, storage } from '@/lib/firebase/client';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { normalizeFestivalSettings } from '@/domain/festivalSettings';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -21,6 +23,14 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState('');
+  useEffect(() => {
+    if (!logoFile) { setLocalPreviewUrl(''); return; }
+    const objectUrl = URL.createObjectURL(logoFile);
+    setLocalPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [logoFile]);
   useEffect(() => setLogoPreviewFailed(false), [form.logoUrl]);
   useEffect(() => {
     if (!isOpen) return;
@@ -29,6 +39,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       institutionName: theme.institutionName, logoUrl: theme.logoUrl || '', festivalStartDate: theme.festivalStartDate || '',
       festivalEndDate: theme.festivalEndDate || ''
     });
+    setLogoFile(null);
     setError('');
     setSaved(false);
   }, [isOpen]); // Reset once when opened; do not overwrite in-progress edits from snapshots
@@ -43,9 +54,16 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
     try {
       const changes = normalizeFestivalSettings(form);
       setSaving(true); setError(''); setSaved(false);
+      if (logoFile) {
+        if (!storage || !auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
+        const suffix = logoFile.type === 'image/png' ? 'png' : logoFile.type === 'image/jpeg' ? 'jpg' : 'webp';
+        const fileRef = ref(storage, `branding/festival-logo-${crypto.randomUUID()}.${suffix}`);
+        await uploadBytes(fileRef, logoFile, { contentType: logoFile.type, cacheControl: 'public,max-age=3600' });
+        changes.logoUrl = await getDownloadURL(fileRef);
+      }
       // A share-page URL is not an image. Validate the actual browser-renderable
       // image before publishing so every portal won't fall back to an initial.
-      if (changes.logoUrl) {
+      if (changes.logoUrl && !logoFile) {
         await new Promise<void>((resolve, reject) => {
           const probe = new Image();
           const timeout = window.setTimeout(() => reject(new Error('Logo URL took too long to load. Use a direct public PNG/JPG/WebP image URL.')), 8000);
@@ -55,6 +73,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
         });
       }
       await updateTheme(changes);
+      setLogoFile(null);
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save festival settings.');
@@ -86,16 +105,29 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       <Input label="Institution Name" value={form.institutionName} required maxLength={150}
         onChange={e => change('institutionName', e.target.value)} placeholder="Ma'din Suffa Campus Vavoor" />
       <div>
+        <div className="mb-3">
+          <label htmlFor="festival-logo-file" className="block text-xs font-semibold uppercase tracking-wider mb-1.5">Upload Festival Logo (Recommended)</label>
+          <input id="festival-logo-file" type="file" accept="image/png,image/jpeg,image/webp" className="block w-full text-sm border border-[#E1E7EF] rounded-lg p-2 bg-white" onChange={event => {
+            const file = event.target.files?.[0] || null;
+            if (file && (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size >= 5 * 1024 * 1024)) {
+              setError('Upload a PNG, JPG or WebP image smaller than 5 MB.'); setLogoFile(null); return;
+            }
+            setLogoFile(file); setLogoPreviewFailed(false); setError(''); setSaved(false);
+          }} />
+          <p className="mt-1 text-xs text-[#526070]">Upload directly to Firebase Storage, like participant photos. Upload takes priority over the URL below when you save.</p>
+        </div>
         <Input label="Festival Logo URL (Optional)" type="url" value={form.logoUrl}
           placeholder="https://example.com/festival-logo.png"
           helperText="Use a direct, publicly accessible image URL (not a ChatGPT chat link). Leave empty for an initial."
           onChange={e => change('logoUrl', e.target.value)} />
         <div className="mt-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] p-3">
           <p className="text-[10px] uppercase tracking-wide font-semibold text-[#526070] mb-2">
-            Logo Preview {form.logoUrl.trim() ? '· Save to publish' : '· No logo URL'}
+            Logo Preview {logoFile ? '· Uploaded when you save' : form.logoUrl.trim() ? '· Save to publish' : '· No logo URL'}
           </p>
           <div className="flex items-center gap-3">
-            {form.logoUrl.trim() && !logoPreviewFailed ? (
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="Selected festival logo" className="w-14 h-14 bg-white rounded-lg object-contain border border-[#E1E7EF]" />
+            ) : form.logoUrl.trim() && !logoPreviewFailed ? (
               <img key={form.logoUrl.trim()} src={form.logoUrl.trim()} alt="New festival logo preview"
                 onError={() => setLogoPreviewFailed(true)}
                 className="w-14 h-14 bg-white rounded-lg object-contain border border-[#E1E7EF]" />
@@ -106,10 +138,10 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
               </div>
             )}
             <span className="text-xs text-[#526070]">
-              {form.logoUrl.trim() ? 'Preview of the entered Logo URL' : 'No logo uploaded — festival initial'}
+              {logoFile ? 'Selected upload · Save Settings to publish' : form.logoUrl.trim() ? 'Preview of the entered Logo URL' : 'No logo uploaded — festival initial'}
             </span>
           </div>
-          {logoPreviewFailed && form.logoUrl.trim() && (
+          {logoPreviewFailed && form.logoUrl.trim() && !logoFile && (
             <p role="alert" className="mt-2 text-xs text-red-700 font-semibold">
               This URL could not display an image. Use a direct, publicly accessible image link (PNG, JPG or WebP).
             </p>
