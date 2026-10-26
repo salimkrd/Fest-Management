@@ -206,7 +206,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <FestivalLogo size={32} />
             <div>
               <span className="font-bold text-[#111111] text-sm tracking-tight block leading-tight">
-                {theme.festivalName}
+                <span className="festival-name">{theme.festivalName}</span>
               </span>
               <span className="text-[10px] text-[#526070] font-semibold uppercase tracking-wider block">
                 Control Center
@@ -309,7 +309,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
             <div className="w-64 bg-white h-full flex flex-col p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between pb-4 border-b border-[#E1E7EF]">
-                <span className="font-bold text-sm text-[#111111]">{theme.festivalName}</span>
+                <span className="font-bold text-sm text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span>
                 <button onClick={() => setMobileMenuOpen(false)}>
                   <X className="w-5 h-5 text-[#526070]" />
                 </button>

@@ -212,7 +212,7 @@ function TeamLoginForm() {
           Team Manager Portal
         </h2>
         <p className="mt-1 text-center text-xs text-[#526070]">
-          {theme.festivalName} · Contingent House Administration
+          <span className="festival-name">{theme.festivalName}</span> · Contingent House Administration
         </p>
         <div className="mt-3 flex justify-center"><FestivalStatusBadge /></div>
       </div>

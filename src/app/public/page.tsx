@@ -51,7 +51,7 @@ export default function PublicResultHomePage() {
             </span>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight mt-4 leading-tight">
-              {theme.festivalName}
+              <span className="festival-name">{theme.festivalName}</span>
             </h1>
             <p className="mt-3 text-sm sm:text-base text-white/90 leading-relaxed font-medium">
               {theme.heroBannerText || theme.tagline}
