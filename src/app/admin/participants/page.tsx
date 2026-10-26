@@ -5,16 +5,14 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Participant } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
+import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
-import { Plus, Search, Edit2, Trash2, IdCard, Users2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
 
 export default function ParticipantsPage() {
-  const { participants, teams, categories, competitions, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const { participants, teams, categories, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -22,19 +20,6 @@ export default function ParticipantsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<Participant | null>(null);
   const [selectedIdCardPart, setSelectedIdCardPart] = useState<Participant | null>(null);
-
-  // Form State
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [teamId, setTeamId] = useState(teams[0]?.id || '');
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
-  const [classGrade, setClassGrade] = useState('Std 11');
-  const [division, setDivision] = useState('A');
-  const [dob, setDob] = useState('2008-05-10');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const filteredParticipants = participants.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -47,78 +32,19 @@ export default function ParticipantsPage() {
 
   const handleOpenAdd = () => {
     setEditingPart(null);
-    setName('');
-    setEmail('');
-    setPhone('+91 98470 ');
-    setTeamId(teams[0]?.id || '');
-    setCategoryId(categories[0]?.id || '');
-    setClassGrade('Std 11');
-    setDivision('A');
-    setDob('2008-05-10');
-    setPhotoUrl('');
-    setError('');
     setModalOpen(true);
   };
 
-  const handleOpenEdit = (p: Participant) => {
-    setEditingPart(p);
-    setName(p.name);
-    setEmail(p.email);
-    setPhone(p.phone);
-    setTeamId(p.teamId);
-    setCategoryId(p.categoryId);
-    setClassGrade(p.classGrade);
-    setDivision(p.division);
-    setDob(p.dob);
-    setPhotoUrl(p.photoUrl);
-    setError('');
+  const handleOpenEdit = (participant: Participant) => {
+    setEditingPart(participant);
     setModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!name) {
-      setError('Please provide student full name.');
-      return;
-    }
-
-    const team = teams.find(t => t.id === teamId);
-    if (!team) {
-      setError('Please select a valid participating team.');
-      return;
-    }
-    const cat = categories.find(c => c.id === categoryId);
-
-    const partData = {
-      name,
-      email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@student.institution.org`,
-      phone,
-      teamId: team.id,
-      teamCode: team.code,
-      teamName: team.name,
-      categoryId,
-      categoryName: cat?.name || 'Senior',
-      classGrade,
-      division,
-      dob,
-      photoUrl: photoUrl.trim(),
-      registeredEventIds: editingPart ? editingPart.registeredEventIds : ['cmp-1']
-    };
-
-    setSaving(true);
-    try {
-      if (editingPart) {
-        await updateParticipant(editingPart.id, partData);
-      } else {
-        await addParticipant(partData);
-      }
-      setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save participant.');
-    } finally {
-      setSaving(false);
+  const handleSave = async (data: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
+    if (editingPart) {
+      await updateParticipant(editingPart.id, data);
+    } else {
+      await addParticipant(data);
     }
   };
 
@@ -292,98 +218,16 @@ export default function ParticipantsPage() {
           </div>
         </div>
 
-        {/* Add/Edit Modal */}
-        <Modal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          title={editingPart ? `Edit Participant (${editingPart.name})` : 'Register New Participant'}
-          description="Contestant profile, team allocation, grade tier, and contact information"
-          maxWidth="lg"
-          footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
-                {editingPart ? 'Update Participant' : 'Save & Generate Bib'}
-              </Button>
-            </div>
-          }
-        >
-          <form onSubmit={handleSave} className="space-y-4">
-            {error && (
-              <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
-            )}
-
-            <Input
-              label="Full Student Name"
-              placeholder="e.g. Rayan Siddiqui"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Institutional Email"
-                type="email"
-                placeholder="student@institution.org"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <Input
-                label="Contact Phone"
-                placeholder="+91 98470 12345"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                label="Team Guild"
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
-                options={teams.map(t => ({ value: t.id, label: `${t.name} (${t.code})` }))}
-              />
-              <Select
-                label="Category Division"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                options={categories.map(c => ({ value: c.id, label: c.name }))}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <Input
-                label="Class / Grade"
-                placeholder="Std 11"
-                value={classGrade}
-                onChange={(e) => setClassGrade(e.target.value)}
-              />
-              <Input
-                label="Division"
-                placeholder="A"
-                value={division}
-                onChange={(e) => setDivision(e.target.value)}
-              />
-              <Input
-                label="Date of Birth"
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-              />
-            </div>
-
-            <Input
-              label="Student Profile Photo URL"
-              placeholder="https://..."
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              helperText="Paste direct image URL or leave default for avatar generation"
-            />
-          </form>
-        </Modal>
+        {/* The same participant editor is used for Admin and Team Manager. */}
+        {modalOpen && (
+          <ParticipantEditorModal
+            participant={editingPart}
+            teams={teams}
+            categories={categories}
+            onSave={handleSave}
+            onClose={() => setModalOpen(false)}
+          />
+        )}
 
         {/* Digital ID Card Preview Modal */}
         <DigitalIdCard
