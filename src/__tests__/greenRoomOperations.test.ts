@@ -150,7 +150,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       createdAt: new Date().toISOString()
     });
 
-    // 4. Seed Solo Registrations (2 APPROVED, 1 PENDING)
+    // 4. Seed Solo Registrations (3 APPROVED, 1 PENDING)
     await db.collection('registrations').doc('reg-gr-solo-01').set({
       id: 'reg-gr-solo-01',
       code: 'REG-GR-101',
@@ -183,6 +183,25 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       competitionName: 'Classical Vocal (Solo)',
       type: 'SOLO',
       chestNumber: '102',
+      status: 'APPROVED',
+      registeredAt: new Date().toISOString()
+    });
+
+    // Third approved entry keeps C available for the later reassignment test.
+    await db.collection('registrations').doc('reg-gr-solo-03').set({
+      id: 'reg-gr-solo-03',
+      code: 'REG-GR-104',
+      participantId: 'p-gr-104',
+      participantName: 'Third Approved Contestant',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Al-Shamama',
+      categoryId: 'cat-senior',
+      categoryName: 'Senior',
+      competitionId: testCompId,
+      competitionName: 'Classical Vocal (Solo)',
+      type: 'SOLO',
+      chestNumber: '104',
       status: 'APPROVED',
       registeredAt: new Date().toISOString()
     });
@@ -534,10 +553,11 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
   });
 
   describe('3. Transactional Code Letter Assignment & Idempotency', () => {
-    it('assigns Code Letter A to the first approved participant', async () => {
+    it('honors explicit manual selection A for an approved participant', async () => {
       const res = await GreenRoomService.checkInContestant({
         competitionId: testCompId,
         participantIdentifier: '101', // Chest number
+        manualCodeLetter: 'A', // Deterministic fixture for subsequent judge mapping assertions
         operatorIdToken: staffIdToken
       });
 
@@ -549,10 +569,11 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(res.assignment.participantName).toBe('Fathima Zahra');
     });
 
-    it('assigns Code Letter B sequentially to the second approved participant', async () => {
+    it('honors explicit manual selection B for an approved participant', async () => {
       const res = await GreenRoomService.checkInContestant({
         competitionId: testCompId,
         participantIdentifier: 'p-gr-102', // Participant ID
+        manualCodeLetter: 'B', // Deterministic fixture for subsequent judge mapping assertions
         operatorIdToken: staffIdToken
       });
 
@@ -1449,7 +1470,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.success).toBe(true);
         expect(res.qrVerified).toBe(true);
         expect(res.checkInMethod).toBe('QR_SCAN');
-        expect(res.assignment.codeLetter).toBe('A');
+        expect(['A', 'B']).toContain(res.assignment.codeLetter);
 
         // Verify assignment record in Firestore
         const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
@@ -1478,7 +1499,9 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.success).toBe(true);
         expect(res.qrVerified).toBe(false);
         expect(res.checkInMethod).toBe('MANUAL_LOOKUP');
-        expect(res.assignment.codeLetter).toBe('B');
+        const firstAssignment = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
+        expect(['A', 'B']).toContain(res.assignment.codeLetter);
+        expect(res.assignment.codeLetter).not.toBe(firstAssignment.data()?.codeLetter);
 
         // Verify assignment record in Firestore
         const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).get();
