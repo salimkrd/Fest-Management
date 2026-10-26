@@ -14,7 +14,7 @@ service firebase.storage {
       return isSignedIn() &&
              firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              getUserData().status == 'ACTIVE' &&
-             getUserData().disabled != true;
+             (!('disabled' in getUserData()) || getUserData().disabled != true);
     }
 
     function isAdmin() {
