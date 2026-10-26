@@ -8,7 +8,7 @@ import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
-import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
+import { ParticipantPhoto, isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -27,6 +27,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const [signedToken, setSignedToken] = useState<string>('');
   const [signedPayload, setSignedPayload] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [exporting, setExporting] = useState<boolean>(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,6 +104,48 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     window.print();
   };
 
+  const handleDownload = async () => {
+    if (!participant || !signedToken || !signedPayload || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      let photoBlob: Blob | undefined;
+      const photoUrl = participant.photoUrl?.trim();
+      if (photoUrl && !isStockPhotoPlaceholder(photoUrl)) {
+        const idToken = authMode === 'firebase'
+          ? await auth?.currentUser?.getIdToken()
+          : undefined;
+        if (authMode === 'firebase' && !idToken) {
+          throw new Error('Please sign in again to download this participant photo.');
+        }
+        // The authenticated endpoint reads the authoritative participant photo URL.
+        // This avoids CORS/tainted canvases for Firebase Storage and external photos.
+        const response = await fetch('/api/participant/photo/' + encodeURIComponent(participant.id), {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: idToken ? { Authorization: 'Bearer ' + idToken } : {}
+        });
+        if (!response.ok) {
+          throw new Error('The participant photo could not be loaded for PNG export. Please check the photo URL and retry.');
+        }
+        photoBlob = await response.blob();
+        if (!photoBlob.type.startsWith('image/')) {
+          throw new Error('The participant photo response is not an image.');
+        }
+      }
+
+      await exportDigitalIdAsPng(participant, 'SAHITHYOLSAV 2025', {
+        token: signedToken,
+        qrPayload: signedPayload,
+        photoBlob
+      });
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Unable to export Digital ID Card.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -119,11 +163,9 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               variant="secondary"
               size="sm"
               leftIcon={<Download className="w-4 h-4" />}
-              onClick={() => exportDigitalIdAsPng(participant, participant.teamName, {
-                token: signedToken,
-                qrPayload: signedPayload
-              })}
-              disabled={loading || !qrDataUrl}
+              onClick={handleDownload}
+              isLoading={exporting}
+              disabled={loading || exporting || !qrDataUrl || !!fetchError}
             >
               Download PNG
             </Button>
@@ -134,6 +176,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         </div>
       }
     >
+      {exportError && (
+        <p role="alert" className="text-xs font-semibold text-red-700 bg-red-50 rounded-lg p-3 mb-3">
+          {exportError}
+        </p>
+      )}
       <div className="flex justify-center py-2">
         {/* Printable Card */}
         <div className="w-[320px] rounded-2xl border-2 border-[#111111] overflow-hidden shadow-lg bg-white flex flex-col">
@@ -177,7 +224,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="px-5 py-3 border-t border-b border-[#E1E7EF] bg-[#F8FAFC] grid grid-cols-2 gap-2 text-left text-xs">
             <div>
               <span className="text-[10px] uppercase font-bold text-[#526070] block">Participant ID</span>
-              <span className="font-semibold text-[#111111]">{participant.id.toUpperCase()}</span>
+              <span className="font-semibold text-[#111111] break-all block min-w-0">{participant.id.toUpperCase()}</span>
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-[#526070] block">Category Tier</span>
