@@ -73,3 +73,8 @@
     color: black !important;
   }
 }
+
+/* Festival name only: UI labels and body text retain the institutional font. */
+.festival-name {
+  font-family: var(--festival-name-font, var(--font-montserrat), sans-serif) !important;
+}

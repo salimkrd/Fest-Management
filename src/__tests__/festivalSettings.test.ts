@@ -26,7 +26,7 @@ describe('Chief Admin festival settings and live status', () => {
       festivalEndDate: '2026-10-18'
     });
     expect(normalized).toEqual({
-      festivalName: 'INSPIRAATH 26', institutionName: 'Suffa Campus Vavoor',
+      festivalName: 'INSPIRAATH 26', festivalNameFont: 'Montserrat', institutionName: 'Suffa Campus Vavoor',
       logoUrl: 'https://example.com/logo.png', festivalStartDate: '2026-10-16',
       festivalEndDate: '2026-10-18', year: '2026'
     });
