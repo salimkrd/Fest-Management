@@ -48,7 +48,10 @@ export default function TeamParticipantsPage() {
       throw new Error('You can only manage participants belonging to your assigned team.');
     }
     if (editingPart) {
-      await updateParticipant(editingPart.id, data);
+      // Do not replace competition registrations when editing profile fields.
+      const profileUpdates: Partial<Participant> = { ...data };
+      delete profileUpdates.registeredEventIds;
+      await updateParticipant(editingPart.id, profileUpdates);
     } else {
       await addParticipant(data);
     }

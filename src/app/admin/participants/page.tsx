@@ -42,7 +42,10 @@ export default function ParticipantsPage() {
 
   const handleSave = async (data: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
     if (editingPart) {
-      await updateParticipant(editingPart.id, data);
+      // Do not replace competition registrations when editing profile fields.
+      const profileUpdates: Partial<Participant> = { ...data };
+      delete profileUpdates.registeredEventIds;
+      await updateParticipant(editingPart.id, profileUpdates);
     } else {
       await addParticipant(data);
     }

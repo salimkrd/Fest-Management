@@ -47,6 +47,9 @@ export function prepareParticipantPayload(
   if (lockedTeamId && fields.teamId !== lockedTeamId) {
     throw new Error('You can only manage participants in your assigned team.');
   }
+  if (lockedTeamId && existing && existing.teamId !== lockedTeamId) {
+    throw new Error('You can only edit participants in your assigned team.');
+  }
   const team = teams.find(t => t.id === fields.teamId);
   if (!team || team.status === 'DISABLED') {
     throw new Error('Please select an active team.');
