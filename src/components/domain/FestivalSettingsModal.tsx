@@ -52,7 +52,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
     event.preventDefault();
     if (saving) return;
     try {
-      const changes = normalizeFestivalSettings(form);
+      const changes = normalizeFestivalSettings(logoFile ? { ...form, logoUrl: '' } : form);
       setSaving(true); setError(''); setSaved(false);
       if (logoFile) {
         if (!storage || !auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
@@ -73,6 +73,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
         });
       }
       await updateTheme(changes);
+      setForm(current => ({ ...current, logoUrl: changes.logoUrl }));
       setLogoFile(null);
       setSaved(true);
     } catch (e) {
