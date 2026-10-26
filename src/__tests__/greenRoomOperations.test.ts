@@ -1224,6 +1224,106 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     });
   });
 
+  describe('Competition-sized randomized QR and manual code pools', () => {
+    it('uses only A-E, without collisions, for five APPROVED registrations (PENDING excluded)', async () => {
+      const compId = 'cmp-random5-' + Date.now();
+      const registrationIds = Array.from({ length: 6 }, (_, index) => 'reg-random5-' + compId + '-' + index);
+      await db.collection('competitions').doc(compId).set({
+        id: compId, name: 'Random Five Entry Competition', code: 'RND5',
+        type: 'SOLO', categoryId: 'cat-senior', stageId: 'stage-random',
+        status: 'SCHEDULED'
+      });
+      try {
+        for (let i = 0; i < registrationIds.length; i++) {
+          await db.collection('registrations').doc(registrationIds[i]).set({
+            id: registrationIds[i], competitionId: compId,
+            participantId: 'part-random5-' + i, bib: '#90' + String(100 + i),
+            participantName: 'Random Contestant ' + i,
+            code: 'RN5-' + i, chestNumber: 'RN5-' + i,
+            type: 'SOLO', status: i === 5 ? 'PENDING' : 'APPROVED'
+          });
+        }
+        const signed = QrSignerService.signParticipantQr('part-random5-0', '#90100');
+        const first = await GreenRoomService.checkInContestant({
+          competitionId: compId,
+          participantIdentifier: encodeParticipantQrPayload({
+            id: 'part-random5-0', bib: '#90100', token: signed.token
+          }),
+          checkInMethod: 'QR_SCAN', operatorIdToken: staffIdToken
+        });
+        expect(first.qrVerified).toBe(true);
+        expect(['A', 'B', 'C', 'D', 'E']).toContain(first.assignment.codeLetter);
+
+        const codes = [first.assignment.codeLetter];
+        for (let i = 1; i < 5; i++) {
+          const next = await GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'RN5-' + i, checkInMethod: 'MANUAL_LOOKUP',
+            operatorIdToken: staffIdToken
+          });
+          codes.push(next.assignment.codeLetter);
+        }
+        expect(new Set(codes)).toEqual(new Set(['A', 'B', 'C', 'D', 'E']));
+        const repeat = await GreenRoomService.checkInContestant({
+          competitionId: compId, participantIdentifier: 'RN5-0',
+          checkInMethod: 'MANUAL_LOOKUP', operatorIdToken: staffIdToken
+        });
+        expect(repeat.isExisting).toBe(true);
+        expect(repeat.assignment.codeLetter).toBe(first.assignment.codeLetter);
+        await expect(GreenRoomService.checkInContestant({
+          competitionId: compId, participantIdentifier: 'RN5-5',
+          operatorIdToken: staffIdToken
+        })).rejects.toThrow(/Only APPROVED registrations/);
+      } finally {
+        const batch = db.batch();
+        for (const id of registrationIds) batch.delete(db.collection('registrations').doc(id));
+        for (const id of registrationIds) batch.delete(db.collection('greenRoomAssignments').doc(compId + '_' + id));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+
+    it('assigns only A-C to three approved entries and rejects manual letters beyond C', async () => {
+      const compId = 'cmp-random3-' + Date.now();
+      const ids = Array.from({ length: 3 }, (_, i) => 'reg-random3-' + compId + '-' + i);
+      await db.collection('competitions').doc(compId).set({
+        id: compId, name: 'Random Three Entry Competition', type: 'SOLO',
+        code: 'RND3', status: 'SCHEDULED'
+      });
+      try {
+        for (let i = 0; i < 3; i++) {
+          await db.collection('registrations').doc(ids[i]).set({
+            id: ids[i], competitionId: compId, participantId: 'part-random3-' + i,
+            participantName: 'Contestant ' + i, chestNumber: 'RN3-' + i,
+            status: 'APPROVED', type: 'SOLO'
+          });
+        }
+        const codes: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          const outcome = await GreenRoomService.checkInContestant({
+            competitionId: compId, participantIdentifier: 'RN3-' + i,
+            operatorIdToken: staffIdToken
+          });
+          codes.push(outcome.assignment.codeLetter);
+        }
+        expect(new Set(codes)).toEqual(new Set(['A', 'B', 'C']));
+        await expect(GreenRoomService.reassignCodeLetter({
+          competitionId: compId, registrationId: ids[0],
+          newCodeLetter: 'D', reason: 'Invalid code outside roster',
+          operatorIdToken: staffIdToken
+        })).rejects.toThrow(/outside the A..N range/);
+      } finally {
+        const batch = db.batch();
+        for (const id of ids) batch.delete(db.collection('registrations').doc(id));
+        for (const id of ids) batch.delete(db.collection('greenRoomAssignments').doc(compId + '_' + id));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
+
   describe('10. Competition Cascade Deletion of Green Room Records', () => {
     const cascadeCompId = 'cmp-gr-cascade-test';
 
