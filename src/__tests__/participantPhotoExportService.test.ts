@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { isPublicIpv4, validatePhotoSource } from '@/services/participantPhotoExportService';
+import { isPublicIpv4, pinnedLookupAnswer, validatePhotoSource } from '@/services/participantPhotoExportService';
 
 describe('Authenticated participant photo image source validation', () => {
   it('allows public HTTPS photo sources, including Firebase Storage', () => {
     expect(validatePhotoSource('https://firebasestorage.googleapis.com/v0/b/test/o/p.jpg?alt=media').hostname)
       .toBe('firebasestorage.googleapis.com');
     expect(isPublicIpv4('142.250.190.75')).toBe(true);
+  });
+  it('returns valid DNS lookup result shapes for Node 22 all-address and single-address modes', () => {
+    const address = '142.250.190.75';
+    expect(pinnedLookupAnswer(address, false)).toBe(address);
+    expect(pinnedLookupAnswer(address, true)).toEqual([{ address, family: 4 }]);
+    expect(() => pinnedLookupAnswer('169.254.169.254', true)).toThrow(/unsafe/i);
+    expect(() => pinnedLookupAnswer('127.0.0.1', false)).toThrow(/unsafe/i);
   });
   it('prevents localhost, credentials, non-HTTPS, IP-literal, private and metadata origins', () => {
     for (const source of [
