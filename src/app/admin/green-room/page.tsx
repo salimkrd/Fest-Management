@@ -562,7 +562,7 @@ export default function GreenRoomPage() {
                 )}
 
                 <p className="text-[11px] text-[#526070]">
-                  Leave manual code empty to automatically allocate the next available sequential letter (A, B, C... AA, AB...).
+                  Leave manual code empty to randomly assign one unused letter within the approved competition roster (3 entries: A-C; 5 entries: A-E). Codes cannot repeat.
                 </p>
               </div>
             </div>
