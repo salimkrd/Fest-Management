@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Printer, ShieldAlert, Award, Sparkles } from 'lucide-react';
 import { FirestoreGreenRoomAssignment } from '@/types/firestore';
@@ -17,6 +18,7 @@ export const GreenRoomCodeSlip: React.FC<GreenRoomCodeSlipProps> = ({
   onClose,
   assignment
 }) => {
+  const { theme } = useFest();
   if (!assignment) return null;
 
   const handlePrint = () => {
@@ -57,7 +59,7 @@ export const GreenRoomCodeSlip: React.FC<GreenRoomCodeSlipProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 block">
               GREEN ROOM ENTRY SLIP
             </span>
-            <h4 className="text-sm font-extrabold tracking-tight">SAHITHYOLSAV 2025</h4>
+            <h4 className="text-sm font-extrabold tracking-tight">{theme.festivalName}</h4>
             <p className="text-[11px] text-neutral-300">Annual Cultural &amp; Literary Festival</p>
           </div>
 

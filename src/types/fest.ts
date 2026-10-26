@@ -268,6 +268,9 @@ export interface PosterTemplate {
 export interface PublicThemeSettings {
   festivalName: string;
   institutionName: string;
+  /** Inclusive local calendar dates in Asia/Kolkata (YYYY-MM-DD). */
+  festivalStartDate?: string;
+  festivalEndDate?: string;
   tagline: string;
   year: string;
   primaryColor: string; // e.g. #2563EB or custom

@@ -29,7 +29,7 @@ function TeamLoginForm() {
       setEmail(emailParam);
     }
     if (isOnboarding === 'true') {
-      setNotice('Welcome to Sahithyolsav! Please log in with your provisioned manager credentials to access your team workspace.');
+      setNotice('Welcome! Please log in with your provisioned manager credentials to access your team workspace.');
     }
   }, [searchParams]);
 

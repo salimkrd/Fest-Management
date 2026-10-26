@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Trophy, Search, Sparkles, Award, FileText, Menu, X } from 'lucide-react';
 
 interface PublicLayoutProps {
@@ -94,9 +95,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           <span>·</span>
           <span>Official Real-Time Results &amp; Championship Tabulation Center</span>
           <span className="hidden sm:inline">·</span>
-          <span className="hidden sm:inline text-white/80">Markaz Knowledge City</span>
+          <span className="hidden sm:inline text-white/80">{theme.institutionName}</span>
         </div>
       </div>
+
+      <div className="bg-white flex justify-center py-1"><FestivalStatusBadge /></div>
 
       {/* Main Navbar */}
       <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30 shadow-xs">
@@ -104,12 +107,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-between h-18">
             {/* Brand Logo & Title */}
             <Link href="/" className="flex items-center gap-3">
-              <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-extrabold text-base shadow-sm"
-                style={{ backgroundColor: theme.primaryColor }}
-              >
-                S
-              </div>
+              <FestivalLogo size={40} />
               <div>
                 <span className="text-base font-extrabold text-[#111111] tracking-tight block leading-tight">
                   {theme.festivalName}

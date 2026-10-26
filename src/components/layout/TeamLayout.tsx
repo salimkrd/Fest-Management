@@ -13,6 +13,7 @@ import {
   Trophy
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { auth } from '@/lib/firebase/client';
 import { signOut } from 'firebase/auth';
 
@@ -23,7 +24,7 @@ interface TeamLayoutProps {
 export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentTeamUser, setCurrentTeamUser } = useFest();
+  const { currentTeamUser, setCurrentTeamUser, theme } = useFest();
   const [checking, setChecking] = React.useState(!currentTeamUser);
 
   const team = currentTeamUser;
@@ -98,7 +99,8 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div 
+              <FestivalLogo size={36} />
+              <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shadow-xs"
                 style={{ backgroundColor: team?.color || '#2563EB' }}
               >
@@ -114,12 +116,13 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   </span>
                 </div>
                 <span className="text-[11px] text-[#526070] font-medium">
-                  Manager: {team?.managerName} · {team?.zone}
+                  {theme.festivalName} · {theme.institutionName}
                 </span>
               </div>
             </div>
 
             {/* Right Team Stats & Controls */}
+            <FestivalStatusBadge className="hidden md:inline-flex" />
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-3 bg-[#F8FAFC] px-3.5 py-1.5 rounded-lg border border-[#E1E7EF] text-xs">
                 <div className="flex items-center gap-1.5">

@@ -4,9 +4,12 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, IdCard, LogIn, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 
 export default function ParticipantLoginPage() {
   const router = useRouter();
+  const { theme } = useFest();
   const [bib, setBib] = useState('');
   const [dob, setDob] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -41,12 +44,13 @@ export default function ParticipantLoginPage() {
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-[#526070] hover:text-[#2563EB] mb-5">
           <ArrowLeft className="w-4 h-4" /> Back to Festival Home
         </Link>
+        <div className="mb-3"><FestivalStatusBadge /></div>
         <div className="rounded-2xl bg-white border border-[#E1E7EF] shadow-sm overflow-hidden">
           <div className="bg-[#225DEE] text-white px-7 py-7">
             <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center"><IdCard className="w-6 h-6" /></div>
+              <FestivalLogo size={44} />
               <div>
-                <p className="text-xs font-semibold text-blue-100">INSPIRATH · Participant Portal</p>
+                <p className="text-xs font-semibold text-blue-100">{theme.festivalName} · Participant Portal</p>
                 <h1 className="text-2xl font-extrabold tracking-tight">Participant Login</h1>
               </div>
             </div>

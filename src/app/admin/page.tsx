@@ -23,8 +23,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-import { ThemeCustomizerModal } from '@/components/domain/ThemeCustomizerModal';
-import { Palette } from 'lucide-react';
+import { FestivalSettingsModal } from '@/components/domain/FestivalSettingsModal';
+import { Settings } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const { theme, participants, competitions, results, teams, schedules } = useFest();
@@ -67,10 +67,10 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               size="sm"
-              leftIcon={<Palette className="w-4 h-4 text-[#2563EB]" />}
+              leftIcon={<Settings className="w-4 h-4 text-[#2563EB]" />}
               onClick={() => setThemeModalOpen(true)}
             >
-              Customize Public Theme
+              Settings
             </Button>
             <Link href="/" target="_blank">
               <Button
@@ -85,7 +85,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <ThemeCustomizerModal
+        <FestivalSettingsModal
           isOpen={themeModalOpen}
           onClose={() => setThemeModalOpen(false)}
         />

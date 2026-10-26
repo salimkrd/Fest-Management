@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck, LogOut, Lock } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
+import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 
 interface JudgeLayoutProps {
   children: React.ReactNode;
@@ -24,9 +25,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
       <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30 shadow-xs">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#111111] text-white flex items-center justify-center font-bold text-xs">
-              J
-            </div>
+            <FestivalLogo size={32} />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-[#111111]">{theme.festivalName}</span>
@@ -41,6 +40,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            <FestivalStatusBadge className="hidden sm:inline-flex" />
             {isLocked ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
                 <Lock className="w-3.5 h-3.5 text-emerald-600" />
