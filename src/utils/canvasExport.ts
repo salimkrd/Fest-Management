@@ -44,7 +44,7 @@ export async function exportPosterAsPng(
 export async function exportDigitalIdAsPng(
   participant: Participant,
   festivalName: string = 'SAHITHYOLSAV 2025',
-  options?: { token?: string; qrPayload?: string }
+  options?: { token?: string; qrPayload?: string; photoBlob?: Blob }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -94,21 +94,54 @@ export async function exportDigitalIdAsPng(
   ctx.fillStyle = '#2563EB';
   ctx.fillText(categoryText, width - 25 - tagW / 2, 44);
 
-  // Participant Portrait Circle Placeholder
+
+  // Downloaded PNG uses the same genuine photo as the live ID preview.
+  // A same-origin authenticated endpoint provides the Blob, preventing canvas
+  // tainting from cross-origin Firebase Storage or other HTTPS image hosts.
   const avatarY = 270;
   ctx.fillStyle = '#EFF6FF';
   ctx.beginPath();
   ctx.arc(width / 2, avatarY, 75, 0, Math.PI * 2);
   ctx.fill();
+
+  if (options?.photoBlob) {
+    const localUrl = URL.createObjectURL(options.photoBlob);
+    try {
+      const photo = new Image();
+      photo.src = localUrl;
+      await photo.decode();
+      if (!photo.naturalWidth || !photo.naturalHeight) {
+        throw new Error('Participant photo has invalid dimensions.');
+      }
+      // Equivalent to object-cover and rounded-full in the on-screen card.
+      const diameter = 150;
+      const scale = Math.max(diameter / photo.naturalWidth, diameter / photo.naturalHeight);
+      const drawnWidth = photo.naturalWidth * scale;
+      const drawnHeight = photo.naturalHeight * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(width / 2, avatarY, 75, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(
+        photo, (width - drawnWidth) / 2, avatarY - drawnHeight / 2,
+        drawnWidth, drawnHeight
+      );
+      ctx.restore();
+    } finally {
+      URL.revokeObjectURL(localUrl);
+    }
+  } else {
+    // Only use initials when there really is no participant photo.
+    ctx.fillStyle = '#2563EB';
+    ctx.font = '800 56px Montserrat, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(participant.name.charAt(0).toUpperCase(), width / 2, avatarY + 20);
+  }
   ctx.strokeStyle = '#2563EB';
   ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(width / 2, avatarY, 75, 0, Math.PI * 2);
   ctx.stroke();
-
-  // Draw Avatar Icon or Initial
-  ctx.fillStyle = '#2563EB';
-  ctx.font = '800 56px Montserrat, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(participant.name.charAt(0).toUpperCase(), width / 2, avatarY + 20);
 
   // Bib Badge Pill
   ctx.fillStyle = '#111111';
@@ -158,9 +191,16 @@ export async function exportDigitalIdAsPng(
   ctx.fillText('CATEGORY TIER', 350, 575);
 
   ctx.fillStyle = '#111111';
+  // Full UUID-sized participant IDs must wrap inside the left-hand grid cell.
+  // Never let the identifier overwrite the Category Tier on the right.
+  ctx.font = '800 15px Montserrat, sans-serif';
+  const participantId = participant.id.toUpperCase();
+  const idLines = participantId.match(/.{1,18}/g) || [participantId];
+  idLines.forEach((line, index) => {
+    ctx.fillText(line, 70, 601 + index * 18, 245);
+  });
   ctx.font = '800 18px Montserrat, sans-serif';
-  ctx.fillText(participant.id.toUpperCase(), 70, 605);
-  ctx.fillText(participant.categoryName, 350, 605);
+  ctx.fillText(participant.categoryName, 350, 605, 225);
 
   // Row 2
   ctx.fillStyle = '#64748B';
@@ -191,19 +231,17 @@ export async function exportDigitalIdAsPng(
   ctx.font = '700 16px monospace';
   ctx.fillText(tokenText, 70, 825);
 
+  if (!options?.qrPayload || !options?.token) {
+    throw new Error('Verified QR credentials are required before downloading a digital ID.');
+  }
+
   // Generate and draw scannable QR Code from server-issued payload
   const qrX = width - 180;
   const qrY = 755;
   const qrSize = 100;
 
   try {
-    const payloadToDraw = options?.qrPayload || JSON.stringify({
-      app: 'INSPIRATH',
-      type: 'PARTICIPANT_ID',
-      id: participant.id,
-      bib: participant.bib,
-      version: 3
-    });
+    const payloadToDraw = options.qrPayload;
 
     const qrDataUrl = await QRCode.toDataURL(payloadToDraw, {
       width: 300,
@@ -221,21 +259,21 @@ export async function exportDigitalIdAsPng(
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
   } catch (qrErr) {
     console.error('[canvasExport] QR rendering error:', qrErr);
-    ctx.fillStyle = '#111111';
-    ctx.fillRect(qrX, qrY, qrSize, qrSize);
+    throw new Error('Unable to render the verified QR. No invalid badge was downloaded.');
   }
 
-  // Trigger Download
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `Digital_ID_${participant.bib}_${participant.name.replace(/\s+/g, '_')}.png`;
-    link.href = url;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(value => value
+      ? resolve(value)
+      : reject(new Error('Could not create the participant ID PNG.')), 'image/png');
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = `Digital_ID_${participant.bib}_${participant.name.replace(/[^a-zA-Z0-9_-]+/g, '_')}.png`;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
