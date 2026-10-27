@@ -281,8 +281,6 @@ export class JudgeService {
               throw new Error(
                 `Validation Error: Criterion "${critKey}" score (${critMark}) for participant "${scoreKey}" exceeds specific rubric limit of ${rubricCriterion.maxMarks}.`
               );
-            } else if (!rubricCriterion && critMark > 100) {
-              throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be between 0 and 100.`);
             }
           } else {
             if (critMark > 100) {
