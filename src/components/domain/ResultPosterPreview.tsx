@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CompetitionResult, PosterConfig, PosterElement, PublicThemeSettings } from '@/types/fest';
 import { normalizePosterConfig, posterSvgDataUrl, posterDimensions } from '@/domain/poster';
+import { loadPosterFonts } from '@/domain/posterFonts';
 
 interface ResultPosterPreviewProps {
   result: CompetitionResult;
@@ -17,7 +18,29 @@ interface ResultPosterPreviewProps {
 
 export function ResultPosterPreview({ result, theme, config, className = '', selectedId, onSelect, onMove, showGrid }: ResultPosterPreviewProps) {
   const normalized = useMemo(() => normalizePosterConfig(config), [config]);
-  const source = useMemo(() => posterSvgDataUrl(result, theme, normalized), [result, theme, normalized]);
+  const [fontVersion, setFontVersion] = useState(0);
+  const usedFontNames = useMemo(
+    () => [...new Set((normalized.elements ?? [])
+      .filter(element => element.type === 'text' && element.field !== 'festivalName')
+      .map(element => element.fontFamily)
+      .filter(name => !['sans', 'serif', 'mono'].includes(name)))].sort().join('|'),
+    [normalized],
+  );
+
+  useEffect(() => {
+    if (!usedFontNames) return;
+    let active = true;
+    void loadPosterFonts(usedFontNames.split('|')).finally(() => {
+      if (active) setFontVersion(version => version + 1);
+    });
+    return () => { active = false; };
+  }, [usedFontNames]);
+
+  // A fragment change makes the SVG image re-render after web fonts finish loading.
+  const source = useMemo(
+    () => posterSvgDataUrl(result, theme, normalized) + '#font-version-' + fontVersion,
+    [result, theme, normalized, fontVersion],
+  );
   const dimensions = posterDimensions(normalized.aspectRatio);
   const drag = useRef<{ id: string; startX: number; startY: number; x: number; y: number; canvasWidth: number; canvasHeight: number } | null>(null);
   const move = (element: PosterElement, x: number, y: number) => onMove?.(element.id, {
