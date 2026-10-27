@@ -9,7 +9,6 @@ const row: TeamResultExportRow = {
   stageName: 'Main Auditorium',
   candidateName: 'Ameen "A.J." Farhan',
   bib: '1042',
-  score: 94,
   grade: 'A+',
   rank: 1,
   points: 11,
@@ -23,7 +22,10 @@ describe('TeamExportService', () => {
     expect(csv).toContain('"CMP-01"');
     expect(csv).toContain('"Ameen ""A.J."" Farhan"');
     expect(csv).toContain('"1st Place"');
+    expect(csv).toContain('"A+"');
     expect(csv).toContain('"11"');
+    expect(csv).not.toContain('Score');
+    expect(csv).not.toContain('"94"');
   });
 
   it('keeps the grade-only/no-prize placement label in CSV output', () => {
