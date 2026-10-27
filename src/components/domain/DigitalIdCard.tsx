@@ -136,17 +136,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         }
       }
 
-      let logoBlob: Blob | undefined;
-      if (theme.logoUrl?.trim()) {
-        // Configured logo is publicly readable; fetch same-origin for untainted PNG.
-        const logoResponse = await fetch('/api/festival/logo', { cache: 'no-store' });
-        if (logoResponse.ok) logoBlob = await logoResponse.blob();
-      }
       await exportDigitalIdAsPng(participant, theme.festivalName, {
         token: signedToken,
         qrPayload: signedPayload,
         photoBlob,
-        logoBlob,
         festivalNameFont: theme.festivalNameFont
       });
     } catch (err) {
