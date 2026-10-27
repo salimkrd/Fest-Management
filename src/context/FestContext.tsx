@@ -2989,11 +2989,26 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (assignment) {
-      // Find or create result record and set status to READY_FOR_REVIEW
+      // A competition is review-ready only after every active assigned judge has submitted.
+      // The current submission is included even though React state updates asynchronously.
+      const competitionAssignments = markEntries.filter(entry =>
+        entry.competitionId === assignment.competitionId &&
+        !entry.revoked &&
+        entry.status !== 'REVOKED' &&
+        entry.status !== 'EXPIRED'
+      );
+      const allJudgesSubmitted = competitionAssignments.length > 0 &&
+        competitionAssignments.every(entry => entry.id === markEntryId || entry.status === 'SUBMITTED');
+      const marksStatus: CompetitionResult['marksStatus'] = allJudgesSubmitted ? 'COMPLETE' : 'PARTIAL';
+      const resultStatus: ResultStatus = allJudgesSubmitted ? 'READY_FOR_REVIEW' : 'AWAITING_MARKS';
+
       setResults(prev => {
         const existing = prev.find(r => r.competitionId === assignment.competitionId);
         if (existing) {
-          return prev.map(r => r.id === existing.id ? { ...r, resultStatus: 'READY_FOR_REVIEW', marksStatus: 'COMPLETE' } : r);
+          return prev.map(r => r.id === existing.id
+            ? { ...r, resultStatus, marksStatus }
+            : r
+          );
         }
 
         const comp = competitions.find(c => c.id === assignment.competitionId);
@@ -3005,8 +3020,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           categoryName: assignment.categoryName,
           type: assignment.type,
           stageName: comp ? comp.stageName : 'Main Stage',
-          marksStatus: 'COMPLETE',
-          resultStatus: 'READY_FOR_REVIEW',
+          marksStatus,
+          resultStatus,
           ranks: [],
           posterReleased: false
         };
