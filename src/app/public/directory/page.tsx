@@ -42,7 +42,7 @@ function DirectoryContent() {
           Public Results Directory &amp; Archive
         </h1>
         <p className="text-xs sm:text-sm text-[#526070] mt-1">
-          Search verified results, download official winner posters, and inspect score registers
+          Search published results and download official winner posters
         </p>
       </div>
 
@@ -146,7 +146,7 @@ function DirectoryContent() {
                           </span>
                           <span className="font-bold text-[#111111] line-clamp-1">{rank1.candidateName}</span>
                         </div>
-                        <span className="font-extrabold text-[#111111] text-[11px] shrink-0">{rank1.score} pts</span>
+                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank1.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts</span></span>
                       </div>
                     )}
 
@@ -158,7 +158,7 @@ function DirectoryContent() {
                           </span>
                           <span className="font-medium text-[#111111] line-clamp-1">{rank2.candidateName}</span>
                         </div>
-                        <span className="text-[11px] font-semibold text-[#526070] shrink-0">{rank2.score} pts</span>
+                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank2.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
                       </div>
                     )}
                   </div>
