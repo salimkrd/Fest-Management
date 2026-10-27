@@ -56,7 +56,7 @@ export async function exportDigitalIdAsPng(
   }
 
   const width = 640;
-  const height = 960;
+  const height = 1024;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -69,7 +69,7 @@ export async function exportDigitalIdAsPng(
   ctx.fillRect(0, 0, width, height);
 
   // Card Outer Border
-  ctx.strokeStyle = '#111111';
+  ctx.strokeStyle = '#60A5FA';
   ctx.lineWidth = 10;
   ctx.strokeRect(10, 10, width - 20, height - 20);
 
@@ -244,52 +244,58 @@ export async function exportDigitalIdAsPng(
   ctx.fillStyle = '#059669';
   ctx.fillText('VERIFIED AUTH', 350, 685);
 
-  // Bottom QR / Verification Barcode Section
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(40, 740, width - 80, 150);
+  // Large, high-contrast QR section. Keep a quiet white margin around the code
+  // so venue phones can scan it from a printed or phone-screen ID.
+  ctx.fillStyle = '#F8FBFF';
+  ctx.fillRect(40, 730, width - 80, 270);
+  ctx.strokeStyle = '#BFDBFE';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(40, 730, width - 80, 270);
 
-  ctx.fillStyle = '#64748B';
-  ctx.font = '600 13px Montserrat, sans-serif';
-  ctx.fillText('Scan at Venue Entrance & Stage Gate', 70, 790);
-
-  const tokenText = options?.token
-    ? `TOKEN: ${options.token.slice(0, 16).toUpperCase()}`
-    : `ID: ${participant.bib}-AUTH`;
-
-  ctx.fillStyle = '#111111';
-  ctx.font = '700 16px monospace';
-  ctx.fillText(tokenText, 70, 825);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#0758D8';
+  ctx.font = '800 14px Montserrat, sans-serif';
+  ctx.fillText('SCAN AT VENUE ENTRANCE & STAGE GATE', width / 2, 755);
 
   if (!options?.qrPayload || !options?.token) {
     throw new Error('Verified QR credentials are required before downloading a digital ID.');
   }
 
-  // Generate and draw scannable QR Code from server-issued payload
-  const qrX = width - 180;
-  const qrY = 755;
-  const qrSize = 100;
-
   try {
-    const payloadToDraw = options.qrPayload;
-
-    const qrDataUrl = await QRCode.toDataURL(payloadToDraw, {
-      width: 300,
-      margin: 1,
-      errorCorrectionLevel: 'M',
-      color: {
-        dark: '#111111',
-        light: '#FFFFFF'
-      }
+    const qrDataUrl = await QRCode.toDataURL(options.qrPayload, {
+      width: 600,
+      margin: 3,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#000000', light: '#FFFFFF' }
     });
-
     const qrImg = new Image();
     qrImg.src = qrDataUrl;
     await qrImg.decode();
+    const qrSize = 190;
+    const qrX = (width - qrSize) / 2;
+    const qrY = 766;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
+    ctx.fill();
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
   } catch (qrErr) {
     console.error('[canvasExport] QR rendering error:', qrErr);
     throw new Error('Unable to render the verified QR. No invalid badge was downloaded.');
   }
+
+  ctx.fillStyle = '#EAF3FF';
+  ctx.beginPath();
+  ctx.roundRect(80, 972, width - 160, 32, 16);
+  ctx.fill();
+  ctx.fillStyle = '#0758D8';
+  ctx.font = '800 12px Montserrat, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('TOKEN:', 100, 992);
+  ctx.fillStyle = '#111827';
+  ctx.font = '700 13px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(options.token.slice(0, 24).toUpperCase(), width / 2 + 28, 992, width - 250);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(value => value
