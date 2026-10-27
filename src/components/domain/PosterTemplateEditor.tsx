@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Copy, Download, Globe, Grid2X2, ImagePlus, Layers, Plus, Save, Trash2, Type, Upload, CheckCircle2, ArrowUp, ArrowDown } from 'lucide-react';
 import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterTemplate } from '@/types/fest';
@@ -9,7 +9,6 @@ import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { ResultPosterPreview } from './ResultPosterPreview';
 import { PosterFontPicker } from './PosterFontPicker';
-import { loadPosterFonts } from '@/domain/posterFonts';
 import { createPosterPreset, createTextElement, normalizePosterConfig, POSTER_FIELDS, POSTER_PRESETS, posterDimensions, validatePosterConfig } from '@/domain/poster';
 import { exportPosterAsPng } from '@/utils/canvasExport';
 
@@ -65,17 +64,6 @@ export function PosterTemplateEditor() {
   const published = results.filter(item => item.resultStatus === 'PUBLISHED');
   const selected = config.elements?.find(element => element.id === selectedId);
   const dimensions = posterDimensions(config.aspectRatio);
-  const usedFontNames = useMemo(
-    () => [...new Set((config.elements ?? [])
-      .filter(element => element.type === 'text' && element.field !== 'festivalName')
-      .map(element => element.fontFamily))].join('|'),
-    [config.elements],
-  );
-
-  useEffect(() => {
-    if (usedFontNames) void loadPosterFonts(usedFontNames.split('|'));
-  }, [usedFontNames]);
-
   useEffect(() => {
     if (!auth) return;
     let active = true;
