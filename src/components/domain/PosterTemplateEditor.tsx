@@ -45,7 +45,7 @@ async function readArtwork(file: File, background: boolean): Promise<string> {
 }
 
 export function PosterTemplateEditor() {
-  const { results, theme, updatePosterConfig } = useFest();
+  const { results, theme } = useFest();
   const [config, setConfig] = useState<PosterConfig>(() => createPosterPreset());
   const [resultId, setResultId] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>('announcement');
@@ -98,22 +98,33 @@ export function PosterTemplateEditor() {
     setBusy(label); setError(''); setNotice('');
     try { await action(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Something went wrong. Please try again.'); } finally { setBusy(''); }
   }
-  function saveTemplate(asCopy = false) {
-    void perform('template', async () => {
-      if (!templateName.trim()) throw new Error('Give your template a name before saving.');
-      const id = !asCopy && templateId ? templateId : crypto.randomUUID();
-      const checked = validatePosterConfig(config);
-      setTemplates(await templateRequest('PUT', { template: { id, name: templateName.trim(), config: checked } }));
-      setTemplateId(id); setDirty(false); setNotice('Template saved. You can reuse it with any published result.');
-    });
-  }
-  function saveResult(release?: boolean) {
-    void perform(release === undefined ? 'draft' : release ? 'release' : 'withdraw', async () => {
-      if (!result || result.resultStatus !== 'PUBLISHED') throw new Error('Choose a published result first.');
-      await updatePosterConfig(result.id, validatePosterConfig(config), release);
-      setDirty(false);
-      setNotice(release === true ? 'Poster released. Visitors can now view and download it on the public page.' : release === false ? 'Poster withdrawn from the public page. Your draft is saved.' : 'Draft saved. The current public poster stays as it is until you publish this version.');
-    });
+  const selectedTemplate = templates.find(template => template.id === templateId);
+  const templateReleased = selectedTemplate?.released === true;
+
+  function saveTemplate(asCopy = false, releasedOverride?: boolean) {
+    void perform(
+      releasedOverride === true ? 'release-template' : releasedOverride === false ? 'withdraw-template' : 'template',
+      async () => {
+        if (!templateName.trim()) throw new Error('Give your template a name before saving.');
+        const id = !asCopy && templateId ? templateId : crypto.randomUUID();
+        const existingTemplate = !asCopy && templateId
+          ? templates.find(template => template.id === templateId)
+          : undefined;
+        const released = releasedOverride ?? existingTemplate?.released ?? false;
+        const checked = validatePosterConfig(config);
+        const updatedTemplates = await templateRequest('PUT', {
+          template: { id, name: templateName.trim(), config: checked, released },
+        });
+        setTemplates(updatedTemplates);
+        setTemplateId(id);
+        setDirty(false);
+        setNotice(releasedOverride === true
+          ? 'Template released. It is now available to download for every published competition.'
+          : releasedOverride === false
+            ? 'Template withdrawn from the public gallery. Your saved template remains in Media Studio.'
+            : 'Template saved. You can reuse it with any published result.');
+      },
+    );
   }
   function addText() {
     if ((config.elements?.length ?? 0) >= 30) { setError('A template can have up to 30 layers.'); return; }
@@ -145,14 +156,20 @@ export function PosterTemplateEditor() {
         if (!canReplace()) return;
         const item = published.find(entry => entry.id === event.target.value);
         setResultId(event.target.value);
-        if (item?.posterDraftConfig || item?.posterConfig) load(item.posterDraftConfig ?? item.posterConfig!);
-        else { setNotice('Current template applied to this preview. Save a draft or release it when ready.'); setDirty(false); }
+        setNotice(item
+          ? 'Previewing the current reusable template with this published competition. The released template can be downloaded for every published result.'
+          : 'Designing a reusable template with sample winner data.');
+
       }}><option value="">Sample result — design a reusable template</option>{published.map(item => <option key={item.id} value={item.id}>{item.competitionCode} · {item.competitionName}</option>)}</select></Field></div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`mr-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${result?.posterReleased ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{result ? result.posterReleased ? 'Live poster' : 'Draft poster' : 'Sample preview'}</span>
-        <Button variant="outline" size="sm" disabled={Boolean(busy)} leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => void perform('download', async () => { await exportPosterAsPng(preview, theme, config); setNotice('PNG download started.'); })}>{busy === 'download' ? 'Preparing…' : 'Download PNG'}</Button>
-        <Button variant="outline" size="sm" disabled={!result || Boolean(busy)} onClick={() => saveResult()} isLoading={busy === 'draft'}>Save draft</Button>
-        <Button size="sm" disabled={!result || Boolean(busy)} leftIcon={<Globe className="h-3.5 w-3.5" />} onClick={() => saveResult(true)} isLoading={busy === 'release'}>{result?.posterReleased ? 'Publish changes' : 'Release poster'}</Button>
+        <span className={`mr-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${templateReleased ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+          {templateReleased ? 'Released template' : templateId ? 'Saved draft template' : 'Unsaved template'}
+        </span>
+        <Button variant="outline" size="sm" disabled={Boolean(busy)} leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => void perform('download', async () => { await exportPosterAsPng(preview, theme, config, templateName); setNotice('PNG preview download started.'); })}>{busy === 'download' ? 'Preparing…' : 'Download Preview'}</Button>
+        <Button size="sm" disabled={Boolean(busy)} leftIcon={<Globe className="h-3.5 w-3.5" />} onClick={() => saveTemplate(false, true)} isLoading={busy === 'release-template'}>
+          {templateReleased ? 'Update Released Template' : 'Release Template'}
+        </Button>
+        {templateReleased && <Button variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => saveTemplate(false, false)} isLoading={busy === 'withdraw-template'}>Withdraw</Button>}
       </div>
     </div>
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -170,7 +187,7 @@ export function PosterTemplateEditor() {
             {config.backgroundImage && <div className="space-y-2"><Field label="Background image opacity"><input type="range" min="0" max="1" step="0.05" value={config.backgroundOpacity ?? 1} onChange={event => change({ ...config, backgroundOpacity: Number(event.target.value) })} className="w-full" /></Field><button type="button" onClick={() => change({ ...config, backgroundImage: undefined })} className="text-xs font-semibold text-red-600">Remove background image</button></div>}
           </div>}
           {tab === 'layers' && <div className="space-y-3"><p className="text-[10px] text-slate-500">Choose a layer, then drag it on the canvas. Arrow keys move the selected layer.</p><div className="max-h-[470px] space-y-1 overflow-y-auto">{config.elements?.map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}</div></div>}
-          {tab === 'saved' && <div className="space-y-2">{templatesLoading ? <p className="text-xs text-slate-500">Loading your templates…</p> : templates.length ? templates.map(template => <button type="button" key={template.id} className={`w-full rounded-xl border p-3 text-left text-xs ${templateId === template.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700'}`} onClick={() => { if (canReplace()) { load(template.config); setTemplateId(template.id); setTemplateName(template.name); } }}><strong className="block">{template.name}</strong><span className="mt-1 block text-[10px] text-slate-500">{template.config.aspectRatio} · {template.config.elements?.length ?? 0} layers</span></button>) : <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">Your saved templates appear here. Design once, then reuse with each published result.</p>}</div>}
+          {tab === 'saved' && <div className="space-y-2">{templatesLoading ? <p className="text-xs text-slate-500">Loading your templates…</p> : templates.length ? templates.map(template => <button type="button" key={template.id} className={`w-full rounded-xl border p-3 text-left text-xs ${templateId === template.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700'}`} onClick={() => { if (canReplace()) { load(template.config); setTemplateId(template.id); setTemplateName(template.name); } }}><strong className="block">{template.name}</strong><span className="mt-1 block text-[10px] text-slate-500">{template.config.aspectRatio} · {template.config.elements?.length ?? 0} layers</span><span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${template.released ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{template.released ? 'Publicly released' : 'Private draft'}</span></button>) : <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">Your saved templates appear here. Design once, then reuse with each published result.</p>}</div>}
         </div>
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"><Field label="Template name"><input className={inputStyle} value={templateName} maxLength={80} onChange={event => setTemplateName(event.target.value)} /></Field><Button className="w-full" size="sm" variant="secondary" leftIcon={<Save className="h-3.5 w-3.5" />} onClick={() => saveTemplate()}>{templateId ? 'Update template' : 'Save template'}</Button>{templateId && <button type="button" className="w-full text-xs font-medium text-blue-600" onClick={() => saveTemplate(true)}>Save as a new template</button>}<p className="text-[10px] leading-relaxed text-slate-400">Saving a template does not publish a poster. Choose a result and release it when ready.</p></div>
       </div>
@@ -195,7 +212,7 @@ export function PosterTemplateEditor() {
             <div className="flex items-center justify-between border-t border-slate-100 pt-3"><div className="flex gap-1"><button type="button" aria-label="Move layer backward" onClick={() => reorder(-1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" aria-label="Move layer forward" onClick={() => reorder(1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" aria-label="Duplicate selected layer" className="rounded p-2 text-slate-500 hover:bg-slate-100" onClick={() => { if ((config.elements?.length ?? 0) >= 30) { setError('Maximum 30 layers.'); return; } const copy = { ...selected, id: crypto.randomUUID(), label: `${selected.label.slice(0, 70)} copy` }; change({ ...config, elements: [...(config.elements ?? []), copy] }); setSelectedId(copy.id); }}><Copy className="h-3.5 w-3.5" /></button></div><button type="button" aria-label="Delete selected layer" className="rounded p-2 text-red-500 hover:bg-red-50" onClick={() => { change({ ...config, elements: config.elements?.filter(element => element.id !== selected.id) }); setSelectedId(null); }}><Trash2 className="h-3.5 w-3.5" /></button></div>
           </div> : <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">Select text or an image on the canvas to edit it. Add new layers with the buttons above.</p>}
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-2 text-xs font-bold text-slate-700">From studio to public</h3><ol className="space-y-2 text-[11px] leading-relaxed text-slate-500"><li>1. Design and save your template.</li><li>2. Select a published competition result.</li><li>3. Release the poster for visitors to view and download.</li></ol>{result?.posterReleased && <button type="button" disabled={Boolean(busy)} onClick={() => saveResult(false)} className="mt-4 text-xs font-semibold text-red-600">Withdraw public poster</button>}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-2 text-xs font-bold text-slate-700">Release one reusable template</h3><ol className="space-y-2 text-[11px] leading-relaxed text-slate-500"><li>1. Design and save your poster template.</li><li>2. Select <strong>Release Template</strong> to publish this design once.</li><li>3. The same released template becomes available for every published competition. Visitors choose a result, pick any released template, then download the PNG.</li></ol><p className="mt-3 text-[10px] leading-relaxed text-slate-400">Releasing a template is separate from publishing competition results and does not alter scores, grades, or points.</p></div>
       </div>
     </fieldset>
   </div>;
