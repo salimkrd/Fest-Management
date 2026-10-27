@@ -156,9 +156,17 @@ describe('Poster result bindings and shared rendering', () => {
     expect(resolvePosterField(textLayer('rank1.team'), tied, theme)).toBe('Blue House\nGold House');
     expect(resolvePosterField(textLayer('rank1.grade'), tied, theme)).toBe('');
     expect(resolvePosterField(textLayer('rank1.score'), tied, theme)).toBe('');
-    expect(POSTER_FIELDS.some(field => /\\.(grade|score)$/.test(field.value))).toBe(false);
+    expect(POSTER_FIELDS.some(field => /\.(grade|score)$/.test(field.value))).toBe(false);
     const names = renderedText(renderPosterSvg(tied, theme, withElements(textLayer('rank1.name'))));
     expect(names).toEqual(['Ameen', 'Bilal']);
+  });
+
+  it('keeps legacy grade/score layers loadable but renders them blank', () => {
+    const legacy = validatePosterConfig(withElements(textLayer('rank1.grade'), textLayer('rank1.score')));
+    const svg = renderPosterSvg(result([winner()]), theme, legacy);
+    expect(renderedText(svg)).toEqual(['', '']);
+    expect(svg).not.toContain('Grade A+');
+    expect(svg).not.toContain('95 marks');
   });
 
   it('leaves missing ranks empty without shifting another winner into the gap', () => {
