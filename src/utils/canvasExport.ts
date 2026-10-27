@@ -188,7 +188,7 @@ export async function exportDigitalIdAsPng(
 
   ctx.fillStyle = '#64748B';
   ctx.font = '600 18px Montserrat, sans-serif';
-  ctx.fillText(`${participant.classGrade} - Division ${participant.division}`, width / 2, 435);
+  ctx.fillText([participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' - '), width / 2, 435);
 
   // Team Delegation Pill
   const teamText = `${participant.teamName} (${participant.teamCode})`;
