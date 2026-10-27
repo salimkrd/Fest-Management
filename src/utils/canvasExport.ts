@@ -6,6 +6,7 @@
 import { CompetitionResult, Participant, PublicThemeSettings, PosterConfig } from '@/types/fest';
 import QRCode from 'qrcode';
 import { FESTIVAL_NAME_FONTS, DEFAULT_FESTIVAL_NAME_FONT } from '@/domain/festivalFonts';
+import { loadPosterFonts } from '@/domain/posterFonts';
 
 /**
  * Generates and downloads a high-resolution Celebration Result Poster (PNG)
@@ -19,6 +20,9 @@ export async function exportPosterAsPng(
   const { validatePosterConfig, normalizePosterConfig, posterDimensions, posterSvgDataUrl } = await import('@/domain/poster');
   const checked = validatePosterConfig(normalizePosterConfig(config));
   const { width, height } = posterDimensions(checked.aspectRatio);
+  await loadPosterFonts((checked.elements ?? [])
+    .filter(element => element.type === 'text' && element.field !== 'festivalName')
+    .map(element => element.fontFamily));
   await document.fonts.ready;
   const artwork = new Image();
   artwork.src = posterSvgDataUrl(result, theme, checked);
