@@ -2,6 +2,10 @@ import type { CompetitionResult, PosterConfig, PosterElement, PosterField, Publi
 import { festivalNameFontFamily } from '@/domain/festivalFonts';
 import { isPosterFont, posterFontCssFamily } from '@/domain/posterFonts';
 
+// Legacy alias retained for existing callers and saved templates.
+export const POSTER_FONTS = { sans: 'Arial, sans-serif', serif: 'Georgia, serif', mono: 'monospace' };
+
+
 export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
   { value: 'text', label: 'Custom text' }, { value: 'festivalName', label: 'Festival name' },
   { value: 'institutionName', label: 'Institution name' }, { value: 'competitionName', label: 'Competition name' },
