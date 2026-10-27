@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TeamExportService, TeamResultExportRow } from '../teamExportService';
+import { TeamExportService, type TeamResultExportRow } from '../teamExportService';
 
 const row: TeamResultExportRow = {
   competitionCode: 'CMP-01',
