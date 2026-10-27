@@ -72,9 +72,9 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         setSignedPayload(data.payload);
 
         const url = await QRCode.toDataURL(data.payload, {
-          width: 180,
-          margin: 1,
-          errorCorrectionLevel: 'M',
+          width: 420,
+          margin: 2,
+          errorCorrectionLevel: 'H',
           color: {
             dark: '#111111',
             light: '#FFFFFF'
@@ -193,84 +193,68 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         </p>
       )}
       <div className="flex justify-center py-2">
-        {/* Printable Card */}
-        <div className="w-[320px] rounded-2xl border-2 border-[#111111] overflow-hidden shadow-lg bg-white flex flex-col">
-          {/* Top Banner */}
-          <div className="bg-[#2563EB] text-white p-4 text-center relative">
-            {theme.logoUrl && <span className="absolute top-2 left-2"><FestivalLogo size={26} /></span>}
-            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-200 block">
-              OFFICIAL FESTIVAL PASS
-            </span>
-            <h4 className="text-base font-bold tracking-tight"><span className="festival-name">{theme.festivalName}</span></h4>
-            <p className="text-[11px] text-blue-100">Annual Cultural &amp; Literary Festival</p>
-            <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-white text-[#2563EB] text-[10px] font-bold">
-              {participant.categoryName.toUpperCase()}
+        {/* Printable / downloadable ID card — shared by Admin, Team Manager and Participant portals. */}
+        <div className="w-full max-w-[410px] rounded-[26px] border-[3px] border-[#60A5FA] overflow-hidden shadow-[0_12px_32px_rgba(37,99,235,0.20)] bg-white flex flex-col">
+          <div className="bg-gradient-to-br from-[#0758D8] via-[#1675F7] to-[#38A5FF] text-white px-5 pt-5 pb-6 text-center relative overflow-hidden">
+            <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full border-[18px] border-white/10" />
+            <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[20px] border-white/10" />
+            <div className="absolute top-3 right-3 px-3 py-1 rounded-lg bg-white text-[#0758D8] text-[11px] font-extrabold uppercase">
+              {participant.categoryName}
+            </div>
+            <span className="relative text-[10px] sm:text-xs font-bold uppercase tracking-[0.22em] text-blue-100 block mb-3">Official Festival Pass</span>
+            <h4 className="relative text-xl sm:text-2xl font-extrabold tracking-tight leading-tight break-words">
+              <span className="festival-name">{theme.festivalName}</span>
+            </h4>
+            <p className="relative text-xs sm:text-sm text-blue-100 mt-1">Annual Cultural &amp; Literary Festival</p>
+            <div className="relative flex justify-center mt-5">
+              <div className="w-[108px] h-[108px] rounded-full p-1.5 bg-white ring-4 ring-blue-200 shadow-lg">
+                <ParticipantPhoto photoUrl={participant.photoUrl} name={participant.name} shape="circle" size="lg" className="!w-full !h-full border-2 border-[#2563EB]" />
+              </div>
+              <span className="absolute -bottom-3 bg-black text-white text-sm font-extrabold px-6 py-1 rounded-full border-2 border-white shadow-md">{participant.bib}</span>
             </div>
           </div>
 
-          {/* Photo & Bib */}
-          <div className="p-5 flex flex-col items-center text-center bg-gradient-to-b from-blue-50/50 to-white">
-            <div className="relative">
-              <ParticipantPhoto
-                photoUrl={participant.photoUrl}
-                name={participant.name}
-                shape="circle"
-                size="lg"
-                className="border-4 border-white shadow-md"
-              />
-              <span className="absolute bottom-0 right-0 bg-[#111111] text-white text-[11px] font-bold px-2 py-0.5 rounded-full border border-white">
-                {participant.bib}
-              </span>
-            </div>
-
-            <h3 className="mt-3 text-base font-bold text-[#111111]">{participant.name}</h3>
-            <p className="text-xs text-[#526070]">{participant.classGrade} - Div {participant.division}</p>
-
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#2563EB] text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
-              {participant.teamName} ({participant.teamCode})
+          <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
+            <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
+            <p className="text-sm font-semibold text-[#64748B] mt-1">{participant.classGrade} · Division {participant.division}</p>
+            <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
+              <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
+              <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
             </div>
           </div>
 
-          {/* Metadata Grid */}
-          <div className="px-5 py-3 border-t border-b border-[#E1E7EF] bg-[#F8FAFC] grid grid-cols-2 gap-2 text-left text-xs">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#526070] block">Participant ID</span>
-              <span className="font-semibold text-[#111111] break-all block min-w-0">{participant.id.toUpperCase()}</span>
+          <div className="mx-4 mb-4 p-4 rounded-2xl border border-blue-100 bg-[#F8FBFF] grid grid-cols-2 gap-x-4 gap-y-4 text-left">
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Participant ID</span>
+              <span className="mt-1 font-bold text-xs text-[#111827] break-all block">{participant.id.toUpperCase()}</span>
             </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#526070] block">Category Tier</span>
-              <span className="font-semibold text-[#111111]">{participant.categoryName}</span>
+            <div className="min-w-0 border-l border-blue-100 pl-3">
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Category Tier</span>
+              <span className="mt-1 font-extrabold text-sm text-[#111827] block break-words">{participant.categoryName}</span>
             </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#526070] block">Events Registered</span>
-              <span className="font-semibold text-[#111111]">{participant.registeredEventIds.length} Contests</span>
+            <div className="min-w-0 border-t border-blue-100 pt-3">
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Registered Contests</span>
+              <span className="mt-1 font-extrabold text-sm text-[#111827] block">{participant.registeredEventIds.length} Competitions</span>
             </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#526070] block">Security Auth</span>
-              <span className="font-semibold text-emerald-600">VERIFIED</span>
+            <div className="min-w-0 border-t border-blue-100 pt-3 border-l pl-3">
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Security Status</span>
+              <span className="mt-1 font-extrabold text-sm text-emerald-700 block">✓ Verified Auth</span>
             </div>
           </div>
 
-          {/* QR Code & Barcode */}
-          <div className="p-4 bg-white flex items-center justify-between">
-            <div className="text-left">
-              <span className="text-[9px] text-[#526070] uppercase font-medium block">Scan at Venue Gate &amp; Green Room</span>
-              <span className="text-[10px] font-mono text-[#111111]">
-                {fetchError ? 'AUTH ERROR' : signedToken ? `TOKEN: ${signedToken.slice(0, 16).toUpperCase()}` : 'VERIFYING...'}
-              </span>
-            </div>
-            <div className="w-14 h-14 bg-white border border-[#E1E7EF] rounded-lg p-0.5 flex items-center justify-center shadow-xs">
+          <div className="mx-4 mb-4 rounded-2xl border-2 border-blue-100 bg-gradient-to-b from-white to-blue-50 px-4 pt-4 pb-3 flex flex-col items-center text-center">
+            <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#0758D8]">Scan at Venue Entrance &amp; Stage Gate</div>
+            <div className="mt-3 w-[164px] h-[164px] p-2 bg-white rounded-2xl shadow-sm border border-blue-50 flex items-center justify-center">
               {qrDataUrl ? (
-                <img
-                  src={qrDataUrl}
-                  alt={`QR Verification for ${participant.bib}`}
-                  className="w-full h-full object-contain"
-                />
+                <img src={qrDataUrl} alt={`QR Verification for ${participant.bib}`} className="w-full h-full object-contain" />
               ) : (
-                <QrCode className="w-8 h-8 text-neutral-400 animate-pulse" />
+                <QrCode className="w-14 h-14 text-neutral-400 animate-pulse" />
               )}
             </div>
+            <div className="mt-3 w-full rounded-full bg-blue-50 border border-blue-100 px-3 py-2 text-[10px] sm:text-xs font-mono text-[#111827] break-all">
+              <span className="font-extrabold text-[#0758D8]">TOKEN:</span> {fetchError ? 'AUTH ERROR' : signedToken ? signedToken.slice(0, 16).toUpperCase() : 'VERIFYING...'}
+            </div>
+            {fetchError && <p role="alert" className="mt-2 text-xs text-red-700">{fetchError}</p>}
           </div>
         </div>
       </div>
