@@ -128,7 +128,7 @@ export class TeamExportService {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 26;
     const usableWidth = pageWidth - margin * 2;
-    const widths = [46, 116, 112, 48, 70, 76, 48, 46, 48, 62];
+    const widths = [50, 136, 130, 48, 78, 85, 65, 56, 54, 65];
     const labels = ['CODE', 'COMPETITION', 'CONTESTANT / GROUP', 'BIB', 'CATEGORY / TYPE', 'STAGE', 'RANK', 'SCORE', 'GRADE', 'POINTS'];
     const wrap = (value: string, width: number, maxLines = 3): string[] =>
       (doc.splitTextToSize(value || '-', width) as string[]).slice(0, maxLines);
