@@ -71,9 +71,9 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         setSignedPayload(data.payload);
 
         const url = await QRCode.toDataURL(data.payload, {
-          width: 420,
-          margin: 2,
-          errorCorrectionLevel: 'H',
+          width: 600,
+          margin: 4,
+          errorCorrectionLevel: 'Q',
           color: {
             dark: '#111111',
             light: '#FFFFFF'
@@ -193,7 +193,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
       )}
       <div className="flex justify-center py-2">
         {/* Printable / downloadable ID card — shared by Admin, Team Manager and Participant portals. */}
-        <div className="w-full max-w-[410px] rounded-[26px] border-[3px] border-[#60A5FA] overflow-hidden shadow-[0_12px_32px_rgba(37,99,235,0.20)] bg-white flex flex-col">
+        <div className="w-full max-w-[430px] rounded-[26px] border-[3px] border-[#60A5FA] overflow-hidden shadow-[0_12px_32px_rgba(37,99,235,0.20)] bg-white flex flex-col">
           <div className="bg-gradient-to-br from-[#0758D8] via-[#1675F7] to-[#38A5FF] text-white px-5 pt-5 pb-6 text-center relative overflow-hidden">
             <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full border-[18px] border-white/10" />
             <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[20px] border-white/10" />
@@ -215,7 +215,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
             <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
-            <p className="text-sm font-semibold text-[#64748B] mt-1">{participant.classGrade} · Division {participant.division}</p>
+            <p className="text-sm font-semibold text-[#64748B] mt-1">{[participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' · ')}</p>
             <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
               <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
               <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
@@ -225,7 +225,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="mx-4 mb-4 p-4 rounded-2xl border border-blue-100 bg-[#F8FBFF] grid grid-cols-2 gap-x-4 gap-y-4 text-left">
             <div className="min-w-0">
               <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Participant ID</span>
-              <span className="mt-1 font-bold text-xs text-[#111827] break-all block">{participant.id.toUpperCase()}</span>
+              <span className="mt-1 font-bold text-[11px] leading-4 text-[#111827] break-all block">{participant.id.toUpperCase()}</span>
             </div>
             <div className="min-w-0 border-l border-blue-100 pl-3">
               <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Category Tier</span>
@@ -243,7 +243,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           <div className="mx-4 mb-4 rounded-2xl border-2 border-blue-100 bg-gradient-to-b from-white to-blue-50 px-4 pt-4 pb-3 flex flex-col items-center text-center">
             <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#0758D8]">Scan at Venue Entrance &amp; Stage Gate</div>
-            <div className="mt-3 w-[164px] h-[164px] p-2 bg-white rounded-2xl shadow-sm border border-blue-50 flex items-center justify-center">
+            <div className="mt-3 w-[204px] h-[204px] p-2 bg-white rounded-2xl shadow-sm border border-blue-50 flex items-center justify-center">
               {qrDataUrl ? (
                 <img src={qrDataUrl} alt={`QR Verification for ${participant.bib}`} className="w-full h-full object-contain" />
               ) : (

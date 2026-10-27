@@ -56,7 +56,7 @@ export async function exportDigitalIdAsPng(
   }
 
   const width = 640;
-  const height = 1024;
+  const height = 1080;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -188,7 +188,7 @@ export async function exportDigitalIdAsPng(
 
   ctx.fillStyle = '#64748B';
   ctx.font = '600 18px Montserrat, sans-serif';
-  ctx.fillText(`${participant.classGrade} - Division ${participant.division}`, width / 2, 435);
+  ctx.fillText([participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' - '), width / 2, 435);
 
   // Team Delegation Pill
   const teamText = `${participant.teamName} (${participant.teamCode})`;
@@ -247,10 +247,10 @@ export async function exportDigitalIdAsPng(
   // Large, high-contrast QR section. Keep a quiet white margin around the code
   // so venue phones can scan it from a printed or phone-screen ID.
   ctx.fillStyle = '#F8FBFF';
-  ctx.fillRect(40, 730, width - 80, 270);
+  ctx.fillRect(40, 730, width - 80, 330);
   ctx.strokeStyle = '#BFDBFE';
   ctx.lineWidth = 2;
-  ctx.strokeRect(40, 730, width - 80, 270);
+  ctx.strokeRect(40, 730, width - 80, 330);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#0758D8';
@@ -263,17 +263,17 @@ export async function exportDigitalIdAsPng(
 
   try {
     const qrDataUrl = await QRCode.toDataURL(options.qrPayload, {
-      width: 600,
-      margin: 3,
-      errorCorrectionLevel: 'H',
+      width: 800,
+      margin: 4,
+      errorCorrectionLevel: 'Q',
       color: { dark: '#000000', light: '#FFFFFF' }
     });
     const qrImg = new Image();
     qrImg.src = qrDataUrl;
     await qrImg.decode();
-    const qrSize = 190;
+    const qrSize = 220;
     const qrX = (width - qrSize) / 2;
-    const qrY = 766;
+    const qrY = 770;
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
     ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
@@ -286,16 +286,16 @@ export async function exportDigitalIdAsPng(
 
   ctx.fillStyle = '#EAF3FF';
   ctx.beginPath();
-  ctx.roundRect(80, 972, width - 160, 32, 16);
+  ctx.roundRect(80, 1020, width - 160, 32, 16);
   ctx.fill();
   ctx.fillStyle = '#0758D8';
   ctx.font = '800 12px Montserrat, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('TOKEN:', 100, 992);
+  ctx.fillText('TOKEN:', 100, 1040);
   ctx.fillStyle = '#111827';
   ctx.font = '700 13px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(options.token.slice(0, 24).toUpperCase(), width / 2 + 28, 992, width - 250);
+  ctx.fillText(options.token.slice(0, 24).toUpperCase(), width / 2 + 28, 1040, width - 250);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(value => value
