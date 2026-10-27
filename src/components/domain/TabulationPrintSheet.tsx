@@ -127,7 +127,7 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
                           Grade {rk.grade}
                         </td>
                         <td className="py-2 px-3 text-right font-bold text-emerald-600">
-                          +{rk.totalEarnedPoints} pts
+                          +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
                         </td>
                       </tr>
                     ))
