@@ -10,10 +10,19 @@ export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
   { value: 'text', label: 'Custom text' }, { value: 'festivalName', label: 'Festival name' },
   { value: 'institutionName', label: 'Institution name' }, { value: 'competitionName', label: 'Competition name' },
   { value: 'categoryName', label: 'Category' }, { value: 'competitionCode', label: 'Competition code' },
-  ...([1, 2, 3] as const).flatMap(rank => (['name', 'team', 'grade', 'score'] as const).map(field => ({
-    value: `rank${rank}.${field}` as PosterField, label: `Rank ${rank} · ${field === 'name' ? 'Winner name' : field}`,
+  ...([1, 2, 3] as const).flatMap(rank => (['name', 'team'] as const).map(field => ({
+    value: `rank${rank}.${field}` as PosterField, label: `Rank ${rank} · ${field === 'name' ? 'Winner name' : 'Team name'}`,
   }))),
 ];
+
+// Legacy grade/score dynamic fields remain valid only so existing saved templates load;
+// they are deliberately hidden from the editor and render no data on poster outputs.
+const HIDDEN_LEGACY_POSTER_FIELDS = new Set<PosterField>(
+  ([1, 2, 3] as const).flatMap(rank => [
+    `rank${rank}.grade` as PosterField,
+    `rank${rank}.score` as PosterField,
+  ]),
+);
 export const POSTER_PALETTES = {
   royal: { background: '#142C50', accent: '#EACB85', text: '#FFFFFF' },
   crimson: { background: '#571E32', accent: '#F9D59B', text: '#FFFFFF' },
@@ -109,7 +118,7 @@ export function validatePosterConfig(value: unknown): PosterConfig {
       const item = input as PosterElement;
       if (typeof item.id !== 'string' || !/^[\w-]{1,80}$/.test(item.id) || ids.has(item.id)) throw new Error('Invalid or duplicate layer ID.');
       ids.add(item.id);
-      if (!['text', 'image'].includes(item.type) || !POSTER_FIELDS.some(field => field.value === item.field)) throw new Error('Invalid layer type or field.');
+      if (!['text', 'image'].includes(item.type) || (!POSTER_FIELDS.some(field => field.value === item.field) && !HIDDEN_LEGACY_POSTER_FIELDS.has(item.field))) throw new Error('Invalid layer type or field.');
       for (const key of ['label', 'text'] as const) if (typeof item[key] !== 'string' || item[key].length > (key === 'text' ? 500 : 80)) throw new Error('Invalid layer text.');
       for (const key of ['x', 'y', 'width', 'height', 'fontSize'] as const) {
         if (!Number.isFinite(item[key]) || item[key] < (key === 'width' || key === 'height' ? 1 : key === 'fontSize' ? 8 : 0) || item[key] > (key === 'fontSize' ? 180 : 100)) throw new Error('Invalid layer position or size.');
@@ -127,14 +136,11 @@ export function resolvePosterField(element: PosterElement, result: CompetitionRe
   if (element.field === 'text') return element.text;
   if (element.field === 'festivalName' || element.field === 'institutionName') return theme[element.field] || '';
   if (element.field === 'competitionName' || element.field === 'categoryName' || element.field === 'competitionCode') return result[element.field] || '';
-  const match = /^rank([123])\.(name|team|grade|score)$/.exec(element.field);
+  const match = /^rank([123])\.(name|team)$/.exec(element.field);
   if (!match) return '';
-  return result.ranks.filter(rank => rank.rank === Number(match[1])).map(rank => {
-    if (match[2] === 'name') return rank.candidateName;
-    if (match[2] === 'team') return rank.teamName || rank.teamCode;
-    if (match[2] === 'grade') return rank.grade === 'NO_GRADE' ? '' : `Grade ${rank.grade}`;
-    return `${rank.score} marks`;
-  }).filter(Boolean).join('\n');
+  return result.ranks.filter(rank => rank.rank === Number(match[1])).map(rank =>
+    match[2] === 'name' ? rank.candidateName : (rank.teamName || rank.teamCode)
+  ).filter(Boolean).join('\n');
 }
 const escapeXml = (value: string) => value.replace(/[<>&"']/g, character => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[character]!);
 function wrapText(text: string, capacity: number): string[] {
