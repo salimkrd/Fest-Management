@@ -25,10 +25,12 @@ interface TeamLayoutProps {
 export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentTeamUser, setCurrentTeamUser, theme } = useFest();
+  const { currentTeamUser, teams, setCurrentTeamUser, theme } = useFest();
   const [checking, setChecking] = React.useState(!currentTeamUser);
 
-  const team = currentTeamUser;
+  const team = currentTeamUser
+    ? teams.find(candidate => candidate.id === currentTeamUser.id) || currentTeamUser
+    : null;
 
   React.useEffect(() => {
     if (!currentTeamUser) {
