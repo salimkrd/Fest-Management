@@ -10,7 +10,8 @@ import {
   Award,
   Shield,
   LogOut,
-  Trophy
+  Trophy,
+  FileDown
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
@@ -79,6 +80,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
     { name: 'My Participants', href: '/team/participants', icon: Users },
     { name: 'Competition Registration', href: '/team/registration', icon: ClipboardCheck },
     { name: 'Team Results & Standings', href: '/team/results', icon: Award },
+    { name: 'Export Page', href: '/team/export', icon: FileDown },
   ];
 
   if (checking || !team) {
