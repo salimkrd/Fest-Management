@@ -11,7 +11,8 @@ describe('Media Studio poster font library', () => {
   it('includes the requested font families grouped for the editor', () => {
     const groups = new Map(POSTER_FONT_GROUPS.map(group => [group.category, group.fonts.map(font => font.name)]));
     expect(groups.get('Sans-Serif')).toContain('Plus Jakarta Sans');
-    expect(groups.get('Display / Headlines')).toContain('Press Start 2P');
+    expect(groups.get('Display / Headlines')).toContain('Big Shoulders Display');
+    expect(groups.get('Special / Fun')).toContain('Press Start 2P');
     expect(groups.get('Script / Handwriting')).toContain('Great Vibes');
     expect(groups.get('Monospace')).toContain('JetBrains Mono');
     expect(groups.get('Malayalam')).toContain('Noto Sans Malayalam');
