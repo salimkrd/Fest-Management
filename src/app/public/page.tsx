@@ -29,7 +29,6 @@ export default function PublicResultHomePage() {
     return matchesSearch && matchesCat;
   });
 
-  const releasedPosters = filteredResults.filter(result => result.posterReleased);
 
   return (
     <PublicLayout>
