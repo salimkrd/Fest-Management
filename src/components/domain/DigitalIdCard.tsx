@@ -10,7 +10,6 @@ import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
 import { ParticipantPhoto, isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
 import { useFest } from '@/context/FestContext';
-import { FestivalLogo } from '@/components/domain/FestivalBrand';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
