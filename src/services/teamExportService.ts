@@ -9,7 +9,6 @@ export interface TeamResultExportRow {
   stageName: string;
   candidateName: string;
   bib: string;
-  score: number;
   grade: string;
   rank: 1 | 2 | 3 | null;
   points: number;
@@ -41,12 +40,12 @@ export class TeamExportService {
   static generateCSV(rows: TeamResultExportRow[]): string {
     const headers = [
       'Competition Code', 'Competition', 'Category', 'Type', 'Stage / Venue',
-      'Contestant / Group', 'Bib', 'Score', 'Grade', 'Prize Rank', 'Team Points', 'Published Date'
+      'Contestant / Group', 'Bib', 'Grade', 'Prize Rank', 'Team Points', 'Published Date'
     ];
     const escape = (value: string | number) => '"' + String(value ?? '').replace(/"/g, '""') + '"';
     const lines = rows.map(row => [
       row.competitionCode, row.competitionName, row.categoryName, row.type, row.stageName,
-      row.candidateName, row.bib, row.score, row.grade, rankLabel(row.rank), row.points, row.publishedDate
+      row.candidateName, row.bib, row.grade, rankLabel(row.rank), row.points, row.publishedDate
     ].map(escape).join(','));
     return '\uFEFF' + headers.map(escape).join(',') + '\r\n' + lines.join('\r\n');
   }
@@ -72,7 +71,6 @@ export class TeamExportService {
       'Stage / Venue': row.stageName,
       'Contestant / Group': row.candidateName,
       'Bib': row.bib,
-      'Score': row.score,
       'Grade': row.grade,
       'Prize Rank': rankLabel(row.rank),
       'Team Points': row.points,
@@ -81,12 +79,11 @@ export class TeamExportService {
     const detailSheet = XLSX.utils.json_to_sheet(detailData);
     detailSheet['!cols'] = [
       { wch: 5 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 10 },
-      { wch: 24 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
-      { wch: 24 }, { wch: 14 }, { wch: 18 }
+      { wch: 24 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 18 }
     ];
     detailSheet['!rows'] = [{ hpt: 24 }, ...rows.map(() => ({ hpt: 22 }))];
     if (detailData.length > 0) {
-      detailSheet['!autofilter'] = { ref: 'A1:M' + (detailData.length + 1) };
+      detailSheet['!autofilter'] = { ref: 'A1:L' + (detailData.length + 1) };
     }
 
     const totalPoints = rows.reduce((total, row) => total + row.points, 0);
@@ -128,8 +125,8 @@ export class TeamExportService {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 26;
     const usableWidth = pageWidth - margin * 2;
-    const widths = [50, 136, 130, 48, 78, 85, 65, 56, 54, 65];
-    const labels = ['CODE', 'COMPETITION', 'CONTESTANT / GROUP', 'BIB', 'CATEGORY / TYPE', 'STAGE', 'RANK', 'SCORE', 'GRADE', 'POINTS'];
+    const widths = [55, 135, 140, 45, 80, 75, 68, 60, 95];
+    const labels = ['CODE', 'COMPETITION', 'CONTESTANT / GROUP', 'BIB', 'CATEGORY / TYPE', 'STAGE', 'RANK', 'GRADE', 'POINTS'];
     const wrap = (value: string, width: number, maxLines = 3): string[] =>
       (doc.splitTextToSize(value || '-', width) as string[]).slice(0, maxLines);
     const generatedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -173,7 +170,7 @@ export class TeamExportService {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(6.8);
         doc.setTextColor(51, 65, 85);
-        const centered = [0, 3, 6, 7, 8, 9].includes(index);
+        const centered = [0, 3, 6, 7, 8].includes(index);
         doc.text(label, centered ? x + widths[index] / 2 : x + 4, headerY + 14, { align: centered ? 'center' : 'left' });
         x += widths[index];
       });
@@ -190,9 +187,8 @@ export class TeamExportService {
         wrap(row.categoryName + ' / ' + row.type, widths[4] - 8, 3),
         wrap(row.stageName, widths[5] - 8, 3),
         wrap(rankLabel(row.rank), widths[6] - 8, 3),
-        wrap(String(row.score), widths[7] - 8, 2),
-        wrap(row.grade, widths[8] - 8, 2),
-        wrap(String(row.points), widths[9] - 8, 2)
+        wrap(row.grade, widths[7] - 8, 2),
+        wrap(String(row.points), widths[8] - 8, 2)
       ];
       const maxLines = Math.max(...cells.map(cell => cell.length));
       const rowHeight = Math.max(30, maxLines * 8 + 10);
@@ -206,7 +202,7 @@ export class TeamExportService {
         doc.setFillColor(...(index % 2 === 0 ? [255, 255, 255] as [number, number, number] : [248, 250, 252] as [number, number, number]));
         doc.setDrawColor(226, 232, 240);
         doc.rect(x, y, widths[columnIndex], rowHeight, 'FD');
-        const centered = [0, 3, 6, 7, 8, 9].includes(columnIndex);
+        const centered = [0, 3, 6, 7, 8].includes(columnIndex);
         doc.setFont('helvetica', columnIndex === 0 || columnIndex === 2 ? 'bold' : 'normal');
         doc.setFontSize(columnIndex === 2 ? 7.2 : 6.9);
         doc.setTextColor(columnIndex === 0 ? 37 : 51, columnIndex === 0 ? 99 : 65, columnIndex === 0 ? 235 : 85);

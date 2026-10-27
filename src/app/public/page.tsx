@@ -232,9 +232,9 @@ export default function PublicResultHomePage() {
                                 <span className="text-[10px] text-[#526070]">{rank1.teamName} ({rank1.teamCode})</span>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-xs font-extrabold text-[#111111]">{rank1.score}</span>
-                              <span className="text-[9px] font-bold text-amber-700 block">Gr {rank1.grade}</span>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] font-bold text-amber-800 block">Grade {rank1.grade || '—'}</span>
+                              <span className="text-xs font-extrabold text-emerald-700 block">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts</span>
                             </div>
                           </div>
                         )}
@@ -247,7 +247,7 @@ export default function PublicResultHomePage() {
                               </span>
                               <span className="font-medium text-[#111111] line-clamp-1">{rank2.candidateName}</span>
                             </div>
-                            <span className="text-[11px] font-semibold text-[#526070] shrink-0">{rank2.score} pts</span>
+                            <span className="text-right shrink-0"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank2.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
                           </div>
                         )}
 
@@ -259,7 +259,7 @@ export default function PublicResultHomePage() {
                               </span>
                               <span className="font-medium text-[#111111] line-clamp-1">{rank3.candidateName}</span>
                             </div>
-                            <span className="text-[11px] font-semibold text-[#526070] shrink-0">{rank3.score} pts</span>
+                            <span className="text-right shrink-0"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank3.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 0} pts</span></span>
                           </div>
                         )}
                       </div>

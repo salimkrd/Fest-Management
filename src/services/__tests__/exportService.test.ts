@@ -73,4 +73,17 @@ describe('ExportService — Official Published Winners Verification', () => {
     // Event Total Points
     expect(row.eventTotalPoints).toBe(25);
   });
+
+  it('exports grades and official points without raw scores', () => {
+    const rows = ExportService.getOfficialPublishedWinners(sampleResults);
+    const csv = ExportService.generateWinnersCSV(rows);
+    expect(csv).toContain('1st Grade');
+    expect(csv).toContain('1st Points');
+    expect(csv).toContain('"A+"');
+    expect(csv).toContain(',11,');
+    expect(csv).not.toContain('95');
+    expect(csv).not.toContain('88');
+    expect(csv).not.toContain('74');
+    expect(csv).not.toContain('Score');
+  });
 });

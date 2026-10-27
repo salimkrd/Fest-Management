@@ -29,8 +29,8 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Official Tabulation Sheet (Printable Register)"
-      description="Formal signed certificate document of verified festival contest rankings"
+      title="Official Published Results Register"
+      description="Official published results with grades and awarded points"
       maxWidth="4xl"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -52,7 +52,7 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
               leftIcon={<Printer className="w-4 h-4" />}
               onClick={handlePrint}
             >
-              Print Official Sheet
+              Print Official Results
             </Button>
           </div>
         </div>
@@ -101,7 +101,6 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
                     <th className="py-2 px-3">Candidate / Group</th>
                     <th className="py-2 px-3">Chest / Bib</th>
                     <th className="py-2 px-3">House Contingent</th>
-                    <th className="py-2 px-3 text-center">Score</th>
                     <th className="py-2 px-3 text-center">Grade</th>
                     <th className="py-2 px-3 text-right">Points Earned</th>
                   </tr>
@@ -109,7 +108,7 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
                 <tbody className="divide-y divide-[#E1E7EF]">
                   {res.ranks.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-3 text-center text-[#526070] italic">
+                      <td colSpan={6} className="py-3 text-center text-[#526070] italic">
                         Results under review / No public ranks published yet.
                       </td>
                     </tr>
@@ -124,12 +123,11 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
                         <td className="py-2 px-3">
                           <span className="font-medium text-[#111111]">{rk.teamName}</span> ({rk.teamCode})
                         </td>
-                        <td className="py-2 px-3 text-center font-bold text-[#111111]">{rk.score}</td>
                         <td className="py-2 px-3 text-center font-bold text-[#2563EB]">
                           Grade {rk.grade}
                         </td>
                         <td className="py-2 px-3 text-right font-bold text-emerald-600">
-                          +{rk.totalEarnedPoints} pts
+                          +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
                         </td>
                       </tr>
                     ))

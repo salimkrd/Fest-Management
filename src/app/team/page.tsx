@@ -194,7 +194,7 @@ export default function TeamManagerDashboardPage() {
                   <div className="flex items-center gap-3">
                     <Award className="w-4 h-4 text-[#2563EB]" />
                     <span className="text-xs font-bold text-[#111111] group-hover:text-[#2563EB]">
-                      Review Scores &amp; Points Breakdown
+                      Published Results &amp; Points Breakdown
                     </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-[#526070]" />

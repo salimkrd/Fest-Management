@@ -35,7 +35,6 @@ export default function TeamExportPage() {
               stageName: result.stageName || '-',
               candidateName: rank.candidateName,
               bib: rank.bib || '-',
-              score: rank.score,
               grade: rank.grade || '-',
               rank: rank.rank,
               points: rank.officialPoints ?? rank.totalEarnedPoints ?? 0,
@@ -120,7 +119,7 @@ export default function TeamExportPage() {
               <FileDown className="w-4 h-4" /> Team Manager Portal
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight mt-1">Export My Team Results</h1>
-            <p className="text-xs text-[#526070] mt-1">Download the published results and points awarded to {team?.name || 'your team'} only.</p>
+            <p className="text-xs text-[#526070] mt-1">Download published grades and points awarded to {team?.name || 'your team'} only.</p>
           </div>
           <div className="team-export-actions flex flex-wrap gap-2">
             <Button variant="outline" size="sm" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint} disabled={disabled}>Print View</Button>
@@ -183,7 +182,7 @@ export default function TeamExportPage() {
             <div className="overflow-x-auto">
               <table className="team-export-table w-full text-left text-xs">
                 <thead><tr className="bg-[#F8FAFC] border-b border-[#E1E7EF] text-[10px] uppercase tracking-wide text-[#526070]">
-                  <th className="py-3 px-4">Code</th><th className="py-3 px-4">Competition</th><th className="py-3 px-4">Contestant / Group</th><th className="py-3 px-4">Bib</th><th className="py-3 px-4">Category / Type</th><th className="py-3 px-4">Stage</th><th className="py-3 px-4 text-center">Rank</th><th className="py-3 px-4 text-center">Score</th><th className="py-3 px-4 text-center">Grade</th><th className="py-3 px-4 text-right">Points</th>
+                  <th className="py-3 px-4">Code</th><th className="py-3 px-4">Competition</th><th className="py-3 px-4">Contestant / Group</th><th className="py-3 px-4">Bib</th><th className="py-3 px-4">Category / Type</th><th className="py-3 px-4">Stage</th><th className="py-3 px-4 text-center">Rank</th><th className="py-3 px-4 text-center">Grade</th><th className="py-3 px-4 text-right">Points</th>
                 </tr></thead>
                 <tbody className="divide-y divide-[#E1E7EF]">
                   {filteredRows.map(row => (
@@ -192,7 +191,7 @@ export default function TeamExportPage() {
                       <td className="py-3 px-4 font-bold text-[#111111]">{row.competitionName}</td>
                       <td className="py-3 px-4 font-semibold text-[#111111]">{row.candidateName}</td>
                       <td className="py-3 px-4">{row.bib}</td><td className="py-3 px-4">{row.categoryName} / {row.type}</td><td className="py-3 px-4 text-[#526070]">{row.stageName}</td>
-                      <td className="py-3 px-4 text-center font-semibold">{rankLabel(row.rank)}</td><td className="py-3 px-4 text-center font-bold">{row.score}</td><td className="py-3 px-4 text-center font-bold text-[#2563EB]">{row.grade}</td><td className="py-3 px-4 text-right font-extrabold text-emerald-700">{row.points} pts</td>
+                      <td className="py-3 px-4 text-center font-semibold">{rankLabel(row.rank)}</td><td className="py-3 px-4 text-center font-bold text-[#2563EB]">{row.grade}</td><td className="py-3 px-4 text-right font-extrabold text-emerald-700">{row.points} pts</td>
                     </tr>
                   ))}
                 </tbody>

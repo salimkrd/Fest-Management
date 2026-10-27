@@ -224,7 +224,7 @@ export default function ExportManagementPage() {
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Full Score Register / Tabulation Register</span>
+            <span>Full Results / Tabulation Register</span>
           </button>
         </div>
 
@@ -417,7 +417,7 @@ export default function ExportManagementPage() {
               <div>
                 <h3 className="text-sm font-bold text-[#111111]">Comprehensive Tabulation Register</h3>
                 <p className="text-xs text-[#526070] mt-0.5">
-                  Print the master jury score sheets with criterion sub-totals, judges signature lines, and chief controller sign-off.
+                  Print the official published-results register with candidate names, prize positions, grades, and official points.
                 </p>
               </div>
               <Button
@@ -431,7 +431,7 @@ export default function ExportManagementPage() {
             </div>
 
             <div className="p-4 bg-[#F8FAFC] rounded-lg border border-[#E1E7EF] text-xs text-[#526070]">
-              Available for formal institutional accreditation records. Contains all candidate rows, criteria score matrices, and signatures.
+              Available for formal institutional records. Contains published candidate rows, grades, points, and signature lines; raw scores are omitted.
             </div>
           </div>
         )}

@@ -48,7 +48,7 @@ export default function TeamResultsPage() {
               My Team Results &amp; Championship Tally
             </h1>
             <p className="text-xs text-[#526070] mt-1">
-              Verified contest scores, position prizes, and Sahithyolsav points accredited to {team?.name}
+              Published grades, prize positions, and Sahithyolsav points accredited to {team?.name}
             </p>
           </div>
           <Link href="/public/championship" target="_blank">
@@ -58,11 +58,11 @@ export default function TeamResultsPage() {
           </Link>
         </div>
 
-        {/* Team Score Card Banner */}
+        {/* Team Championship Points Banner */}
         <div className="bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="col-span-2 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-[#E1E7EF] pb-4 lg:pb-0 lg:pr-6">
             <span className="text-xs font-bold uppercase tracking-wider text-[#526070]">
-              Accumulated Total Score
+              Accumulated Total Points
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-4xl font-black text-[#2563EB]">{team?.totalPoints}</span>
@@ -123,7 +123,6 @@ export default function TeamResultsPage() {
                   <th className="py-3 px-6">Participant / Ensemble</th>
                   <th className="py-3 px-6">Category</th>
                   <th className="py-3 px-6 text-center">Type</th>
-                  <th className="py-3 px-6 text-center">Score</th>
                   <th className="py-3 px-6 text-center">Official Grade</th>
                   <th className="py-3 px-6 text-center">Prize Rank</th>
                   <th className="py-3 px-6 text-right">Team Championship Points</th>
@@ -132,7 +131,7 @@ export default function TeamResultsPage() {
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-[#526070]">
+                    <td colSpan={7} className="py-8 text-center text-[#526070]">
                       No results published yet for competitions featuring {team?.name}.
                     </td>
                   </tr>
@@ -159,9 +158,6 @@ export default function TeamResultsPage() {
                           {r.type}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-center font-bold text-[#111111]">
-                        {r.score}
-                      </td>
                       <td className="py-4 px-6 text-center">
                         <span className="font-bold text-[#2563EB] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
                           Grade {r.grade}
@@ -173,7 +169,7 @@ export default function TeamResultsPage() {
                         {r.rank === 3 && <span className="font-extrabold text-amber-800">🥉 3rd Place</span>}
                       </td>
                       <td className="py-4 px-6 text-right font-extrabold text-emerald-600 text-sm">
-                        +{r.totalEarnedPoints} pts
+                        +{r.officialPoints ?? r.totalEarnedPoints ?? 0} pts
                         {r.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
                       </td>
                     </tr>
