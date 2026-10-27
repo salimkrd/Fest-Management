@@ -149,7 +149,7 @@ export default function ParticipantDashboard() {
           <p className="text-xs leading-relaxed text-blue-900">
             Individual points come from <strong>published SOLO results only</strong>.
             Group competition awards count toward the team championship and never increase your individual points.
-            Unpublished scores remain confidential.
+            Unpublished results remain confidential.
           </p>
         </div>
 
@@ -157,7 +157,7 @@ export default function ParticipantDashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 border-b border-[#E1E7EF] gap-3">
             <div>
               <h2 className="text-lg font-extrabold text-[#111827]">My Competitions & Results</h2>
-              <p className="text-xs text-[#526070] mt-1">Events assigned to your participant record; only officially published marks are shown.</p>
+              <p className="text-xs text-[#526070] mt-1">Events assigned to your participant record; published grades and awarded points are shown here.</p>
             </div>
             <button onClick={() => void refresh()} className="px-3 py-2 border border-[#E1E7EF] rounded-lg text-xs font-semibold text-[#2563EB]">Refresh Results</button>
           </div>
@@ -187,7 +187,7 @@ export default function ParticipantDashboard() {
                   <div className="md:text-right shrink-0">
                     {event.published ? (
                       <>
-                        <p className="text-sm font-black text-[#111827]">{event.score ?? '—'} marks · Grade {event.grade || '—'}</p>
+                        <p className="text-sm font-black text-[#111827]">Grade {event.grade || '—'}</p>
                         <p className="text-xs text-[#526070] mt-0.5">
                           {event.position ? 'Position #' + event.position : 'No Prize'}
                         </p>
