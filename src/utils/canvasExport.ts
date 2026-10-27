@@ -14,7 +14,8 @@ import { loadPosterFonts } from '@/domain/posterFonts';
 export async function exportPosterAsPng(
   result: CompetitionResult,
   theme: PublicThemeSettings,
-  config?: PosterConfig
+  config?: PosterConfig,
+  templateName?: string
 ): Promise<void> {
   if (typeof window === 'undefined') throw new Error('Poster downloads require a browser.');
   const { validatePosterConfig, normalizePosterConfig, posterDimensions, posterSvgDataUrl } = await import('@/domain/poster');
@@ -37,7 +38,9 @@ export async function exportPosterAsPng(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Poster_${(result.competitionCode || 'Result').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+  const filenameParts = [`Poster_${(result.competitionCode || 'Result').replace(/[^a-zA-Z0-9_-]/g, '_')}`];
+  if (templateName?.trim()) filenameParts.push(templateName.trim().replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, ''));
+  link.download = filenameParts.join('_') + '.png';
   document.body.appendChild(link);
   link.click();
   link.remove();

@@ -7,13 +7,12 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { PublicResultPoster } from '@/components/domain/PublicResultPoster';
 import {
   Trophy,
   Share2,
   ArrowLeft,
   Check,
-  Sparkles,
+  Download,
   Calendar,
   MapPin
 } from 'lucide-react';
@@ -303,22 +302,22 @@ function CompetitionDetailContent() {
         </div>
       </section>
 
-      {result.posterReleased && (
-        <section id="poster" aria-labelledby="official-poster-heading" className="scroll-mt-24 rounded-3xl border border-[#E1E7EF] bg-white p-5 shadow-xs sm:p-8">
-          <div className="mb-6">
-            <h2 id="official-poster-heading" className="flex items-center gap-2 text-lg font-bold text-[#111111]">
-              <Sparkles className="h-5 w-5 text-amber-500" />
-              Official Result Poster
+      <section aria-labelledby="poster-download-heading" className="scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="poster-download-heading" className="flex items-center gap-2 text-base font-bold text-[#111111]">
+              <Download className="h-4 w-4 text-[#2563EB]" />
+              Download a Result Poster
             </h2>
             <p className="mt-1 text-sm text-[#526070]">
-              The festival’s released poster, ready to download and share as a high-resolution PNG.
+              Choose from templates released by the festival. Each template can be used with every published competition result.
             </p>
           </div>
-          <div className="mx-auto max-w-lg">
-            <PublicResultPoster result={result} theme={theme} />
-          </div>
-        </section>
-      )}
+          <Link href={`/public/posters?resultId=${encodeURIComponent(result.id)}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#1D4ED8]">
+            Choose Poster Template <Download className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

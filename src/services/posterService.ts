@@ -18,6 +18,15 @@ export interface ReleasedPoster {
   releasedAt?: string;
 }
 
+export interface ReleasedPosterTemplate {
+  id: string;
+  name: string;
+  config: PosterConfig;
+  released: true;
+  releasedAt?: string;
+  updatedAt?: string;
+}
+
 function database() {
   const db = getAdminDb();
   if (!db) throw new Error('Poster storage is unavailable. Please try again later.');
@@ -162,8 +171,38 @@ export class PosterService {
     return snapshot.docs.flatMap(item => {
       const data = item.data();
       const config = storedConfig(data.config);
-      return config ? [{ id: item.id, name: data.name as string, config, updatedAt: data.updatedAt as string }] : [];
+      return config ? [{
+        id: item.id,
+        name: data.name as string,
+        config,
+        ...(data.released === true
+          ? { releasedConfig: storedConfig(data.releasedConfig) || (config ? config : undefined) }
+          : {}),
+        released: data.released === true,
+        ...(data.releasedAt ? { releasedAt: data.releasedAt as string } : {}),
+        ...(data.updatedAt ? { updatedAt: data.updatedAt as string } : {}),
+      }] : [];
     }).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  }
+
+  /** Only explicitly released reusable templates are exposed to the public poster gallery. */
+  static async listReleasedTemplates(): Promise<ReleasedPosterTemplate[]> {
+    const snapshot = await database().collection('settings').doc('posterTemplates')
+      .collection('items').where('released', '==', true).get();
+    return snapshot.docs.flatMap(item => {
+      const data = item.data();
+      const draftConfig = storedConfig(data.config);
+      const config = storedConfig(data.releasedConfig) || draftConfig;
+      if (!config || typeof data.name !== 'string' || !data.name.trim() || data.released !== true) return [];
+      return [{
+        id: item.id,
+        name: data.name,
+        config,
+        released: true as const,
+        ...(data.releasedAt ? { releasedAt: data.releasedAt as string } : {}),
+        ...(data.updatedAt ? { updatedAt: data.updatedAt as string } : {}),
+      }];
+    }).sort((a, b) => (b.releasedAt || b.updatedAt || '').localeCompare(a.releasedAt || a.updatedAt || ''));
   }
 
   static async saveTemplate(adminIdToken: string, value: unknown): Promise<PosterTemplate[]> {
@@ -177,8 +216,33 @@ export class PosterService {
       throw new Error('Validation error: Template name must contain 1 to 80 characters.');
     }
     const config = validatePosterConfig(input.config);
-    await database().collection('settings').doc('posterTemplates').collection('items').doc(id).set({
-      name: input.name.trim(), config, updatedAt: new Date().toISOString(), updatedBy: admin.uid,
+    if (input.released !== undefined && typeof input.released !== 'boolean') {
+      throw new Error('Validation error: Template release must be true or false.');
+    }
+    const ref = database().collection('settings').doc('posterTemplates').collection('items').doc(id);
+    const existing = await ref.get();
+    const previous = existing.exists ? existing.data()! : undefined;
+    const released = input.released === undefined ? previous?.released === true : input.released;
+    const now = new Date().toISOString();
+    // Saving a draft must not silently alter a version already live on the public site.
+    const previousReleasedConfig = storedConfig(previous?.releasedConfig)
+      || (previous?.released === true ? storedConfig(previous?.config) : undefined);
+    const releasedConfig = input.released === true
+      ? config
+      : released ? previousReleasedConfig : undefined;
+    const releasedAt = released
+      ? (input.released === true
+        ? now
+        : previous?.releasedAt as string | undefined || now)
+      : undefined;
+    await ref.set({
+      name: input.name.trim(),
+      config,
+      released,
+      ...(releasedConfig ? { releasedConfig } : {}),
+      ...(releasedAt ? { releasedAt } : {}),
+      updatedAt: now,
+      updatedBy: admin.uid,
     });
     return this.readTemplates();
   }
