@@ -129,6 +129,41 @@ export function PosterTemplateEditor() {
       },
     );
   }
+  function deleteSavedTemplate(template: PosterTemplate) {
+    const messages = [
+      `Delete the saved template "${template.name}"?`,
+      template.released ? ' This template is publicly released, so deleting it will also remove it from the public poster gallery.' : '',
+      templateId === template.id && dirty ? ' Your unsaved edits to this template will also be lost.' : '',
+      ' This cannot be undone.',
+    ].join('');
+    if (!window.confirm(messages)) return;
+
+    void perform(`delete-template-${template.id}`, async () => {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error('Please sign in as an administrator to delete templates.');
+      const response = await fetch(`/api/posters/templates?id=${encodeURIComponent(template.id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not delete the template.');
+
+      setTemplates(Array.isArray(payload.templates) ? payload.templates : []);
+      if (templateId === template.id) {
+        setTemplateId(null);
+        setConfig(createPosterPreset());
+        setTemplateName('My result poster');
+        setSelectedId('announcement');
+        setDirty(false);
+        setTab('design');
+      }
+      setNotice(template.released
+        ? 'Template deleted and removed from the public poster gallery.'
+        : 'Saved template deleted.');
+    });
+  }
+
   function addText() {
     if ((config.elements?.length ?? 0) >= 30) { setError('A template can have up to 30 layers.'); return; }
     const element = { ...createTextElement(crypto.randomUUID()), color: config.textColor ?? '#FFFFFF' };
@@ -189,7 +224,31 @@ export function PosterTemplateEditor() {
             {config.backgroundImage && <div className="space-y-2"><Field label="Background image opacity"><input type="range" min="0" max="1" step="0.05" value={config.backgroundOpacity ?? 1} onChange={event => change({ ...config, backgroundOpacity: Number(event.target.value) })} className="w-full" /></Field><button type="button" onClick={() => change({ ...config, backgroundImage: undefined })} className="text-xs font-semibold text-red-600">Remove background image</button></div>}
           </div>}
           {tab === 'layers' && <div className="space-y-3"><p className="text-[10px] text-slate-500">Choose a layer, then drag it on the canvas. Arrow keys move the selected layer.</p><div className="max-h-[470px] space-y-1 overflow-y-auto">{config.elements?.map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}</div></div>}
-          {tab === 'saved' && <div className="space-y-2">{templatesLoading ? <p className="text-xs text-slate-500">Loading your templates…</p> : templates.length ? templates.map(template => <button type="button" key={template.id} className={`w-full rounded-xl border p-3 text-left text-xs ${templateId === template.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700'}`} onClick={() => { if (canReplace()) { load(template.config); setTemplateId(template.id); setTemplateName(template.name); } }}><strong className="block">{template.name}</strong><span className="mt-1 block text-[10px] text-slate-500">{template.config.aspectRatio} · {template.config.elements?.length ?? 0} layers</span><span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${template.released ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{template.released ? 'Publicly released' : 'Private draft'}</span></button>) : <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">Your saved templates appear here. Released templates are available to the public for every published result; private drafts remain in Media Studio until released.</p>}</div>}
+          {tab === 'saved' && <div className="space-y-2">
+            {templatesLoading ? <p className="text-xs text-slate-500">Loading your templates…</p> : templates.length ? templates.map(template => (
+              <div key={template.id} className={`flex items-stretch gap-2 rounded-xl border p-2 ${templateId === template.id ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+                <button type="button" disabled={Boolean(busy)} className="min-w-0 flex-1 rounded-lg p-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-60" onClick={() => {
+                  if (canReplace()) { load(template.config); setTemplateId(template.id); setTemplateName(template.name); }
+                }}>
+                  <strong className="block break-words text-slate-900">{template.name}</strong>
+                  <span className="mt-1 block text-[10px] text-slate-500">{template.config.aspectRatio} · {template.config.elements?.length ?? 0} layers</span>
+                  <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${template.released ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{template.released ? 'Publicly released' : 'Private draft'}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busy)}
+                  aria-label={`Delete template ${template.name}`}
+                  title={template.released ? 'Delete template and remove it from the public gallery' : 'Delete saved template'}
+                  onClick={() => deleteSavedTemplate(template)}
+                  className="flex w-9 shrink-0 items-center justify-center self-center rounded-lg border border-red-100 bg-white text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy === `delete-template-${template.id}`
+                    ? <span className="text-xs font-bold">…</span>
+                    : <Trash2 className="h-4 w-4" />}
+                </button>
+              </div>
+            )) : <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">Your saved templates appear here. Released templates are available to the public for every published result; private drafts remain in Media Studio until released.</p>}
+          </div>}
         </div>
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"><Field label="Template name"><input className={inputStyle} value={templateName} maxLength={80} onChange={event => setTemplateName(event.target.value)} /></Field><Button className="w-full" size="sm" variant="secondary" leftIcon={<Save className="h-3.5 w-3.5" />} onClick={() => saveTemplate()}>{templateId ? 'Update template' : 'Save template'}</Button>{templateId && <button type="button" className="w-full text-xs font-medium text-blue-600" onClick={() => saveTemplate(true)}>Save as a new template</button>}<p className="text-[10px] leading-relaxed text-slate-400">Saving stores your reusable design as a draft. Release the template once to make it available for every published competition. Draft edits do not change the live version until you choose Update Released Template.</p></div>
       </div>
