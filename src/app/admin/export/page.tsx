@@ -115,6 +115,10 @@ export default function ExportManagementPage() {
       alert('Please select at least one published competition to print.');
       return;
     }
+    document.body.classList.add('print-winners-mode');
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('print-winners-mode');
+    }, { once: true });
     window.print();
   };
 
@@ -513,11 +517,11 @@ export default function ExportManagementPage() {
         .official-winners-print { display: none; }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
-          html, body { background: #fff !important; }
-          body * { visibility: hidden !important; }
-          #official-winners-print,
-          #official-winners-print * { visibility: visible !important; }
-          #official-winners-print {
+          body.print-winners-mode, body.print-winners-mode * { visibility: hidden !important; }
+          body.print-winners-mode #official-winners-print,
+          body.print-winners-mode #official-winners-print * { visibility: visible !important; }
+          body.print-winners-mode { background: #fff !important; }
+          body.print-winners-mode #official-winners-print {
             display: block !important;
             position: absolute !important;
             top: 0 !important;
