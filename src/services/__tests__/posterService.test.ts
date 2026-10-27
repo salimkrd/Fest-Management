@@ -138,6 +138,41 @@ describe('Poster persistence and publication boundaries', () => {
     expect(await PosterService.deleteTemplate('admin-token', 'template-1')).toEqual([]);
   });
 
+  it('releases one reusable template for all published results and keeps its public snapshot until updates are released', async () => {
+    await PosterService.saveTemplate('admin-token', {
+      id: 'global-template', name: 'Festival poster', config: draft,
+    });
+    expect(await PosterService.listReleasedTemplates()).toEqual([]);
+
+    await PosterService.saveTemplate('admin-token', {
+      id: 'global-template', name: 'Festival poster', config: released, released: true,
+    });
+    const firstRelease = await PosterService.listReleasedTemplates();
+    expect(firstRelease).toHaveLength(1);
+    expect(firstRelease[0]).toMatchObject({
+      id: 'global-template', name: 'Festival poster', released: true,
+      config: { colorPreset: 'royal' },
+    });
+
+    // Saving editor changes should not silently change the version already released publicly.
+    await PosterService.saveTemplate('admin-token', {
+      id: 'global-template', name: 'Festival poster', config: draft,
+    });
+    expect((await PosterService.listReleasedTemplates())[0].config.colorPreset).toBe('royal');
+    expect((await PosterService.listTemplates('admin-token'))[0].config.colorPreset).toBe('monochrome');
+
+    // The new version becomes public only when the admin explicitly releases it.
+    await PosterService.saveTemplate('admin-token', {
+      id: 'global-template', name: 'Festival poster', config: draft, released: true,
+    });
+    expect((await PosterService.listReleasedTemplates())[0].config.colorPreset).toBe('monochrome');
+
+    await PosterService.saveTemplate('admin-token', {
+      id: 'global-template', name: 'Festival poster', config: draft, released: false,
+    });
+    expect(await PosterService.listReleasedTemplates()).toEqual([]);
+  });
+
   it('rejects invalid config and identifiers and fails closed if storage is unavailable', async () => {
     await expect(PosterService.saveResult('admin-token', '../result-1', { config: draft })).rejects.toThrow('identifier');
     await expect(PosterService.saveResult('admin-token', 'result-1', { config: { ...draft, backgroundImage: 'https://untrusted.test/image.png' } })).rejects.toThrow('Invalid background');
