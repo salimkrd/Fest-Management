@@ -79,11 +79,11 @@ export class TeamExportService {
     const detailSheet = XLSX.utils.json_to_sheet(detailData);
     detailSheet['!cols'] = [
       { wch: 5 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 10 },
-      { wch: 24 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 18 }
+      { wch: 24 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 18 }
     ];
     detailSheet['!rows'] = [{ hpt: 24 }, ...rows.map(() => ({ hpt: 22 }))];
     if (detailData.length > 0) {
-      detailSheet['!autofilter'] = { ref: 'A1:K' + (detailData.length + 1) };
+      detailSheet['!autofilter'] = { ref: 'A1:L' + (detailData.length + 1) };
     }
 
     const totalPoints = rows.reduce((total, row) => total + row.points, 0);
