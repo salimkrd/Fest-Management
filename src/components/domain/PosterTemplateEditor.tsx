@@ -156,7 +156,6 @@ export function PosterTemplateEditor() {
   return <div className="space-y-4">
     <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="w-full sm:max-w-sm"><Field label="Preview with result"><select className={inputStyle} value={resultId} disabled={Boolean(busy)} onChange={event => {
-        if (!canReplace()) return;
         const item = published.find(entry => entry.id === event.target.value);
         setResultId(event.target.value);
         setNotice(item
