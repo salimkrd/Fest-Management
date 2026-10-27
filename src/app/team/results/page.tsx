@@ -10,7 +10,9 @@ import Link from 'next/link';
 
 export default function TeamResultsPage() {
   const { currentTeamUser, teams, results } = useFest();
-  const team = currentTeamUser || teams[0];
+  const team = currentTeamUser
+    ? teams.find(candidate => candidate.id === currentTeamUser.id) || currentTeamUser
+    : null;
 
   const [search, setSearch] = useState('');
 

@@ -1697,6 +1697,17 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
+  // Keep the authenticated manager's in-memory team in sync with the authoritative
+  // team collection. Scores and standings can change while a manager stays signed in.
+  useEffect(() => {
+    if (!currentTeamUser) return;
+    const latestTeam = teams.find(team => team.id === currentTeamUser.id);
+    if (latestTeam && latestTeam !== currentTeamUser) {
+      setCurrentTeamUser(latestTeam);
+    }
+  }, [teams, currentTeamUser]);
+
+
   // Purge stale localStorage caches in live production
   useEffect(() => {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
@@ -2550,15 +2561,13 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const handleSetCurrentTeamUser = (teamUser: Team | null) => {
     setCurrentTeamUser(teamUser);
     if (teamUser) {
-      setTeams(prev => {
-        const idx = prev.findIndex(t => t.id === teamUser.id);
-        if (idx !== -1) {
-          const updated = [...prev];
-          updated[idx] = { ...updated[idx], ...teamUser };
-          return updated;
-        }
-        return [...prev, teamUser];
-      });
+      // Do not overwrite live championship totals with the login/localStorage
+      // snapshot. Firestore's teams collection remains authoritative for existing teams.
+      setTeams(prev => (
+        prev.some(team => team.id === teamUser.id)
+          ? prev
+          : [...prev, teamUser]
+      ));
     }
   };
 

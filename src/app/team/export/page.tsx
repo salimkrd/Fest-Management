@@ -11,8 +11,10 @@ import { Award, Download, FileDown, FileSpreadsheet, FileText, Printer, Search, 
 type TeamExportRow = TeamResultExportRow & { id: string };
 
 export default function TeamExportPage() {
-  const { currentTeamUser, results, theme } = useFest();
-  const team = currentTeamUser;
+  const { currentTeamUser, teams, results, theme } = useFest();
+  const team = currentTeamUser
+    ? teams.find(candidate => candidate.id === currentTeamUser.id) || currentTeamUser
+    : null;
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [notice, setNotice] = useState('');

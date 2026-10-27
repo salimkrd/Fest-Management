@@ -22,7 +22,9 @@ import {
 
 export default function TeamManagerDashboardPage() {
   const { currentTeamUser, teams, participants, registrations, schedules, results } = useFest();
-  const team = currentTeamUser || teams[0];
+  const team = currentTeamUser
+    ? teams.find(candidate => candidate.id === currentTeamUser.id) || currentTeamUser
+    : null;
 
   // Scoped team data
   const teamParticipants = participants.filter(p => p.teamId === team?.id);
