@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { ScheduleSlot } from '@/types/fest';
@@ -9,10 +10,29 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Calendar, Clock, MapPin, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Calendar, Clock, MapPin, CheckCircle2, FileDown } from 'lucide-react';
+
+const getTimeMinutes = (value: string): number => {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  let hours = Number(match[1]) % 12;
+  const minutes = Number(match[2]);
+  if (match[3]?.toUpperCase() === 'PM') hours += 12;
+  return hours * 60 + minutes;
+};
+
+const formatScheduleDate = (value: string): string => {
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return value;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(parts[0], parts[1] - 1, parts[2]));
+};
 
 export default function SchedulePage() {
-  const { schedules, competitions, stages, addSchedule, updateSchedule, deleteSchedule } = useFest();
+  const { schedules, competitions, stages, theme, addSchedule, updateSchedule, deleteSchedule } = useFest();
 
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('ALL');
@@ -37,6 +57,10 @@ export default function SchedulePage() {
     const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
     return matchesSearch && matchesStage && matchesStatus;
   });
+
+  const sortedSchedules = [...filteredSchedules].sort((a, b) =>
+    a.date.localeCompare(b.date) || getTimeMinutes(a.startTime) - getTimeMinutes(b.startTime)
+  );
 
   const handleOpenAdd = () => {
     setEditingSlot(null);
@@ -112,6 +136,132 @@ export default function SchedulePage() {
     }
   };
 
+  const handleExportSchedulePDF = () => {
+    if (sortedSchedules.length === 0) {
+      alert('There are no schedule entries to export with the current filters.');
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 26;
+    const tableWidth = pageWidth - margin * 2;
+    const generatedDate = new Date().toLocaleDateString('en-GB');
+    const columns: {
+      label: string;
+      width: number;
+      align?: 'left' | 'center' | 'right';
+      value: (slot: ScheduleSlot, index: number) => string;
+    }[] = [
+      { label: '#', width: 30, align: 'center', value: (_slot, index) => String(index + 1) },
+      { label: 'COMPETITION', width: 184, value: slot => slot.competitionName || '-' },
+      { label: 'CATEGORY', width: 104, value: slot => slot.categoryName || '-' },
+      { label: 'TYPE', width: 48, align: 'center', value: slot => slot.type || '-' },
+      { label: 'STAGE / VENUE', width: 112, value: slot => slot.stageName || '-' },
+      { label: 'DATE', width: 80, value: slot => formatScheduleDate(slot.date) },
+      { label: 'TIME', width: 140, align: 'center', value: slot => (slot.startTime || '-') + ' - ' + (slot.endTime || '-') },
+      { label: 'STATUS', width: 91, align: 'center', value: slot => slot.status.replace('_', ' ') }
+    ];
+
+    const drawPageHeader = (): number => {
+      doc.setFillColor(37, 99, 235);
+      doc.rect(0, 0, pageWidth, 64, 'F');
+
+      const festivalName = (theme.festivalName || 'Festival').toUpperCase();
+      doc.setFont('helvetica', 'bold');
+      let titleSize = 15;
+      doc.setFontSize(titleSize);
+      while (doc.getTextWidth(festivalName) > tableWidth - 175 && titleSize > 9) {
+        titleSize -= 0.5;
+        doc.setFontSize(titleSize);
+      }
+      doc.setTextColor(255, 255, 255);
+      doc.text(festivalName, margin, 27);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(theme.institutionName || 'Official Competition Timetable', margin, 45);
+      doc.text('Generated: ' + generatedDate, pageWidth - margin, 45, { align: 'right' });
+
+      doc.setTextColor(17, 24, 39);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('COMPETITION SCHEDULE', margin, 86);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(82, 96, 112);
+      doc.text(String(sortedSchedules.length) + ' schedule entries | Chronological order | Current filters applied', margin, 101);
+
+      let x = margin;
+      const tableTop = 115;
+      const headerHeight = 23;
+      columns.forEach(column => {
+        doc.setFillColor(241, 245, 249);
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(x, tableTop, column.width, headerHeight, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.4);
+        doc.setTextColor(51, 65, 85);
+        const textX = column.align === 'center' ? x + column.width / 2 :
+          column.align === 'right' ? x + column.width - 5 : x + 5;
+        doc.text(column.label, textX, tableTop + 14, {
+          align: column.align || 'left'
+        });
+        x += column.width;
+      });
+      return tableTop + headerHeight;
+    };
+
+    let y = drawPageHeader();
+    sortedSchedules.forEach((slot, index) => {
+      doc.setFont('helvetica', index % 8 === 0 ? 'bold' : 'normal');
+      doc.setFontSize(8);
+      const cellLines = columns.map(column =>
+        doc.splitTextToSize(column.value(slot, index), column.width - 10) as string[]
+      );
+      const maxLines = Math.max(1, ...cellLines.map(lines => lines.length));
+      const rowHeight = Math.max(25, maxLines * 10 + 8);
+
+      if (y + rowHeight > pageHeight - 38) {
+        doc.addPage();
+        y = drawPageHeader();
+      }
+
+      let x = margin;
+      columns.forEach((column, columnIndex) => {
+        doc.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(x, y, column.width, rowHeight, 'FD');
+        doc.setFont('helvetica', columnIndex === 1 ? 'bold' : 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(columnIndex === 1 ? 17 : 51, columnIndex === 1 ? 24 : 65, columnIndex === 1 ? 39 : 85);
+        const lines = cellLines[columnIndex];
+        const textY = y + Math.max(8, (rowHeight - lines.length * 9) / 2 + 7);
+        const textX = column.align === 'center' ? x + column.width / 2 :
+          column.align === 'right' ? x + column.width - 5 : x + 5;
+        doc.text(lines, textX, textY, { align: column.align || 'left', lineHeightFactor: 1.1 });
+        x += column.width;
+      });
+      y += rowHeight;
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let page = 1; page <= totalPages; page += 1) {
+      doc.setPage(page);
+      doc.setDrawColor(203, 213, 225);
+      doc.line(margin, pageHeight - 27, pageWidth - margin, pageHeight - 27);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Festival Schedule | A4 Landscape', margin, pageHeight - 13);
+      doc.text('Page ' + page + ' of ' + totalPages, pageWidth - margin, pageHeight - 13, { align: 'right' });
+    }
+
+    const safeName = (theme.festivalName || 'Festival').trim().replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'Festival';
+    doc.save(safeName + '_Competition_Schedule_A4.pdf');
+  };
+
   const getStatusBadge = (st: ScheduleSlot['status']) => {
     switch (st) {
       case 'LIVE':
@@ -139,14 +289,25 @@ export default function SchedulePage() {
               Master chronological timetable, venue slot allocations, and stage performance progression
             </p>
           </div>
-          <Button
-            variant="primary"
-            size="md"
-            leftIcon={<Plus className="w-4 h-4" />}
-            onClick={handleOpenAdd}
-          >
-            Create Schedule Slot
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<FileDown className="w-4 h-4" />}
+              onClick={handleExportSchedulePDF}
+              disabled={sortedSchedules.length === 0}
+            >
+              Export A4 PDF
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={handleOpenAdd}
+            >
+              Create Schedule Slot
+            </Button>
+          </div>
         </div>
 
         {/* Filter bar */}
@@ -211,7 +372,7 @@ export default function SchedulePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredSchedules.map((slot) => (
+                {sortedSchedules.map((slot) => (
                   <tr key={slot.id} className="hover:bg-[#F8FAFC] transition-colors">
                     <td className="py-4 px-6 font-bold text-[#111111] text-sm">
                       {slot.competitionName}
