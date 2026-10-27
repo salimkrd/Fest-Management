@@ -261,7 +261,10 @@ export interface PosterElement {
 export interface PosterTemplate {
   id: string;
   name: string;
+  /** Current editable draft. */
   config: PosterConfig;
+  /** Immutable snapshot currently served by the public poster gallery. */
+  releasedConfig?: PosterConfig;
   /** Public templates are reusable for every officially published competition. */
   released?: boolean;
   releasedAt?: string;
