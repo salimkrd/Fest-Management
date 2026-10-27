@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { TeamLayout } from '@/components/layout/TeamLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
-import { TeamExportService, TeamResultExportRow } from '@/services/teamExportService';
+import { TeamExportService, type TeamResultExportRow } from '@/services/teamExportService';
 import { Award, Download, FileDown, FileSpreadsheet, FileText, Printer, Search, Trophy } from 'lucide-react';
 
 type TeamExportRow = TeamResultExportRow & { id: string };
@@ -188,7 +188,7 @@ export default function TeamExportPage() {
                     <tr key={row.id} className="hover:bg-[#F8FAFC]">
                       <td className="py-3 px-4 font-bold text-[#2563EB]">{row.competitionCode}</td>
                       <td className="py-3 px-4 font-bold text-[#111111]">{row.competitionName}</td>
-                      <td className="py-3 px-4"><span className="block font-semibold text-[#111111]">{row.candidateName}</span><span className="block text-[10px] text-[#526070]">Bib: {row.bib}</span></td>
+                      <td className="py-3 px-4 font-semibold text-[#111111]">{row.candidateName}</td>
                       <td className="py-3 px-4">{row.bib}</td><td className="py-3 px-4">{row.categoryName} / {row.type}</td><td className="py-3 px-4 text-[#526070]">{row.stageName}</td>
                       <td className="py-3 px-4 text-center font-semibold">{rankLabel(row.rank)}</td><td className="py-3 px-4 text-center font-bold">{row.score}</td><td className="py-3 px-4 text-center font-bold text-[#2563EB]">{row.grade}</td><td className="py-3 px-4 text-right font-extrabold text-emerald-700">{row.points} pts</td>
                     </tr>
