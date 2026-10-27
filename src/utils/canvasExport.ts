@@ -77,21 +77,6 @@ export async function exportDigitalIdAsPng(
   ctx.fillStyle = '#2563EB';
   ctx.fillRect(15, 15, width - 30, 160);
 
-  // Render the same published festival logo as the on-screen Digital ID.
-  if (options?.logoBlob) {
-    const logoObjectUrl = URL.createObjectURL(options.logoBlob);
-    try {
-      const logo = new Image();
-      logo.src = logoObjectUrl;
-      await logo.decode();
-      ctx.drawImage(logo, 30, 25, 44, 44);
-    } catch (error) {
-      console.warn('[canvasExport] Festival logo unavailable in PNG:', error);
-    } finally {
-      URL.revokeObjectURL(logoObjectUrl);
-    }
-  }
-
   ctx.textAlign = 'center';
   ctx.fillStyle = '#BFDBFE';
   ctx.font = '700 18px Montserrat, sans-serif';
@@ -113,16 +98,6 @@ export async function exportDigitalIdAsPng(
   ctx.fillStyle = '#DBEAFE';
   ctx.font = '600 16px Montserrat, sans-serif';
   ctx.fillText('Annual Cultural & Literary Festival', width / 2, 140);
-
-  // Category Tag on Banner
-  const categoryText = (participant.categoryName || 'GENERAL').toUpperCase();
-  ctx.font = '800 14px Montserrat, sans-serif';
-  const tagW = ctx.measureText(categoryText).width + 24;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(width - 25 - tagW, 25, tagW, 28);
-  ctx.fillStyle = '#2563EB';
-  ctx.fillText(categoryText, width - 25 - tagW / 2, 44);
-
 
   // Downloaded PNG uses the same genuine photo as the live ID preview.
   // A same-origin authenticated endpoint provides the Blob, preventing canvas
@@ -188,7 +163,7 @@ export async function exportDigitalIdAsPng(
 
   ctx.fillStyle = '#64748B';
   ctx.font = '600 18px Montserrat, sans-serif';
-  ctx.fillText([participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' - '), width / 2, 435);
+  ctx.fillText(participant.categoryName || 'GENERAL', width / 2, 435);
 
   // Team Delegation Pill
   const teamText = `${participant.teamName} (${participant.teamCode})`;
@@ -284,18 +259,19 @@ export async function exportDigitalIdAsPng(
     throw new Error('Unable to render the verified QR. No invalid badge was downloaded.');
   }
 
+  // Two balanced columns keep TOKEN and its value aligned on every downloaded PNG.
   ctx.fillStyle = '#EAF3FF';
   ctx.beginPath();
   ctx.roundRect(80, 1020, width - 160, 32, 16);
   ctx.fill();
-  ctx.fillStyle = '#0758D8';
   ctx.font = '800 12px Montserrat, sans-serif';
   ctx.textAlign = 'left';
+  ctx.fillStyle = '#0758D8';
   ctx.fillText('TOKEN:', 100, 1040);
-  ctx.fillStyle = '#111827';
   ctx.font = '700 13px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(options.token.slice(0, 24).toUpperCase(), width / 2 + 28, 1040, width - 250);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#111827';
+  ctx.fillText(options.token.slice(0, 24).toUpperCase(), width - 100, 1040, width - 250);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(value => value
