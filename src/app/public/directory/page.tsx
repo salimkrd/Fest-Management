@@ -7,7 +7,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Search, Trophy, ArrowRight, Sparkles, Filter, ChevronRight, Calendar, MapPin } from 'lucide-react';
+import { Search, Trophy, ArrowRight, Sparkles, Filter, ChevronRight, Calendar, MapPin, Download } from 'lucide-react';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
@@ -42,7 +42,7 @@ function DirectoryContent() {
           Public Results Directory &amp; Archive
         </h1>
         <p className="text-xs sm:text-sm text-[#526070] mt-1">
-          Search published results and download official winner posters
+          Search published competition results and download a poster template
         </p>
       </div>
 
@@ -164,16 +164,16 @@ function DirectoryContent() {
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between">
-                  <span className="text-[10px] text-[#526070]">
-                    {res.publishedDate}
-                  </span>
-                  <Link
-                    href={`/public/competition/${res.competitionId}`}
-                    className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1 group"
-                  >
-                    View Result <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </Link>
+                <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-[10px] text-[#526070]">{res.publishedDate}</span>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/public/posters?resultId=${encodeURIComponent(res.id)}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8]" aria-label={`Choose a poster template for ${res.competitionName}`}>
+                      <Download className="w-3.5 h-3.5" /> Download Poster
+                    </Link>
+                    <Link href={`/public/competition/${res.competitionId}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] group">
+                      View Result <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
