@@ -100,6 +100,9 @@ export function PosterTemplateEditor() {
   }
   const selectedTemplate = templates.find(template => template.id === templateId);
   const templateReleased = selectedTemplate?.released === true;
+  const releasedSnapshot = selectedTemplate?.releasedConfig ?? selectedTemplate?.config;
+  const templateHasUnpublishedChanges = templateReleased && Boolean(releasedSnapshot)
+    && JSON.stringify(config) !== JSON.stringify(releasedSnapshot);
 
   function saveTemplate(asCopy = false, releasedOverride?: boolean) {
     void perform(
@@ -163,7 +166,7 @@ export function PosterTemplateEditor() {
       }}><option value="">Sample result — design a reusable template</option>{published.map(item => <option key={item.id} value={item.id}>{item.competitionCode} · {item.competitionName}</option>)}</select></Field></div>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`mr-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${templateReleased ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-          {templateReleased ? 'Released template' : templateId ? 'Saved draft template' : 'Unsaved template'}
+          {templateReleased ? (templateHasUnpublishedChanges ? 'Released · draft changes pending' : 'Released template') : templateId ? 'Saved draft template' : 'Unsaved template'}
         </span>
         <Button variant="outline" size="sm" disabled={Boolean(busy)} leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => void perform('download', async () => { await exportPosterAsPng(preview, theme, config, templateName); setNotice('PNG preview download started.'); })}>{busy === 'download' ? 'Preparing…' : 'Download Preview'}</Button>
         <Button size="sm" disabled={Boolean(busy)} leftIcon={<Globe className="h-3.5 w-3.5" />} onClick={() => saveTemplate(false, true)} isLoading={busy === 'release-template'}>
