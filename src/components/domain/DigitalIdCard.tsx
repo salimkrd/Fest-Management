@@ -197,9 +197,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="bg-gradient-to-br from-[#0758D8] via-[#1675F7] to-[#38A5FF] text-white px-5 pt-5 pb-6 text-center relative overflow-hidden">
             <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full border-[18px] border-white/10" />
             <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[20px] border-white/10" />
-            <div className="absolute top-3 right-3 px-3 py-1 rounded-lg bg-white text-[#0758D8] text-[11px] font-extrabold uppercase">
-              {participant.categoryName}
-            </div>
             <span className="relative text-[10px] sm:text-xs font-bold uppercase tracking-[0.22em] text-blue-100 block mb-3">Official Festival Pass</span>
             <h4 className="relative text-xl sm:text-2xl font-extrabold tracking-tight leading-tight break-words">
               <span className="festival-name">{theme.festivalName}</span>
@@ -215,7 +212,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
             <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
-            <p className="text-sm font-semibold text-[#64748B] mt-1">{[participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' · ')}</p>
+            <p className="text-sm font-semibold text-[#64748B] mt-1">{participant.categoryName}</p>
             <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
               <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
               <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
