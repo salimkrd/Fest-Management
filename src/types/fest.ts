@@ -262,6 +262,9 @@ export interface PosterTemplate {
   id: string;
   name: string;
   config: PosterConfig;
+  /** Public templates are reusable for every officially published competition. */
+  released?: boolean;
+  releasedAt?: string;
   updatedAt?: string;
 }
 
