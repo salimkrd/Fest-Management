@@ -260,6 +260,7 @@ export class JudgeService {
         }
 
         let participantTotal = 0;
+        const seenCriterionIds = new Set<string>();
         for (const [critKey, critMark] of critEntries) {
           if (typeof critMark !== 'number' || isNaN(critMark) || critMark < 0) {
             throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be a non-negative number.`);
@@ -270,7 +271,13 @@ export class JudgeService {
             const rubricCriterion = criteriaList.find(
               c => c.id === critKey || c.name.toLowerCase() === critKey.toLowerCase()
             );
-            if (rubricCriterion && critMark > rubricCriterion.maxMarks) {
+            if (!rubricCriterion) {
+              throw new Error(
+                `Validation Error: Criterion "${critKey}" is not part of the competition rubric for participant "${scoreKey}".`
+              );
+            }
+            seenCriterionIds.add(rubricCriterion.id);
+            if (critMark > rubricCriterion.maxMarks) {
               throw new Error(
                 `Validation Error: Criterion "${critKey}" score (${critMark}) for participant "${scoreKey}" exceeds specific rubric limit of ${rubricCriterion.maxMarks}.`
               );
@@ -283,6 +290,15 @@ export class JudgeService {
             }
           }
           participantTotal += critMark;
+        }
+
+        if (criteriaList.length > 0) {
+          const missingCriteria = criteriaList.filter(criterion => !seenCriterionIds.has(criterion.id));
+          if (missingCriteria.length > 0) {
+            throw new Error(
+              `Validation Error: Participant "${scoreKey}" is missing marks for required criteria: ${missingCriteria.map(criterion => criterion.name || criterion.id).join(', ')}.`
+            );
+          }
         }
 
         if (participantTotal > compMaxMarks) {
