@@ -22,6 +22,7 @@ export interface ReleasedPosterTemplate {
   id: string;
   name: string;
   config: PosterConfig;
+  released: true;
   releasedAt?: string;
   updatedAt?: string;
 }
@@ -197,6 +198,7 @@ export class PosterService {
         id: item.id,
         name: data.name,
         config,
+        released: true as const,
         ...(data.releasedAt ? { releasedAt: data.releasedAt as string } : {}),
         ...(data.updatedAt ? { updatedAt: data.updatedAt as string } : {}),
       }];
