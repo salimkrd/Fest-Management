@@ -61,10 +61,14 @@ export function PosterFontPicker({ value, onChange }: PosterFontPickerProps) {
     return () => document.removeEventListener('mousedown', outside);
   }, [open]);
 
-  const choose = (font: PosterFontOption) => {
+  const choose = async (font: PosterFontOption) => {
     const nextValue = optionValue(font);
+    // Load the selected typeface before changing the canvas so the first preview
+    // and exported artwork use the chosen font rather than the fallback.
+    if (!['sans', 'serif', 'mono'].includes(nextValue)) {
+      await loadPosterFonts([nextValue]);
+    }
     onChange(nextValue);
-    if (!['sans', 'serif', 'mono'].includes(nextValue)) void loadPosterFonts([nextValue]);
     setOpen(false);
     setQuery('');
     setActive(0);
@@ -93,9 +97,9 @@ export function PosterFontPicker({ value, onChange }: PosterFontPickerProps) {
         onChange={event => { setQuery(event.target.value); setActive(0); }}
         onKeyDown={event => {
           if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
-          if (event.key === 'ArrowDown') { event.preventDefault(); setActive(index => Math.min(index + 1, flattened.length - 1)); }
+          if (event.key === 'ArrowDown') { event.preventDefault(); setActive(index => Math.max(0, Math.min(index + 1, flattened.length - 1))); }
           if (event.key === 'ArrowUp') { event.preventDefault(); setActive(index => Math.max(index - 1, 0)); }
-          if (event.key === 'Enter' && flattened[active]) { event.preventDefault(); choose(flattened[active]); }
+          if (event.key === 'Enter' && flattened[active]) { event.preventDefault(); void choose(flattened[active]); }
         }} />
       <div id="poster-font-results" role="listbox" aria-label="Poster fonts" className="max-h-72 overflow-y-auto overscroll-contain">
         {matches.length ? matches.map(group => <div key={group.category} className="pb-1.5">
@@ -116,7 +120,7 @@ export function PosterFontPicker({ value, onChange }: PosterFontPickerProps) {
                   void loadPosterFonts([fontValue]);
                 }
               }}
-              onClick={() => choose(font)}>
+              onClick={() => { void choose(font); }}>
               <span className="truncate" style={{ fontFamily: font.family, fontSize: 14 }}>{font.name}</span>
               {selected && <span aria-hidden="true" className="shrink-0 font-bold text-blue-600">✓</span>}
             </button>;
