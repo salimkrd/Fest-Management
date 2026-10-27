@@ -1,5 +1,10 @@
 import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PublicThemeSettings } from '@/types/fest';
 import { festivalNameFontFamily } from '@/domain/festivalFonts';
+import { isPosterFont, posterFontCssFamily } from '@/domain/posterFonts';
+
+// Legacy alias retained for existing callers and saved templates.
+export const POSTER_FONTS = { sans: 'Arial, sans-serif', serif: 'Georgia, serif', mono: 'monospace' };
+
 
 export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
   { value: 'text', label: 'Custom text' }, { value: 'festivalName', label: 'Festival name' },
@@ -9,7 +14,6 @@ export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
     value: `rank${rank}.${field}` as PosterField, label: `Rank ${rank} · ${field === 'name' ? 'Winner name' : field}`,
   }))),
 ];
-export const POSTER_FONTS = { sans: 'Arial, sans-serif', serif: 'Georgia, serif', mono: 'monospace' };
 export const POSTER_PALETTES = {
   royal: { background: '#142C50', accent: '#EACB85', text: '#FFFFFF' },
   crimson: { background: '#571E32', accent: '#F9D59B', text: '#FFFFFF' },
@@ -111,7 +115,7 @@ export function validatePosterConfig(value: unknown): PosterConfig {
         if (!Number.isFinite(item[key]) || item[key] < (key === 'width' || key === 'height' ? 1 : key === 'fontSize' ? 8 : 0) || item[key] > (key === 'fontSize' ? 180 : 100)) throw new Error('Invalid layer position or size.');
       }
       if (item.x + item.width > 100.01 || item.y + item.height > 100.01) throw new Error('Invalid layer: keep layers within the canvas.');
-      if (!isHex(item.color) || !['sans', 'serif', 'mono'].includes(item.fontFamily) || !['400', '600', '800'].includes(item.fontWeight) || !['left', 'center', 'right'].includes(item.align)) throw new Error('Invalid layer typography.');
+      if (!isHex(item.color) || !isPosterFont(item.fontFamily) || !['400', '600', '800'].includes(item.fontWeight) || !['left', 'center', 'right'].includes(item.align)) throw new Error('Invalid layer typography.');
       const layer: PosterElement = { id: item.id, type: item.type, label: item.label, field: item.field, text: item.text, x: item.x, y: item.y, width: item.width, height: item.height, fontSize: item.fontSize, fontFamily: item.fontFamily, fontWeight: item.fontWeight, color: item.color, align: item.align };
       if (item.type === 'image') { if (!isPosterImage(item.image)) throw new Error('Invalid layer image.'); layer.image = item.image; }
       return layer;
@@ -173,7 +177,7 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
     // text layers retain their independently configured typography.
     const font = element.field === 'festivalName'
       ? festivalNameFontFamily(theme.festivalNameFont).replaceAll('"', '').replace('var(--font-montserrat), ', '')
-      : POSTER_FONTS[element.fontFamily] ?? POSTER_FONTS.sans;
+      : posterFontCssFamily(element.fontFamily);
     return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${escapeXml(font)}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}">${lines.map((line, index) => `<tspan x="${tx}" y="${ty + index * size * 1.2}">${escapeXml(line)}</tspan>`).join('')}</text>`;
   }).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${background}"/>${config.backgroundImage && isPosterImage(config.backgroundImage) ? `<image width="100%" height="100%" href="${config.backgroundImage}" opacity="${Math.max(0, Math.min(1, config.backgroundOpacity ?? 1))}" preserveAspectRatio="xMidYMid slice"/>` : ''}${decoration}${layers}</svg>`;

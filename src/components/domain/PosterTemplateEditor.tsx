@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase/client';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { ResultPosterPreview } from './ResultPosterPreview';
+import { PosterFontPicker } from './PosterFontPicker';
 import { createPosterPreset, createTextElement, normalizePosterConfig, POSTER_FIELDS, POSTER_PRESETS, posterDimensions, validatePosterConfig } from '@/domain/poster';
 import { exportPosterAsPng } from '@/utils/canvasExport';
 
@@ -63,7 +64,6 @@ export function PosterTemplateEditor() {
   const published = results.filter(item => item.resultStatus === 'PUBLISHED');
   const selected = config.elements?.find(element => element.id === selectedId);
   const dimensions = posterDimensions(config.aspectRatio);
-
   useEffect(() => {
     if (!auth) return;
     let active = true;
@@ -187,7 +187,7 @@ export function PosterTemplateEditor() {
           {selected ? <div className="space-y-4">
             <Field label="Layer name"><input className={inputStyle} value={selected.label} maxLength={80} onChange={event => patchLayer(selected.id, { label: event.target.value })} /></Field>
             {selected.type === 'text' && <><Field label="Content source"><select className={inputStyle} value={selected.field} onChange={event => patchLayer(selected.id, { field: event.target.value as PosterField })}>{POSTER_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}</select></Field>{selected.field === 'text' ? <Field label="Text"><textarea className={`${inputStyle} min-h-20`} value={selected.text} maxLength={500} onChange={event => patchLayer(selected.id, { text: event.target.value })} /></Field> : <p className="rounded-lg bg-blue-50 p-2 text-[10px] leading-relaxed text-blue-700">This field fills automatically from the selected result. Official names and ranks stay unchanged.</p>}
-            <Field label="Font"><select className={inputStyle} value={selected.fontFamily} onChange={event => patchLayer(selected.id, { fontFamily: event.target.value as PosterElement['fontFamily'] })}><option value="sans">Sans serif · Arial</option><option value="serif">Serif · Georgia</option><option value="mono">Monospace</option></select></Field>
+            <PosterFontPicker value={selected.fontFamily} onChange={fontFamily => patchLayer(selected.id, { fontFamily })} />
             <div className="grid grid-cols-2 gap-2"><Field label="Font size"><input className={inputStyle} type="number" min="8" max="180" value={selected.fontSize} onChange={event => patchLayer(selected.id, { fontSize: Math.max(8, Math.min(180, Number(event.target.value))) })} /></Field><Field label="Weight"><select className={inputStyle} value={selected.fontWeight} onChange={event => patchLayer(selected.id, { fontWeight: event.target.value as PosterElement['fontWeight'] })}><option value="400">Regular</option><option value="600">Semibold</option><option value="800">Bold</option></select></Field></div>
             <div className="grid grid-cols-2 gap-2"><Field label="Text colour"><input aria-label="Layer text colour" type="color" className="h-9 w-full rounded border border-slate-200" value={selected.color} onChange={event => patchLayer(selected.id, { color: event.target.value })} /></Field><Field label="Alignment"><select className={inputStyle} value={selected.align} onChange={event => patchLayer(selected.id, { align: event.target.value as PosterElement['align'] })}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></Field></div></>}
             <div className="grid grid-cols-2 gap-2">{(['x', 'y', 'width', 'height'] as const).map(key => <Field key={key} label={`${key === 'x' ? 'Left' : key === 'y' ? 'Top' : key === 'width' ? 'Width' : 'Height'} (%)`}><input className={inputStyle} type="number" min={key === 'x' || key === 'y' ? 0 : 1} max="100" step="0.5" value={Number(selected[key].toFixed(1))} onChange={event => patchLayer(selected.id, { [key]: Number(event.target.value) })} /></Field>)}</div>

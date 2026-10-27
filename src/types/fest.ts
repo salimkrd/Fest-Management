@@ -251,7 +251,7 @@ export interface PosterElement {
   width: number;
   height: number;
   fontSize: number;
-  fontFamily: 'sans' | 'serif' | 'mono';
+  fontFamily: string; // Google font name, or legacy sans/serif/mono value
   fontWeight: '400' | '600' | '800';
   color: string;
   align: 'left' | 'center' | 'right';
