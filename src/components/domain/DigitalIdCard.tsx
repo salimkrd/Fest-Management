@@ -215,7 +215,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
             <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
-            <p className="text-sm font-semibold text-[#64748B] mt-1">{participant.classGrade} · Division {participant.division}</p>
+            <p className="text-sm font-semibold text-[#64748B] mt-1">{[participant.classGrade, participant.division ? `Division ${participant.division}` : ''].filter(Boolean).join(' · ')}</p>
             <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
               <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
               <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
