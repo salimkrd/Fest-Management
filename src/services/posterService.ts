@@ -174,6 +174,9 @@ export class PosterService {
         id: item.id,
         name: data.name as string,
         config,
+        ...(data.released === true
+          ? { releasedConfig: storedConfig(data.releasedConfig) || (config ? config : undefined) }
+          : {}),
         released: data.released === true,
         ...(data.releasedAt ? { releasedAt: data.releasedAt as string } : {}),
         ...(data.updatedAt ? { updatedAt: data.updatedAt as string } : {}),
@@ -187,7 +190,8 @@ export class PosterService {
       .collection('items').where('released', '==', true).get();
     return snapshot.docs.flatMap(item => {
       const data = item.data();
-      const config = storedConfig(data.config);
+      const draftConfig = storedConfig(data.config);
+      const config = storedConfig(data.releasedConfig) || draftConfig;
       if (!config || typeof data.name !== 'string' || !data.name.trim() || data.released !== true) return [];
       return [{
         id: item.id,
@@ -218,15 +222,22 @@ export class PosterService {
     const previous = existing.exists ? existing.data()! : undefined;
     const released = input.released === undefined ? previous?.released === true : input.released;
     const now = new Date().toISOString();
+    // Saving a draft must not silently alter a version already live on the public site.
+    const previousReleasedConfig = storedConfig(previous?.releasedConfig)
+      || (previous?.released === true ? storedConfig(previous?.config) : undefined);
+    const releasedConfig = input.released === true
+      ? config
+      : released ? previousReleasedConfig : undefined;
     const releasedAt = released
-      ? (previous?.released === true && previous?.releasedAt
-        ? previous.releasedAt as string
-        : now)
+      ? (input.released === true
+        ? now
+        : previous?.releasedAt as string | undefined || now)
       : undefined;
     await ref.set({
       name: input.name.trim(),
       config,
       released,
+      ...(releasedConfig ? { releasedConfig } : {}),
       ...(releasedAt ? { releasedAt } : {}),
       updatedAt: now,
       updatedBy: admin.uid,
