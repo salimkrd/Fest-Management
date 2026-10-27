@@ -91,7 +91,7 @@ export default function ExportManagementPage() {
     const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.xlsx`;
     ExportService.downloadWinnersXLSX(rows, filename);
 
-    setExportNotice('Official Published Winners OpenXML Workbook (.xlsx) generated and downloaded successfully.');
+    setExportNotice('Excel workbook downloaded with a readable Winners Summary sheet and a complete Full Details sheet.');
     setTimeout(() => setExportNotice(null), 4000);
   };
 
@@ -109,8 +109,12 @@ export default function ExportManagementPage() {
     setTimeout(() => setExportNotice(null), 4000);
   };
 
-  // Export 4: Browser Print Sheet
+  // Print a dedicated A4 landscape document rather than the admin dashboard.
   const handlePrintWinnersSheet = () => {
+    if (selectedResults.length === 0) {
+      alert('Please select at least one published competition to print.');
+      return;
+    }
     window.print();
   };
 
@@ -441,6 +445,178 @@ export default function ExportManagementPage() {
           onClose={() => setMigrationModalOpen(false)}
         />
       </div>
+
+      {/* A dedicated print-only document; the admin interface is hidden on paper. */}
+      <div id="official-winners-print" className="official-winners-print">
+        <header className="official-print-header">
+          <div className="official-print-kicker">OFFICIAL FESTIVAL RESULTS</div>
+          <h1>{theme.festivalName}</h1>
+          <p>{theme.institutionName}</p>
+          <div className="official-print-meta">
+            <span>Published Winners Register</span>
+            <span>{selectedResults.length} selected competitions</span>
+            <span>Generated {new Date().toLocaleDateString('en-GB')}</span>
+          </div>
+        </header>
+        {selectedResults.length === 0 ? (
+          <p>No competitions selected for printing.</p>
+        ) : (
+          <table className="official-print-table">
+            <thead>
+              <tr>
+                <th className="col-code">Code</th>
+                <th className="col-competition">Competition</th>
+                <th className="col-category">Category / Type</th>
+                <th>1st Prize Winner</th>
+                <th>2nd Prize Winner</th>
+                <th>3rd Prize Winner</th>
+                <th className="col-total">Total Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedResults.map((res) => {
+                const first = res.ranks.find(rank => rank.rank === 1);
+                const second = res.ranks.find(rank => rank.rank === 2);
+                const third = res.ranks.find(rank => rank.rank === 3);
+                const total = [first, second, third].reduce((sum, rank) =>
+                  sum + (rank ? (rank.officialPoints ?? rank.totalEarnedPoints ?? 0) : 0), 0);
+                return (
+                  <tr key={res.id}>
+                    <td className="print-code">{res.competitionCode}</td>
+                    <td className="print-competition">{res.competitionName}</td>
+                    <td>{res.categoryName} / {res.type}</td>
+                    {[first, second, third].map((winner, index) => (
+                      <td key={index}>
+                        {winner ? (
+                          <div className="print-winner">
+                            <strong>{winner.candidateName}</strong>
+                            <span>{winner.teamName} [{winner.teamCode}]</span>
+                            <small>Bib {winner.bib} | Grade {winner.grade} | +{winner.officialPoints ?? winner.totalEarnedPoints ?? 0} pts</small>
+                          </div>
+                        ) : <span className="print-empty">-</span>}
+                      </td>
+                    ))}
+                    <td className="print-total">{total} pts</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        <footer className="official-print-footer">
+          <span>{theme.festivalName} | Official published results</span>
+          <span>Generated from the festival management system</span>
+        </footer>
+      </div>
+
+      <style jsx global>{`
+        .official-winners-print { display: none; }
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          html, body { background: #fff !important; }
+          body * { visibility: hidden !important; }
+          #official-winners-print,
+          #official-winners-print * { visibility: visible !important; }
+          #official-winners-print {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            color: #111827 !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 8pt !important;
+            z-index: 999999 !important;
+          }
+          .official-print-header {
+            border-bottom: 2px solid #2563eb;
+            padding: 0 0 10px 0;
+            margin-bottom: 12px;
+          }
+          .official-print-kicker {
+            color: #2563eb;
+            font-size: 7pt;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+          }
+          .official-print-header h1 {
+            margin: 4px 0 2px;
+            font-size: 18pt;
+            line-height: 1.15;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          .official-print-header p {
+            margin: 0;
+            color: #475569;
+            font-size: 9pt;
+          }
+          .official-print-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 8px;
+            color: #475569;
+            font-size: 7pt;
+          }
+          .official-print-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .official-print-table thead { display: table-header-group; }
+          .official-print-table tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .official-print-table th {
+            background: #e2e8f0 !important;
+            color: #334155 !important;
+            text-transform: uppercase;
+            font-size: 6.5pt;
+            font-weight: 800;
+            letter-spacing: .2px;
+            text-align: left;
+          }
+          .official-print-table th,
+          .official-print-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+          }
+          .official-print-table td { font-size: 7pt; line-height: 1.25; }
+          .official-print-table tbody tr:nth-child(even) { background: #f8fafc !important; }
+          .official-print-table .col-code { width: 7%; }
+          .official-print-table .col-competition { width: 16%; }
+          .official-print-table .col-category { width: 9%; }
+          .official-print-table .col-total { width: 8%; text-align: right; }
+          .print-code { color: #2563eb; font-weight: 800; }
+          .print-competition { font-weight: 700; }
+          .print-winner strong,
+          .print-winner span,
+          .print-winner small { display: block; }
+          .print-winner strong { color: #111827; font-size: 7.2pt; }
+          .print-winner span { color: #475569; margin-top: 2px; }
+          .print-winner small { color: #2563eb; margin-top: 3px; font-size: 6pt; }
+          .print-empty { color: #94a3b8; }
+          .print-total { text-align: right; color: #047857; font-weight: 800; }
+          .official-print-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 10px;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 5px;
+            color: #64748b;
+            font-size: 6.5pt;
+          }
+        }
+`}</style>
+
     </AdminLayout>
   );
 }
