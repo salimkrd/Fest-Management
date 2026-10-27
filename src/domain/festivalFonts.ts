@@ -8,6 +8,8 @@ export const FESTIVAL_NAME_FONTS = [
   { name: 'Bebas Neue', family: '"Bebas Neue", sans-serif', google: 'Bebas+Neue' },
   { name: 'Cinzel', family: '"Cinzel", serif', google: 'Cinzel:wght@400;700;900' },
   { name: 'Orbitron', family: '"Orbitron", sans-serif', google: 'Orbitron:wght@400;700;800' },
+  { name: 'Bruno Ace', family: '"Bruno Ace", sans-serif', google: 'Bruno+Ace' },
+  { name: 'Bruno Ace SC', family: '"Bruno Ace SC", sans-serif', google: 'Bruno+Ace+SC' },
   { name: 'Rajdhani', family: '"Rajdhani", sans-serif', google: 'Rajdhani:wght@400;700' },
   { name: 'Barlow Condensed', family: '"Barlow Condensed", sans-serif', google: 'Barlow+Condensed:wght@400;700;800' },
   { name: 'Playfair Display', family: '"Playfair Display", serif', google: 'Playfair+Display:wght@400;700;800' },
