@@ -121,12 +121,21 @@ export async function loadPosterFonts(fontNames: readonly string[]): Promise<voi
   await Promise.all(safeNames.map(async name => {
     const id = 'poster-web-font-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     let link = document.getElementById(id) as HTMLLinkElement | null;
+    const alreadyLoaded = link?.dataset.loaded === 'true';
     if (!link) {
       link = document.createElement('link');
       link.id = id;
       link.rel = 'stylesheet';
       link.href = posterFontStylesheetUrl(name);
-      document.head.appendChild(link);
+    }
+    if (!alreadyLoaded) {
+      await new Promise<void>(resolve => {
+        if (!link) return resolve();
+        const finish = () => { if (link) link.dataset.loaded = 'true'; resolve(); };
+        link.addEventListener('load', finish, { once: true });
+        link.addEventListener('error', finish, { once: true });
+        if (!link.isConnected) document.head.appendChild(link);
+      });
     }
     if (document.fonts?.load) {
       try { await document.fonts.load('400 16px "' + name.replace(/"/g, '') + '"'); }
