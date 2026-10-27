@@ -182,33 +182,6 @@ export class ExportService {
     URL.revokeObjectURL(url);
   }
 
-rank3Points,
-      'Event Total Points': row.eventTotalPoints
-    }));
-    const detailSheet = XLSX.utils.json_to_sheet(detailData);
-    detailSheet['!cols'] = [
-      { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 10 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 16 }
-    ];
-    if (detailData.length > 0) detailSheet['!autofilter'] = { ref: 'A1:T' + (detailData.length + 1) };
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Winners Summary');
-    XLSX.utils.book_append_sheet(workbook, detailSheet, 'Full Details');
-
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename.endsWith('.xlsx') ? filename : filename + '.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 
   /**
    * Creates an A4 landscape winners report with a clear hierarchy, repeating
