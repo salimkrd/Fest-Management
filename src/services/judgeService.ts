@@ -449,24 +449,67 @@ export class JudgeService {
       throw new Error(`Validation Error: Competition "${competitionId}" has an invalid maximum mark value.`);
     }
 
-    const totalsByRegistration = new Map<string, number[]>();
+    // Keep each judge's submitted scorecard immutable in markEntries. The published
+    // candidate score is calculated by averaging each rubric criterion across all
+    // submitted judges, then summing those criterion averages.
+    const criterionDefinitions = criteria as Array<{ id: string; name?: string; maxMarks?: number }>;
+    const criterionLookup = new Map<string, string>();
+    criterionDefinitions.forEach(criterion => {
+      criterionLookup.set(String(criterion.id).trim().toLowerCase(), criterion.id);
+      if (criterion.name) criterionLookup.set(criterion.name.trim().toLowerCase(), criterion.id);
+    });
+
+    const criterionMarksByRegistration = new Map<string, Map<string, number[]>>();
+    const legacyTotalsByRegistration = new Map<string, number[]>();
+
     submittedMarks.forEach(mark => {
-      Object.entries(mark!.scores as Record<string, Record<string, number> | number>).forEach(([registrationId, value]) => {
-        const total = typeof value === 'number'
-          ? value
-          : Object.values(value).reduce((sum, score) => sum + score, 0);
-        const totals = totalsByRegistration.get(registrationId) || [];
-        totals.push(total);
-        totalsByRegistration.set(registrationId, totals);
+      const scorecard = mark!.scores as Record<string, Record<string, number> | number>;
+      Object.entries(scorecard).forEach(([registrationId, value]) => {
+        if (typeof value === 'number') {
+          const totals = legacyTotalsByRegistration.get(registrationId) || [];
+          totals.push(value);
+          legacyTotalsByRegistration.set(registrationId, totals);
+          return;
+        }
+
+        const byCriterion = criterionMarksByRegistration.get(registrationId) || new Map<string, number[]>();
+        Object.entries(value).forEach(([criterionKey, rawScore]) => {
+          const criterionId = criterionLookup.get(criterionKey.trim().toLowerCase());
+          if (!criterionId) {
+            throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in a submitted scorecard for registration "${registrationId}".`);
+          }
+          const values = byCriterion.get(criterionId) || [];
+          values.push(Number(rawScore));
+          byCriterion.set(criterionId, values);
+        });
+        criterionMarksByRegistration.set(registrationId, byCriterion);
       });
     });
 
     const registrations = registrationSnapshot.docs.filter(doc => doc.data().status === 'APPROVED');
     const evaluated = registrations.flatMap(doc => {
-      const totals = totalsByRegistration.get(doc.id);
-      if (!totals?.length) return [];
+      const criterionMap = criterionMarksByRegistration.get(doc.id);
+      const legacyTotals = legacyTotalsByRegistration.get(doc.id) || [];
+      if (criterionMap && legacyTotals.length > 0) {
+        throw new Error(`Validation Error: Registration "${doc.id}" has a mixture of legacy total scores and criterion scores. Re-submit using one consistent score format.`);
+      }
+
+      let score: number;
+      if (criterionMap && criterionMap.size > 0) {
+        // Each criterion has its own denominator: only judges who supplied that
+        // criterion contribute to its average. A complete rubric is validated at
+        // submission time; this also safely supports older partial scorecards.
+        const criterionAverages = criterionDefinitions.map(criterion => {
+          const marks = criterionMap.get(criterion.id) || [];
+          return marks.length ? marks.reduce((sum, mark) => sum + mark, 0) / marks.length : 0;
+        });
+        score = Number(criterionAverages.reduce((sum, average) => sum + average, 0).toFixed(2));
+      } else {
+        if (legacyTotals.length === 0) return [];
+        score = Number((legacyTotals.reduce((sum, value) => sum + value, 0) / legacyTotals.length).toFixed(2));
+      }
+
       const registration = doc.data();
-      const score = Number((totals.reduce((sum, value) => sum + value, 0) / totals.length).toFixed(2));
       return [{
         registrationId: doc.id,
         bib: registration.chestNumber || '',
