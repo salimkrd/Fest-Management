@@ -4,6 +4,7 @@ import {
   createTextElement,
   isPosterImage,
   normalizePosterConfig,
+  POSTER_FIELDS,
   posterDimensions,
   posterSvgDataUrl,
   renderPosterSvg,
@@ -145,7 +146,7 @@ describe('Poster configuration validation', () => {
 });
 
 describe('Poster result bindings and shared rendering', () => {
-  it('includes every tied winner and keeps corresponding team, grade and score order', () => {
+  it('keeps tied winner names and teams while omitting grade and score data from posters', () => {
     const tied = result([
       winner({ candidateName: 'Ameen', teamName: 'Blue House', score: 95, grade: 'A+' }),
       winner({ registrationId: 'registration-2', candidateName: 'Bilal', teamName: 'Gold House', score: 95, grade: 'A' }),
@@ -153,8 +154,9 @@ describe('Poster result bindings and shared rendering', () => {
     ]);
     expect(resolvePosterField(textLayer('rank1.name'), tied, theme)).toBe('Ameen\nBilal');
     expect(resolvePosterField(textLayer('rank1.team'), tied, theme)).toBe('Blue House\nGold House');
-    expect(resolvePosterField(textLayer('rank1.grade'), tied, theme)).toBe('Grade A+\nGrade A');
-    expect(resolvePosterField(textLayer('rank1.score'), tied, theme)).toBe('95 marks\n95 marks');
+    expect(resolvePosterField(textLayer('rank1.grade'), tied, theme)).toBe('');
+    expect(resolvePosterField(textLayer('rank1.score'), tied, theme)).toBe('');
+    expect(POSTER_FIELDS.some(field => /\\.(grade|score)$/.test(field.value))).toBe(false);
     const names = renderedText(renderPosterSvg(tied, theme, withElements(textLayer('rank1.name'))));
     expect(names).toEqual(['Ameen', 'Bilal']);
   });
