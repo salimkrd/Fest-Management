@@ -14,7 +14,6 @@ export const FESTIVAL_NAME_FONTS = [
   { name: 'Barlow Condensed', family: '"Barlow Condensed", sans-serif', google: 'Barlow+Condensed:wght@400;700;800' },
   { name: 'Playfair Display', family: '"Playfair Display", serif', google: 'Playfair+Display:wght@400;700;800' },
   { name: 'DM Serif Display', family: '"DM Serif Display", serif', google: 'DM+Serif+Display' },
-  { name: 'Teko', family: '"Teko", sans-serif', google: 'Teko:wght@400;700' },
   { name: 'Archivo Black', family: '"Archivo Black", sans-serif', google: 'Archivo+Black' },
   { name: 'Cormorant Garamond', family: '"Cormorant Garamond", serif', google: 'Cormorant+Garamond:wght@400;700' },
   { name: 'Abril Fatface', family: '"Abril Fatface", serif', google: 'Abril+Fatface' },
