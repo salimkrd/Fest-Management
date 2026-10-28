@@ -23,6 +23,7 @@ export function ResultPosterPreview({ result, theme, config, className = '', sel
     () => [...new Set((normalized.elements ?? [])
       .filter(element => element.type === 'text' && element.field !== 'festivalName')
       .map(element => element.fontFamily)
+      .concat((normalized.winnerContainer?.layers ?? []).filter(layer => layer.type === 'text').map(layer => layer.fontFamily))
       .filter(name => !['sans', 'serif', 'mono'].includes(name)))].sort().join('|'),
     [normalized],
   );
