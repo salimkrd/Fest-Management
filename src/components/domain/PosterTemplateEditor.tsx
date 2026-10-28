@@ -9,7 +9,7 @@ import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { ResultPosterPreview } from './ResultPosterPreview';
 import { PosterFontPicker } from './PosterFontPicker';
-import { createPosterPreset, createTextElement, normalizePosterConfig, POSTER_FIELDS, POSTER_PRESETS, posterDimensions, validatePosterConfig } from '@/domain/poster';
+import { createPosterPreset, createTextElement, normalizePosterConfig, POSTER_FIELDS, POSTER_PRESETS, WINNER_POSITION_FORMATS, posterDimensions, validatePosterConfig } from '@/domain/poster';
 import { exportPosterAsPng } from '@/utils/canvasExport';
 
 const SAMPLE_RESULT: CompetitionResult = {
@@ -337,12 +337,8 @@ export function PosterTemplateEditor() {
               <p className="mt-1 text-[10px] leading-relaxed text-blue-700">This is one reusable child layer. Change its position or style once and it updates across every winner row.</p>
             </div>
             <Field label="Layer name"><input className={inputStyle} value={selectedWinnerLayer.label} maxLength={80} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { label: event.target.value })} /></Field>
-            <Field label="Winner data"><input className={inputStyle} value={selectedWinnerLayer.field === 'position' ? 'Placement number and prize name' : selectedWinnerLayer.field === 'name' ? 'Published winner name' : selectedWinnerLayer.field === 'team' ? 'Winner team' : 'Winner photo slot'} disabled readOnly /></Field>
-            {selectedWinnerLayer.field === 'photo' ? <div className="space-y-2">
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400"><ImagePlus className="h-4 w-4" /> Upload fallback image<input aria-label="Upload repeated winner photo artwork" type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={event => { const file = event.target.files?.[0]; if (file) void perform('winner-photo', async () => patchWinnerLayer('photo', { image: await readArtwork(file, false) })); event.target.value = ''; }} /></label>
-              {selectedWinnerLayer.image && <button type="button" className="text-xs font-semibold text-red-600" onClick={() => patchWinnerLayer('photo', { image: undefined })}>Remove fallback image</button>}
-              <p className="text-[10px] leading-relaxed text-slate-400">The photo slot repeats for each winner. Uploading an image here uses the same fallback image in each row; without one, a photo placeholder is shown.</p>
-            </div> : <p className="rounded-lg bg-slate-50 p-2 text-[10px] leading-relaxed text-slate-500">This value is filled automatically from the published result and cannot be manually overridden.</p>}
+            <Field label="Winner data"><input className={inputStyle} value={selectedWinnerLayer.field === 'position' ? 'Placement label' : selectedWinnerLayer.field === 'name' ? 'Published winner name' : 'Winner team'} disabled readOnly /></Field>
+            {selectedWinnerLayer.field === 'position' ? <Field label="Position format"><select className={inputStyle} value={config.winnerPositionFormat ?? 'padded-place'} onChange={event => change({ ...config, winnerPositionFormat: event.target.value as NonNullable<PosterConfig['winnerPositionFormat']> })}>{WINNER_POSITION_FORMATS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field> : <p className="rounded-lg bg-slate-50 p-2 text-[10px] leading-relaxed text-slate-500">This value is filled automatically from the published result and cannot be manually overridden.</p>}
             {selectedWinnerLayer.type === 'text' && <>
               <PosterFontPicker value={selectedWinnerLayer.fontFamily} onChange={fontFamily => patchWinnerLayer(selectedWinnerLayer.field, { fontFamily })} />
               <div className="grid grid-cols-2 gap-2"><Field label="Font size"><input className={inputStyle} type="number" min="8" max="180" value={selectedWinnerLayer.fontSize} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { fontSize: Math.max(8, Math.min(180, Number(event.target.value))) })} /></Field><Field label="Weight"><select className={inputStyle} value={selectedWinnerLayer.fontWeight} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { fontWeight: event.target.value as PosterWinnerLayer['fontWeight'] })}><option value="400">Regular</option><option value="600">Semibold</option><option value="800">Bold</option></select></Field></div>
