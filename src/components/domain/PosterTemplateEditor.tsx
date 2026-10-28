@@ -262,35 +262,21 @@ export function PosterTemplateEditor() {
             {config.backgroundImage && <div className="space-y-2"><Field label="Background image opacity"><input type="range" min="0" max="1" step="0.05" value={config.backgroundOpacity ?? 1} onChange={event => change({ ...config, backgroundOpacity: Number(event.target.value) })} className="w-full" /></Field><button type="button" onClick={() => change({ ...config, backgroundImage: undefined })} className="text-xs font-semibold text-red-600">Remove background image</button></div>}
           </div>}
           {tab === 'layers' && <div className="space-y-3">
-            <p className="text-[10px] text-slate-500">Winner layers are grouped by place. Select individual layers or adjust the full winner group together.</p>
-            <div className="max-h-[560px] space-y-2 overflow-y-auto">
-              {([1, 2, 3] as const).map(rank => {
-                const group = (config.elements ?? []).filter(element => rankForLayer(element) === rank);
-                if (!group.length) return null;
-                return <div key={rank} className="rounded-xl border border-blue-100 bg-blue-50/40 p-2">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-800">Winner {rank}</div>
-                    <div className="flex gap-1">
-                      <button type="button" title="Move winner group up" aria-label={`Move winner ${rank} group up`} onClick={() => adjustWinnerGroup(rank, 'up')} className="rounded border border-blue-100 bg-white p-1 text-slate-600 hover:bg-blue-100"><ArrowUp className="h-3 w-3" /></button>
-                      <button type="button" title="Move winner group down" aria-label={`Move winner ${rank} group down`} onClick={() => adjustWinnerGroup(rank, 'down')} className="rounded border border-blue-100 bg-white p-1 text-slate-600 hover:bg-blue-100"><ArrowDown className="h-3 w-3" /></button>
-                      <button type="button" title="Center winner group" aria-label={`Center winner ${rank} group`} onClick={() => adjustWinnerGroup(rank, 'center')} className="rounded border border-blue-100 bg-white px-1.5 text-[10px] text-slate-600 hover:bg-blue-100">Center</button>
-                    </div>
-                  </div>
-                  <div className="space-y-1 border-l-2 border-blue-200 pl-2">
-                    {group.map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === element.id ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-600 hover:bg-white'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
-                  </div>
-                  <div className="mt-2">
-                    <label className="flex items-center justify-between gap-2 text-[10px] text-slate-500"><span>Vertical spacing</span><span>{winnerSpacing[rank]} units</span></label>
-                    <input aria-label={`Adjust winner ${rank} spacing`} type="range" min="-4" max="4" step="1" value={winnerSpacing[rank]} onChange={event => {
-                      const nextValue = Number(event.target.value);
-                      const delta = nextValue - winnerSpacing[rank];
-                      if (delta !== 0) adjustWinnerGroup(rank, 'space', delta * 0.5);
-                      setWinnerSpacing(previous => ({ ...previous, [rank]: nextValue }));
-                    }} className="w-full accent-blue-600" />
-                  </div>
-                </div>;
-              })}
-              {(config.elements ?? []).filter(element => rankForLayer(element) === null).map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
+            <p className="text-[10px] leading-relaxed text-slate-500">One Winner Container holds a reusable item layout. Position, name, team and photo layers repeat for every ranked winner, including ties.</p>
+            <div className="max-h-[560px] space-y-1 overflow-y-auto">
+              {(config.elements ?? []).map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
+              {config.winnerContainer ? <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2">
+                <button type="button" aria-label="Select Winner Container" className={`flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-xs ${selectedWinnerContainer ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`} onClick={() => setSelectedId('__winner-container__')}>
+                  <Layers className="h-4 w-4 shrink-0" /><span className="font-semibold">Winner Container</span>
+                </button>
+                <div className="ml-2 mt-2 border-l-2 border-slate-200 pl-2">
+                  <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">Winner Item (All)</p>
+                  {config.winnerContainer.layers.map(layer => <button type="button" key={layer.field} aria-label={`Select winner ${layer.label} layer`} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === `__winner-item:${layer.field}__` ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(`__winner-item:${layer.field}__`)}>{layer.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{layer.label}</span><span className="ml-auto text-[9px] text-slate-400">ALL</span></button>)}
+                </div>
+              </div> : <button type="button" className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-blue-200 px-3 py-3 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => {
+                const winnerContainer = createPosterPreset().winnerContainer;
+                if (winnerContainer) change({ ...config, winnerContainer });
+              }}><Plus className="h-3.5 w-3.5" /> Add Winner Container</button>}
             </div>
           </div>}
           {tab === 'saved' && <div className="space-y-2">
