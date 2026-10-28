@@ -92,6 +92,29 @@ describe('Festival Category & Contestant Eligibility Domain Engine', () => {
     expect(isParticipantEligibleForCategory(mislabeledSeniorId, seniorCat, categories)).toBe(false);
   });
 
+  it('11. Does not treat a specific category as General because its descriptive fields are broad', () => {
+    // Some category records may have stale/broad descriptive metadata.
+    // A named Senior tier must still exclude a Junior participant.
+    const seniorWithBroadMetadata: Category = {
+      ...categories.find(category => category.name === 'Senior')!,
+      eligibility: 'All Eligible Students',
+      classRange: 'Campus Wide'
+    };
+
+    expect(
+      isParticipantEligibleForCategory(juniorParticipant, seniorWithBroadMetadata, categories)
+    ).toBe(false);
+
+    const customTierParticipant: Participant = {
+      ...juniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: 'Test CAT 26'
+    };
+    expect(
+      isParticipantEligibleForCategory(customTierParticipant, seniorWithBroadMetadata, categories)
+    ).toBe(false);
+  });
+
   it('9. Uses classGrade as the category only when it exactly matches a known category name', () => {
     const customCategory: Category = {
       id: 'cat-test-26',
