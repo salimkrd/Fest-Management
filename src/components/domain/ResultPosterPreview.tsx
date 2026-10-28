@@ -49,8 +49,9 @@ export function ResultPosterPreview({ result, theme, config, className = '', sel
   });
   const winnerContainer = normalized.winnerContainer;
   const winnerRows = orderedPosterWinners(result);
+  const winnerRowCapacity = Math.max(3, winnerRows.length);
   const winnerRowHeight = winnerContainer && winnerRows.length
-    ? Math.max(0, (winnerContainer.height - winnerContainer.rowGap * (winnerRows.length - 1)) / winnerRows.length)
+    ? Math.max(0, (winnerContainer.height - winnerContainer.rowGap * (winnerRowCapacity - 1)) / winnerRowCapacity)
     : 0;
 
   return (
