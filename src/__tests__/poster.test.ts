@@ -167,7 +167,7 @@ describe('Poster result bindings and shared rendering', () => {
   it('uses one reusable winner item for positions, names, teams and photos', () => {
     const preset = createPosterPreset();
     expect(preset.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
-    expect(preset.elements?.some(element => /^rank[123]\\.(?:name|team)$/.test(element.field))).toBe(false);
+    expect(preset.elements?.some(element => /^rank[123]\.(?:name|team)$/.test(element.field))).toBe(false);
 
     const fourWinners = result([
       winner({ rank: 1, candidateName: 'Winner One', teamName: 'Team One' }),
@@ -186,7 +186,7 @@ describe('Poster result bindings and shared rendering', () => {
     expect(text).toContain('Winner Three B');
     expect(text).toContain('Team Three A');
     expect(text).toContain('Team Three B');
-    expect(svg.match(/>PHOTO<\\/text>/g)).toHaveLength(4);
+    expect(svg.match(/>PHOTO<\/text>/g)).toHaveLength(4);
   });
 
   it('migrates old rank-specific template layers into the reusable winner container', () => {
