@@ -88,7 +88,25 @@ describe('Poster configuration validation', () => {
     expect(svg.match(/<image\b/g)).toHaveLength(2);
     expect(svg).toContain(`href="${pixelPng}"`);
     expect(svg).toContain('opacity="0.5"');
+    // Uploaded artwork supplies the full background; preset decoration lines
+    // must not be drawn over it.
+    expect(svg).not.toContain('<path');
+    expect(svg).not.toContain('<circle');
+    expect(svg).not.toContain('stroke="#846E45"');
   });
+
+  it.each(['arches', 'minimal', 'confetti'] as const)(
+    'does not overlay the %s preset decorations on an uploaded background',
+    decoration => {
+      const config = validatePosterConfig({
+        ...createPosterPreset(), decoration, backgroundImage: pixelPng, backgroundOpacity: 1,
+      });
+      const svg = renderPosterSvg(result(), theme, config);
+      expect(svg).toContain(`href="${pixelPng}"`);
+      expect(svg).not.toContain('<path');
+      expect(svg).not.toContain('<circle');
+    },
+  );
 
   it('rejects duplicate layer IDs, even when their fields differ', () => {
     expect(() => validatePosterConfig(withElements(textLayer('festivalName'), textLayer('rank1.name'))))

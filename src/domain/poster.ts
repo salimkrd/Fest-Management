@@ -206,10 +206,14 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
   const config = normalizePosterConfig(input); const { width, height } = posterDimensions(config.aspectRatio);
   const accent = isHex(config.accentColor) ? config.accentColor : '#EACB85';
   const background = isHex(config.backgroundColor) ? config.backgroundColor : '#142C50';
+  // When an uploaded artwork is used as the background, it is the complete
+  // background design. Do not add preset arches, lines, or confetti over it.
   let decoration = '';
-  if (config.decoration === 'arches') decoration = `<g fill="none" stroke="${accent}" opacity=".25"><path d="M32 ${height} V300 Q32 32 540 32 Q1048 32 1048 300 V${height}" stroke-width="2"/><path d="M52 ${height} V310 Q52 52 540 52 Q1028 52 1028 310 V${height}"/></g><circle cx="1060" cy="25" r="260" fill="${accent}" opacity=".05"/>`;
-  if (config.decoration === 'minimal') decoration = `<path d="M72 50H1008M72 ${height - 45}H1008" stroke="${accent}" stroke-width="3"/>`;
-  if (config.decoration === 'confetti') decoration = Array.from({ length: 26 }, (_, index) => `<circle cx="${index % 2 ? 28 + (index * 13) % 70 : 985 + (index * 11) % 70}" cy="${(index * 137 + 37) % height}" r="${3 + index % 6}" fill="${accent}" opacity=".4"/>`).join('');
+  if (!config.backgroundImage) {
+    if (config.decoration === 'arches') decoration = `<g fill="none" stroke="${accent}" opacity=".25"><path d="M32 ${height} V300 Q32 32 540 32 Q1048 32 1048 300 V${height}" stroke-width="2"/><path d="M52 ${height} V310 Q52 52 540 52 Q1028 52 1028 310 V${height}"/></g><circle cx="1060" cy="25" r="260" fill="${accent}" opacity=".05"/>`;
+    if (config.decoration === 'minimal') decoration = `<path d="M72 50H1008M72 ${height - 45}H1008" stroke="${accent}" stroke-width="3"/>`;
+    if (config.decoration === 'confetti') decoration = Array.from({ length: 26 }, (_, index) => `<circle cx="${index % 2 ? 28 + (index * 13) % 70 : 985 + (index * 11) % 70}" cy="${(index * 137 + 37) % height}" r="${3 + index % 6}" fill="${accent}" opacity=".4"/>`).join('');
+  }
   const layers = (config.elements ?? []).map(element => {
     const x = element.x / 100 * width, y = element.y / 100 * height, w = element.width / 100 * width, h = element.height / 100 * height;
     if (element.type === 'image') return isPosterImage(element.image) ? `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${element.image}" preserveAspectRatio="xMidYMid meet"/>` : '';
