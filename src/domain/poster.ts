@@ -373,8 +373,11 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
 
   const container = config.winnerContainer;
   const winners = orderedPosterWinners(result);
+  // Keep the baseline three-row rhythm when only one or two places are
+  // awarded. Additional tied winners compress evenly to fit the same container.
+  const rowCapacity = Math.max(3, winners.length);
   const rowHeight = container && winners.length
-    ? Math.max(0, (container.height - container.rowGap * (winners.length - 1)) / winners.length)
+    ? Math.max(0, (container.height - container.rowGap * (rowCapacity - 1)) / rowCapacity)
     : 0;
   const winnerLayers = container && winners.length ? winners.map((winner, rowIndex) => {
     const rowTop = container.y + rowIndex * (rowHeight + container.rowGap);
