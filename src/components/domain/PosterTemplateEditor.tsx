@@ -173,7 +173,7 @@ export function PosterTemplateEditor() {
     if (!file) return;
     void perform('image', async () => {
       const image = await readArtwork(file, background);
-      if (background) change({ ...config, backgroundImage: image, decoration: 'minimal' });
+      if (background) change({ ...config, backgroundImage: image });
       else {
         if ((config.elements?.length ?? 0) >= 30) throw new Error('A template can have up to 30 layers.');
         const element: PosterElement = { ...createTextElement(crypto.randomUUID()), type: 'image', label: 'Logo / image', image, x: 40, y: 4, width: 20, height: 12 };
