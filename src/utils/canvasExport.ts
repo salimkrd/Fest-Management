@@ -21,9 +21,14 @@ export async function exportPosterAsPng(
   const { validatePosterConfig, normalizePosterConfig, posterDimensions, posterSvgDataUrl } = await import('@/domain/poster');
   const checked = validatePosterConfig(normalizePosterConfig(config));
   const { width, height } = posterDimensions(checked.aspectRatio);
-  await loadPosterFonts((checked.elements ?? [])
-    .filter(element => element.type === 'text' && element.field !== 'festivalName')
-    .map(element => element.fontFamily));
+  await loadPosterFonts([
+    ...(checked.elements ?? [])
+      .filter(element => element.type === 'text' && element.field !== 'festivalName')
+      .map(element => element.fontFamily),
+    ...(checked.winnerContainer?.layers ?? [])
+      .filter(layer => layer.type === 'text')
+      .map(layer => layer.fontFamily),
+  ]);
   await document.fonts.ready;
   const artwork = new Image();
   artwork.src = posterSvgDataUrl(result, theme, checked);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Copy, Download, Globe, Grid2X2, ImagePlus, Layers, Plus, Save, Trash2, Type, Upload, CheckCircle2, ArrowUp, ArrowDown } from 'lucide-react';
-import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterTemplate } from '@/types/fest';
+import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterTemplate, PosterWinnerContainer, PosterWinnerField, PosterWinnerLayer } from '@/types/fest';
 import { auth } from '@/lib/firebase/client';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
@@ -57,14 +57,19 @@ export function PosterTemplateEditor() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [showGrid, setShowGrid] = useState(false);
-  const [winnerSpacing, setWinnerSpacing] = useState<Record<1 | 2 | 3, number>>({ 1: 0, 2: 0, 3: 0 });
   const [tab, setTab] = useState<'design' | 'layers' | 'saved'>('design');
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const result = results.find(item => item.id === resultId);
   const preview = result ?? SAMPLE_RESULT;
   const published = results.filter(item => item.resultStatus === 'PUBLISHED');
   const selected = config.elements?.find(element => element.id === selectedId);
+  const selectedWinnerLayer = config.winnerContainer?.layers.find(layer => `__winner-item:${layer.field}__` === selectedId);
+  const selectedWinnerContainer = selectedId === '__winner-container__';
   const dimensions = posterDimensions(config.aspectRatio);
+  const orderedCanvasLayers = [...(config.elements ?? [])].sort((a, b) => a.y - b.y);
+  const layersBeforeWinner = orderedCanvasLayers.filter(element => !config.winnerContainer || element.y < config.winnerContainer.y);
+  const layersAfterWinner = orderedCanvasLayers.filter(element => Boolean(config.winnerContainer) && element.y >= (config.winnerContainer?.y ?? 100));
+  const renderCanvasLayer = (element: PosterElement) => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>;
   useEffect(() => {
     if (!auth) return;
     let active = true;
@@ -92,6 +97,41 @@ export function PosterTemplateEditor() {
       return next;
     }) }));
     setDirty(true); setNotice('');
+  };
+  const patchWinnerLayer = (field: PosterWinnerField, updates: Partial<PosterWinnerLayer>) => {
+    setConfig(current => {
+      if (!current.winnerContainer) return current;
+      return { ...current, winnerContainer: {
+        ...current.winnerContainer,
+        layers: current.winnerContainer.layers.map(layer => {
+          if (layer.field !== field) return layer;
+          const next = { ...layer, ...updates };
+          next.width = Math.max(1, Math.min(100, next.width));
+          next.height = Math.max(1, Math.min(100, next.height));
+          next.x = Math.max(0, Math.min(100 - next.width, next.x));
+          next.y = Math.max(0, Math.min(100 - next.height, next.y));
+          return next;
+        }),
+      } };
+    });
+    setDirty(true); setNotice('');
+  };
+  const patchWinnerContainer = (updates: Partial<PosterWinnerContainer>) => {
+    setConfig(current => {
+      if (!current.winnerContainer) return current;
+      const next = { ...current.winnerContainer, ...updates };
+      next.width = Math.max(1, Math.min(100, next.width));
+      next.height = Math.max(1, Math.min(100, next.height));
+      next.x = Math.max(0, Math.min(100 - next.width, next.x));
+      next.y = Math.max(0, Math.min(100 - next.height, next.y));
+      next.rowGap = Math.max(0, Math.min(10, next.rowGap));
+      return { ...current, winnerContainer: next };
+    });
+    setDirty(true); setNotice('');
+  };
+  const handlePreviewMove = (id: string, position: { x: number; y: number }) => {
+    if (id === '__winner-container__') patchWinnerContainer(position);
+    else patchLayer(id, position);
   };
   const canReplace = () => !dirty || window.confirm('Replace your unsaved canvas changes? Save the template or result draft first to keep them.');
   const load = (next: PosterConfig) => { setConfig(normalizePosterConfig(next)); setSelectedId(null); setDirty(false); setNotice(''); setError(''); };
@@ -189,40 +229,6 @@ export function PosterTemplateEditor() {
     change({ ...config, elements });
   }
 
-  function rankForLayer(element: PosterElement): 1 | 2 | 3 | null {
-    const fieldMatch = /^rank([123])\\.(?:name|team)$/.exec(element.field);
-    if (fieldMatch) return Number(fieldMatch[1]) as 1 | 2 | 3;
-    const idMatch = /^(?:place|rank|position|prize)[-_ ]*0?([123])(?:$|[-_ ])/i.exec(element.id);
-    if (idMatch && element.field === 'text') return Number(idMatch[1]) as 1 | 2 | 3;
-    return null;
-  }
-
-  function adjustWinnerGroup(rank: 1 | 2 | 3, action: 'up' | 'down' | 'center' | 'space', amount = 1) {
-    const elements = config.elements ?? [];
-    const group = elements.filter(element => rankForLayer(element) === rank);
-    if (!group.length) return;
-    const groupIds = new Set(group.map(element => element.id));
-    const groupTop = Math.min(...group.map(element => element.y));
-    const groupBottom = Math.max(...group.map(element => element.y + element.height));
-    const center = group.reduce((sum, element) => sum + element.x + element.width / 2, 0) / group.length;
-    const next = elements.map(element => {
-      if (!groupIds.has(element.id)) return element;
-      if (action === 'up') return { ...element, y: Math.max(0, element.y - 1) };
-      if (action === 'down') return { ...element, y: Math.min(100 - element.height, element.y + 1) };
-      if (action === 'center') return { ...element, x: Math.max(0, Math.min(100 - element.width, 50 - element.width / 2)) };
-      // Increase/decrease the spacing below the placement marker while preserving
-      // the relative positions of name and team layers within the winner group.
-      if (element.id.match(/^(?:name|team)-[123]$/) || /^rank[123]\\.(?:name|team)$/.test(element.field)) {
-        const delta = element.field.endsWith('.team') || element.id.startsWith('team-') ? amount : amount * 0.5;
-        return { ...element, y: Math.max(groupTop, Math.min(100 - element.height, element.y + delta)) };
-      }
-      return element;
-    });
-    // Keep group position adjustments inside the canvas without changing each
-    // layer's individual dimensions.
-    if (action === 'center' && groupBottom > 100) return;
-    change({ ...config, elements: next });
-  }
 
   return <div className="space-y-4">
     <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
@@ -260,35 +266,22 @@ export function PosterTemplateEditor() {
             {config.backgroundImage && <div className="space-y-2"><Field label="Background image opacity"><input type="range" min="0" max="1" step="0.05" value={config.backgroundOpacity ?? 1} onChange={event => change({ ...config, backgroundOpacity: Number(event.target.value) })} className="w-full" /></Field><button type="button" onClick={() => change({ ...config, backgroundImage: undefined })} className="text-xs font-semibold text-red-600">Remove background image</button></div>}
           </div>}
           {tab === 'layers' && <div className="space-y-3">
-            <p className="text-[10px] text-slate-500">Winner layers are grouped by place. Select individual layers or adjust the full winner group together.</p>
-            <div className="max-h-[560px] space-y-2 overflow-y-auto">
-              {([1, 2, 3] as const).map(rank => {
-                const group = (config.elements ?? []).filter(element => rankForLayer(element) === rank);
-                if (!group.length) return null;
-                return <div key={rank} className="rounded-xl border border-blue-100 bg-blue-50/40 p-2">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-800">Winner {rank}</div>
-                    <div className="flex gap-1">
-                      <button type="button" title="Move winner group up" aria-label={`Move winner ${rank} group up`} onClick={() => adjustWinnerGroup(rank, 'up')} className="rounded border border-blue-100 bg-white p-1 text-slate-600 hover:bg-blue-100"><ArrowUp className="h-3 w-3" /></button>
-                      <button type="button" title="Move winner group down" aria-label={`Move winner ${rank} group down`} onClick={() => adjustWinnerGroup(rank, 'down')} className="rounded border border-blue-100 bg-white p-1 text-slate-600 hover:bg-blue-100"><ArrowDown className="h-3 w-3" /></button>
-                      <button type="button" title="Center winner group" aria-label={`Center winner ${rank} group`} onClick={() => adjustWinnerGroup(rank, 'center')} className="rounded border border-blue-100 bg-white px-1.5 text-[10px] text-slate-600 hover:bg-blue-100">Center</button>
-                    </div>
-                  </div>
-                  <div className="space-y-1 border-l-2 border-blue-200 pl-2">
-                    {group.map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === element.id ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-600 hover:bg-white'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
-                  </div>
-                  <div className="mt-2">
-                    <label className="flex items-center justify-between gap-2 text-[10px] text-slate-500"><span>Vertical spacing</span><span>{winnerSpacing[rank]} units</span></label>
-                    <input aria-label={`Adjust winner ${rank} spacing`} type="range" min="-4" max="4" step="1" value={winnerSpacing[rank]} onChange={event => {
-                      const nextValue = Number(event.target.value);
-                      const delta = nextValue - winnerSpacing[rank];
-                      if (delta !== 0) adjustWinnerGroup(rank, 'space', delta * 0.5);
-                      setWinnerSpacing(previous => ({ ...previous, [rank]: nextValue }));
-                    }} className="w-full accent-blue-600" />
-                  </div>
-                </div>;
-              })}
-              {(config.elements ?? []).filter(element => rankForLayer(element) === null).map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
+            <p className="text-[10px] leading-relaxed text-slate-500">One Winner Container holds a reusable item layout. Position, name, team and photo layers repeat for every ranked winner, including ties.</p>
+            <div className="max-h-[560px] space-y-1 overflow-y-auto">
+              {layersBeforeWinner.map(renderCanvasLayer)}
+              {config.winnerContainer ? <div className="my-2 rounded-xl border border-slate-200 bg-white p-2">
+                <button type="button" aria-label="Select Winner Container" className={`flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-xs ${selectedWinnerContainer ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`} onClick={() => setSelectedId('__winner-container__')}>
+                  <Layers className="h-4 w-4 shrink-0" /><span className="font-semibold">Winner Container</span>
+                </button>
+                <div className="ml-2 mt-2 border-l-2 border-slate-200 pl-2">
+                  <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">Winner Item (All)</p>
+                  {config.winnerContainer.layers.map(layer => <button type="button" key={layer.field} aria-label={`Select winner ${layer.label} layer`} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === `__winner-item:${layer.field}__` ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(`__winner-item:${layer.field}__`)}>{layer.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{layer.label}</span><span className="ml-auto text-[9px] text-slate-400">ALL</span></button>)}
+                </div>
+              </div> : <button type="button" className="my-2 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-blue-200 px-3 py-3 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => {
+                const winnerContainer = createPosterPreset().winnerContainer;
+                if (winnerContainer) change({ ...config, winnerContainer });
+              }}><Plus className="h-3.5 w-3.5" /> Add Winner Container</button>}
+              {layersAfterWinner.map(renderCanvasLayer)}
             </div>
           </div>}
           {tab === 'saved' && <div className="space-y-2">
@@ -322,7 +315,7 @@ export function PosterTemplateEditor() {
       <div className="order-first min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-[#e9edf2] xl:order-none">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3"><div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="text-xs font-semibold text-slate-700">Live canvas</span><span className="text-[10px] text-slate-400">{dirty ? 'Unsaved changes' : 'Ready'}</span></div><button type="button" aria-label="Toggle canvas grid" aria-pressed={showGrid} onClick={() => setShowGrid(!showGrid)} className={`rounded-md p-1.5 ${showGrid ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}><Grid2X2 className="h-4 w-4" /></button></div>
         <div className="flex min-h-[570px] flex-col items-center justify-center p-5 sm:p-8" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '16px 16px' }}>
-          <div className="w-full" style={{ maxWidth: config.aspectRatio === '9:16' ? 330 : 460 }}><ResultPosterPreview result={preview} theme={theme} config={config} selectedId={selectedId} onSelect={setSelectedId} onMove={patchLayer} showGrid={showGrid} className="w-full shadow-xl" /></div>
+          <div className="w-full" style={{ maxWidth: config.aspectRatio === '9:16' ? 330 : 460 }}><ResultPosterPreview result={preview} theme={theme} config={config} selectedId={selectedId} onSelect={setSelectedId} onMove={handlePreviewMove} showGrid={showGrid} className="w-full shadow-xl" /></div>
           <div className="mt-5 text-center text-[10px] font-medium text-slate-500">{dimensions.width} × {dimensions.height} px · PNG export{!result && <span className="mt-1 block rounded-full bg-white/70 px-3 py-1 text-amber-700">Sample names for design preview only</span>}</div>
         </div>
       </div>
@@ -331,14 +324,43 @@ export function PosterTemplateEditor() {
           <div className="mb-4 grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={addText} leftIcon={<Plus className="h-3.5 w-3.5" />}>Text</Button><label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"><ImagePlus className="h-3.5 w-3.5" />Image<input aria-label="Upload logo or image layer" className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { upload(event.target.files?.[0], false); event.target.value = ''; }} /></label></div>
           {selected ? <div className="space-y-4">
             <Field label="Layer name"><input className={inputStyle} value={selected.label} maxLength={80} onChange={event => patchLayer(selected.id, { label: event.target.value })} /></Field>
-            {selected.type === 'text' && <><Field label="Content source"><select className={inputStyle} value={selected.field} onChange={event => patchLayer(selected.id, { field: event.target.value as PosterField })}>{POSTER_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}</select></Field>{selected.field === 'text' ? <Field label="Text"><textarea className={`${inputStyle} min-h-20`} value={selected.text} maxLength={500} onChange={event => patchLayer(selected.id, { text: event.target.value })} /></Field> : <p className="rounded-lg bg-blue-50 p-2 text-[10px] leading-relaxed text-blue-700">This field fills automatically from the selected result. Official names and ranks stay unchanged.</p>}
+            {selected.type === 'text' && <><Field label="Content source"><select className={inputStyle} value={selected.field} onChange={event => patchLayer(selected.id, { field: event.target.value as PosterField })}>{POSTER_FIELDS.map(field => <option key={field.value} value={field.value}>{field.label}</option>)}</select></Field>{selected.field === 'text' ? <Field label="Text"><textarea className={`${inputStyle} min-h-20`} value={selected.text} maxLength={500} onChange={event => patchLayer(selected.id, { text: event.target.value })} /></Field> : <p className="rounded-lg bg-blue-50 p-2 text-[10px] leading-relaxed text-blue-700">This field fills automatically from the selected result.</p>}
             <PosterFontPicker value={selected.fontFamily} onChange={fontFamily => patchLayer(selected.id, { fontFamily })} />
             <div className="grid grid-cols-2 gap-2"><Field label="Font size"><input className={inputStyle} type="number" min="8" max="180" value={selected.fontSize} onChange={event => patchLayer(selected.id, { fontSize: Math.max(8, Math.min(180, Number(event.target.value))) })} /></Field><Field label="Weight"><select className={inputStyle} value={selected.fontWeight} onChange={event => patchLayer(selected.id, { fontWeight: event.target.value as PosterElement['fontWeight'] })}><option value="400">Regular</option><option value="600">Semibold</option><option value="800">Bold</option></select></Field></div>
             <div className="grid grid-cols-2 gap-2"><Field label="Text colour"><input aria-label="Layer text colour" type="color" className="h-9 w-full rounded border border-slate-200" value={selected.color} onChange={event => patchLayer(selected.id, { color: event.target.value })} /></Field><Field label="Alignment"><select className={inputStyle} value={selected.align} onChange={event => patchLayer(selected.id, { align: event.target.value as PosterElement['align'] })}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></Field></div></>}
             <div className="grid grid-cols-2 gap-2">{(['x', 'y', 'width', 'height'] as const).map(key => <Field key={key} label={`${key === 'x' ? 'Left' : key === 'y' ? 'Top' : key === 'width' ? 'Width' : 'Height'} (%)`}><input className={inputStyle} type="number" min={key === 'x' || key === 'y' ? 0 : 1} max="100" step="0.5" value={Number(selected[key].toFixed(1))} onChange={event => patchLayer(selected.id, { [key]: Number(event.target.value) })} /></Field>)}</div>
-            <p className="text-[10px] leading-relaxed text-slate-400">Text wraps and scales to fit its box. Increase the box height for long names or tied winners.</p>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3"><div className="flex gap-1"><button type="button" aria-label="Move layer backward" onClick={() => reorder(-1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" aria-label="Move layer forward" onClick={() => reorder(1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" aria-label="Duplicate selected layer" className="rounded p-2 text-slate-500 hover:bg-slate-100" onClick={() => { if ((config.elements?.length ?? 0) >= 30) { setError('Maximum 30 layers.'); return; } const copy = { ...selected, id: crypto.randomUUID(), label: `${selected.label.slice(0, 70)} copy` }; change({ ...config, elements: [...(config.elements ?? []), copy] }); setSelectedId(copy.id); }}><Copy className="h-3.5 w-3.5" /></button></div><button type="button" aria-label="Delete selected layer" className="rounded p-2 text-red-500 hover:bg-red-50" onClick={() => { change({ ...config, elements: config.elements?.filter(element => element.id !== selected.id) }); setSelectedId(null); }}><Trash2 className="h-3.5 w-3.5" /></button></div>
-          </div> : <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">Select text or an image on the canvas to edit it. Add new layers with the buttons above.</p>}
+            <p className="text-[10px] leading-relaxed text-slate-400">This standard layer is placed directly on the poster canvas.</p>
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3"><div className="flex gap-1"><button type="button" aria-label="Move layer backward" onClick={() => reorder(-1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" aria-label="Move layer forward" onClick={() => reorder(1)} className="rounded p-2 text-slate-500 hover:bg-slate-100"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" aria-label="Duplicate selected layer" className="rounded p-2 text-slate-500 hover:bg-slate-100" onClick={() => { if ((config.elements?.length ?? 0) >= 30) { setError('Maximum 30 layers.'); return; } const copy = { ...selected, id: crypto.randomUUID(), label: `${selected.label.slice(0, 70)} copy` }; change({ ...config, elements: [...(config.elements ?? []), copy] }); setSelectedId(copy.id); }}><Copy className="h-3.5 w-3.5" /></button></div><button type="button" aria-label="Delete selected layer" className="rounded p-2 text-red-500 hover:bg-red-50" onClick={() => { change({ ...config, elements: config.elements?.filter(element => element.id !== selected.id) }); setSelectedId(null); }}><Trash2 className="h-4 w-4" /></button></div>
+          </div> : selectedWinnerLayer ? <div className="space-y-4">
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+              <p className="text-xs font-bold text-blue-900">{selectedWinnerLayer.label} · All Winners</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-blue-700">This is one reusable child layer. Change its position or style once and it updates across every winner row.</p>
+            </div>
+            <Field label="Layer name"><input className={inputStyle} value={selectedWinnerLayer.label} maxLength={80} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { label: event.target.value })} /></Field>
+            <Field label="Winner data"><input className={inputStyle} value={selectedWinnerLayer.field === 'position' ? 'Placement number and prize name' : selectedWinnerLayer.field === 'name' ? 'Published winner name' : selectedWinnerLayer.field === 'team' ? 'Winner team' : 'Winner photo slot'} disabled readOnly /></Field>
+            {selectedWinnerLayer.field === 'photo' ? <div className="space-y-2">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400"><ImagePlus className="h-4 w-4" /> Upload fallback image<input aria-label="Upload repeated winner photo artwork" type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={event => { const file = event.target.files?.[0]; if (file) void perform('winner-photo', async () => patchWinnerLayer('photo', { image: await readArtwork(file, false) })); event.target.value = ''; }} /></label>
+              {selectedWinnerLayer.image && <button type="button" className="text-xs font-semibold text-red-600" onClick={() => patchWinnerLayer('photo', { image: undefined })}>Remove fallback image</button>}
+              <p className="text-[10px] leading-relaxed text-slate-400">The photo slot repeats for each winner. Uploading an image here uses the same fallback image in each row; without one, a photo placeholder is shown.</p>
+            </div> : <p className="rounded-lg bg-slate-50 p-2 text-[10px] leading-relaxed text-slate-500">This value is filled automatically from the published result and cannot be manually overridden.</p>}
+            {selectedWinnerLayer.type === 'text' && <>
+              <PosterFontPicker value={selectedWinnerLayer.fontFamily} onChange={fontFamily => patchWinnerLayer(selectedWinnerLayer.field, { fontFamily })} />
+              <div className="grid grid-cols-2 gap-2"><Field label="Font size"><input className={inputStyle} type="number" min="8" max="180" value={selectedWinnerLayer.fontSize} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { fontSize: Math.max(8, Math.min(180, Number(event.target.value))) })} /></Field><Field label="Weight"><select className={inputStyle} value={selectedWinnerLayer.fontWeight} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { fontWeight: event.target.value as PosterWinnerLayer['fontWeight'] })}><option value="400">Regular</option><option value="600">Semibold</option><option value="800">Bold</option></select></Field></div>
+              <div className="grid grid-cols-2 gap-2"><Field label="Text colour"><input aria-label="Winner text colour" type="color" className="h-9 w-full rounded border border-slate-200" value={selectedWinnerLayer.color} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { color: event.target.value })} /></Field><Field label="Alignment"><select className={inputStyle} value={selectedWinnerLayer.align} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { align: event.target.value as PosterWinnerLayer['align'] })}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></Field></div>
+            </>}
+            <p className="text-[10px] font-semibold text-slate-500">Position and size within one winner row</p>
+            <div className="grid grid-cols-2 gap-2">{(['x', 'y', 'width', 'height'] as const).map(key => <Field key={key} label={`${key === 'x' ? 'Left' : key === 'y' ? 'Top' : key === 'width' ? 'Width' : 'Height'} (%)`}><input className={inputStyle} type="number" min={key === 'x' || key === 'y' ? 0 : 1} max="100" step="0.5" value={Number(selectedWinnerLayer[key].toFixed(1))} onChange={event => patchWinnerLayer(selectedWinnerLayer.field, { [key]: Number(event.target.value) })} /></Field>)}</div>
+            <button type="button" aria-label="Center winner item layer" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => patchWinnerLayer(selectedWinnerLayer.field, { x: Math.max(0, (100 - selectedWinnerLayer.width) / 2) })}>Center this layer</button>
+          </div> : selectedWinnerContainer && config.winnerContainer ? <div className="space-y-4">
+            <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
+              <p className="text-xs font-bold text-teal-900">Winner Container</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-teal-700">One container repeats the item layout for all published ranked winners. Tied winners receive their own row automatically.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">{(['x', 'y', 'width', 'height'] as const).map(key => <Field key={key} label={`${key === 'x' ? 'Left' : key === 'y' ? 'Top' : key === 'width' ? 'Width' : 'Height'} on canvas (%)`}><input className={inputStyle} type="number" min={key === 'x' || key === 'y' ? 0 : 1} max="100" step="0.5" value={Number(config.winnerContainer![key].toFixed(1))} onChange={event => patchWinnerContainer({ [key]: Number(event.target.value) })} /></Field>)}</div>
+            <Field label="Space between winner rows"><input className="w-full accent-blue-600" type="range" min="0" max="8" step="0.5" value={config.winnerContainer.rowGap} onChange={event => patchWinnerContainer({ rowGap: Number(event.target.value) })} /><span className="block text-[10px] text-slate-500">{config.winnerContainer.rowGap.toFixed(1)}% canvas spacing</span></Field>
+            <div className="grid grid-cols-2 gap-2"><button type="button" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => patchWinnerContainer({ x: (100 - config.winnerContainer!.width) / 2 })}>Center horizontally</button><button type="button" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => patchWinnerContainer({ y: 41, height: 45, rowGap: 1 })}>Reset spacing</button></div>
+          </div> : <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">Select a normal layer, Winner Container, or one of the reusable winner item layers to edit its properties.</p>}
+
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-2 text-xs font-bold text-slate-700">Release one reusable template</h3><ol className="space-y-2 text-[11px] leading-relaxed text-slate-500"><li>1. Design and save your poster template.</li><li>2. Select <strong>Release Template</strong> to publish this design once.</li><li>3. The same released template becomes available for every published competition. Visitors choose a result, pick any released template, then download the PNG.</li></ol><p className="mt-3 text-[10px] leading-relaxed text-slate-400">Releasing a template is separate from publishing competition results and does not alter scores, grades, or points.</p></div>
       </div>
