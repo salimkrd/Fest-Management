@@ -82,6 +82,28 @@ describe('Festival Category & Contestant Eligibility Domain Engine', () => {
     expect(isParticipantEligibleForCategory(legacySeniorParticipant, seniorCat, categories)).toBe(true);
   });
 
+  it('6. Rejects a participant whose explicit category name conflicts with a legacy Senior ID', () => {
+    const mislabeledSeniorId: Participant = {
+      ...seniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: 'Test CAT 26'
+    };
+    const seniorCat = categories.find(c => c.name === 'Senior')!;
+    expect(isParticipantEligibleForCategory(mislabeledSeniorId, seniorCat, categories)).toBe(false);
+  });
+
+  it('7. Rejects a participant from another custom category even if their ID resembles a legacy tier ID', () => {
+    const customCategoryParticipant: Participant = {
+      ...seniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: 'Test CAT 26'
+    };
+    const juniorCat = categories.find(c => c.name === 'Junior')!;
+    const seniorCat = categories.find(c => c.name === 'Senior')!;
+    expect(isParticipantEligibleForCategory(customCategoryParticipant, juniorCat, categories)).toBe(false);
+    expect(isParticipantEligibleForCategory(customCategoryParticipant, seniorCat, categories)).toBe(false);
+  });
+
   it('5. Resilient matching: handles legacy cat-4 General category ID mapping', () => {
     const legacyGeneralCat: Category = {
       id: 'cat-4',
