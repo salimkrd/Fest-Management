@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { ChampionshipPodium } from '@/components/domain/ChampionshipPodium';
+import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import {
   Search,
   Sparkles,
   ArrowRight,
-  Download,
   ChevronRight
 } from 'lucide-react';
 
@@ -214,13 +214,7 @@ export default function PublicResultHomePage() {
                         Published: {res.publishedDate}
                       </span>
                       <div className="flex items-center gap-3">
-                        <Link
-                          href={`/public/posters?resultId=${encodeURIComponent(res.id)}`}
-                          className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1"
-                          aria-label={`Choose a poster template for ${res.competitionName}`}
-                        >
-                          <Download className="w-3.5 h-3.5" /> Download Poster
-                        </Link>
+                        <PosterDownloadDialog result={res} theme={theme} />
                         <Link
                           href={`/public/competition/${res.competitionId}`}
                           className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1 group"
