@@ -238,15 +238,17 @@ export interface PosterConfig {
   elements?: PosterElement[];
   /** Reusable row template repeated for every published winner. */
   winnerContainer?: PosterWinnerContainer;
+  /** Display style for the reusable winner position label. */
+  winnerPositionFormat?: 'padded-place' | 'padded' | 'number' | 'word' | 'place-word' | 'prize-word' | 'ordinal' | 'roman' | 'dots';
 }
 
-export type PosterWinnerField = 'position' | 'name' | 'team' | 'photo';
+export type PosterWinnerField = 'position' | 'name' | 'team';
 
 export interface PosterWinnerLayer {
   id: string;
   field: PosterWinnerField;
   label: string;
-  type: 'text' | 'image';
+  type: 'text';
   text: string;
   /** Position and size are percentages within a single repeated winner row. */
   x: number;
@@ -258,7 +260,6 @@ export interface PosterWinnerLayer {
   fontWeight: '400' | '600' | '800';
   color: string;
   align: 'left' | 'center' | 'right';
-  image?: string;
 }
 
 export interface PosterWinnerContainer {
