@@ -49,11 +49,15 @@ export class RegistrationService {
 
       const team = teamSnapshot.data()!;
       const competition = competitionSnapshot.data()!;
-      const categorySnapshot = await transaction.get(db.collection('categories').doc(competition.categoryId));
+      const [categorySnapshot, categoriesSnapshot] = await Promise.all([
+        transaction.get(db.collection('categories').doc(competition.categoryId)),
+        transaction.get(db.collection('categories')),
+      ]);
       if (!categorySnapshot.exists || categorySnapshot.data()?.status === 'INACTIVE') {
         throw new Error('Validation Error: The competition category is not active.');
       }
       const category = { id: categorySnapshot.id, ...categorySnapshot.data() } as Category;
+      const allCategories = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
 
       const isGroup = competition.type === 'GROUP';
       const groupLeaderId = isGroup ? input.groupLeaderId : undefined;
@@ -79,7 +83,7 @@ export class RegistrationService {
         if (participant.teamId !== teamId) {
           throw new Error('Unauthorized: Participants must belong to the current team.');
         }
-        if (!isParticipantEligibleForCategory(participant, category, [category])) {
+        if (!isParticipantEligibleForCategory(participant, category, allCategories)) {
           throw new Error(`Validation Error: Participant "${participant.name}" is not eligible for ${category.name}.`);
         }
         return participant;
