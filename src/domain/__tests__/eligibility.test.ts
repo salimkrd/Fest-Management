@@ -92,6 +92,27 @@ describe('Festival Category & Contestant Eligibility Domain Engine', () => {
     expect(isParticipantEligibleForCategory(mislabeledSeniorId, seniorCat, categories)).toBe(false);
   });
 
+  it('8. Keeps a custom-category participant eligible for their named category when their legacy ID points to Senior', () => {
+    const customCategory: Category = {
+      id: 'cat-test-26',
+      name: 'Test CAT 26',
+      code: 'TEST26',
+      eligibility: 'Custom tier',
+      ageRange: 'Open',
+      classRange: 'Custom',
+      enrolledCount: 0,
+      competitionsCount: 0,
+      status: 'ACTIVE'
+    };
+    const importedParticipant: Participant = {
+      ...seniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: 'Test CAT 26'
+    };
+    expect(isParticipantEligibleForCategory(importedParticipant, customCategory, [...categories, customCategory])).toBe(true);
+    expect(isParticipantEligibleForCategory(importedParticipant, categories.find(category => category.name === 'Senior')!, [...categories, customCategory])).toBe(false);
+  });
+
   it('7. Rejects a participant from another custom category even if their ID resembles a legacy tier ID', () => {
     const customCategoryParticipant: Participant = {
       ...seniorParticipant,

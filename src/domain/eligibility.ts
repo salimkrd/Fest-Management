@@ -38,15 +38,16 @@ export function isParticipantEligibleForCategory(
   const participantName = normalize(participant.categoryName);
   const participantId = (participant.categoryId || '').trim();
 
-  // If the stored display name explicitly belongs to another category, never
-  // let the legacy category-ID aliases silently override that assignment.
-  if (participantName && targetName && participantName !== targetName) {
-    return false;
+  // The participant's explicit category name is the reliable assignment
+  // for imported/custom categories. If it disagrees with the selected tier,
+  // reject it; if it matches, do not let a stale legacy ID override that match.
+  if (participantName && targetName) {
+    return participantName === targetName;
   }
 
-  // Prefer a real category record when one exists. This avoids treating
-  // unrelated custom category IDs as equivalent just because names/aliases
-  // happen to overlap.
+  // Only fall back to category IDs when the participant record has no explicit
+  // category name. This keeps legacy IDs useful without allowing them to
+  // override a known category assignment.
   const participantCategory = participantId
     ? allCategories?.find(category => category.id === participantId)
     : undefined;
@@ -56,12 +57,6 @@ export function isParticipantEligibleForCategory(
     const participantCode = normalize(participantCategory.code).toUpperCase();
     const sameCode = Boolean(participantCode && targetCode && participantCode === targetCode);
     return sameId || sameCode;
-  }
-
-  // Legacy records can have IDs such as cat-3 while the current category uses
-  // cat-sr. Use an explicit participant category name for those unresolved IDs.
-  if (participantName && targetName) {
-    return participantName === targetName;
   }
 
   // Older records without a categoryName can still use known legacy identifiers.
