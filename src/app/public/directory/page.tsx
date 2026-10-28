@@ -4,10 +4,11 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
+import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Search, Trophy, ArrowRight, Sparkles, Filter, ChevronRight, Calendar, MapPin, Download } from 'lucide-react';
+import { Search, Trophy, ArrowRight, Sparkles, Filter, ChevronRight, Calendar, MapPin } from 'lucide-react';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
@@ -167,9 +168,7 @@ function DirectoryContent() {
                 <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex flex-wrap items-center justify-between gap-3">
                   <span className="text-[10px] text-[#526070]">{res.publishedDate}</span>
                   <div className="flex items-center gap-3">
-                    <Link href={`/public/posters?resultId=${encodeURIComponent(res.id)}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8]" aria-label={`Choose a poster template for ${res.competitionName}`}>
-                      <Download className="w-3.5 h-3.5" /> Download Poster
-                    </Link>
+                    <PosterDownloadDialog result={res} theme={theme} />
                     <Link href={`/public/competition/${res.competitionId}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] group">
                       View Result <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </Link>
