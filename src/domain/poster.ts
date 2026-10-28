@@ -142,7 +142,7 @@ export function formatWinnerPosition(rank: 1 | 2 | 3): string {
   return `${String(rank).padStart(2, '0')}  /  ${names[rank]} PLACE`;
 }
 
-export function orderedPosterWinners(result: CompetitionResult): ResultRank[] {
+export function orderedPosterWinners(result: CompetitionResult): (ResultRank & { rank: 1 | 2 | 3 })[] {
   return result.ranks
     .filter((rank): rank is ResultRank & { rank: 1 | 2 | 3 } => rank.rank === 1 || rank.rank === 2 || rank.rank === 3)
     .filter(rank => Boolean((rank.candidateName || rank.teamName || rank.teamCode || '').trim()))
