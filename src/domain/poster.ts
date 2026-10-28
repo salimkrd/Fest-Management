@@ -132,12 +132,54 @@ export function validatePosterConfig(value: unknown): PosterConfig {
   }
   return normalizePosterConfig(config);
 }
+function rankMarkerForTextLayer(element: PosterElement): 1 | 2 | 3 | null {
+  // Support the built-in presets and custom templates that use a separate text
+  // layer for markers such as "03", "03 / THIRD PLACE", or "THIRD PLACE".
+  const idMatch = /^(?:place|rank|position|prize)[-_ ]*0?([123])(?:$|[-_ ])/i.exec(element.id);
+  if (idMatch) return Number(idMatch[1]) as 1 | 2 | 3;
+
+  const candidates = [element.text, element.label];
+  for (const candidate of candidates) {
+    const value = candidate.trim();
+    const numberMatch = /^0?([123])$/.exec(value);
+    if (numberMatch) return Number(numberMatch[1]) as 1 | 2 | 3;
+
+    const labelledMatch = /^0?([123])\s*(?:\/|[-–—:·|])\s*(?:FIRST|1ST|SECOND|2ND|THIRD|3RD)(?:\s+PLACE)?$/i.exec(value);
+    if (labelledMatch) return Number(labelledMatch[1]) as 1 | 2 | 3;
+
+    const ordinalMatch = /^(FIRST|1ST|SECOND|2ND|THIRD|3RD)(?:\s+PLACE)?$/i.exec(value);
+    if (ordinalMatch) {
+      const ordinal = ordinalMatch[1].toUpperCase();
+      return ordinal === 'FIRST' || ordinal === '1ST' ? 1
+        : ordinal === 'SECOND' || ordinal === '2ND' ? 2 : 3;
+    }
+
+    const prefixedMatch = /^(?:PLACE|RANK|POSITION|PRIZE)[-_ ]*0?([123])$/i.exec(value);
+    if (prefixedMatch) return Number(prefixedMatch[1]) as 1 | 2 | 3;
+  }
+  return null;
+}
+
+function hasWinnerAtRank(result: CompetitionResult, rankNumber: number): boolean {
+  return result.ranks.some(rank =>
+    rank.rank === rankNumber &&
+    Boolean((rank.candidateName || rank.teamName || rank.teamCode || '').trim())
+  );
+}
+
 export function resolvePosterField(element: PosterElement, result: CompetitionResult, theme: PublicThemeSettings): string {
-  if (element.field === 'text') return element.text;
+  if (element.field === 'text') {
+    const markerRank = rankMarkerForTextLayer(element);
+    if (markerRank && !hasWinnerAtRank(result, markerRank)) return '';
+    return element.text;
+  }
   if (element.field === 'festivalName' || element.field === 'institutionName') return theme[element.field] || '';
   if (element.field === 'competitionName' || element.field === 'categoryName' || element.field === 'competitionCode') return result[element.field] || '';
   const match = /^rank([123])\.(name|team)$/.exec(element.field);
   if (!match) return '';
+  // The Rankify-style winner-list behaviour is preserved: every winner sharing a
+  // rank is included, in order, with a line per person/team rather than taking
+  // only the first matching entry.
   return result.ranks.filter(rank => rank.rank === Number(match[1])).map(rank =>
     match[2] === 'name' ? rank.candidateName : (rank.teamName || rank.teamCode)
   ).filter(Boolean).join('\n');
