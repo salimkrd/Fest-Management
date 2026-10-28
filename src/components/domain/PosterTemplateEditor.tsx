@@ -266,7 +266,7 @@ export function PosterTemplateEditor() {
             {config.backgroundImage && <div className="space-y-2"><Field label="Background image opacity"><input type="range" min="0" max="1" step="0.05" value={config.backgroundOpacity ?? 1} onChange={event => change({ ...config, backgroundOpacity: Number(event.target.value) })} className="w-full" /></Field><button type="button" onClick={() => change({ ...config, backgroundImage: undefined })} className="text-xs font-semibold text-red-600">Remove background image</button></div>}
           </div>}
           {tab === 'layers' && <div className="space-y-3">
-            <p className="text-[10px] leading-relaxed text-slate-500">One Winner Container holds a reusable item layout. Position, name, team and photo layers repeat for every ranked winner, including ties.</p>
+            <p className="text-[10px] leading-relaxed text-slate-500">One Winner Container holds a reusable item layout. Position, name and team layers repeat for every ranked winner, including ties.</p>
             <div className="max-h-[560px] space-y-1 overflow-y-auto">
               {layersBeforeWinner.map(renderCanvasLayer)}
               {config.winnerContainer ? <div className="my-2 rounded-xl border border-slate-200 bg-white p-2">
