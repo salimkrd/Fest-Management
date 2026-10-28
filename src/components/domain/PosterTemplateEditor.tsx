@@ -66,6 +66,10 @@ export function PosterTemplateEditor() {
   const selectedWinnerLayer = config.winnerContainer?.layers.find(layer => `__winner-item:${layer.field}__` === selectedId);
   const selectedWinnerContainer = selectedId === '__winner-container__';
   const dimensions = posterDimensions(config.aspectRatio);
+  const orderedCanvasLayers = [...(config.elements ?? [])].sort((a, b) => a.y - b.y);
+  const layersBeforeWinner = orderedCanvasLayers.filter(element => !config.winnerContainer || element.y < config.winnerContainer.y);
+  const layersAfterWinner = orderedCanvasLayers.filter(element => Boolean(config.winnerContainer) && element.y >= (config.winnerContainer?.y ?? 100));
+  const renderCanvasLayer = (element: PosterElement) => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>;
   useEffect(() => {
     if (!auth) return;
     let active = true;
@@ -264,8 +268,8 @@ export function PosterTemplateEditor() {
           {tab === 'layers' && <div className="space-y-3">
             <p className="text-[10px] leading-relaxed text-slate-500">One Winner Container holds a reusable item layout. Position, name, team and photo layers repeat for every ranked winner, including ties.</p>
             <div className="max-h-[560px] space-y-1 overflow-y-auto">
-              {(config.elements ?? []).map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs ${selectedId === element.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
-              {config.winnerContainer ? <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2">
+              {layersBeforeWinner.map(renderCanvasLayer)}
+              {config.winnerContainer ? <div className="my-2 rounded-xl border border-slate-200 bg-white p-2">
                 <button type="button" aria-label="Select Winner Container" className={`flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-xs ${selectedWinnerContainer ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`} onClick={() => setSelectedId('__winner-container__')}>
                   <Layers className="h-4 w-4 shrink-0" /><span className="font-semibold">Winner Container</span>
                 </button>
@@ -273,10 +277,11 @@ export function PosterTemplateEditor() {
                   <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">Winner Item (All)</p>
                   {config.winnerContainer.layers.map(layer => <button type="button" key={layer.field} aria-label={`Select winner ${layer.label} layer`} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === `__winner-item:${layer.field}__` ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setSelectedId(`__winner-item:${layer.field}__`)}>{layer.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{layer.label}</span><span className="ml-auto text-[9px] text-slate-400">ALL</span></button>)}
                 </div>
-              </div> : <button type="button" className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-blue-200 px-3 py-3 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => {
+              </div> : <button type="button" className="my-2 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-blue-200 px-3 py-3 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => {
                 const winnerContainer = createPosterPreset().winnerContainer;
                 if (winnerContainer) change({ ...config, winnerContainer });
               }}><Plus className="h-3.5 w-3.5" /> Add Winner Container</button>}
+              {layersAfterWinner.map(renderCanvasLayer)}
             </div>
           </div>}
           {tab === 'saved' && <div className="space-y-2">
