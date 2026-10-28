@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
+import type { Participant, Registration, ResultRank } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -17,10 +18,67 @@ import {
   MapPin
 } from 'lucide-react';
 
+interface WinnerPhotoProps {
+  rank: ResultRank;
+  participants: Participant[];
+  registrations: Registration[];
+  className: string;
+}
+
+/** Use the photo URL saved on the participant record; never substitute a stock portrait. */
+function WinnerPhoto({ rank, participants, registrations, className }: WinnerPhotoProps) {
+  const registration = registrations.find(item =>
+    item.id === rank.registrationId || item.code === rank.registrationId ||
+    (item.chestNumber && item.chestNumber === rank.bib)
+  );
+  const normalizedBib = String(rank.bib || '').replace(/^#/, '').trim().toLowerCase();
+  const normalizedName = String(rank.candidateName || '').trim().toLowerCase();
+  const participant =
+    participants.find(item => item.id === registration?.participantId) ||
+    participants.find(item =>
+      String(item.bib || '').replace(/^#/, '').trim().toLowerCase() === normalizedBib &&
+      (!rank.teamId || item.teamId === rank.teamId)
+    ) ||
+    participants.find(item =>
+      String(item.name || '').trim().toLowerCase() === normalizedName &&
+      (!rank.teamId || item.teamId === rank.teamId)
+    );
+  const photoUrl = participant?.photoUrl?.trim() || '';
+  const [imageFailed, setImageFailed] = useState(false);
+  const initials = (rank.candidateName || '')
+    .trim()
+    .split(/\\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('') || '•';
+
+  useEffect(() => setImageFailed(false), [photoUrl]);
+
+  return (
+    <div className={`${className} mx-auto overflow-hidden text-center`}>
+      {photoUrl && !imageFailed ? (
+        <img
+          src={photoUrl}
+          alt={rank.candidateName ? `${rank.candidateName} profile photo` : 'Participant photo'}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-slate-100 text-lg font-extrabold text-slate-400" aria-label="Participant photo unavailable">
+          {initials}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompetitionDetailContent() {
   const params = useParams<{ id: string }>();
   const compId = params.id;
-  const { results, theme } = useFest();
+  const { results, theme, participants, registrations } = useFest();
 
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -148,13 +206,13 @@ function CompetitionDetailContent() {
               </div>
 
               <div className="pt-2">
-                <div className="w-20 h-20 rounded-full border-4 border-amber-300 mx-auto shadow-md overflow-hidden bg-amber-100 mb-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
-                    alt={rank1.candidateName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <WinnerPhoto
+                  key={rank1.registrationId}
+                  rank={rank1}
+                  participants={participants}
+                  registrations={registrations}
+                  className="w-20 h-20 rounded-full border-4 border-amber-300 shadow-md bg-amber-100 mb-3"
+                />
 
                 <h3 className="text-base font-extrabold text-[#111111] leading-tight">{rank1.candidateName}</h3>
                 <span className="text-xs font-mono font-bold text-[#526070]">{rank1.bib}</span>
@@ -184,13 +242,13 @@ function CompetitionDetailContent() {
               </div>
 
               <div className="pt-2">
-                <div className="w-16 h-16 rounded-full border-4 border-slate-200 mx-auto shadow-xs overflow-hidden bg-slate-100 mb-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80"
-                    alt={rank2.candidateName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <WinnerPhoto
+                  key={rank2.registrationId}
+                  rank={rank2}
+                  participants={participants}
+                  registrations={registrations}
+                  className="w-16 h-16 rounded-full border-4 border-slate-200 shadow-xs bg-slate-100 mb-3"
+                />
 
                 <h3 className="text-sm font-bold text-[#111111] leading-tight">{rank2.candidateName}</h3>
                 <span className="text-xs font-mono font-semibold text-[#526070]">{rank2.bib}</span>
@@ -220,13 +278,13 @@ function CompetitionDetailContent() {
               </div>
 
               <div className="pt-2">
-                <div className="w-16 h-16 rounded-full border-4 border-amber-100 mx-auto shadow-xs overflow-hidden bg-amber-50 mb-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80"
-                    alt={rank3.candidateName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <WinnerPhoto
+                  key={rank3.registrationId}
+                  rank={rank3}
+                  participants={participants}
+                  registrations={registrations}
+                  className="w-16 h-16 rounded-full border-4 border-amber-100 shadow-xs bg-amber-50 mb-3"
+                />
 
                 <h3 className="text-sm font-bold text-[#111111] leading-tight">{rank3.candidateName}</h3>
                 <span className="text-xs font-mono font-semibold text-[#526070]">{rank3.bib}</span>
