@@ -57,6 +57,7 @@ export function PosterTemplateEditor() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [showGrid, setShowGrid] = useState(false);
+  const [winnerSpacing, setWinnerSpacing] = useState<Record<1 | 2 | 3, number>>({ 1: 0, 2: 0, 3: 0 });
   const [tab, setTab] = useState<'design' | 'layers' | 'saved'>('design');
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const result = results.find(item => item.id === resultId);
@@ -277,10 +278,12 @@ export function PosterTemplateEditor() {
                     {group.map(element => <button type="button" key={element.id} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedId === element.id ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-600 hover:bg-white'}`} onClick={() => setSelectedId(element.id)}>{element.type === 'image' ? <ImagePlus className="h-3.5 w-3.5 shrink-0" /> : <Type className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{element.label}</span></button>)}
                   </div>
                   <div className="mt-2">
-                    <label className="flex items-center justify-between gap-2 text-[10px] text-slate-500"><span>Spacing</span><span>±{1 + 0} units</span></label>
-                    <input aria-label={`Adjust winner ${rank} spacing`} type="range" min="-4" max="4" step="1" defaultValue="0" onChange={event => {
-                      const amount = Number(event.target.value);
-                      if (amount !== 0) adjustWinnerGroup(rank, 'space', amount > 0 ? 0.5 : -0.5);
+                    <label className="flex items-center justify-between gap-2 text-[10px] text-slate-500"><span>Vertical spacing</span><span>{winnerSpacing[rank]} units</span></label>
+                    <input aria-label={`Adjust winner ${rank} spacing`} type="range" min="-4" max="4" step="1" value={winnerSpacing[rank]} onChange={event => {
+                      const nextValue = Number(event.target.value);
+                      const delta = nextValue - winnerSpacing[rank];
+                      if (delta !== 0) adjustWinnerGroup(rank, 'space', delta * 0.5);
+                      setWinnerSpacing(previous => ({ ...previous, [rank]: nextValue }));
                     }} className="w-full accent-blue-600" />
                   </div>
                 </div>;
