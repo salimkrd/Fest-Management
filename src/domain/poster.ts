@@ -74,7 +74,7 @@ export function createPosterPreset(preset: PosterPreset = 'laureate'): PosterCon
 type LegacyWinnerField = PosterWinnerField | 'grade' | 'score';
 
 function legacyWinnerBinding(element: PosterElement): { rank: 1 | 2 | 3; field: LegacyWinnerField } | null {
-  const fieldMatch = /^rank([123])\\.(name|team|grade|score)$/.exec(element.field);
+  const fieldMatch = /^rank([123])\.(name|team|grade|score)$/.exec(element.field);
   if (fieldMatch) return { rank: Number(fieldMatch[1]) as 1 | 2 | 3, field: fieldMatch[2] as LegacyWinnerField };
   const idMatch = /^(place|position|name|team)[-_ ]*([123])$/i.exec(element.id);
   if (!idMatch) return null;
