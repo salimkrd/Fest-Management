@@ -67,15 +67,20 @@ export async function GET(
       // Older imports may not have participantId on the registration. In that case
       // use the registered bib and team only, and return no photo if the match is ambiguous.
       if (!participantSnapshot?.exists) {
-        const bib = String(registration.chestNumber || rank.bib || '').trim();
-        if (bib) {
-          const matchingParticipants = await db.collection('participants').where('bib', '==', bib).get();
-          const candidates = matchingParticipants.docs.filter(doc =>
-            (!rank.teamId || doc.data().teamId === rank.teamId) &&
-            (!registration.participantName || String(doc.data().name || '').trim().toLowerCase() === String(registration.participantName).trim().toLowerCase())
-          );
-          if (candidates.length === 1) participantSnapshot = candidates[0];
+        const rawBib = String(registration.chestNumber || rank.bib || '').trim();
+        const bareBib = rawBib.replace(/^#/, '');
+        const bibCandidates = [...new Set([rawBib, bareBib, bareBib ? `#${bareBib}` : ''].filter(Boolean))];
+        const candidateMap = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+        for (const bib of bibCandidates) {
+          const matching = await db.collection('participants').where('bib', '==', bib).get();
+          for (const doc of matching.docs) {
+            if (
+              (!rank.teamId || doc.data().teamId === rank.teamId) &&
+              (!rank.candidateName || String(doc.data().name || '').trim().toLowerCase() === String(rank.candidateName).trim().toLowerCase())
+            ) candidateMap.set(doc.id, doc);
+          }
         }
+        if (candidateMap.size === 1) participantSnapshot = [...candidateMap.values()][0];
       }
 
       if (!participantSnapshot?.exists) return null;
