@@ -90,6 +90,9 @@ function migrateLegacyWinnerContainer(elements: PosterElement[]): { elements: Po
   if (!bound.some(item => item.binding)) return { elements };
 
   const relevant = bound.filter(item => item.binding && ['position', 'name', 'team'].includes(item.binding.field));
+  // Old grade/score-only bindings should be removed without constructing an
+  // invalid container when there is no legacy position/name/team layout.
+  if (!relevant.length) return { elements: elements.filter(element => !legacyWinnerBinding(element)) };
   const rankOne = relevant.filter(item => item.binding?.rank === 1);
   const firstAvailableRank = (relevant.find(item => item.binding?.field === 'name')?.binding?.rank ?? 1) as 1 | 2 | 3;
   const base = rankOne.length ? rankOne : relevant.filter(item => item.binding?.rank === firstAvailableRank);
