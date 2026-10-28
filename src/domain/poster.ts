@@ -71,6 +71,82 @@ export function createPosterPreset(preset: PosterPreset = 'laureate'): PosterCon
     decoration: preset === 'editorial' ? 'minimal' : preset === 'celebration' ? 'confetti' : 'arches', elements,
     winnerContainer };
 }
+type LegacyWinnerField = PosterWinnerField | 'grade' | 'score';
+
+function legacyWinnerBinding(element: PosterElement): { rank: 1 | 2 | 3; field: LegacyWinnerField } | null {
+  const fieldMatch = /^rank([123])\\.(name|team|grade|score)$/.exec(element.field);
+  if (fieldMatch) return { rank: Number(fieldMatch[1]) as 1 | 2 | 3, field: fieldMatch[2] as LegacyWinnerField };
+  const idMatch = /^(place|position|name|team)[-_ ]*([123])$/i.exec(element.id);
+  if (!idMatch) return null;
+  const idField = idMatch[1].toLowerCase();
+  return {
+    rank: Number(idMatch[2]) as 1 | 2 | 3,
+    field: idField === 'place' || idField === 'position' ? 'position' : idField as 'name' | 'team',
+  };
+}
+
+function migrateLegacyWinnerContainer(elements: PosterElement[], palette: typeof POSTER_PALETTES.royal): { elements: PosterElement[]; winnerContainer?: PosterWinnerContainer } {
+  const bound = elements.map(element => ({ element, binding: legacyWinnerBinding(element) }));
+  if (!bound.some(item => item.binding)) return { elements };
+
+  const relevant = bound.filter(item => item.binding && ['position', 'name', 'team'].includes(item.binding.field));
+  const rankOne = relevant.filter(item => item.binding?.rank === 1);
+  const firstAvailableRank = (relevant.find(item => item.binding?.field === 'name')?.binding?.rank ?? 1) as 1 | 2 | 3;
+  const base = rankOne.length ? rankOne : relevant.filter(item => item.binding?.rank === firstAvailableRank);
+  const placeSource = base.find(item => item.binding?.field === 'position')?.element;
+  const baseY = placeSource?.y ?? Math.min(...base.map(item => item.element.y));
+  const rowStart = (rank: number) => {
+    const place = relevant.find(item => item.binding?.rank === rank && item.binding.field === 'position')?.element;
+    const name = relevant.find(item => item.binding?.rank === rank && item.binding.field === 'name')?.element;
+    return place?.y ?? name?.y ?? null;
+  };
+  const starts = [rowStart(1), rowStart(2), rowStart(3)].filter((value): value is number => value !== null).sort((a, b) => a - b);
+  const differences = starts.slice(1).map((value, index) => value - starts[index]).filter(value => value >= 5);
+  const rowStep = differences.length ? Math.min(...differences) : 15;
+  const containerX = Math.max(0, Math.min(...base.map(item => item.element.x)));
+  const containerWidth = Math.max(1, Math.min(100 - containerX, Math.max(...base.map(item => item.element.x + item.element.width)) - containerX));
+  const containerY = Math.max(0, baseY);
+  const containerHeight = Math.max(1, Math.min(100 - containerY, rowStep * 3 + 2));
+  const defaults = createPosterPreset().winnerContainer!;
+  const layers: PosterWinnerLayer[] = defaults.layers.map(defaultLayer => {
+    const source = base.find(item => item.binding?.field === defaultLayer.field)?.element;
+    if (!source) return defaultLayer;
+    return {
+      ...defaultLayer,
+      label: defaultLayer.label,
+      text: '',
+      x: Math.max(0, Math.min(100, (source.x - containerX) / containerWidth * 100)),
+      y: Math.max(0, Math.min(99, (source.y - containerY) / rowStep * 100)),
+      width: Math.max(1, Math.min(100, source.width / containerWidth * 100)),
+      height: Math.max(1, Math.min(100, source.height / rowStep * 100)),
+      fontSize: source.fontSize,
+      fontFamily: source.fontFamily,
+      fontWeight: source.fontWeight,
+      color: source.color,
+      align: source.align,
+    };
+  });
+  const migrated = new Set(bound.filter(item => item.binding).map(item => item.element.id));
+  return {
+    elements: elements.filter(element => !migrated.has(element.id)),
+    winnerContainer: { x: containerX, y: containerY, width: containerWidth, height: containerHeight, rowGap: 1, layers },
+  };
+}
+
+/** Stable labels for the single reusable winner row. Tied winners repeat the same place label. */
+export function formatWinnerPosition(rank: 1 | 2 | 3): string {
+  const names: Record<1 | 2 | 3, string> = { 1: 'FIRST', 2: 'SECOND', 3: 'THIRD' };
+  return `${String(rank).padStart(2, '0')} / ${names[rank]} PLACE`;
+}
+
+export function orderedPosterWinners(result: CompetitionResult): ResultRank[] {
+  return result.ranks
+    .filter((rank): rank is ResultRank & { rank: 1 | 2 | 3 } => rank.rank === 1 || rank.rank === 2 || rank.rank === 3)
+    .filter(rank => Boolean((rank.candidateName || rank.teamName || rank.teamCode || '').trim()))
+    .slice()
+    .sort((a, b) => a.rank - b.rank);
+}
+
 export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
   const fallback = createPosterPreset(config?.colorPreset === 'monochrome' ? 'editorial' : config?.colorPreset === 'emerald' ? 'celebration' : 'laureate');
   const palette = POSTER_PALETTES[config?.colorPreset ?? 'royal'] ?? POSTER_PALETTES.royal;
@@ -80,6 +156,15 @@ export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
     elements: config?.elements ?? fallback.elements?.map(element => ({ ...element, color: element.color === fallback.accentColor ? palette.accent : palette.text })),
   };
   if (!config?.elements && config?.customTitle) normalized.elements = normalized.elements?.map(element => element.id === 'announcement' ? { ...element, text: config.customTitle! } : element);
+  // Migrate earlier templates that stored separate rank-1/2/3 layers to one
+  // reusable winner-item container. The container then repeats for all winners,
+  // including ties, while unrelated text and image layers remain untouched.
+  if (!config?.winnerContainer && config?.elements?.length) {
+    const migrated = migrateLegacyWinnerContainer(normalized.elements ?? [], palette);
+    normalized.elements = migrated.elements;
+    if (migrated.winnerContainer) normalized.winnerContainer = migrated.winnerContainer;
+    else normalized.winnerContainer = undefined;
+  }
   return normalized;
 }
 const isHex = (value: unknown): value is string => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
