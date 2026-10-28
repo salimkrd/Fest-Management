@@ -10,18 +10,14 @@ export const POSTER_FIELDS: { value: PosterField; label: string }[] = [
   { value: 'text', label: 'Custom text' }, { value: 'festivalName', label: 'Festival name' },
   { value: 'institutionName', label: 'Institution name' }, { value: 'competitionName', label: 'Competition name' },
   { value: 'categoryName', label: 'Category' }, { value: 'competitionCode', label: 'Competition code' },
-  ...([1, 2, 3] as const).flatMap(rank => (['name', 'team'] as const).map(field => ({
-    value: `rank${rank}.${field}` as PosterField, label: `Rank ${rank} · ${field === 'name' ? 'Winner name' : 'Team name'}`,
-  }))),
 ];
 
-// Legacy grade/score dynamic fields remain valid only so existing saved templates load;
-// they are deliberately hidden from the editor and render no data on poster outputs.
+// Rank-bound fields from older templates are accepted during loading/migration only.
+// New posters use the reusable Winner Container child fields instead.
 const HIDDEN_LEGACY_POSTER_FIELDS = new Set<PosterField>(
-  ([1, 2, 3] as const).flatMap(rank => [
-    `rank${rank}.grade` as PosterField,
-    `rank${rank}.score` as PosterField,
-  ]),
+  ([1, 2, 3] as const).flatMap(rank => (['name', 'team', 'grade', 'score'] as const).map(field =>
+    `rank${rank}.${field}` as PosterField
+  )),
 );
 export const POSTER_PALETTES = {
   royal: { background: '#142C50', accent: '#EACB85', text: '#FFFFFF' },
