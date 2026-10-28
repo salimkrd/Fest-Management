@@ -236,6 +236,40 @@ export interface PosterConfig {
   backgroundOpacity?: number;
   decoration?: 'arches' | 'confetti' | 'minimal';
   elements?: PosterElement[];
+  /** Reusable row template repeated for every published winner. */
+  winnerContainer?: PosterWinnerContainer;
+}
+
+export type PosterWinnerField = 'position' | 'name' | 'team' | 'photo';
+
+export interface PosterWinnerLayer {
+  id: string;
+  field: PosterWinnerField;
+  label: string;
+  type: 'text' | 'image';
+  text: string;
+  /** Position and size are percentages within a single repeated winner row. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: '400' | '600' | '800';
+  color: string;
+  align: 'left' | 'center' | 'right';
+  image?: string;
+}
+
+export interface PosterWinnerContainer {
+  /** Overall region, expressed as percentages of the poster canvas. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Gap between repeated rows, expressed as percentage points of canvas height. */
+  rowGap: number;
+  layers: PosterWinnerLayer[];
 }
 
 export type PosterField = 'text' | 'festivalName' | 'institutionName' | 'competitionName' | 'categoryName' | 'competitionCode' | 'rank1.name' | 'rank1.team' | 'rank1.grade' | 'rank1.score' | 'rank2.name' | 'rank2.team' | 'rank2.grade' | 'rank2.score' | 'rank3.name' | 'rank3.team' | 'rank3.grade' | 'rank3.score';
