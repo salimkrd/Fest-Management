@@ -342,7 +342,7 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
     if (config.decoration === 'confetti') decoration = Array.from({ length: 26 }, (_, index) => `<circle cx="${index % 2 ? 28 + (index * 13) % 70 : 985 + (index * 11) % 70}" cy="${(index * 137 + 37) % height}" r="${3 + index % 6}" fill="${accent}" opacity=".4"/>`).join('');
   }
   const renderTextLayer = (
-    element: Pick<PosterElement, 'fontSize' | 'fontWeight' | 'fontFamily' | 'color' | 'align' | 'field'>,
+    element: { fontSize: number; fontWeight: '400' | '600' | '800'; fontFamily: string; color: string; align: 'left' | 'center' | 'right'; field: PosterField | PosterWinnerField },
     value: string,
     x: number,
     y: number,
