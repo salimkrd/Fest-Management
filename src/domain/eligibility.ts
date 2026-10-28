@@ -30,8 +30,10 @@ export function isParticipantEligibleForCategory(
     normalize(targetCategory.id) === 'cat-4' ||
     normalize(targetCategory.id) === 'cat-gen' ||
     normalize(targetCategory.id).includes('gen') ||
-    normalize(targetCategory.eligibility).includes('all') ||
-    normalize(targetCategory.classRange).includes('campus');
+    // Do not infer an open tier from descriptive fields such as eligibility
+    // or classRange. Those fields can be broad/misconfigured on a specific
+    // tier (e.g. Senior with "Campus Wide") and must never bypass category
+    // isolation. General/open status must come from the category's identity.
 
   if (isGeneralTier) return true;
 
