@@ -341,25 +341,63 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
     if (config.decoration === 'minimal') decoration = `<path d="M72 50H1008M72 ${height - 45}H1008" stroke="${accent}" stroke-width="3"/>`;
     if (config.decoration === 'confetti') decoration = Array.from({ length: 26 }, (_, index) => `<circle cx="${index % 2 ? 28 + (index * 13) % 70 : 985 + (index * 11) % 70}" cy="${(index * 137 + 37) % height}" r="${3 + index % 6}" fill="${accent}" opacity=".4"/>`).join('');
   }
-  const layers = (config.elements ?? []).map(element => {
-    const x = element.x / 100 * width, y = element.y / 100 * height, w = element.width / 100 * width, h = element.height / 100 * height;
-    if (element.type === 'image') return isPosterImage(element.image) ? `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${element.image}" preserveAspectRatio="xMidYMid meet"/>` : '';
-    const value = resolvePosterField(element, result, theme);
-    let size = element.fontSize; let lines = wrapText(value, Math.max(1, Math.floor(w / (size * .62))));
+  const renderTextLayer = (
+    element: Pick<PosterElement, 'fontSize' | 'fontWeight' | 'fontFamily' | 'color' | 'align' | 'field'>,
+    value: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ) => {
+    let size = element.fontSize;
+    let lines = wrapText(value, Math.max(1, Math.floor(w / (size * .62))));
     while ((lines.length * size * 1.2 > h || Math.max(...lines.map(line => line.length), 0) * size * .62 > w) && size > 8) {
-      size -= 1; lines = wrapText(value, Math.max(1, Math.floor(w / (size * .62))));
+      size -= 1;
+      lines = wrapText(value, Math.max(1, Math.floor(w / (size * .62))));
     }
+    if (!value.trim()) return '';
     const anchor = element.align === 'left' ? 'start' : element.align === 'right' ? 'end' : 'middle';
     const tx = x + (element.align === 'center' ? w / 2 : element.align === 'right' ? w : 0);
     const ty = y + Math.max(size, (h - lines.length * size * 1.2) / 2 + size);
-    // The official Festival Name layer follows festival branding; other poster
-    // text layers retain their independently configured typography.
     const font = element.field === 'festivalName'
       ? festivalNameFontFamily(theme.festivalNameFont).replaceAll('"', '').replace('var(--font-montserrat), ', '')
       : posterFontCssFamily(element.fontFamily);
     return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${escapeXml(font)}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}">${lines.map((line, index) => `<tspan x="${tx}" y="${ty + index * size * 1.2}">${escapeXml(line)}</tspan>`).join('')}</text>`;
+  };
+
+  const layers = (config.elements ?? []).map(element => {
+    const x = element.x / 100 * width, y = element.y / 100 * height, w = element.width / 100 * width, h = element.height / 100 * height;
+    if (element.type === 'image') return isPosterImage(element.image) ? `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${element.image}" preserveAspectRatio="xMidYMid meet"/>` : '';
+    return renderTextLayer(element, resolvePosterField(element, result, theme), x, y, w, h);
   }).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${background}"/>${config.backgroundImage && isPosterImage(config.backgroundImage) ? `<image width="100%" height="100%" href="${config.backgroundImage}" opacity="${Math.max(0, Math.min(1, config.backgroundOpacity ?? 1))}" preserveAspectRatio="xMidYMid slice"/>` : ''}${decoration}${layers}</svg>`;
+
+  const container = config.winnerContainer;
+  const winners = orderedPosterWinners(result);
+  const rowHeight = container && winners.length
+    ? Math.max(0, (container.height - container.rowGap * (winners.length - 1)) / winners.length)
+    : 0;
+  const winnerLayers = container && winners.length ? winners.map((winner, rowIndex) => {
+    const rowTop = container.y + rowIndex * (rowHeight + container.rowGap);
+    return container.layers.map(layer => {
+      const xPercent = container.x + container.width * layer.x / 100;
+      const yPercent = rowTop + rowHeight * layer.y / 100;
+      const wPercent = container.width * layer.width / 100;
+      const hPercent = rowHeight * layer.height / 100;
+      const x = xPercent / 100 * width, y = yPercent / 100 * height;
+      const w = wPercent / 100 * width, h = hPercent / 100 * height;
+      if (layer.field === 'photo') {
+        if (isPosterImage(layer.image)) {
+          return `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${layer.image}" preserveAspectRatio="xMidYMid slice"/>`;
+        }
+        return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/><text x="${x + w / 2}" y="${y + h / 2}" fill="#94A3B8" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">PHOTO</text></g>`;
+      }
+      const value = layer.field === 'position'
+        ? formatWinnerPosition(winner.rank)
+        : layer.field === 'name' ? winner.candidateName : (winner.teamName || winner.teamCode);
+      return renderTextLayer(layer, value, x, y, w, h);
+    }).join('');
+  }).join('') : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${background}"/>${config.backgroundImage && isPosterImage(config.backgroundImage) ? `<image width="100%" height="100%" href="${config.backgroundImage}" opacity="${Math.max(0, Math.min(1, config.backgroundOpacity ?? 1))}" preserveAspectRatio="xMidYMid slice"/>` : ''}${decoration}${layers}${winnerLayers}</svg>`;
 }
 export function posterSvgDataUrl(result: CompetitionResult, theme: PublicThemeSettings, config?: PosterConfig) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(renderPosterSvg(result, theme, config))}`;
