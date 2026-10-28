@@ -85,7 +85,7 @@ function legacyWinnerBinding(element: PosterElement): { rank: 1 | 2 | 3; field: 
   };
 }
 
-function migrateLegacyWinnerContainer(elements: PosterElement[], palette: typeof POSTER_PALETTES.royal): { elements: PosterElement[]; winnerContainer?: PosterWinnerContainer } {
+function migrateLegacyWinnerContainer(elements: PosterElement[]): { elements: PosterElement[]; winnerContainer?: PosterWinnerContainer } {
   const bound = elements.map(element => ({ element, binding: legacyWinnerBinding(element) }));
   if (!bound.some(item => item.binding)) return { elements };
 
@@ -160,7 +160,7 @@ export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
   // reusable winner-item container. The container then repeats for all winners,
   // including ties, while unrelated text and image layers remain untouched.
   if (!config?.winnerContainer && config?.elements?.length) {
-    const migrated = migrateLegacyWinnerContainer(normalized.elements ?? [], palette);
+    const migrated = migrateLegacyWinnerContainer(normalized.elements ?? []);
     normalized.elements = migrated.elements;
     if (migrated.winnerContainer) normalized.winnerContainer = migrated.winnerContainer;
     else normalized.winnerContainer = undefined;
@@ -218,6 +218,44 @@ export function validatePosterConfig(value: unknown): PosterConfig {
       if (item.type === 'image') { if (!isPosterImage(item.image)) throw new Error('Invalid layer image.'); layer.image = item.image; }
       return layer;
     });
+  }
+
+  if (raw.winnerContainer !== undefined && raw.winnerContainer !== null) {
+    if (typeof raw.winnerContainer !== 'object' || Array.isArray(raw.winnerContainer)) throw new Error('Invalid winner container.');
+    const container = raw.winnerContainer as PosterWinnerContainer;
+    for (const key of ['x', 'y', 'width', 'height', 'rowGap'] as const) {
+      const min = key === 'width' || key === 'height' ? 1 : 0;
+      const max = key === 'rowGap' ? 10 : 100;
+      if (!Number.isFinite(container[key]) || container[key] < min || container[key] > max) throw new Error('Invalid winner container dimensions.');
+    }
+    if (container.x + container.width > 100.01 || container.y + container.height > 100.01) throw new Error('Winner container must stay inside the poster.');
+    if (!Array.isArray(container.layers) || container.layers.length > 8) throw new Error('Invalid winner item layers.');
+    const allowedFields: PosterWinnerField[] = ['position', 'name', 'team', 'photo'];
+    const childIds = new Set<string>();
+    const winnerLayers: PosterWinnerLayer[] = container.layers.map((input: unknown) => {
+      if (!input || typeof input !== 'object') throw new Error('Invalid winner item layer.');
+      const item = input as PosterWinnerLayer;
+      if (typeof item.id !== 'string' || !/^[\w-]{1,80}$/.test(item.id) || childIds.has(item.id)) throw new Error('Invalid or duplicate winner item layer ID.');
+      childIds.add(item.id);
+      if (!allowedFields.includes(item.field) || !['text', 'image'].includes(item.type)) throw new Error('Invalid winner item field.');
+      if ((item.field === 'photo') !== (item.type === 'image')) throw new Error('Photo must be an image layer; other winner fields must be text layers.');
+      if (typeof item.label !== 'string' || item.label.length > 80 || typeof item.text !== 'string' || item.text.length > 500) throw new Error('Invalid winner item text.');
+      for (const key of ['x', 'y', 'width', 'height', 'fontSize'] as const) {
+        if (!Number.isFinite(item[key]) || item[key] < (key === 'width' || key === 'height' ? 1 : key === 'fontSize' ? 8 : 0) || item[key] > (key === 'fontSize' ? 180 : 100)) throw new Error('Invalid winner item position or size.');
+      }
+      if (item.x + item.width > 100.01 || item.y + item.height > 100.01) throw new Error('Winner item layer must stay within its row.');
+      if (!isHex(item.color) || !isPosterFont(item.fontFamily) || !['400', '600', '800'].includes(item.fontWeight) || !['left', 'center', 'right'].includes(item.align)) throw new Error('Invalid winner item typography.');
+      const layer: PosterWinnerLayer = { id: item.id, field: item.field, label: item.label, type: item.type, text: item.text, x: item.x, y: item.y, width: item.width, height: item.height, fontSize: item.fontSize, fontFamily: item.fontFamily, fontWeight: item.fontWeight, color: item.color, align: item.align };
+      if (item.image !== undefined) {
+        if (!isPosterImage(item.image)) throw new Error('Invalid winner item image.');
+        layer.image = item.image;
+      }
+      return layer;
+    });
+    config.winnerContainer = { x: container.x, y: container.y, width: container.width, height: container.height, rowGap: container.rowGap, layers: winnerLayers };
+  } else if (raw.elements !== undefined) {
+    // Distinguish older/custom layers from newly generated defaults in normalizePosterConfig.
+    config.winnerContainer = undefined;
   }
   return normalizePosterConfig(config);
 }
