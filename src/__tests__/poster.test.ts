@@ -161,6 +161,35 @@ describe('Poster result bindings and shared rendering', () => {
     expect(names).toEqual(['Ameen', 'Bilal']);
   });
 
+  it('hides placement markers for ranks that have no published winner', () => {
+    const twoWinners = result([
+      winner({ rank: 1, candidateName: 'First Winner', teamName: 'Team One' }),
+      winner({ rank: 2, registrationId: 'registration-2', candidateName: 'Second Winner', teamName: 'Team Two' }),
+    ]);
+    const text = renderedText(renderPosterSvg(twoWinners, theme, createPosterPreset()));
+    expect(text).toContain('01  /  FIRST PLACE');
+    expect(text).toContain('02  /  SECOND PLACE');
+    expect(text).not.toContain('03  /  THIRD PLACE');
+    expect(text).not.toContain('03');
+  });
+
+  it('renders all tied winners in the same placement instead of showing a blank third-place row', () => {
+    const tiedThird = result([
+      winner({ rank: 1, candidateName: 'First Winner', teamName: 'Team One' }),
+      winner({ rank: 2, registrationId: 'registration-2', candidateName: 'Second Winner', teamName: 'Team Two' }),
+      winner({ rank: 3, registrationId: 'registration-3', candidateName: 'Third Winner A', teamName: 'Team Three A' }),
+      winner({ rank: 3, registrationId: 'registration-4', candidateName: 'Third Winner B', teamName: 'Team Three B' }),
+    ]);
+    const text = renderedText(renderPosterSvg(tiedThird, theme, createPosterPreset()));
+    expect(text).toContain('03  /  THIRD PLACE');
+    expect(text).toContain('First Winner');
+    expect(text).toContain('Second Winner');
+    expect(text).toContain('Third Winner A');
+    expect(text).toContain('Third Winner B');
+    expect(text).toContain('Team Three A');
+    expect(text).toContain('Team Three B');
+  });
+
   it('keeps legacy grade/score layers loadable but renders them blank', () => {
     const legacy = validatePosterConfig(withElements(textLayer('rank1.grade'), textLayer('rank1.score')));
     const svg = renderPosterSvg(result([winner()]), theme, legacy);
