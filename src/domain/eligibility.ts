@@ -1,67 +1,84 @@
-import { Category, Participant } from '@/types/fest';
+import type { Category, Participant } from '@/types/fest';
+
+const normalize = (value: string | undefined): string => (value || '').trim().toLocaleLowerCase();
 
 /**
- * Determines whether a participant is eligible to register for a given category/competition.
- * 
- * Rules:
- * 1. "General" tier is an Open / Campus-Wide tier ("All Eligible Students") where ANY enrolled
- *    participant from any academic category (Sub Junior, Junior, Senior) is eligible.
- * 2. For specific categories (Sub Junior, Junior, Senior), participants must match the category
- *    either by direct categoryId, normalized categoryName ("Senior" === "Senior"), or standard aliases.
+ * Determines if a participant belongs to the selected registration category.
+ *
+ * A General/open tier is intentionally available to all participants. For every
+ * other tier, a non-empty participant category name is treated as an explicit
+ * category assignment and must not be overridden by a legacy ID alias. This
+ * prevents records such as { categoryId: "cat-3", categoryName: "Test CAT 26" }
+ * from being incorrectly accepted as Senior just because "cat-3" is a legacy
+ * Senior identifier.
  */
 export function isParticipantEligibleForCategory(
   participant: Participant,
   targetCategory: Category | undefined,
   allCategories?: Category[]
 ): boolean {
-  if (!targetCategory) return true;
+  if (!targetCategory) return false;
 
-  // 1. General tier is open to ALL students across the institution / campus
+  const targetName = normalize(targetCategory.name);
+  const targetCode = normalize(targetCategory.code).toUpperCase();
+
   const isGeneralTier =
-    targetCategory.code?.toUpperCase() === 'CAT-GEN' ||
-    targetCategory.code?.toUpperCase() === 'GEN' ||
-    targetCategory.name?.trim().toLowerCase() === 'general' ||
-    targetCategory.name?.trim().toLowerCase().includes('general') ||
-    targetCategory.id?.toLowerCase() === 'cat-4' ||
-    targetCategory.id?.toLowerCase() === 'cat-gen' ||
-    targetCategory.id?.toLowerCase().includes('gen') ||
-    targetCategory.eligibility?.toLowerCase().includes('all') ||
-    targetCategory.classRange?.toLowerCase().includes('campus');
+    targetCode === 'CAT-GEN' ||
+    targetCode === 'GEN' ||
+    targetName === 'general' ||
+    targetName.includes('general') ||
+    normalize(targetCategory.id) === 'cat-4' ||
+    normalize(targetCategory.id) === 'cat-gen' ||
+    normalize(targetCategory.id).includes('gen') ||
+    normalize(targetCategory.eligibility).includes('all') ||
+    normalize(targetCategory.classRange).includes('campus');
 
-  if (isGeneralTier) {
-    return true;
+  if (isGeneralTier) return true;
+
+  const participantName = normalize(participant.categoryName);
+  const participantId = (participant.categoryId || '').trim();
+
+  // If the stored display name explicitly belongs to another category, never
+  // let the legacy category-ID aliases silently override that assignment.
+  if (participantName && targetName && participantName !== targetName) {
+    return false;
   }
 
-  // 2. Direct ID match
-  if (participant.categoryId && participant.categoryId === targetCategory.id) {
-    return true;
+  // Prefer a real category record when one exists. This avoids treating
+  // unrelated custom category IDs as equivalent just because names/aliases
+  // happen to overlap.
+  const participantCategory = participantId
+    ? allCategories?.find(category => category.id === participantId)
+    : undefined;
+
+  if (participantCategory) {
+    const sameId = participantCategory.id === targetCategory.id;
+    const participantCode = normalize(participantCategory.code).toUpperCase();
+    const sameCode = Boolean(participantCode && targetCode && participantCode === targetCode);
+    return sameId || sameCode;
   }
 
-  // 3. Name normalization match (e.g. "Senior" === "Senior")
-  const partName = participant.categoryName?.trim().toLowerCase();
-  const targetName = targetCategory.name?.trim().toLowerCase();
-  if (partName && targetName && partName === targetName) {
-    return true;
+  // Legacy records can have IDs such as cat-3 while the current category uses
+  // cat-sr. Use an explicit participant category name for those unresolved IDs.
+  if (participantName && targetName) {
+    return participantName === targetName;
   }
 
-  // 4. Resolve participant's category from allCategories if participant has categoryId
-  if (allCategories && participant.categoryId) {
-    const partCat = allCategories.find(c => c.id === participant.categoryId);
-    if (partCat) {
-      if (partCat.name?.trim().toLowerCase() === targetName) return true;
-      if (partCat.code && targetCategory.code && partCat.code.toUpperCase() === targetCategory.code.toUpperCase()) return true;
-    }
-  }
+  // Older records without a categoryName can still use known legacy identifiers.
+  const isTargetSJ =
+    targetCode === 'CAT-SJ' || targetName.includes('sub') ||
+    normalize(targetCategory.id) === 'cat-1' || normalize(targetCategory.id) === 'cat-sj';
+  const isTargetJR =
+    !isTargetSJ && (targetCode === 'CAT-JR' || targetName === 'junior' ||
+    normalize(targetCategory.id) === 'cat-2' || normalize(targetCategory.id) === 'cat-jr');
+  const isTargetSR =
+    targetCode === 'CAT-SR' || targetName === 'senior' ||
+    normalize(targetCategory.id) === 'cat-3' || normalize(targetCategory.id) === 'cat-sr';
 
-  // 5. Standard tier code and name aliases
-  const targetCode = targetCategory.code?.toUpperCase();
-  const isTargetSJ = targetCode === 'CAT-SJ' || targetName?.includes('sub') || targetCategory.id === 'cat-1' || targetCategory.id === 'cat-sj';
-  const isTargetJR = !isTargetSJ && (targetCode === 'CAT-JR' || targetName === 'junior' || targetCategory.id === 'cat-2' || targetCategory.id === 'cat-jr');
-  const isTargetSR = targetCode === 'CAT-SR' || targetName === 'senior' || targetCategory.id === 'cat-3' || targetCategory.id === 'cat-sr';
-
-  const isPartSJ = partName?.includes('sub') || participant.categoryId === 'cat-1' || participant.categoryId === 'cat-sj';
-  const isPartJR = !isPartSJ && (partName === 'junior' || participant.categoryId === 'cat-2' || participant.categoryId === 'cat-jr');
-  const isPartSR = partName === 'senior' || participant.categoryId === 'cat-3' || participant.categoryId === 'cat-sr';
+  const id = normalize(participantId);
+  const isPartSJ = id === 'cat-1' || id === 'cat-sj';
+  const isPartJR = id === 'cat-2' || id === 'cat-jr';
+  const isPartSR = id === 'cat-3' || id === 'cat-sr';
 
   if (isTargetSJ && isPartSJ) return true;
   if (isTargetJR && isPartJR) return true;
