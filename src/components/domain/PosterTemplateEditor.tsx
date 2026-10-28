@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Copy, Download, Globe, Grid2X2, ImagePlus, Layers, Plus, Save, Trash2, Type, Upload, CheckCircle2, ArrowUp, ArrowDown } from 'lucide-react';
-import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterTemplate } from '@/types/fest';
+import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterTemplate, PosterWinnerContainer, PosterWinnerField, PosterWinnerLayer } from '@/types/fest';
 import { auth } from '@/lib/firebase/client';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
@@ -57,13 +57,14 @@ export function PosterTemplateEditor() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [showGrid, setShowGrid] = useState(false);
-  const [winnerSpacing, setWinnerSpacing] = useState<Record<1 | 2 | 3, number>>({ 1: 0, 2: 0, 3: 0 });
   const [tab, setTab] = useState<'design' | 'layers' | 'saved'>('design');
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const result = results.find(item => item.id === resultId);
   const preview = result ?? SAMPLE_RESULT;
   const published = results.filter(item => item.resultStatus === 'PUBLISHED');
   const selected = config.elements?.find(element => element.id === selectedId);
+  const selectedWinnerLayer = config.winnerContainer?.layers.find(layer => `__winner-item:${layer.field}__` === selectedId);
+  const selectedWinnerContainer = selectedId === '__winner-container__';
   const dimensions = posterDimensions(config.aspectRatio);
   useEffect(() => {
     if (!auth) return;
@@ -92,6 +93,41 @@ export function PosterTemplateEditor() {
       return next;
     }) }));
     setDirty(true); setNotice('');
+  };
+  const patchWinnerLayer = (field: PosterWinnerField, updates: Partial<PosterWinnerLayer>) => {
+    setConfig(current => {
+      if (!current.winnerContainer) return current;
+      return { ...current, winnerContainer: {
+        ...current.winnerContainer,
+        layers: current.winnerContainer.layers.map(layer => {
+          if (layer.field !== field) return layer;
+          const next = { ...layer, ...updates };
+          next.width = Math.max(1, Math.min(100, next.width));
+          next.height = Math.max(1, Math.min(100, next.height));
+          next.x = Math.max(0, Math.min(100 - next.width, next.x));
+          next.y = Math.max(0, Math.min(100 - next.height, next.y));
+          return next;
+        }),
+      } };
+    });
+    setDirty(true); setNotice('');
+  };
+  const patchWinnerContainer = (updates: Partial<PosterWinnerContainer>) => {
+    setConfig(current => {
+      if (!current.winnerContainer) return current;
+      const next = { ...current.winnerContainer, ...updates };
+      next.width = Math.max(1, Math.min(100, next.width));
+      next.height = Math.max(1, Math.min(100, next.height));
+      next.x = Math.max(0, Math.min(100 - next.width, next.x));
+      next.y = Math.max(0, Math.min(100 - next.height, next.y));
+      next.rowGap = Math.max(0, Math.min(10, next.rowGap));
+      return { ...current, winnerContainer: next };
+    });
+    setDirty(true); setNotice('');
+  };
+  const handlePreviewMove = (id: string, position: { x: number; y: number }) => {
+    if (id === '__winner-container__') patchWinnerContainer(position);
+    else patchLayer(id, position);
   };
   const canReplace = () => !dirty || window.confirm('Replace your unsaved canvas changes? Save the template or result draft first to keep them.');
   const load = (next: PosterConfig) => { setConfig(normalizePosterConfig(next)); setSelectedId(null); setDirty(false); setNotice(''); setError(''); };
@@ -189,40 +225,6 @@ export function PosterTemplateEditor() {
     change({ ...config, elements });
   }
 
-  function rankForLayer(element: PosterElement): 1 | 2 | 3 | null {
-    const fieldMatch = /^rank([123])\\.(?:name|team)$/.exec(element.field);
-    if (fieldMatch) return Number(fieldMatch[1]) as 1 | 2 | 3;
-    const idMatch = /^(?:place|rank|position|prize)[-_ ]*0?([123])(?:$|[-_ ])/i.exec(element.id);
-    if (idMatch && element.field === 'text') return Number(idMatch[1]) as 1 | 2 | 3;
-    return null;
-  }
-
-  function adjustWinnerGroup(rank: 1 | 2 | 3, action: 'up' | 'down' | 'center' | 'space', amount = 1) {
-    const elements = config.elements ?? [];
-    const group = elements.filter(element => rankForLayer(element) === rank);
-    if (!group.length) return;
-    const groupIds = new Set(group.map(element => element.id));
-    const groupTop = Math.min(...group.map(element => element.y));
-    const groupBottom = Math.max(...group.map(element => element.y + element.height));
-    const center = group.reduce((sum, element) => sum + element.x + element.width / 2, 0) / group.length;
-    const next = elements.map(element => {
-      if (!groupIds.has(element.id)) return element;
-      if (action === 'up') return { ...element, y: Math.max(0, element.y - 1) };
-      if (action === 'down') return { ...element, y: Math.min(100 - element.height, element.y + 1) };
-      if (action === 'center') return { ...element, x: Math.max(0, Math.min(100 - element.width, 50 - element.width / 2)) };
-      // Increase/decrease the spacing below the placement marker while preserving
-      // the relative positions of name and team layers within the winner group.
-      if (element.id.match(/^(?:name|team)-[123]$/) || /^rank[123]\\.(?:name|team)$/.test(element.field)) {
-        const delta = element.field.endsWith('.team') || element.id.startsWith('team-') ? amount : amount * 0.5;
-        return { ...element, y: Math.max(groupTop, Math.min(100 - element.height, element.y + delta)) };
-      }
-      return element;
-    });
-    // Keep group position adjustments inside the canvas without changing each
-    // layer's individual dimensions.
-    if (action === 'center' && groupBottom > 100) return;
-    change({ ...config, elements: next });
-  }
 
   return <div className="space-y-4">
     <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
