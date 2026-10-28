@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createPosterPreset,
   createTextElement,
+  formatWinnerPosition,
   isPosterImage,
   normalizePosterConfig,
   POSTER_FIELDS,
@@ -164,9 +165,9 @@ describe('Poster configuration validation', () => {
 });
 
 describe('Poster result bindings and shared rendering', () => {
-  it('uses one reusable winner item for positions, names, teams and photos', () => {
+  it('uses one reusable winner item for positions, names and teams without a photo layer', () => {
     const preset = createPosterPreset();
-    expect(preset.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
+    expect(preset.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team']);
     expect(preset.elements?.some(element => /^rank[123]\.(?:name|team)$/.test(element.field))).toBe(false);
 
     const fourWinners = result([
@@ -186,7 +187,34 @@ describe('Poster result bindings and shared rendering', () => {
     expect(text).toContain('Winner Three B');
     expect(text).toContain('Team Three A');
     expect(text).toContain('Team Three B');
-    expect(svg.match(/>PHOTO<\/text>/g)).toHaveLength(4);
+    expect(svg).not.toContain('PHOTO');
+  });
+
+  it('formats winner positions using the selected display style', () => {
+    expect(formatWinnerPosition(1, 'padded')).toBe('01');
+    expect(formatWinnerPosition(2, 'padded')).toBe('02');
+    expect(formatWinnerPosition(3, 'padded')).toBe('03');
+    expect(formatWinnerPosition(1, 'number')).toBe('1');
+    expect(formatWinnerPosition(2, 'word')).toBe('Second');
+    expect(formatWinnerPosition(3, 'place-word')).toBe('Third Place');
+    expect(formatWinnerPosition(1, 'prize-word')).toBe('First Prize');
+    expect(formatWinnerPosition(2, 'ordinal')).toBe('2nd');
+    expect(formatWinnerPosition(3, 'roman')).toBe('III');
+    expect(formatWinnerPosition(3, 'dots')).toBe('...');
+  });
+
+  it('removes old photo child layers from previously saved winner containers', () => {
+    const oldConfig = createPosterPreset();
+    const oldWinnerContainer = {
+      ...oldConfig.winnerContainer!,
+      layers: [
+        ...oldConfig.winnerContainer!.layers,
+        { id: 'winner-photo', field: 'photo', label: 'Photo', type: 'image', text: '', x: 86, y: 0, width: 14, height: 95, fontSize: 12, fontFamily: 'sans', fontWeight: '600', color: '#EACB85', align: 'center', image: undefined },
+      ],
+    } as unknown as PosterConfig['winnerContainer'];
+    const normalized = normalizePosterConfig({ ...oldConfig, winnerContainer: oldWinnerContainer });
+    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team']);
+    expect(() => validatePosterConfig({ ...oldConfig, winnerContainer: oldWinnerContainer })).not.toThrow();
   });
 
   it('migrates old rank-specific template layers into the reusable winner container', () => {
@@ -202,7 +230,7 @@ describe('Poster result bindings and shared rendering', () => {
     });
     const legacy: PosterConfig = { ...base, winnerContainer: undefined, elements: [...(base.elements ?? []), ...legacyWinnerLayers] };
     const normalized = normalizePosterConfig(legacy);
-    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
+    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team']);
     expect(normalized.elements?.some(element => /^(place|name|team)-[123]$/.test(element.id))).toBe(false);
     expect(renderedText(renderPosterSvg(result([winner({ candidateName: 'Migrated Winner' })]), theme, legacy)).some(line => line === 'Migrated Winner')).toBe(true);
   });

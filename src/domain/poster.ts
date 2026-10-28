@@ -59,13 +59,12 @@ export function createPosterPreset(preset: PosterPreset = 'laureate'): PosterCon
       { id: 'winner-position', field: 'position', label: 'Position', type: 'text', text: '', x: 0, y: 0, width: 24, height: 23, fontSize: 17, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.accent, align: 'left' },
       { id: 'winner-name', field: 'name', label: 'Name', type: 'text', text: '', x: 24, y: 22, width: 61, height: 46, fontSize: 35, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.text, align: 'left' },
       { id: 'winner-team', field: 'team', label: 'Team', type: 'text', text: '', x: 24, y: 69, width: 61, height: 26, fontSize: 22, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.accent, align: 'left' },
-      { id: 'winner-photo', field: 'photo', label: 'Photo', type: 'image', text: '', x: 86, y: 0, width: 14, height: 95, fontSize: 12, fontFamily: 'sans', fontWeight: '600', color: palette.accent, align: 'center' },
     ],
   };
   return { version: 2, aspectRatio: '4:5', colorPreset, fontFamily: 'Arial', fontSize: 'standard', fontWeight: '800',
     backgroundColor: palette.background, accentColor: palette.accent, textColor: palette.text, backgroundOpacity: 1,
     decoration: preset === 'editorial' ? 'minimal' : preset === 'celebration' ? 'confetti' : 'arches', elements,
-    winnerContainer };
+    winnerContainer, winnerPositionFormat: 'padded-place' };
 }
 type LegacyWinnerField = PosterWinnerField | 'grade' | 'score';
 
@@ -132,10 +131,36 @@ function migrateLegacyWinnerContainer(elements: PosterElement[]): { elements: Po
   };
 }
 
-/** Stable labels for the single reusable winner row. Tied winners repeat the same place label. */
-export function formatWinnerPosition(rank: 1 | 2 | 3): string {
-  const names: Record<1 | 2 | 3, string> = { 1: 'FIRST', 2: 'SECOND', 3: 'THIRD' };
-  return `${String(rank).padStart(2, '0')}  /  ${names[rank]} PLACE`;
+/** Stable position label choices for the reusable winner row. */
+export const WINNER_POSITION_FORMATS: { value: NonNullable<PosterConfig['winnerPositionFormat']>; label: string; example: string }[] = [
+  { value: 'padded-place', label: '01 / FIRST PLACE', example: '01 / FIRST PLACE' },
+  { value: 'padded', label: '01, 02, 03', example: '01' },
+  { value: 'number', label: '1, 2, 3', example: '1' },
+  { value: 'word', label: 'First, Second, Third', example: 'First' },
+  { value: 'place-word', label: 'First Place, Second Place…', example: 'First Place' },
+  { value: 'prize-word', label: 'First Prize, Second Prize…', example: 'First Prize' },
+  { value: 'ordinal', label: '1st, 2nd, 3rd', example: '1st' },
+  { value: 'roman', label: 'I, II, III', example: 'I' },
+  { value: 'dots', label: '., .., ...', example: '.' },
+];
+
+/** Tied winners repeat the same position label, appropriate to their shared rank. */
+export function formatWinnerPosition(rank: 1 | 2 | 3, format: NonNullable<PosterConfig['winnerPositionFormat']> = 'padded-place'): string {
+  const words: Record<1 | 2 | 3, string> = { 1: 'First', 2: 'Second', 3: 'Third' };
+  const uppercaseWords: Record<1 | 2 | 3, string> = { 1: 'FIRST', 2: 'SECOND', 3: 'THIRD' };
+  const roman: Record<1 | 2 | 3, string> = { 1: 'I', 2: 'II', 3: 'III' };
+  switch (format) {
+    case 'padded': return String(rank).padStart(2, '0');
+    case 'number': return String(rank);
+    case 'word': return words[rank];
+    case 'place-word': return `${words[rank]} Place`;
+    case 'prize-word': return `${words[rank]} Prize`;
+    case 'ordinal': return `${rank}${rank === 1 ? 'st' : rank === 2 ? 'nd' : 'rd'}`;
+    case 'roman': return roman[rank];
+    case 'dots': return '.'.repeat(rank);
+    case 'padded-place':
+    default: return `${String(rank).padStart(2, '0')}  /  ${uppercaseWords[rank]} PLACE`;
+  }
 }
 
 export function orderedPosterWinners(result: CompetitionResult): (ResultRank & { rank: 1 | 2 | 3 })[] {
@@ -152,7 +177,14 @@ export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
   const normalized = { ...fallback, ...config, version: 2 as const,
     backgroundColor: config?.backgroundColor ?? palette.background,
     accentColor: config?.accentColor ?? palette.accent, textColor: config?.textColor ?? palette.text,
+    winnerPositionFormat: config?.winnerPositionFormat ?? 'padded-place' as const,
     elements: config?.elements ?? fallback.elements?.map(element => ({ ...element, color: element.color === fallback.accentColor ? palette.accent : palette.text })),
+    winnerContainer: config?.winnerContainer ? {
+      ...config.winnerContainer,
+      // Older saved templates may still contain the photo slot; it is no longer
+      // part of the reusable Winner Item and is stripped on load.
+      layers: config.winnerContainer.layers.filter(layer => (layer as { field: string }).field !== 'photo'),
+    } : fallback.winnerContainer,
   };
   if (!config?.elements && config?.customTitle) normalized.elements = normalized.elements?.map(element => element.id === 'announcement' ? { ...element, text: config.customTitle! } : element);
   // Migrate earlier templates that stored separate rank-1/2/3 layers to one
@@ -185,6 +217,7 @@ export function validatePosterConfig(value: unknown): PosterConfig {
     colorPreset: choice<PosterConfig['colorPreset']>('colorPreset', ['royal', 'crimson', 'emerald', 'monochrome'], 'royal'),
     fontFamily: 'Arial', fontSize: choice<PosterConfig['fontSize']>('fontSize', ['standard', 'large', 'compact'], 'standard'), fontWeight: '800', version: 2,
     decoration: choice<NonNullable<PosterConfig['decoration']>>('decoration', ['arches', 'confetti', 'minimal'], 'arches'),
+    winnerPositionFormat: choice<NonNullable<PosterConfig['winnerPositionFormat']>>('winnerPositionFormat', ['padded-place', 'padded', 'number', 'word', 'place-word', 'prize-word', 'ordinal', 'roman', 'dots'], 'padded-place'),
   };
   for (const key of ['backgroundColor', 'accentColor', 'textColor'] as const) {
     if (raw[key] !== undefined) { if (!isHex(raw[key])) throw new Error(`Invalid poster ${key}.`); config[key] = raw[key]; }
@@ -229,26 +262,23 @@ export function validatePosterConfig(value: unknown): PosterConfig {
     }
     if (container.x + container.width > 100.01 || container.y + container.height > 100.01) throw new Error('Winner container must stay inside the poster.');
     if (!Array.isArray(container.layers) || container.layers.length > 8) throw new Error('Invalid winner item layers.');
-    const allowedFields: PosterWinnerField[] = ['position', 'name', 'team', 'photo'];
+    // Silently discard the old Photo item when loading previously saved templates.
+    const sourceLayers = container.layers.filter(input => !input || typeof input !== 'object' || (input as { field?: string }).field !== 'photo');
+    const allowedFields: PosterWinnerField[] = ['position', 'name', 'team'];
     const childIds = new Set<string>();
-    const winnerLayers: PosterWinnerLayer[] = container.layers.map((input: unknown) => {
+    const winnerLayers: PosterWinnerLayer[] = sourceLayers.map((input: unknown) => {
       if (!input || typeof input !== 'object') throw new Error('Invalid winner item layer.');
       const item = input as PosterWinnerLayer;
       if (typeof item.id !== 'string' || !/^[\w-]{1,80}$/.test(item.id) || childIds.has(item.id)) throw new Error('Invalid or duplicate winner item layer ID.');
       childIds.add(item.id);
-      if (!allowedFields.includes(item.field) || !['text', 'image'].includes(item.type)) throw new Error('Invalid winner item field.');
-      if ((item.field === 'photo') !== (item.type === 'image')) throw new Error('Photo must be an image layer; other winner fields must be text layers.');
+      if (!allowedFields.includes(item.field) || item.type !== 'text') throw new Error('Invalid winner item field.');
       if (typeof item.label !== 'string' || item.label.length > 80 || typeof item.text !== 'string' || item.text.length > 500) throw new Error('Invalid winner item text.');
       for (const key of ['x', 'y', 'width', 'height', 'fontSize'] as const) {
         if (!Number.isFinite(item[key]) || item[key] < (key === 'width' || key === 'height' ? 1 : key === 'fontSize' ? 8 : 0) || item[key] > (key === 'fontSize' ? 180 : 100)) throw new Error('Invalid winner item position or size.');
       }
       if (item.x + item.width > 100.01 || item.y + item.height > 100.01) throw new Error('Winner item layer must stay within its row.');
       if (!isHex(item.color) || !isPosterFont(item.fontFamily) || !['400', '600', '800'].includes(item.fontWeight) || !['left', 'center', 'right'].includes(item.align)) throw new Error('Invalid winner item typography.');
-      const layer: PosterWinnerLayer = { id: item.id, field: item.field, label: item.label, type: item.type, text: item.text, x: item.x, y: item.y, width: item.width, height: item.height, fontSize: item.fontSize, fontFamily: item.fontFamily, fontWeight: item.fontWeight, color: item.color, align: item.align };
-      if (item.image !== undefined) {
-        if (!isPosterImage(item.image)) throw new Error('Invalid winner item image.');
-        layer.image = item.image;
-      }
+      const layer: PosterWinnerLayer = { id: item.id, field: item.field, label: item.label, type: 'text', text: item.text, x: item.x, y: item.y, width: item.width, height: item.height, fontSize: item.fontSize, fontFamily: item.fontFamily, fontWeight: item.fontWeight, color: item.color, align: item.align };
       return layer;
     });
     config.winnerContainer = { x: container.x, y: container.y, width: container.width, height: container.height, rowGap: container.rowGap, layers: winnerLayers };
@@ -387,14 +417,8 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
       const hPercent = rowHeight * layer.height / 100;
       const x = xPercent / 100 * width, y = yPercent / 100 * height;
       const w = wPercent / 100 * width, h = hPercent / 100 * height;
-      if (layer.field === 'photo') {
-        if (isPosterImage(layer.image)) {
-          return `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${layer.image}" preserveAspectRatio="xMidYMid slice"/>`;
-        }
-        return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/><text x="${x + w / 2}" y="${y + h / 2}" fill="#94A3B8" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">PHOTO</text></g>`;
-      }
       const value = layer.field === 'position'
-        ? formatWinnerPosition(winner.rank)
+        ? formatWinnerPosition(winner.rank, config.winnerPositionFormat)
         : layer.field === 'name' ? winner.candidateName : (winner.teamName || winner.teamCode);
       return renderTextLayer(layer, value, x, y, w, h);
     }).join('');
