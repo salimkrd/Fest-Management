@@ -22,6 +22,10 @@ export function isParticipantEligibleForCategory(
   const targetName = normalize(targetCategory.name);
   const targetCode = normalize(targetCategory.code).toUpperCase();
 
+  // General/open eligibility must be derived from category identity. Do not
+  // treat descriptive fields (eligibility or classRange) as evidence that every
+  // participant belongs to the category; broad metadata on a specific tier,
+  // such as Senior, must not bypass category isolation.
   const isGeneralTier =
     targetCode === 'CAT-GEN' ||
     targetCode === 'GEN' ||
@@ -29,11 +33,7 @@ export function isParticipantEligibleForCategory(
     targetName.includes('general') ||
     normalize(targetCategory.id) === 'cat-4' ||
     normalize(targetCategory.id) === 'cat-gen' ||
-    normalize(targetCategory.id).includes('gen') ||
-    // Do not infer an open tier from descriptive fields such as eligibility
-    // or classRange. Those fields can be broad/misconfigured on a specific
-    // tier (e.g. Senior with "Campus Wide") and must never bypass category
-    // isolation. General/open status must come from the category's identity.
+    normalize(targetCategory.id).includes('gen');
 
   if (isGeneralTier) return true;
 
