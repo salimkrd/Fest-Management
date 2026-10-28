@@ -164,6 +164,49 @@ describe('Poster configuration validation', () => {
 });
 
 describe('Poster result bindings and shared rendering', () => {
+  it('uses one reusable winner item for positions, names, teams and photos', () => {
+    const preset = createPosterPreset();
+    expect(preset.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
+    expect(preset.elements?.some(element => /^rank[123]\\.(?:name|team)$/.test(element.field))).toBe(false);
+
+    const fourWinners = result([
+      winner({ rank: 1, candidateName: 'Winner One', teamName: 'Team One' }),
+      winner({ rank: 2, registrationId: 'registration-2', candidateName: 'Winner Two', teamName: 'Team Two' }),
+      winner({ rank: 3, registrationId: 'registration-3', candidateName: 'Winner Three A', teamName: 'Team Three A' }),
+      winner({ rank: 3, registrationId: 'registration-4', candidateName: 'Winner Three B', teamName: 'Team Three B' }),
+    ]);
+    const svg = renderPosterSvg(fourWinners, theme, preset);
+    const text = renderedText(svg);
+    expect(text).toContain('01  /  FIRST PLACE');
+    expect(text).toContain('02  /  SECOND PLACE');
+    expect(text.filter(line => line === '03  /  THIRD PLACE')).toHaveLength(2);
+    expect(text).toContain('Winner One');
+    expect(text).toContain('Winner Two');
+    expect(text).toContain('Winner Three A');
+    expect(text).toContain('Winner Three B');
+    expect(text).toContain('Team Three A');
+    expect(text).toContain('Team Three B');
+    expect(svg.match(/>PHOTO<\\/text>/g)).toHaveLength(4);
+  });
+
+  it('migrates old rank-specific template layers into the reusable winner container', () => {
+    const base = createPosterPreset();
+    const legacyWinnerLayers: PosterElement[] = [];
+    ([1, 2, 3] as const).forEach((rank, index) => {
+      const top = 41 + index * 15;
+      legacyWinnerLayers.push(
+        { ...createTextElement(`place-${rank}`, 'text', `${String(rank).padStart(2, '0')}  /  ${rank === 1 ? 'FIRST' : rank === 2 ? 'SECOND' : 'THIRD'} PLACE`), y: top, height: 3, fontSize: 21 },
+        { ...createTextElement(`name-${rank}`, `rank${rank}.name`, ''), y: top + 3.5, height: 6.5, fontSize: 35 },
+        { ...createTextElement(`team-${rank}`, `rank${rank}.team`, ''), y: top + 10.5, height: 3.5, fontSize: 22 },
+      );
+    });
+    const legacy: PosterConfig = { ...base, winnerContainer: undefined, elements: [...(base.elements ?? []), ...legacyWinnerLayers] };
+    const normalized = normalizePosterConfig(legacy);
+    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
+    expect(normalized.elements?.some(element => /^(place|name|team)-[123]$/.test(element.id))).toBe(false);
+    expect(renderedText(renderPosterSvg(result([winner({ candidateName: 'Migrated Winner' })]), theme, legacy)).some(line => line === 'Migrated Winner')).toBe(true);
+  });
+
   it('keeps tied winner names and teams while omitting grade and score data from posters', () => {
     const tied = result([
       winner({ candidateName: 'Ameen', teamName: 'Blue House', score: 95, grade: 'A+' }),
