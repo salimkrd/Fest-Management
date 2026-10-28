@@ -177,9 +177,9 @@ describe('Poster result bindings and shared rendering', () => {
     ]);
     const svg = renderPosterSvg(fourWinners, theme, preset);
     const text = renderedText(svg);
-    expect(text).toContain('01  /  FIRST PLACE');
-    expect(text).toContain('02  /  SECOND PLACE');
-    expect(text.filter(line => line === '03  /  THIRD PLACE')).toHaveLength(2);
+    expect(text).toContain('01 / FIRST PLACE');
+    expect(text).toContain('02 / SECOND PLACE');
+    expect(text.filter(line => line === '03 / THIRD PLACE')).toHaveLength(2);
     expect(text).toContain('Winner One');
     expect(text).toContain('Winner Two');
     expect(text).toContain('Winner Three A');
@@ -217,7 +217,7 @@ describe('Poster result bindings and shared rendering', () => {
     expect(resolvePosterField(textLayer('rank1.team'), tied, theme)).toBe('Blue House\nGold House');
     expect(resolvePosterField(textLayer('rank1.grade'), tied, theme)).toBe('');
     expect(resolvePosterField(textLayer('rank1.score'), tied, theme)).toBe('');
-    expect(POSTER_FIELDS.some(field => /\.(grade|score)$/.test(field.value))).toBe(false);
+    expect(POSTER_FIELDS.some(field => /\.(name|team|grade|score)$/.test(field.value))).toBe(false);
     const names = renderedText(renderPosterSvg(tied, theme, withElements(textLayer('rank1.name'))));
     expect(names).toEqual(['Ameen', 'Bilal']);
   });
