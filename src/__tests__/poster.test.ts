@@ -37,7 +37,7 @@ function result(ranks: ResultRank[] = [winner()]): CompetitionResult {
 }
 
 function withElements(...elements: PosterElement[]): PosterConfig {
-  return { ...createPosterPreset(), decoration: 'minimal', elements };
+  return { ...createPosterPreset(), decoration: 'minimal', elements, winnerContainer: undefined };
 }
 
 function textLayer(field: PosterField = 'text', text = ''): PosterElement {
@@ -299,7 +299,7 @@ describe('Legacy poster compatibility', () => {
     expect(normalized.backgroundColor).toBe('#571E32');
     expect(normalized.accentColor).toBe('#F9D59B');
     expect(normalized.elements?.find(element => element.id === 'announcement')?.text).toBe(legacy.customTitle);
-    expect(normalized.elements?.some(element => element.field === 'rank1.name')).toBe(true);
+    expect(normalized.winnerContainer?.layers.some(layer => layer.field === 'name')).toBe(true);
     expect(renderedText(renderPosterSvg(result(), theme, legacy)).join(' ')).toContain(legacy.customTitle);
     expect(legacy).not.toHaveProperty('elements');
   });
