@@ -230,7 +230,7 @@ describe('Poster result bindings and shared rendering', () => {
     });
     const legacy: PosterConfig = { ...base, winnerContainer: undefined, elements: [...(base.elements ?? []), ...legacyWinnerLayers] };
     const normalized = normalizePosterConfig(legacy);
-    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team', 'photo']);
+    expect(normalized.winnerContainer?.layers.map(layer => layer.field)).toEqual(['position', 'name', 'team']);
     expect(normalized.elements?.some(element => /^(place|name|team)-[123]$/.test(element.id))).toBe(false);
     expect(renderedText(renderPosterSvg(result([winner({ candidateName: 'Migrated Winner' })]), theme, legacy)).some(line => line === 'Migrated Winner')).toBe(true);
   });
