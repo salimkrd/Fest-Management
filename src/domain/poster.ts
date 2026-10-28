@@ -1,4 +1,4 @@
-import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PublicThemeSettings } from '@/types/fest';
+import type { CompetitionResult, PosterConfig, PosterElement, PosterField, PosterWinnerContainer, PosterWinnerField, PosterWinnerLayer, PublicThemeSettings, ResultRank } from '@/types/fest';
 import { festivalNameFontFamily } from '@/domain/festivalFonts';
 import { isPosterFont, posterFontCssFamily } from '@/domain/posterFonts';
 
@@ -55,17 +55,21 @@ export function createPosterPreset(preset: PosterPreset = 'laureate'): PosterCon
     element('competition', 'competitionName', '', 23, 38, 9),
     element('category', 'categoryName', '', 33, 24, 4, palette.accent),
   ];
-  ([1, 2, 3] as const).forEach((rank, index) => {
-    const top = 41 + index * 15;
-    elements.push(element(`place-${rank}`, 'text', `0${rank}  /  ${rank === 1 ? 'FIRST' : rank === 2 ? 'SECOND' : 'THIRD'} PLACE`, top, 21, 3, palette.accent));
-    elements.push(element(`name-${rank}`, `rank${rank}.name`, '', top + 3.5, rank === 1 ? 43 : 35, 6.5));
-    elements.push(element(`team-${rank}`, `rank${rank}.team`, '', top + 10.5, 22, 3.5, palette.accent));
-  });
   elements.push(element('institution', 'institutionName', '', 91.5, 22, 4, palette.accent));
   elements.push(element('footer', 'text', 'OFFICIAL RESULTS · CELEBRATING EXCELLENCE', 96, 14, 2));
+  const winnerContainer: PosterWinnerContainer = {
+    x: 10, y: 41, width: 80, height: 45, rowGap: 1,
+    layers: [
+      { id: 'winner-position', field: 'position', label: 'Position', type: 'text', text: '', x: 0, y: 0, width: 24, height: 23, fontSize: 17, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.accent, align: 'left' },
+      { id: 'winner-name', field: 'name', label: 'Name', type: 'text', text: '', x: 24, y: 22, width: 61, height: 46, fontSize: 35, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.text, align: 'left' },
+      { id: 'winner-team', field: 'team', label: 'Team', type: 'text', text: '', x: 24, y: 69, width: 61, height: 26, fontSize: 22, fontFamily: preset === 'editorial' ? 'serif' : 'sans', fontWeight: '800', color: palette.accent, align: 'left' },
+      { id: 'winner-photo', field: 'photo', label: 'Photo', type: 'image', text: '', x: 86, y: 0, width: 14, height: 95, fontSize: 12, fontFamily: 'sans', fontWeight: '600', color: palette.accent, align: 'center' },
+    ],
+  };
   return { version: 2, aspectRatio: '4:5', colorPreset, fontFamily: 'Arial', fontSize: 'standard', fontWeight: '800',
     backgroundColor: palette.background, accentColor: palette.accent, textColor: palette.text, backgroundOpacity: 1,
-    decoration: preset === 'editorial' ? 'minimal' : preset === 'celebration' ? 'confetti' : 'arches', elements };
+    decoration: preset === 'editorial' ? 'minimal' : preset === 'celebration' ? 'confetti' : 'arches', elements,
+    winnerContainer };
 }
 export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
   const fallback = createPosterPreset(config?.colorPreset === 'monochrome' ? 'editorial' : config?.colorPreset === 'emerald' ? 'celebration' : 'laureate');
