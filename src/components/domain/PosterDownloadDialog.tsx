@@ -55,7 +55,7 @@ export function PosterDownloadDialog({ result, theme }: PosterDownloadDialogProp
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [open, templates.length, loading]);
+  }, [open]);
 
   async function downloadPoster(template: PosterTemplate) {
     setDownloadingId(template.id);
