@@ -139,7 +139,7 @@ function migrateLegacyWinnerContainer(elements: PosterElement[]): { elements: Po
 /** Stable labels for the single reusable winner row. Tied winners repeat the same place label. */
 export function formatWinnerPosition(rank: 1 | 2 | 3): string {
   const names: Record<1 | 2 | 3, string> = { 1: 'FIRST', 2: 'SECOND', 3: 'THIRD' };
-  return `${String(rank).padStart(2, '0')} / ${names[rank]} PLACE`;
+  return `${String(rank).padStart(2, '0')}  /  ${names[rank]} PLACE`;
 }
 
 export function orderedPosterWinners(result: CompetitionResult): ResultRank[] {
