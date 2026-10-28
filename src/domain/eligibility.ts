@@ -38,11 +38,23 @@ export function isParticipantEligibleForCategory(
   const participantName = normalize(participant.categoryName);
   const participantId = (participant.categoryId || '').trim();
 
-  // The participant's explicit category name is the reliable assignment
-  // for imported/custom categories. If it disagrees with the selected tier,
-  // reject it; if it matches, do not let a stale legacy ID override that match.
-  if (participantName && targetName) {
-    return participantName === targetName;
+  // Some imported/older participant records have an empty categoryName, while
+  // the UI displays their classGrade as the category (e.g. "Test CAT 26").
+  // Only infer that assignment when classGrade exactly matches a real category
+  // name/code, so academic grades like "Grade 12" or "UG" are not misread.
+  const classGrade = normalize(participant.classGrade);
+  const classGradeCategory = classGrade
+    ? allCategories?.find(category =>
+        normalize(category.name) === classGrade ||
+        normalize(category.code) === classGrade
+      )
+    : undefined;
+  const assignedCategoryName = participantName || normalize(classGradeCategory?.name);
+
+  // The explicit category name (or a classGrade that exactly maps to a known
+  // category) is authoritative. A reused/stale legacy ID must not override it.
+  if (assignedCategoryName && targetName) {
+    return assignedCategoryName === targetName;
   }
 
   // Only fall back to category IDs when the participant record has no explicit

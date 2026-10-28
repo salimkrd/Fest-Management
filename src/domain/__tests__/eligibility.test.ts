@@ -92,6 +92,40 @@ describe('Festival Category & Contestant Eligibility Domain Engine', () => {
     expect(isParticipantEligibleForCategory(mislabeledSeniorId, seniorCat, categories)).toBe(false);
   });
 
+  it('9. Uses classGrade as the category only when it exactly matches a known category name', () => {
+    const customCategory: Category = {
+      id: 'cat-test-26',
+      name: 'Test CAT 26',
+      code: 'TEST26',
+      eligibility: 'Custom tier',
+      ageRange: 'Open',
+      classRange: 'Custom',
+      enrolledCount: 0,
+      competitionsCount: 0,
+      status: 'ACTIVE'
+    };
+    const legacyParticipant: Participant = {
+      ...seniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: '',
+      classGrade: 'Test CAT 26'
+    };
+
+    expect(isParticipantEligibleForCategory(legacyParticipant, customCategory, [...categories, customCategory])).toBe(true);
+    expect(isParticipantEligibleForCategory(legacyParticipant, categories.find(category => category.name === 'Senior')!, [...categories, customCategory])).toBe(false);
+  });
+
+  it('10. Does not treat a normal academic classGrade as a category assignment', () => {
+    const legacySeniorParticipant: Participant = {
+      ...seniorParticipant,
+      categoryId: 'cat-3',
+      categoryName: '',
+      classGrade: 'Grade 12'
+    };
+    const seniorCat = categories.find(category => category.name === 'Senior')!;
+    expect(isParticipantEligibleForCategory(legacySeniorParticipant, seniorCat, categories)).toBe(true);
+  });
+
   it('8. Keeps a custom-category participant eligible for their named category when their legacy ID points to Senior', () => {
     const customCategory: Category = {
       id: 'cat-test-26',
