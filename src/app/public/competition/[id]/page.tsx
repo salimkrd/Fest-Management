@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
-import type { Participant, Registration, ResultRank } from '@/types/fest';
+import type { ResultRank } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -20,30 +20,12 @@ import {
 
 interface WinnerPhotoProps {
   rank: ResultRank;
-  participants: Participant[];
-  registrations: Registration[];
+  photoUrl?: string;
   className: string;
 }
 
-/** Use the photo URL saved on the participant record; never substitute a stock portrait. */
-function WinnerPhoto({ rank, participants, registrations, className }: WinnerPhotoProps) {
-  const registration = registrations.find(item =>
-    item.id === rank.registrationId || item.code === rank.registrationId ||
-    (item.chestNumber && item.chestNumber === rank.bib)
-  );
-  const normalizedBib = String(rank.bib || '').replace(/^#/, '').trim().toLowerCase();
-  const normalizedName = String(rank.candidateName || '').trim().toLowerCase();
-  const participant =
-    participants.find(item => item.id === registration?.participantId) ||
-    participants.find(item =>
-      String(item.bib || '').replace(/^#/, '').trim().toLowerCase() === normalizedBib &&
-      (!rank.teamId || item.teamId === rank.teamId)
-    ) ||
-    participants.find(item =>
-      String(item.name || '').trim().toLowerCase() === normalizedName &&
-      (!rank.teamId || item.teamId === rank.teamId)
-    );
-  const photoUrl = participant?.photoUrl?.trim() || '';
+/** Shows the participant's saved photo URL, with initials only if no usable photo exists. */
+function WinnerPhoto({ rank, photoUrl = '', className }: WinnerPhotoProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const initials = (rank.candidateName || '')
     .trim()
@@ -52,8 +34,6 @@ function WinnerPhoto({ rank, participants, registrations, className }: WinnerPho
     .slice(0, 2)
     .map(part => part.charAt(0).toUpperCase())
     .join('') || '•';
-
-  useEffect(() => setImageFailed(false), [photoUrl]);
 
   return (
     <div className={`${className} mx-auto overflow-hidden text-center`}>
@@ -78,7 +58,7 @@ function WinnerPhoto({ rank, participants, registrations, className }: WinnerPho
 function CompetitionDetailContent() {
   const params = useParams<{ id: string }>();
   const compId = params.id;
-  const { results, theme, participants, registrations } = useFest();
+  const { results, theme } = useFest();
 
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -91,6 +71,27 @@ function CompetitionDetailContent() {
   const rank1 = result?.ranks.find(r => r.rank === 1);
   const rank2 = result?.ranks.find(r => r.rank === 2);
   const rank3 = result?.ranks.find(r => r.rank === 3);
+
+  const [winnerPhotos, setWinnerPhotos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    setWinnerPhotos({});
+    if (!result || result.resultStatus !== 'PUBLISHED') return () => { active = false; };
+
+    fetch(`/api/public/results/${encodeURIComponent(result.id)}/winner-photos`, { cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) return { photos: {} as Record<string, string> };
+        const payload = await response.json();
+        return payload && payload.photos && typeof payload.photos === 'object'
+          ? { photos: payload.photos as Record<string, string> }
+          : { photos: {} as Record<string, string> };
+      })
+      .then(payload => { if (active) setWinnerPhotos(payload.photos); })
+      .catch(() => { if (active) setWinnerPhotos({}); });
+
+    return () => { active = false; };
+  }, [result?.id, result?.resultStatus]);
 
   const handleShare = async () => {
     setShareError(null);
@@ -207,10 +208,9 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <WinnerPhoto
-                  key={rank1.registrationId}
+                  key={`${rank1.registrationId}:${winnerPhotos[rank1.registrationId] || ''}`}
                   rank={rank1}
-                  participants={participants}
-                  registrations={registrations}
+                  photoUrl={winnerPhotos[rank1.registrationId]}
                   className="w-20 h-20 rounded-full border-4 border-amber-300 shadow-md bg-amber-100 mb-3"
                 />
 
@@ -243,10 +243,9 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <WinnerPhoto
-                  key={rank2.registrationId}
+                  key={`${rank2.registrationId}:${winnerPhotos[rank2.registrationId] || ''}`}
                   rank={rank2}
-                  participants={participants}
-                  registrations={registrations}
+                  photoUrl={winnerPhotos[rank2.registrationId]}
                   className="w-16 h-16 rounded-full border-4 border-slate-200 shadow-xs bg-slate-100 mb-3"
                 />
 
@@ -279,10 +278,9 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <WinnerPhoto
-                  key={rank3.registrationId}
+                  key={`${rank3.registrationId}:${winnerPhotos[rank3.registrationId] || ''}`}
                   rank={rank3}
-                  participants={participants}
-                  registrations={registrations}
+                  photoUrl={winnerPhotos[rank3.registrationId]}
                   className="w-16 h-16 rounded-full border-4 border-amber-100 shadow-xs bg-amber-50 mb-3"
                 />
 
