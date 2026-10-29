@@ -643,19 +643,19 @@ export default function TeamsPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-[1440px] space-y-6 sm:space-y-8">
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-[#111111] tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-[28px]">
               House Contingents &amp; Team Managers
             </h1>
-            <p className="text-xs text-[#526070] mt-0.5">
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
               Dynamic team creation, secure WhatsApp onboarding, and manager session administration.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
               variant="outline"
               size="md"
@@ -677,8 +677,8 @@ export default function TeamsPage() {
 
         {/* Success Banner */}
         {successBanner && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
               <span>{successBanner}</span>
             </div>
@@ -693,7 +693,7 @@ export default function TeamsPage() {
 
         {/* Connection Error Banner */}
         {connectionError && (
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-[#DC2626] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex flex-col items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm sm:flex-row sm:items-center">
             <div className="flex items-center gap-2.5">
               <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
               <div>
@@ -716,21 +716,21 @@ export default function TeamsPage() {
 
         {/* Loading Indicator */}
         {loadingTeams && dynamicTeams.length === 0 && !connectionError && (
-          <div className="bg-white rounded-2xl border border-[#E1E7EF] p-12 text-center shadow-xs">
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm sm:px-8">
             <RefreshCw className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
-            <h3 className="text-sm font-bold text-[#111111]">Connecting to Production Database...</h3>
-            <p className="text-xs text-[#526070] mt-1">Retrieving authoritative house contingents.</p>
+            <h3 className="text-base font-semibold text-slate-900">Connecting to live database…</h3>
+            <p className="mt-1.5 text-sm text-slate-500">Retrieving the latest team records.</p>
           </div>
         )}
 
         {/* Authoritative Empty State Message */}
         {!loadingTeams && dynamicTeams.length === 0 && !connectionError && (
-          <div className="bg-white rounded-2xl border border-[#E1E7EF] p-12 text-center shadow-xs">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-4 border border-blue-100">
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm sm:px-8">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
               <UserPlus className="w-7 h-7" />
             </div>
-            <h3 className="text-base font-bold text-[#111111]">No House Contingents Found</h3>
-            <p className="text-xs text-[#526070] mt-1.5 max-w-md mx-auto">
+            <h3 className="text-lg font-semibold text-slate-900">No teams found yet</h3>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
               The live database currently contains zero registered teams. Click &apos;Create Team &amp; Provision Manager&apos; to register your first team and generate their secure WhatsApp onboarding invitation.
             </p>
             <div className="mt-6 flex justify-center">
@@ -751,21 +751,21 @@ export default function TeamsPage() {
           <>
             {/* Championship Highlights */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-[#111111] flex items-center gap-2">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <Trophy className="w-4 h-4 text-amber-500" />
                   Championship Leaderboard Highlights
                 </h3>
-                <span className="text-xs text-[#526070] font-medium">
+                <span className="text-sm font-medium text-slate-500">
                   {dynamicTeams.length} Registered House Contingents
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {dynamicTeams.slice(0, 4).map((team, idx) => (
                   <div
                     key={team.id}
-                    className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs relative overflow-hidden flex flex-col justify-between"
+                    className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
                   >
                     <div
                       className="absolute top-0 left-0 right-0 h-1.5"
@@ -785,8 +785,8 @@ export default function TeamsPage() {
                         </span>
                       </div>
 
-                      <h4 className="text-sm font-bold text-[#111111] mt-3">{team.name}</h4>
-                      <p className="text-[11px] text-[#526070] mt-0.5">
+                      <h4 className="mt-3 text-base font-semibold text-slate-900">{team.name}</h4>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
                         {team.managerName || 'Pending Manager'} · {team.zone || 'Campus'}
                       </p>
                     </div>
@@ -806,35 +806,35 @@ export default function TeamsPage() {
             </div>
 
             {/* Directory Table */}
-            <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-              <div className="p-4 border-b border-[#E1E7EF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <div className="relative w-full flex-1 sm:max-w-xl">
                   <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search team name, code, manager, or WhatsApp number..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-[#E1E7EF] rounded-lg text-xs bg-white text-[#111111] placeholder:text-[#526070] focus:outline-hidden focus:border-[#2563EB]"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                   />
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full min-w-[860px] border-collapse text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-semibold">
-                      <th className="py-3 px-6">Contingent</th>
-                      <th className="py-3 px-6">Assigned Team Manager</th>
-                      <th className="py-3 px-6 text-center">Onboarding Status</th>
-                      <th className="py-3 px-6 text-center">Team Access</th>
-                      <th className="py-3 px-6 text-right">Actions</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-4">Contingent</th>
+                      <th className="px-5 py-4">Assigned Team Manager</th>
+                      <th className="px-5 py-4 text-center">Onboarding Status</th>
+                      <th className="px-5 py-4 text-center">Team Access</th>
+                      <th className="px-5 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E1E7EF]">
                     {filteredTeams.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-[#526070]">
+                        <td colSpan={5} className="px-6 py-16 text-center text-sm text-slate-500">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertCircle className="w-6 h-6 text-[#526070]" />
                             <p className="font-medium">
@@ -845,33 +845,33 @@ export default function TeamsPage() {
                       </tr>
                     ) : (
                       filteredTeams.map((t) => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-4 px-6">
+                        <tr key={t.id} className="transition-colors hover:bg-slate-50/80">
+                          <td className="px-5 py-5">
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-7 h-7 rounded-md flex items-center justify-center text-white font-extrabold text-[10px] shrink-0"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[10px] font-extrabold text-white shadow-sm"
                                 style={{ backgroundColor: t.color }}
                               >
                                 {t.code}
                               </div>
                               <div>
-                                <span className="font-bold text-[#111111] block">{t.name}</span>
-                                <span className="text-[#526070] text-[11px]">
+                                <span className="block text-sm font-semibold text-slate-900">{t.name}</span>
+                                <span className="mt-1 block text-xs text-slate-500">
                                   {t.zone || 'Campus Center'}
                                 </span>
                               </div>
                             </div>
                           </td>
 
-                          <td className="py-4 px-6">
+                          <td className="px-5 py-5">
                             {t.managerEmail ? (
                               <div>
-                                <span className="font-semibold text-[#111111] block">
+                                <span className="block text-sm font-medium text-slate-900">
                                   {t.managerName || 'Team Manager'}
                                 </span>
-                                <span className="text-[#526070] text-[11px] font-mono">{t.managerEmail}</span>
+                                <span className="mt-1 block break-all font-mono text-xs text-slate-500">{t.managerEmail}</span>
                                 {t.managerPhone && (
-                                  <span className="text-[10px] text-emerald-700 font-medium block">
+                                  <span className="mt-1 block text-xs font-medium text-emerald-700">
                                     WhatsApp: {t.managerPhone}
                                   </span>
                                 )}
@@ -883,11 +883,11 @@ export default function TeamsPage() {
                             )}
                           </td>
 
-                          <td className="py-4 px-6 text-center">
+                          <td className="px-5 py-5 text-center">
                             {renderStatusBadge(t.invitationStatus)}
                           </td>
 
-                          <td className="py-4 px-6 text-center">
+                          <td className="px-5 py-5 text-center">
                             <button
                               type="button"
                               disabled={actionLoadingId === t.id}
@@ -906,7 +906,7 @@ export default function TeamsPage() {
                             </button>
                           </td>
 
-                          <td className="py-4 px-6 text-right">
+                          <td className="px-5 py-5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               {/* Generate / View WhatsApp Invitation */}
                               {t.managerEmail && (
@@ -914,7 +914,7 @@ export default function TeamsPage() {
                                   type="button"
                                   disabled={actionLoadingId === t.id}
                                   onClick={() => handleGenerateInvitation(t)}
-                                  className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-colors"
+                                  className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                                   title="Generate / Open WhatsApp Invitation"
                                 >
                                   <MessageSquare className="w-4 h-4" />
@@ -927,7 +927,7 @@ export default function TeamsPage() {
                                   type="button"
                                   disabled={actionLoadingId === t.id}
                                   onClick={() => handleRevokeInvitation(t)}
-                                  className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                                  className="rounded-lg p-2 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
                                   title="Revoke Invitation Code"
                                 >
                                   <Ban className="w-4 h-4" />
@@ -938,7 +938,7 @@ export default function TeamsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenReplace(t)}
-                                className="p-1.5 rounded-lg text-[#526070] hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                                 title="Replace Assigned Team Manager"
                               >
                                 <UserPlus className="w-4 h-4" />
@@ -948,7 +948,7 @@ export default function TeamsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEdit(t)}
-                                className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
+                                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                 title="Edit Team Details"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -987,15 +987,15 @@ export default function TeamsPage() {
             </div>
           }
         >
-          <form onSubmit={handleSaveTeam} className="space-y-4">
+          <form onSubmit={handleSaveTeam} className="space-y-6">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-[#DC2626] flex items-center gap-2">
+              <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Team Name *"
                 placeholder="e.g. Qurtuba Contingent"
@@ -1017,12 +1017,12 @@ export default function TeamsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-[#111111] mb-1.5">
                   Contingent Theme Color
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input
                     type="color"
                     value={color}
@@ -1047,18 +1047,18 @@ export default function TeamsPage() {
             </div>
 
             {!editingTeam && (
-              <div className="pt-3 border-t border-[#E1E7EF] space-y-3">
+              <div className="space-y-4 border-t border-slate-200 pt-5">
                 <div>
-                  <h4 className="text-xs font-bold text-[#111111] flex items-center gap-1.5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <UserPlus className="w-4 h-4 text-[#2563EB]" />
                     <span>Automatic Team Manager Provisioning</span>
                   </h4>
-                  <p className="text-[11px] text-[#526070] mt-0.5">
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
                     Provisions a dedicated Manager identity. You will receive a copyable WhatsApp invitation code.
                   </p>
                 </div>
 
-                <div className="space-y-3 bg-[#F8FAFC] p-3.5 rounded-xl border border-[#E1E7EF]">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                   <Input
                     label="Manager Login Email *"
                     type="email"
@@ -1068,7 +1068,7 @@ export default function TeamsPage() {
                     required
                   />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Input
                       label="Manager Full Name"
                       placeholder="e.g. Ahmad Al-Mansoor"
@@ -1107,15 +1107,15 @@ export default function TeamsPage() {
             </div>
           }
         >
-          <form onSubmit={handleReplaceManager} className="space-y-4">
+          <form onSubmit={handleReplaceManager} className="space-y-6">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-[#DC2626] flex items-center gap-2">
+              <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <div className="flex items-center gap-1.5 font-bold">
                 <ShieldAlert className="w-4 h-4 text-amber-600" />
                 <span>Security Notice: Token Revocation</span>
@@ -1174,7 +1174,7 @@ export default function TeamsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 {invitationStatus === 'READY_TO_SEND' && (
                   <Button
                     variant="outline"
@@ -1192,9 +1192,9 @@ export default function TeamsPage() {
             </div>
           }
         >
-          <div className="space-y-4 text-xs">
+          <div className="space-y-5 text-sm">
             {/* One-Time Code Highlight Card */}
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl space-y-2">
+            <div className="space-y-3 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
                   One-Time Invitation Code
@@ -1203,7 +1203,7 @@ export default function TeamsPage() {
                   Expires in 24 Hours
                 </span>
               </div>
-              <div className="flex items-center justify-between bg-white border border-blue-200 rounded-lg p-2.5">
+              <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="font-mono text-xl font-black text-blue-700 tracking-wider">
                   {invitationCode}
                 </span>
@@ -1222,17 +1222,17 @@ export default function TeamsPage() {
             </div>
 
             {/* Formatted WhatsApp Message Preview */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="block text-xs font-bold text-slate-900">
                 Official WhatsApp Invitation Message
               </label>
-              <div className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-all max-h-56 overflow-y-auto border border-slate-800">
+              <div className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-sm leading-6 text-slate-100 select-all">
                 {invitationMessage}
               </div>
             </div>
 
             {/* Quick Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
               <Button
                 variant="primary"
                 size="md"
@@ -1256,7 +1256,7 @@ export default function TeamsPage() {
             </div>
 
             {/* Security Explanation */}
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] space-y-1">
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <div className="font-bold flex items-center gap-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
                 <span>Security Guidance for Administrators</span>
