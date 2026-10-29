@@ -12,7 +12,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Plus, Search, Edit2, Trash2, Trophy, MapPin, Calendar, Clock, Users, AlertCircle } from 'lucide-react';
 
 export default function CompetitionsPage() {
-  const { competitions, categories, stages, registrations, results, addCompetition, updateCompetition, deleteCompetition } = useFest();
+  const { competitions, categories, stages, registrations, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -37,6 +37,21 @@ export default function CompetitionsPage() {
   const [maxEntriesPerTeam, setMaxEntriesPerTeam] = useState(2);
   const [status, setStatus] = useState<CompetitionStatus>('SCHEDULED');
   const [error, setError] = useState('');
+
+  // Judge assignments are managed through Mark Entry (judgeAssignments collection).
+  // Do not display stale legacy names from Competition.assignedJudges.
+  const getAssignedJudgeNames = (competitionId: string) => {
+    const seen = new Set<string>();
+    return markEntries
+      .filter(entry => entry.competitionId === competitionId && !entry.revoked && entry.status !== 'REVOKED')
+      .map(entry => entry.judgeName?.trim() || '')
+      .filter(judgeName => {
+        const key = judgeName.toLocaleLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
 
   const filteredCompetitions = competitions.filter(comp => {
     const matchesSearch = comp.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -338,7 +353,7 @@ export default function CompetitionsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-slate-600">
-                        {comp.assignedJudges.length > 0 ? comp.assignedJudges.join(', ') : 'Pending Assignment'}
+                        {getAssignedJudgeNames(comp.id).length > 0 ? getAssignedJudgeNames(comp.id).join(', ') : 'Pending Assignment'}
                       </td>
                       <td className="px-4 py-4 text-center">
                         {getStatusBadge(comp.status)}
