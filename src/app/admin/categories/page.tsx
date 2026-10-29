@@ -114,14 +114,14 @@ export default function CategoriesPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-6xl">
+      <div className="mx-auto w-full max-w-[1440px] space-y-6 sm:space-y-7">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-[28px]">
               Category Management
             </h1>
-            <p className="text-xs text-[#526070] mt-1">
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">
               Configure student age groups, division tiers, and institutional competition criteria
             </p>
           </div>
@@ -149,45 +149,45 @@ export default function CategoriesPage() {
         )}
 
         {/* Filter bar */}
-        <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#E1E7EF]">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="relative w-full flex-1 sm:max-w-lg">
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search category name or code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
             />
           </div>
-          <span className="text-xs text-[#526070] font-medium">
+          <span className="text-sm font-medium text-slate-500">
             Showing {filteredCategories.length} categories
           </span>
         </div>
 
         {/* Categories Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E1E7EF] bg-white flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Configured Divisions</h3>
-            <span className="text-xs text-[#526070]">{categories.length} Tiers Defined</span>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <h3 className="text-base font-semibold text-slate-900">Configured categories</h3>
+            <span className="text-xs font-medium text-slate-500">{categories.length} total</span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Category Name &amp; Code</th>
-                  <th className="py-3 px-6">Age / Class Eligibility</th>
-                  <th className="py-3 px-6 text-center">Enrolled Participants</th>
-                  <th className="py-3 px-6 text-center">Assigned Competitions</th>
-                  <th className="py-3 px-6 text-center">System Status</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4">Category Name &amp; Code</th>
+                  <th className="px-5 py-4">Age / Class Eligibility</th>
+                  <th className="px-5 py-4 text-center">Enrolled Participants</th>
+                  <th className="px-5 py-4 text-center">Assigned Competitions</th>
+                  <th className="px-5 py-4 text-center">System Status</th>
+                  <th className="px-5 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filteredCategories.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-xs text-[#526070]">
+                    <td colSpan={6} className="px-6 py-16 text-center text-sm text-slate-500">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <Layers className="w-8 h-8 text-[#94A3B8]" />
                         <p className="font-semibold text-sm text-[#111111]">
@@ -203,41 +203,41 @@ export default function CategoriesPage() {
                   </tr>
                 ) : (
                   filteredCategories.map((cat) => (
-                    <tr key={cat.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-4 px-6">
+                    <tr key={cat.id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-5 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-[#2563EB] flex items-center justify-center font-bold text-xs">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
                             <Layers className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="font-bold text-[#111111] text-sm block">{cat.name}</span>
-                            <span className="font-mono text-[#526070] text-[11px]">{cat.code}</span>
+                            <span className="block text-sm font-semibold text-slate-900">{cat.name}</span>
+                            <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600">{cat.code}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-[#111111] block">{cat.classRange}</span>
-                        <span className="text-[#526070] text-[11px]">{cat.ageRange}</span>
+                      <td className="px-5 py-5">
+                        <span className="block font-medium text-slate-800">{cat.classRange || '—'}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{cat.ageRange || 'Age range not set'}</span>
                       </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className="font-bold text-[#111111]">{cat.enrolledCount}</span>
-                        <span className="text-[#526070] text-[11px] block">Students</span>
+                      <td className="px-5 py-5 text-center">
+                        <span className="font-semibold tabular-nums text-slate-900">{cat.enrolledCount ?? 0}</span>
+                        <span className="mt-1 block text-xs text-slate-500">Participants</span>
                       </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className="font-bold text-[#111111]">{cat.competitionsCount}</span>
-                        <span className="text-[#526070] text-[11px] block">Events</span>
+                      <td className="px-5 py-5 text-center">
+                        <span className="font-semibold tabular-nums text-slate-900">{cat.competitionsCount ?? 0}</span>
+                        <span className="mt-1 block text-xs text-slate-500">Competitions</span>
                       </td>
-                      <td className="py-4 px-6 text-center">
+                      <td className="px-5 py-5 text-center">
                         <Badge variant={cat.status === 'ACTIVE' ? 'success' : 'default'} size="sm" dot>
                           {cat.status}
                         </Badge>
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-5 py-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(cat)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                             title="Edit Category"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -245,7 +245,7 @@ export default function CategoriesPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(cat.id, cat.name)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/30"
                             title="Delete Category"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -284,7 +284,7 @@ export default function CategoriesPage() {
             </div>
           }
         >
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-5">
             {error && (
               <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
             )}
@@ -305,7 +305,7 @@ export default function CategoriesPage() {
               required
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Class / Grade Range"
                 placeholder="Std 5 - 7"
