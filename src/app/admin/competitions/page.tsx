@@ -183,14 +183,14 @@ export default function CompetitionsPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-6xl">
+      <div className="w-full max-w-[1600px] space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
               Competition Directory
             </h1>
-            <p className="text-xs text-[#526070] mt-1">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
               Configure festival artistic, literary, and stage events with judging criteria
             </p>
           </div>
@@ -206,7 +206,7 @@ export default function CompetitionsPage() {
 
         {/* Action Error Banner */}
         {actionError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between text-xs">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-700">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
               <span>{actionError}</span>
@@ -218,24 +218,24 @@ export default function CompetitionsPage() {
         )}
 
         {/* Filter bar */}
-        <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="relative flex-1 w-full md:max-w-md">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="relative w-full flex-1 xl:max-w-md">
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search competition code or title..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto xl:flex-wrap">
             <select
               aria-label="Filter by Category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+              className="min-w-0 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 xl:min-w-[150px]"
             >
               <option value="ALL">All Categories</option>
               {categories.map(c => (
@@ -247,7 +247,7 @@ export default function CompetitionsPage() {
               aria-label="Filter by Competition Type"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+              className="min-w-0 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 xl:min-w-[150px]"
             >
               <option value="ALL">All Types</option>
               <option value="SOLO">Solo Contests</option>
@@ -257,7 +257,7 @@ export default function CompetitionsPage() {
               aria-label="Filter by Performance Mode"
               value={performanceFilter}
               onChange={(e) => setPerformanceFilter(e.target.value)}
-              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+              className="min-w-0 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 xl:min-w-[150px]"
             >
               <option value="ALL">All Performance Modes</option>
               <option value="STAGE">Stage</option>
@@ -268,33 +268,33 @@ export default function CompetitionsPage() {
         </div>
 
         {/* Competitions Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E1E7EF] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Competitions Roster</h3>
-            <span className="text-xs text-[#526070]">Showing {filteredCompetitions.length} Events</span>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <h3 className="text-base font-semibold text-slate-900">Competitions</h3>
+            <span className="text-sm text-slate-500">Showing <span className="font-semibold tabular-nums text-slate-700">{filteredCompetitions.length}</span> of {competitions.length} events</span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Code &amp; Title</th>
-                  <th className="py-3 px-6">Category</th>
-                  <th className="py-3 px-6 text-center">Type</th>
-                  <th className="py-3 px-6 text-center">Performance</th>
-                  <th className="py-3 px-6 text-center">Group Size</th>
-                  <th className="py-3 px-6 text-center">Entries</th>
-                  <th className="py-3 px-6">Stage Assignment</th>
-                  <th className="py-3 px-6">Assigned Judges</th>
-                  <th className="py-3 px-6 text-center">Status</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-3.5">Code &amp; Title</th>
+                  <th className="px-4 py-3.5">Category</th>
+                  <th className="px-4 py-3.5 text-center">Type</th>
+                  <th className="px-4 py-3.5 text-center">Performance</th>
+                  <th className="px-4 py-3.5 text-center">Group Size</th>
+                  <th className="px-4 py-3.5 text-center">Entries</th>
+                  <th className="px-4 py-3.5">Stage Assignment</th>
+                  <th className="px-4 py-3.5">Assigned Judges</th>
+                  <th className="px-4 py-3.5 text-center">Status</th>
                   <th className="py-3 px-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filteredCompetitions.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-xs text-[#526070]">
-                      <div className="flex flex-col items-center justify-center space-y-2">
+                    <td colSpan={10} className="px-6 py-16 text-center text-sm text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-3">
                         <Trophy className="w-8 h-8 text-[#94A3B8]" />
                         <p className="font-semibold text-sm text-[#111111]">
                           {competitions.length === 0 ? 'No competitions configured' : 'No competitions found'}
@@ -309,8 +309,8 @@ export default function CompetitionsPage() {
                   </tr>
                 ) : (
                   filteredCompetitions.map((comp) => (
-                    <tr key={comp.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-4 px-6">
+                    <tr key={comp.id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-4 py-4">
                         <div className="flex items-center gap-2.5">
                           <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                             {comp.code}
@@ -318,37 +318,37 @@ export default function CompetitionsPage() {
                           <span className="font-bold text-[#111111] text-sm">{comp.name}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6 font-semibold text-[#111111]">
+                      <td className="px-4 py-4 font-medium text-slate-700">
                         {comp.categoryName}
                       </td>
-                      <td className="py-4 px-6 text-center">
+                      <td className="px-4 py-4 text-center">
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${comp.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
                           {comp.type}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-center font-semibold text-[#526070]">{comp.performanceMode === 'STAGE' ? 'Stage' : comp.performanceMode === 'OFF_STAGE' ? 'Off Stage' : 'Unclassified'}</td>
-                      <td className="py-4 px-6 text-center font-semibold text-[#111111]">{comp.type === 'GROUP' ? (comp.groupSize || 'Not set') : '—'}</td>
-                      <td className="py-4 px-6 text-center font-bold text-[#111111]">
+                      <td className="px-4 py-4 text-center font-medium text-slate-600">{comp.performanceMode === 'STAGE' ? 'Stage' : comp.performanceMode === 'OFF_STAGE' ? 'Off Stage' : 'Unclassified'}</td>
+                      <td className="px-4 py-4 text-center font-medium text-slate-700">{comp.type === 'GROUP' ? (comp.groupSize || 'Not set') : '—'}</td>
+                      <td className="px-4 py-4 text-center font-semibold tabular-nums text-slate-900">
                         {comp.entriesCount}
                       </td>
-                      <td className="py-4 px-6 text-[#526070]">
+                      <td className="px-4 py-4 text-slate-600">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-[#526070] shrink-0" />
                           <span className="truncate max-w-[150px]">{comp.stageName}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-[#526070]">
+                      <td className="px-4 py-4 text-slate-600">
                         {comp.assignedJudges.length > 0 ? comp.assignedJudges.join(', ') : 'Pending Assignment'}
                       </td>
-                      <td className="py-4 px-6 text-center">
+                      <td className="px-4 py-4 text-center">
                         {getStatusBadge(comp.status)}
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(comp)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             title="Edit Competition"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -356,7 +356,7 @@ export default function CompetitionsPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(comp.id, comp.name)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                             title="Delete Competition"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -377,25 +377,25 @@ export default function CompetitionsPage() {
           onClose={() => setModalOpen(false)}
           title={editingComp ? `Edit Competition (${editingComp.name})` : 'Create New Competition'}
           description="Define event rules, stage location, duration, and maximum registration quotas"
-          maxWidth="lg"
+          maxWidth="xl"
           footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" size="md" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="md" onClick={handleSave} disabled={saving}>
                 {editingComp ? 'Update Competition' : 'Save Competition'}
               </Button>
             </div>
           }
         >
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-6">
             {error && (
-              <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-5 text-red-700">{error}</div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+              <div className="sm:col-span-2">
                 <Input
                   label="Competition Name"
                   placeholder="e.g. Extempore Speech (English)"
@@ -413,7 +413,7 @@ export default function CompetitionsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
               <Select
                 label="Category Division"
                 value={categoryId}
@@ -431,7 +431,7 @@ export default function CompetitionsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
               <Select
                 label="Performance Mode"
                 value={performanceMode}
@@ -442,7 +442,7 @@ export default function CompetitionsPage() {
                 <Input label="Members Per Group" type="number" min={2} value={groupSize} onChange={(e) => setGroupSize(Number(e.target.value))} />
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
               <Select
                 label="Assigned Stage Venue"
                 value={stageId}
@@ -456,17 +456,17 @@ export default function CompetitionsPage() {
                 max={5}
                 value={maxEntriesPerTeam}
                 onChange={(e) => setMaxEntriesPerTeam(Number(e.target.value))}
-              /> : <p className="self-center text-xs text-[#526070]">Unlimited groups per team. Register each group using its leader.</p>}
+              /> : <p className="self-center rounded-xl bg-slate-50 px-3 py-3 text-sm leading-5 text-slate-600 sm:col-span-2">Unlimited groups per team. Register each group using its leader.</p>}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
               <Input
                 label="Competition Date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Input
                   label="Time Slot Window"
                   placeholder="09:30 AM - 11:00 AM"
