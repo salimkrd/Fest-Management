@@ -1370,7 +1370,7 @@ function readStoredResult(id: string, data: DocumentData): CompetitionResult {
     stageName: data.stageName || '',
     marksStatus: data.marksStatus === 'PARTIAL' ? 'PARTIAL' : 'COMPLETE',
     resultStatus: data.resultStatus,
-    publishedDate: data.publishedDate || data.publishedAt,
+    publishedDate: data.publishedDate === null ? undefined : (data.publishedDate || data.publishedAt),
     posterReleased: false,
     ranks: Array.isArray(data.ranks) ? data.ranks.map((rank: DocumentData) => ({
       rank: [1, 2, 3].includes(rank.rank) ? rank.rank : null,
@@ -3211,7 +3211,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (r.id === resultId) {
         return {
           ...r,
-          resultStatus: 'REVISION_REQUIRED'
+          resultStatus: 'REVISION_REQUIRED',
+          publishedDate: undefined
         };
       }
       return r;
