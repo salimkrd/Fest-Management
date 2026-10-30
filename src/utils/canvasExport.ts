@@ -57,7 +57,7 @@ export async function exportPosterAsPng(
 export async function exportDigitalIdAsPng(
   participant: Participant,
   festivalName: string = 'SAHITHYOLSAV 2025',
-  options?: { token?: string; qrPayload?: string; photoBlob?: Blob; logoBlob?: Blob; festivalNameFont?: string }
+  options?: { token?: string; qrPayload?: string; photoBlob?: Blob; logoBlob?: Blob; festivalNameFont?: string; institutionName?: string }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -113,7 +113,7 @@ export async function exportDigitalIdAsPng(
 
   ctx.fillStyle = '#DBEAFE';
   ctx.font = '600 16px Montserrat, sans-serif';
-  ctx.fillText('Annual Cultural & Literary Festival', width / 2, 140);
+  ctx.fillText(options?.institutionName?.trim() || '', width / 2, 140);
 
   // Downloaded PNG uses the same genuine photo as the live ID preview.
   // A same-origin authenticated endpoint provides the Blob, preventing canvas
