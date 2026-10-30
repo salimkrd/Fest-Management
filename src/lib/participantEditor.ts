@@ -7,7 +7,6 @@ export interface ParticipantEditorFields {
   teamId: string;
   categoryId: string;
   classGrade: string;
-  division: string;
   dob: string;
   photoUrl: string;
   remarks: string;
@@ -26,7 +25,6 @@ export function initialParticipantFields(
     teamId: lockedTeam?.id || participant?.teamId || teams[0]?.id || '',
     categoryId: participant?.categoryId || categories[0]?.id || '',
     classGrade: participant?.classGrade || '',
-    division: participant?.division || '',
     dob: participant?.dob || '',
     photoUrl: participant?.photoUrl || '',
     remarks: participant?.remarks || ''
@@ -89,7 +87,6 @@ export function prepareParticipantPayload(
     categoryId: category.id,
     categoryName: category.name,
     classGrade: fields.classGrade.trim(),
-    division: fields.division.trim(),
     dob,
     photoUrl: safePhotoUrl,
     remarks: fields.remarks.trim(),
