@@ -372,13 +372,14 @@ export default function ResultManagementPage() {
           isOpen={!!selectedResult}
           onClose={() => setSelectedResult(null)}
           title={`Tabulation Audit: ${selectedResult?.competitionName}`}
-          description="Detailed breakdown of participant marks, assigned grades, and official Sahithyolsav championship points"
-          maxWidth="2xl"
+          description="Detailed breakdown of participant marks, assigned grades, and official championship points"
+          maxWidth="4xl"
           footer={
-            <div className="flex items-center justify-between w-full">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 leftIcon={<Sparkles className="w-4 h-4 text-amber-500" />}
                 onClick={() => {
                   setPosterStudioResult(selectedResult);
@@ -387,8 +388,8 @@ export default function ResultManagementPage() {
               >
                 Open Poster Studio
               </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSelectedResult(null)}>
+              <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedResult(null)}>
                   Close Audit
                 </Button>
                 {selectedResult && (selectedResult.resultStatus === 'READY_FOR_REVIEW' || selectedResult.resultStatus === 'REVISION_REQUIRED') && (
@@ -398,6 +399,8 @@ export default function ResultManagementPage() {
                     leftIcon={<FileCheck className="w-4 h-4 text-[#2563EB]" />}
                     onClick={() => void handleConfirmGradesAndPositions(selectedResult)}
                     disabled={savingResult}
+                    isLoading={savingResult}
+                    className="w-full sm:w-auto"
                   >
                     Confirm Positions &amp; Grades
                   </Button>
@@ -411,6 +414,8 @@ export default function ResultManagementPage() {
                       setPublishConfirmResult(selectedResult);
                       setSelectedResult(null);
                     }}
+                    disabled={savingResult}
+                    className="w-full sm:w-auto"
                   >
                     Authorize &amp; Publish
                   </Button>
@@ -423,6 +428,8 @@ export default function ResultManagementPage() {
                     leftIcon={<RotateCcw className="w-4 h-4 text-[#DC2626]" />}
                     onClick={() => void handleUnpublish(selectedResult.id, 'Unpublished from Audit Modal')}
                     disabled={savingResult}
+                    isLoading={savingResult}
+                    className="w-full sm:w-auto"
                   >
                     Unpublish Result
                   </Button>
@@ -433,7 +440,7 @@ export default function ResultManagementPage() {
         >
           {selectedResult && (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E7EF] flex items-center justify-between text-xs">
+              <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-slate-50 p-3.5 text-xs sm:grid-cols-3 sm:p-4">
                 <div>
                   <span className="text-[#526070] font-medium block">Adjudication Category:</span>
                   <span className="font-bold text-[#111111]">{selectedResult.categoryName} ({selectedResult.type})</span>
@@ -457,8 +464,30 @@ export default function ResultManagementPage() {
                   </p>
                 </div>
               ) : (
-                <div className="border border-[#E1E7EF] rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <>
+                {/* Mobile audit cards */}
+                <div className="space-y-3 md:hidden">
+                  {selectedResult.ranks.map(rk => (
+                    <article key={rk.registrationId} className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0"><p className="break-words text-sm font-bold text-[#0F172A]">{rk.candidateName}</p><p className="mt-0.5 font-mono text-[10px] text-[#64748B]">{rk.bib}</p></div>
+                        <div className="shrink-0 text-right">
+                          {rk.rank === 1 ? <Badge variant="warning" size="sm">1st Place</Badge> : rk.rank === 2 ? <Badge variant="default" size="sm">2nd Place</Badge> : rk.rank === 3 ? <Badge variant="info" size="sm">3rd Place</Badge> : <Badge variant="default" size="sm">No Prize</Badge>}
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">House</span><span className="mt-0.5 block text-xs font-semibold text-[#0F172A]">{rk.teamName} <span className="font-normal text-[#64748B]">({rk.teamCode})</span></span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Score</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-[#0F172A]">{rk.score}</span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Grade</span><span className="mt-0.5 block text-xs font-bold text-blue-700">Grade {rk.grade}</span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">{selectedResult.type === 'GROUP' ? 'Team points' : 'Points'}</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-emerald-700">+{rk.officialPoints ?? rk.totalEarnedPoints} pts</span></div>
+                      </div>
+                      {selectedResult.type === 'GROUP' && <p className="mt-2 text-[10px] font-medium text-[#64748B]">Points are awarded to the team only.</p>}
+                    </article>
+                  ))}
+                </div>
+                {/* Desktop audit table */}
+                <div className="hidden overflow-x-auto rounded-xl border border-[#E2E8F0] md:block">
+                  <table className="w-full min-w-[780px] text-left text-xs">
                     <thead>
                       <tr className="bg-[#F8FAFC] border-b border-[#E1E7EF] text-[#526070] font-bold uppercase text-[10px]">
                         <th className="py-2.5 px-4">Rank</th>
@@ -500,12 +529,13 @@ export default function ResultManagementPage() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
 
               {/* Official Point Rule Reference */}
-              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg text-[11px] text-blue-900 flex items-center justify-between">
+              <div className="flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-[11px] leading-5 text-blue-900 sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                  <strong>Official Sahithyolsav Matrix:</strong> Exact lookup from ({selectedResult.type}, Grade, Position). Points commit to championship ledger exclusively upon publication.
+                  <strong>Official points matrix:</strong> Exact lookup from ({selectedResult.type}, Grade, Position). Points commit to championship ledger exclusively upon publication.
                 </span>
                 <span className="font-bold text-[#2563EB]">Idempotent Ledger</span>
               </div>
@@ -521,11 +551,11 @@ export default function ResultManagementPage() {
           description="This action commits points to the official championship ledger and releases verified rankings to the public website."
           maxWidth="md"
           footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="outline" size="sm" onClick={() => setPublishConfirmResult(null)}>
+            <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:items-center sm:justify-end">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setPublishConfirmResult(null)} disabled={savingResult}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={() => void handleConfirmPublish()} disabled={savingResult} leftIcon={<CheckCircle2 className="w-4 h-4" />}>
+              <Button variant="primary" size="sm" className="w-full sm:w-auto" onClick={() => void handleConfirmPublish()} disabled={savingResult} isLoading={savingResult} leftIcon={<CheckCircle2 className="w-4 h-4" />}>
                 Confirm &amp; Publish Official Result
               </Button>
             </div>
@@ -533,7 +563,7 @@ export default function ResultManagementPage() {
         >
           {publishConfirmResult && (
             <div className="space-y-3">
-              <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900">
+              <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs leading-5 text-amber-900">
                 <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold">Official Publication Check</h4>
@@ -543,10 +573,11 @@ export default function ResultManagementPage() {
                 </div>
               </div>
 
-              <div className="text-xs text-[#526070] bg-[#F8FAFC] p-3 rounded-lg border border-[#E1E7EF]">
-                <div>Event: <strong className="text-[#111111]">{publishConfirmResult.competitionName} [{publishConfirmResult.competitionCode}]</strong></div>
-                <div>Category: <strong className="text-[#111111]">{publishConfirmResult.categoryName}</strong></div>
-                <div>Type: <strong className="text-[#111111]">{publishConfirmResult.type}</strong></div>
+              <div className="space-y-1 rounded-lg border border-[#E2E8F0] bg-slate-50 p-3 text-xs text-[#64748B]">
+                <div>Event: <strong className="text-[#0F172A]">{publishConfirmResult.competitionName} [{publishConfirmResult.competitionCode}]</strong></div>
+                <div>Category: <strong className="text-[#0F172A]">{publishConfirmResult.categoryName}</strong></div>
+                <div>Type: <strong className="text-[#111111]">{publishConfirmResult.type === 'SOLO' ? 'Individual' : 'Group'}</strong></div>
+                <div>Verified entries: <strong className="text-[#0F172A]">{publishConfirmResult.ranks.length}</strong></div>
               </div>
             </div>
           )}
