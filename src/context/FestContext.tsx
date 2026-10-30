@@ -103,6 +103,7 @@ interface FestContextType {
 
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
+  resultsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   pointsLedger: PointsLedgerEntry[];
   publishResult: (resultId: string) => Promise<void>;
   unpublishResult: (resultId: string, reason?: string) => Promise<void>;
@@ -1620,6 +1621,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return initialResults;
   });
+  const [resultsSyncState, setResultsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
   // Draft artwork lives only in memory after an authenticated API read. Cached result
   // data never determines whether a poster is publicly available.
@@ -1731,7 +1733,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Read official records from the same source the poster API checks before release.
   // Public subscriptions cannot see unpublished results or private poster drafts.
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      setResultsSyncState(isIsolatedDemoOrTest ? 'ready' : 'error');
+      return;
+    }
     const firestore = db;
     let stopped = false;
     let generation = 0;
@@ -1771,6 +1776,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     const subscribe = async () => {
       const currentGeneration = ++generation;
       ready = false;
+      setResultsSyncState('loading');
       unsubscribeResults?.();
       setPosterMedia({});
       let admin = false;
@@ -1785,7 +1791,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         if (stopped || currentGeneration !== generation) return;
         const records = snapshot.docs.map(item => readStoredResult(item.id, item.data()));
         setResults(records);
-      }, error => console.warn('[FestContext] Official results synchronization failed:', error));
+        setResultsSyncState('ready');
+      }, error => {
+        setResultsSyncState('error');
+        console.warn('[FestContext] Official results synchronization failed:', error);
+      });
       ready = true;
       void refreshPosters();
     };
@@ -3315,6 +3325,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         revokeJudgeAssignment,
         cleanupOrphanedJudgeAssignments,
         results,
+        resultsSyncState,
         pointsLedger,
         publishResult,
         unpublishResult,
