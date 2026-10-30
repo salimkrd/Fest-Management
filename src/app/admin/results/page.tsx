@@ -209,29 +209,82 @@ export default function ResultManagementPage() {
         </div>
 
         {/* Verification Register Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E1E7EF] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Competitions Verification Register</h3>
-            <span className="text-xs text-[#526070]">{filteredResults.length} Competitions Audited</span>
+        <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[#E2E8F0] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div><h3 className="text-sm font-bold text-[#0F172A] sm:text-base">Competitions Verification Register</h3><p className="mt-0.5 text-xs text-[#64748B]">Review marks, confirm positions, and publish verified results</p></div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className={"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold " + (resultsSyncState === 'ready' ? 'bg-emerald-50 text-emerald-700' : resultsSyncState === 'error' ? 'bg-red-50 text-red-700' : resultsSyncState === 'idle' ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700')}>
+                <span className={"h-1.5 w-1.5 rounded-full " + (resultsSyncState === 'ready' ? 'bg-emerald-500' : resultsSyncState === 'error' ? 'bg-red-500' : resultsSyncState === 'idle' ? 'bg-slate-400' : 'bg-amber-500')} />
+                {resultsSyncState === 'ready' ? 'Live sync' : resultsSyncState === 'error' ? 'Sync issue' : resultsSyncState === 'idle' ? 'Offline' : 'Connecting'}
+              </span>
+              <span className="text-xs tabular-nums text-[#64748B]">{filteredResults.length} / {results.length}</span>
+            </div>
+          </div>
+          {resultsSyncState === 'error' && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-xs text-red-800 sm:px-5">The results feed could not be synchronized from Firestore. Check the administrator session and database permissions, then reload the page.</div>}
+          {resultsSyncState === 'loading' && <div className="flex items-center gap-3 border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-800 sm:px-5"><Clock className="h-4 w-4 animate-spin" />Connecting to the live results feed…</div>}
+
+          {/* Mobile result cards */}
+          <div className="divide-y divide-[#E2E8F0] lg:hidden">
+            {filteredResults.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <Trophy className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                <p className="text-sm font-semibold text-[#0F172A]">{resultsSyncState === 'loading' ? 'Loading results…' : 'No results found'}</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#64748B]">{results.length === 0 ? 'Results will appear here after judge submissions are completed.' : 'No competitions match the current search or publication filter.'}</p>
+              </div>
+            ) : filteredResults.map(res => (
+              <article key={res.id} className="space-y-3 p-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="inline-flex rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700">{res.competitionCode}</span>
+                    <h4 className="mt-1.5 break-words text-sm font-bold leading-5 text-[#0F172A]">{res.competitionName}</h4>
+                    <p className="mt-1 text-xs text-[#64748B]">{res.categoryName} · {res.type === 'SOLO' ? 'Individual' : 'Group'} · {res.stageName}</p>
+                  </div>
+                  <div className="shrink-0">{getResultStatusBadge(res.resultStatus)}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                  <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">Marks</span><Badge variant={res.marksStatus === 'COMPLETE' ? 'success' : 'warning'} size="sm">{res.marksStatus}</Badge></div>
+                  <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">Published</span><span className="mt-1 block text-xs font-medium text-[#334155]">{res.publishedDate || 'Not yet published'}</span></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" className="w-full" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setSelectedResult(res)}>Review details</Button>
+                  {res.resultStatus === 'PUBLISHED' ? (
+                    <Button variant="outline" size="sm" className="w-full" leftIcon={<RotateCcw className="h-3.5 w-3.5 text-red-600" />} onClick={() => void handleUnpublish(res.id, 'Admin unpublish from Results card')} disabled={savingResult} isLoading={savingResult}>Unpublish</Button>
+                  ) : res.resultStatus === 'READY_TO_PUBLISH' ? (
+                    <Button variant="primary" size="sm" className="w-full" leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={() => setPublishConfirmResult(res)} disabled={savingResult}>Publish</Button>
+                  ) : res.resultStatus === 'READY_FOR_REVIEW' || res.resultStatus === 'REVISION_REQUIRED' ? (
+                    <Button variant="secondary" size="sm" className="w-full" leftIcon={<FileCheck className="h-3.5 w-3.5" />} onClick={() => setSelectedResult(res)} disabled={savingResult}>Audit &amp; confirm</Button>
+                  ) : (
+                    <span className="flex items-center justify-center rounded-lg border border-dashed border-[#CBD5E1] px-2 text-center text-[11px] text-[#64748B]">Awaiting marks</span>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          {/* Desktop register */}
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full min-w-[1120px] text-left text-xs">
               <thead>
                 <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Competition</th>
+                  <th className="px-5 py-3">Competition</th>
                   <th className="py-3 px-6">Category</th>
-                  <th className="py-3 px-6 text-center">Type</th>
+                  <th className="px-5 py-3 text-center">Type</th>
                   <th className="py-3 px-6 text-center">Marks Status</th>
                   <th className="py-3 px-6 text-center">Result Status</th>
                   <th className="py-3 px-6">Published Date</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredResults.map((res) => (
+                {filteredResults.length === 0 ? (
+                  <tr><td colSpan={7} className="px-6 py-14 text-center">
+                    <Trophy className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-semibold text-[#0F172A]">{resultsSyncState === 'loading' ? 'Loading results…' : 'No results found'}</p>
+                    <p className="mt-1 text-xs text-[#64748B]">{results.length === 0 ? 'Results will appear here after judge submissions are completed.' : 'No competitions match the current search or publication filter.'}</p>
+                  </td></tr>
+                ) : filteredResults.map((res) => (
                   <tr key={res.id} className="hover:bg-[#F8FAFC] transition-colors">
-                    <td className="py-4 px-6">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-2.5">
                         <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                           {res.competitionCode}
@@ -242,10 +295,10 @@ export default function ResultManagementPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-semibold text-[#111111]">
+                    <td className="px-5 py-4 font-semibold text-[#111111]">
                       {res.categoryName}
                     </td>
-                    <td className="py-4 px-6 text-center">
+                    <td className="px-5 py-4 text-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${res.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
                         {res.type === 'SOLO' ? 'Individual' : 'Group'}
                       </span>
@@ -258,10 +311,10 @@ export default function ResultManagementPage() {
                     <td className="py-4 px-6 text-center">
                       {getResultStatusBadge(res.resultStatus)}
                     </td>
-                    <td className="py-4 px-6 text-[#526070]">
+                    <td className="px-5 py-4 text-[#64748B]">
                       {res.publishedDate || 'Not yet published'}
                     </td>
-                    <td className="py-4 px-6 text-right">
+                    <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {/* Review Breakdown Button */}
                         <Button
