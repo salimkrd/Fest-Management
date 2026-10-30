@@ -265,7 +265,7 @@ export default function CompetitionsPage() {
               className="min-w-0 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 xl:min-w-[150px]"
             >
               <option value="ALL">All Types</option>
-              <option value="SOLO">Solo Contests</option>
+              <option value="SOLO">Individual Contests</option>
               <option value="GROUP">Group Contests</option>
             </select>
             <select
@@ -338,7 +338,7 @@ export default function CompetitionsPage() {
                       </td>
                       <td className="px-4 py-4 text-center">
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${comp.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                          {comp.type}
+                          {comp.type === 'SOLO' ? 'Individual' : 'Group'}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center font-medium text-slate-600">{comp.performanceMode === 'STAGE' ? 'Stage' : comp.performanceMode === 'OFF_STAGE' ? 'Off Stage' : 'Unclassified'}</td>
@@ -440,7 +440,7 @@ export default function CompetitionsPage() {
                 value={type}
                 onChange={(e) => setType(e.target.value as CompetitionType)}
                 options={[
-                  { value: 'SOLO', label: 'Solo Contest (Individual)' },
+                  { value: 'SOLO', label: 'Individual Contest' },
                   { value: 'GROUP', label: 'Group Ensemble (Team Item)' }
                 ]}
               />
