@@ -4,13 +4,13 @@ import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
-import { Registration, CompetitionType } from '@/types/fest';
+import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Check, X, Trash2, ClipboardList, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Check, Trash2, ClipboardList, Users, UserRound, Filter, RefreshCw } from 'lucide-react';
 
 export default function RegistrationManagementPage() {
   const { registrations, teams, categories, competitions, participants, addRegistration, updateRegistrationStatus, deleteRegistration } = useFest();
@@ -33,6 +33,9 @@ export default function RegistrationManagementPage() {
   const availableCompetitions = competitions.filter(c => c.categoryId === categoryId);
   const selectedCompetition = competitions.find(c => c.id === competitionId);
   const isGroup = selectedCompetition?.type === 'GROUP';
+  const approvedCount = registrations.filter(r => r.status === 'APPROVED').length;
+  const pendingCount = registrations.filter(r => r.status === 'PENDING').length;
+  const rejectedCount = registrations.filter(r => r.status === 'REJECTED').length;
 
   // Derived available participants for selected team & category using domain eligibility engine
   const availableParticipants = participants.filter(p =>
@@ -40,9 +43,8 @@ export default function RegistrationManagementPage() {
   );
 
   const filteredRegistrations = registrations.filter(r => {
-    const matchesSearch = r.code.toLowerCase().includes(search.toLowerCase()) ||
-                          r.participantName.toLowerCase().includes(search.toLowerCase()) ||
-                          r.competitionName.toLowerCase().includes(search.toLowerCase());
+    const term = search.trim().toLowerCase();
+    const matchesSearch = !term || [r.code, r.participantName, r.competitionName, r.teamName, r.categoryName].some(value => (value || '').toLowerCase().includes(term));
     const matchesTeam = teamFilter === 'ALL' || r.teamId === teamFilter;
     const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
     return matchesSearch && matchesTeam && matchesStatus;
@@ -117,7 +119,7 @@ export default function RegistrationManagementPage() {
     }
 
     let participantName = '';
-    if (comp.type === 'SOLO') {
+    if (comp.type !== 'GROUP') {
       const part = availableParticipants.find(p => p.id === participantId);
       if (!part) {
         setError('Please select a student contestant.');
@@ -136,7 +138,7 @@ export default function RegistrationManagementPage() {
     setSaving(true);
     try {
       await addRegistration({
-        participantId: comp.type === 'SOLO' ? participantId : undefined,
+        participantId: comp.type !== 'GROUP' ? participantId : undefined,
         groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
         participantName,
         teamId: team.id,
@@ -147,7 +149,7 @@ export default function RegistrationManagementPage() {
         competitionId: comp.id,
         competitionName: comp.name,
         type: comp.type,
-        chestNumber: chestNumber || (comp.type === 'SOLO' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
+        chestNumber: chestNumber || (comp.type !== 'GROUP' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
         status: 'APPROVED'
       });
       setModalOpen(false);
@@ -170,14 +172,14 @@ export default function RegistrationManagementPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-6xl">
+      <div className="w-full max-w-[1440px] mx-auto space-y-5 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Registration Management
             </h1>
-            <p className="text-xs text-[#526070] mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               Verify, approve, and manage contestant &amp; squad enrollments for scheduled events
             </p>
           </div>
@@ -187,12 +189,12 @@ export default function RegistrationManagementPage() {
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={handleOpenAdd}
           >
-            New Competition Entry
+            Add Registration
           </Button>
         </div>
 
         {/* Filter bar */}
-        <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="relative flex-1 w-full md:max-w-md">
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -204,12 +206,12 @@ export default function RegistrationManagementPage() {
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
             <select
               aria-label="Filter by Team"
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
-              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+              className="w-full min-w-0 text-sm font-medium py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
             >
               <option value="ALL">All Teams</option>
               {teams.map(t => (
@@ -231,30 +233,30 @@ export default function RegistrationManagementPage() {
         </div>
 
         {/* Master Registration Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E1E7EF] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Competition Entry Register</h3>
-            <span className="text-xs text-[#526070]">Total {filteredRegistrations.length} Registrations</span>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+            <div className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-blue-600" /><h3 className="text-sm font-bold text-slate-900">Competition Entry Register</h3></div>
+            <span className="text-xs font-medium text-slate-500">Showing {filteredRegistrations.length} of {registrations.length} registrations</span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Registration ID</th>
+                  <th className="py-3 px-4 sm:px-5">Registration ID</th>
                   <th className="py-3 px-6">Participant / Group</th>
                   <th className="py-3 px-6">Team</th>
                   <th className="py-3 px-6">Category</th>
                   <th className="py-3 px-6">Competition</th>
-                  <th className="py-3 px-6 text-center">Type</th>
+                  <th className="py-3 px-4 sm:px-5 text-center">Type</th>
                   <th className="py-3 px-6 text-center">Status</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
+                  <th className="py-3 px-4 sm:px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredRegistrations.map((reg) => (
+                {filteredRegistrations.length === 0 ? (<tr><td colSpan={8} className="px-6 py-14 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><ClipboardList className="h-5 w-5" /></div><p className="text-sm font-semibold text-slate-800">No registrations found</p><p className="mt-1 text-xs text-slate-500">Try changing the search or filters.</p></td></tr>) : filteredRegistrations.map((reg) => (
                   <tr key={reg.id} className="hover:bg-[#F8FAFC] transition-colors">
-                    <td className="py-4 px-6 font-mono font-bold text-[#2563EB]">
+                    <td className="py-3.5 px-4 sm:px-5 font-mono font-bold text-[#2563EB]">
                       {reg.code}
                     </td>
                     <td className="py-4 px-6">
@@ -322,18 +324,18 @@ export default function RegistrationManagementPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="sm" onClick={() => { const form = document.querySelector<HTMLFormElement>('[data-registration-form]'); form?.requestSubmit(); }} disabled={saving}>
                 Confirm Registration
               </Button>
             </div>
           }
         >
-          <form onSubmit={handleSave} className="space-y-4">
+          <form data-registration-form onSubmit={handleSave} className="space-y-5">
             {error && (
               <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
                 label="Select Team"
                 value={teamId}
@@ -353,7 +355,7 @@ export default function RegistrationManagementPage() {
                 label="Select Competition"
                 value={competitionId}
                 onChange={(e) => handleCompetitionChange(e.target.value)}
-                options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type})` }))}
+                options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type === 'SOLO' ? 'Individual' : 'Group'})` }))}
               />
             </div>
 
