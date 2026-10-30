@@ -1780,7 +1780,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       unsubscribeResults?.();
       setPosterMedia({});
       let admin = false;
-      try { admin = (await auth?.currentUser?.getIdTokenResult())?.claims.role === 'ADMIN'; }
+      try { admin = (await auth?.currentUser?.getIdTokenResult(true))?.claims.role === 'ADMIN'; }
       catch (error) { console.warn('[FestContext] Could not verify result access:', error); }
       if (stopped || currentGeneration !== generation) return;
       isAdmin = admin;
