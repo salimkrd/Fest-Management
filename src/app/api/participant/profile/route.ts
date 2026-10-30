@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest) {
     if ('name' in updates && !updates.name) {
       return NextResponse.json({ error: 'Full Student Name is required.' }, { status: 400 });
     }
-    if (updates.email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(updates.email)) {
+    if (updates.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
       return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
     }
     if (updates.photoUrl) {
