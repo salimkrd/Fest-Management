@@ -441,7 +441,7 @@ export default function ResultManagementPage() {
               <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E2E8F0] bg-slate-50 p-3.5 text-xs sm:grid-cols-3 sm:p-4">
                 <div>
                   <span className="text-[#526070] font-medium block">Adjudication Category:</span>
-                  <span className="font-bold text-[#111111]">{selectedResult.categoryName} ({selectedResult.type})</span>
+                  <span className="font-bold text-[#111111]">{selectedResult.categoryName} ({selectedResult.type === 'SOLO' ? 'Individual' : 'Group'})</span>
                 </div>
                 <div>
                   <span className="text-[#526070] font-medium block">Venue Location:</span>
