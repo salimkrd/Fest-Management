@@ -26,7 +26,7 @@ import {
 import Link from 'next/link';
 
 export default function MarkEntryPage() {
-  const { markEntries, competitions, addOrUpdateJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
+  const { markEntries, markEntriesSyncState, competitions, addOrUpdateJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -94,6 +94,8 @@ export default function MarkEntryPage() {
   const notStartedCount = validMarkEntries.filter(m => m.status === 'NOT_STARTED').length;
   const inProgressCount = validMarkEntries.filter(m => m.status === 'IN_PROGRESS').length;
   const submittedCount = validMarkEntries.filter(m => m.status === 'SUBMITTED').length;
+  const expiredCount = validMarkEntries.filter(m => m.status === 'EXPIRED').length;
+  const revokedCount = validMarkEntries.filter(m => m.status === 'REVOKED' || m.revoked).length;
 
   const handleOpenAssign = () => {
     setCompetitionId(competitions[0]?.id || '');
@@ -153,6 +155,10 @@ export default function MarkEntryPage() {
         return <Badge variant="success" size="sm" dot>SUBMITTED</Badge>;
       case 'IN_PROGRESS':
         return <Badge variant="warning" size="sm" dot>IN PROGRESS</Badge>;
+      case 'EXPIRED':
+        return <Badge variant="error" size="sm" dot>EXPIRED</Badge>;
+      case 'REVOKED':
+        return <Badge variant="error" size="sm" dot>REVOKED</Badge>;
       case 'NOT_STARTED':
       default:
         return <Badge variant="default" size="sm" dot>NOT STARTED</Badge>;
@@ -161,21 +167,22 @@ export default function MarkEntryPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-6xl">
+      <div className="w-full min-w-0 max-w-7xl space-y-5 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
+        <div className="flex flex-col gap-4 border-b border-[#E1E7EF] pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
               Mark Entry &amp; Jury Dispatch
             </h1>
-            <p className="text-xs text-[#526070] mt-1">
+            <p className="mt-1.5 max-w-3xl text-xs leading-5 text-[#64748B] sm:text-sm">
               Issue secure evaluation links to stage judges via WhatsApp and monitor live score submission status
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
             <Button
               variant="outline"
               size="md"
+              className="w-full sm:w-auto"
               leftIcon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
               onClick={handleInspectDryRun}
             >
@@ -184,6 +191,8 @@ export default function MarkEntryPage() {
             <Button
               variant="primary"
               size="md"
+              className="w-full sm:w-auto"
+              disabled={competitions.length === 0}
               leftIcon={<UserPlus className="w-4 h-4" />}
               onClick={handleOpenAssign}
             >
@@ -192,83 +201,76 @@ export default function MarkEntryPage() {
           </div>
         </div>
 
-        {/* 3 Status KPI Pills */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex items-center justify-between shadow-xs">
-            <div>
-              <span className="text-xs text-[#526070] uppercase font-bold tracking-wider">Awaiting Evaluation</span>
-              <h3 className="text-2xl font-bold text-[#111111] mt-1">{notStartedCount} Events</h3>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center text-[#526070]">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex items-center justify-between shadow-xs">
-            <div>
-              <span className="text-xs text-[#526070] uppercase font-bold tracking-wider">Live In Progress</span>
-              <h3 className="text-2xl font-bold text-amber-600 mt-1">{inProgressCount} Events</h3>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex items-center justify-between shadow-xs">
-            <div>
-              <span className="text-xs text-[#526070] uppercase font-bold tracking-wider">Submitted &amp; Sealed</span>
-              <h3 className="text-2xl font-bold text-emerald-600 mt-1">{submittedCount} Events</h3>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
+        {/* Evaluation overview */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="flex min-w-0 items-center justify-between rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm sm:p-4"><div className="min-w-0"><span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] sm:text-xs">Assigned judges</span><h3 className="mt-1 text-2xl font-bold tabular-nums text-[#0F172A]">{validMarkEntries.length}</h3></div><div className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 sm:h-10 sm:w-10"><FileSpreadsheet className="h-5 w-5" /></div></div>
+          <div className="flex min-w-0 items-center justify-between rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm sm:p-4"><div className="min-w-0"><span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] sm:text-xs">Awaiting</span><h3 className="mt-1 text-2xl font-bold tabular-nums text-[#0F172A]">{notStartedCount}</h3></div><div className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 sm:h-10 sm:w-10"><Clock className="h-5 w-5" /></div></div>
+          <div className="flex min-w-0 items-center justify-between rounded-xl border border-amber-200 bg-white p-3.5 shadow-sm sm:p-4"><div className="min-w-0"><span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 sm:text-xs">In progress</span><h3 className="mt-1 text-2xl font-bold tabular-nums text-amber-700">{inProgressCount}</h3></div><div className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 sm:h-10 sm:w-10"><Clock className="h-5 w-5" /></div></div>
+          <div className="flex min-w-0 items-center justify-between rounded-xl border border-emerald-200 bg-white p-3.5 shadow-sm sm:p-4"><div className="min-w-0"><span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 sm:text-xs">Submitted</span><h3 className="mt-1 text-2xl font-bold tabular-nums text-emerald-700">{submittedCount}</h3></div><div className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-10 sm:w-10"><CheckCircle2 className="h-5 w-5" /></div></div>
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="relative flex-1 w-full md:max-w-md">
+        <div className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm sm:p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-lg md:flex-1">
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search event code, competition or judge..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
+              className="min-h-11 w-full rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-9 pr-4 text-sm text-[#0F172A] outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
             <select
               aria-label="Filter by Evaluation Status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
+              className="min-h-11 w-full rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm font-semibold text-[#0F172A] outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:w-auto"
             >
               <option value="ALL">All Evaluation States</option>
               <option value="NOT_STARTED">Not Started</option>
               <option value="IN_PROGRESS">In Progress</option>
               <option value="SUBMITTED">Submitted</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="REVOKED">Revoked</option>
             </select>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#64748B] sm:ml-1">{expiredCount > 0 && <span>{expiredCount} expired</span>}{revokedCount > 0 && <span>{revokedCount} revoked</span>}</div>
+          </div>
           </div>
         </div>
 
         {/* Evaluation Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E1E7EF] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#111111]">Stage Evaluation Roster</h3>
-            <span className="text-xs text-[#526070]">{filteredEntries.length} Assigned Competitions</span>
+        <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[#E2E8F0] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div><h3 className="text-sm font-bold text-[#0F172A] sm:text-base">Stage Evaluation Roster</h3><p className="mt-0.5 text-xs text-[#64748B]">Judge assignments and live submission progress</p></div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${markEntriesSyncState === 'ready' ? 'bg-emerald-50 text-emerald-700' : markEntriesSyncState === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${markEntriesSyncState === 'ready' ? 'bg-emerald-500' : markEntriesSyncState === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />{markEntriesSyncState === 'ready' ? 'Live sync' : markEntriesSyncState === 'error' ? 'Sync issue' : markEntriesSyncState === 'idle' ? 'Offline' : 'Connecting'}</span>
+              <span className="text-xs tabular-nums text-[#64748B]">{filteredEntries.length} / {validMarkEntries.length}</span>
+            </div>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          {markEntriesSyncState === 'error' && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-xs text-red-800 sm:px-5">Live judge assignment updates could not be loaded. Check the administrator session and Firestore permissions, then reload the page.</div>}
+          {markEntriesSyncState === 'loading' && <div className="flex items-center gap-3 border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-800 sm:px-5"><Clock className="h-4 w-4 animate-spin" />Connecting to the live judge assignment feed…</div>}
+          <div className="divide-y divide-[#E2E8F0] lg:hidden">
+            {filteredEntries.length === 0 ? <div className="px-4 py-10 text-center"><FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-[#0F172A]">{markEntriesSyncState === 'loading' ? 'Loading assignments…' : 'No mark entries found'}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#64748B]">{competitions.length === 0 ? 'Create a competition before assigning a judge.' : 'No judge assignments match the current search or status filter.'}</p></div> : filteredEntries.map(entry => (
+              <article key={entry.id} className="space-y-3 p-4">
+                <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700">{entry.competitionCode}</span><h4 className="mt-1.5 break-words text-sm font-bold leading-5 text-[#0F172A]">{entry.competitionName}</h4><p className="mt-1 text-xs text-[#64748B]">{entry.categoryName} · {entry.type === 'SOLO' ? 'Individual' : 'Group'}</p></div><div className="shrink-0">{getStatusBadge(entry.status)}</div></div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2.5"><p className="text-sm font-semibold text-[#0F172A]">{entry.judgeName}</p><p className="mt-0.5 text-xs text-[#64748B]">{entry.judgePhone}</p>{entry.submittedAt && <p className="mt-1 text-[11px] text-emerald-700">Submitted: {entry.submittedAt}</p>}</div>
+                <div className="grid grid-cols-2 gap-2"><Button variant="outline" size="sm" className="w-full" leftIcon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => { setDispatchCredentials(null); setSelectedForDispatch(entry); }}>Dispatch details</Button><Link href={`/judge/marking?code=${encodeURIComponent(entry.accessCode)}&competitionId=${encodeURIComponent(entry.competitionId)}`} target="_blank" className="w-full"><Button variant="secondary" size="sm" className="w-full" leftIcon={<ExternalLink className="h-3.5 w-3.5" />}>Open sheet</Button></Link></div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full min-w-[900px] text-left text-xs">
               <thead>
                 <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Competition Name &amp; Code</th>
+                  <th className="px-5 py-3">Competition Name &amp; Code</th>
                   <th className="py-3 px-6">Category / Type</th>
                   <th className="py-3 px-6">Assigned Judges</th>
-                  <th className="py-3 px-6 text-center">Mark Entry Status</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
+                  <th className="px-5 py-3 text-center">Mark Entry Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7EF]">
@@ -289,7 +291,7 @@ export default function MarkEntryPage() {
                 ) : (
                   filteredEntries.map((entry) => (
                     <tr key={entry.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-4 px-6">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-2.5">
                           <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                             {entry.competitionCode}
@@ -302,17 +304,17 @@ export default function MarkEntryPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6 font-semibold text-[#111111]">
-                        {entry.categoryName} · {entry.type}
+                      <td className="px-5 py-4 font-semibold text-[#111111]">
+                        {entry.categoryName} · {entry.type === 'SOLO' ? 'Individual' : 'Group'}
                       </td>
                       <td className="py-4 px-6">
                         <span className="font-semibold text-[#111111] block">{entry.judgeName}</span>
                         <span className="text-[11px] text-[#526070]">{entry.judgePhone}</span>
                       </td>
-                      <td className="py-4 px-6 text-center">
+                      <td className="px-5 py-4 text-center">
                         {getStatusBadge(entry.status)}
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {/* WhatsApp Dispatch Button */}
                           <Button
@@ -324,7 +326,7 @@ export default function MarkEntryPage() {
                               setSelectedForDispatch(entry);
                             }}
                           >
-                            Dispatch Link
+                            Dispatch Details
                           </Button>
 
                           {/* Open as Judge Simulator link */}
@@ -371,16 +373,15 @@ export default function MarkEntryPage() {
               <Button variant="outline" size="sm" onClick={() => setAssignModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveAssignment} disabled={savingAssignment}>
+              <Button variant="primary" size="sm" onClick={() => (document.getElementById('mark-entry-assignment-form') as HTMLFormElement | null)?.requestSubmit()} disabled={savingAssignment || !competitionId} isLoading={savingAssignment}>
                 {savingAssignment ? 'Generating...' : 'Generate Credentials'}
               </Button>
             </div>
           }
         >
-          <form onSubmit={handleSaveAssignment} className="space-y-4">
-            {error && (
-              <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
-            )}
+          <form id="mark-entry-assignment-form" onSubmit={handleSaveAssignment} className="space-y-4">
+            {competitions.length === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No competitions are available. Add a competition before assigning a judge.</p>}
+            {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{error}</p>}
 
             <Select
               label="Select Competition"

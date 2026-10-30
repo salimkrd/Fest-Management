@@ -49,10 +49,10 @@ export const Drawer: React.FC<DrawerProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-        <div className={`w-screen ${widthClasses[width]} bg-white shadow-2xl border-l border-[#E1E7EF] flex flex-col`}>
+      <div className="fixed inset-y-0 right-0 flex w-full max-w-full sm:pl-4">
+        <div className={`flex h-full w-full flex-col border-l border-[#E1E7EF] bg-white shadow-2xl sm:w-screen ${widthClasses[width]}`}>
           {/* Header */}
-          <div className="px-6 py-5 border-b border-[#E1E7EF] flex items-start justify-between bg-white">
+          <div className="flex items-start justify-between gap-4 border-b border-[#E1E7EF] bg-white px-4 py-4 sm:px-6 sm:py-5">
             <div>
               <h2 className="text-lg font-bold text-[#111111]">{title}</h2>
               {description && (
@@ -69,13 +69,13 @@ export const Drawer: React.FC<DrawerProps> = ({
           </div>
 
           {/* Body */}
-          <div className="flex-1 px-6 py-6 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
             {children}
           </div>
 
           {/* Footer */}
           {footer && (
-            <div className="px-6 py-4 bg-[#F8FAFC] border-t border-[#E1E7EF] flex items-center justify-end gap-3">
+            <div className="flex items-center justify-end gap-3 border-t border-[#E1E7EF] bg-[#F8FAFC] px-4 py-3 sm:px-6 sm:py-4">
               {footer}
             </div>
           )}

@@ -80,6 +80,7 @@ interface FestContextType {
   deleteSchedule: (id: string) => Promise<void>;
 
   markEntries: MarkEntry[];
+  markEntriesSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addOrUpdateJudgeAssignment: (assignment: {
     competitionId: string;
     judgeName: string;
@@ -1593,6 +1594,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [rawJudgeAssignments, setRawJudgeAssignments] = useState<MarkEntry[]>([]);
+  const [markEntriesSyncState, setMarkEntriesSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
   // Show ONLY judge assignments and mark entries for competitions that actually exist in Firestore
   const markEntries = useMemo(() => {
@@ -2117,6 +2119,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         setParticipants([]);
         setRegistrations([]);
         setMarkEntries([]);
+        setMarkEntriesSyncState('idle');
         return;
       }
 
@@ -2124,6 +2127,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const tokenResult = await user.getIdTokenResult(true);
         const role = tokenResult.claims.role || (currentTeamUser ? 'TEAM_MANAGER' : undefined);
         const teamId = (tokenResult.claims.teamId as string | undefined) || currentTeamUser?.id;
+        if (role !== 'ADMIN') setMarkEntriesSyncState('idle');
 
         if (role === 'ADMIN') {
           // 1. Admin reads all participants in realtime
@@ -2196,12 +2200,14 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           );
 
           // 3. Admin reads all judge assignments in realtime across browsers
+          setMarkEntriesSyncState('loading');
           const judgesRef = collection(firestore, 'judgeAssignments');
           unsubJudges = onSnapshot(
             judgesRef,
             (snapshot) => {
               if (snapshot.empty) {
                 setRawJudgeAssignments([]);
+                setMarkEntriesSyncState('ready');
                 return;
               }
               const liveAssignments: MarkEntry[] = snapshot.docs.map(d => {
@@ -2227,8 +2233,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 };
               });
               setRawJudgeAssignments(liveAssignments);
+              setMarkEntriesSyncState('ready');
             },
-            (err) => console.warn('[FestContext] Firestore judgeAssignments sync warning:', err)
+            (err) => {
+              setMarkEntriesSyncState('error');
+              console.warn('[FestContext] Firestore judgeAssignments sync warning:', err);
+            }
           );
 
           // Automatic demo-data seeding and legacy background migration are disabled in production
@@ -3299,6 +3309,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         updateSchedule,
         deleteSchedule,
         markEntries,
+        markEntriesSyncState,
         addOrUpdateJudgeAssignment,
         submitJudgeMarks,
         revokeJudgeAssignment,

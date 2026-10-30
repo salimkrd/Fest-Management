@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Copy, Check, MessageSquare, ExternalLink, ShieldCheck, Key } from 'lucide-react';
 import { buildWhatsAppDispatchUrl } from '@/domain/judgeAuth';
+import { useFest } from '@/context/FestContext';
 
 interface WhatsAppDispatchModalProps {
   markEntry: MarkEntry | null;
@@ -23,6 +24,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
   oneTimeSecret,
   directUrl: issuedDirectUrl
 }) => {
+  const { theme } = useFest();
   const [copiedLink, setCopiedLink] = useState(false);
   const [dispatchedSuccess, setDispatchedSuccess] = useState(false);
 
@@ -34,7 +36,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
 
   const whatsAppUrl = buildWhatsAppDispatchUrl({
     phone: markEntry.judgePhone,
-    festName: 'Sahithyolsav 2025',
+    festName: theme.festivalName,
     competitionName: `${markEntry.competitionName} (${markEntry.categoryName})`,
     judgeName: markEntry.judgeName,
     accessCode: markEntry.accessCode || 'JRY-0001',
@@ -62,7 +64,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
       description="Issue secure credentials and dispatch evaluation sheet directly to juror's phone"
       width="lg"
       footer={
-        <div className="flex items-center justify-between w-full">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="outline" size="sm" onClick={onClose}>
             Close
           </Button>
@@ -78,9 +80,9 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         {/* Security Badge */}
-        <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+        <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 sm:p-4">
           <ShieldCheck className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
           <div className="text-xs">
             <h4 className="font-bold text-[#111111]">Cryptographically Isolated Evaluation Sheet</h4>
@@ -109,7 +111,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-[#526070] font-medium">Category / Type</span>
-            <span className="font-semibold text-[#111111]">{markEntry.categoryName} · {markEntry.type}</span>
+            <span className="font-semibold text-[#111111]">{markEntry.categoryName} · {markEntry.type === 'SOLO' ? 'Individual' : 'Group'}</span>
           </div>
         </div>
 
@@ -163,12 +165,12 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
             Direct Juror Login URL
           </label>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="text"
               readOnly
               value={directLink}
-              className="flex-1 min-h-[44px] px-3.5 py-2 bg-[#F8FAFC] border border-[#E1E7EF] text-xs font-mono rounded-lg text-[#111111] focus:outline-none"
+              className="min-h-11 w-full min-w-0 flex-1 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] px-3 py-2 text-xs font-mono text-[#111111] focus:outline-none"
             />
             <Button
               variant="outline"
@@ -186,8 +188,8 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
             Prepared WhatsApp Dispatch Preview
           </label>
-          <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-lg text-xs font-mono text-emerald-950 whitespace-pre-line">
-            {`Assalamu Alaikum / Greetings ${markEntry.judgeName},\n\nYou have been designated as an Official Adjudicator for Sahithyolsav 2025.\nEvent: ${markEntry.competitionName} (${markEntry.categoryName})\nAccess Code: ${markEntry.accessCode || 'JRY-4101'}\n\nDirect Link: ${directLink}`}
+          <div className="overflow-x-auto rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-xs font-mono leading-5 text-emerald-950 whitespace-pre-line">
+            {`Assalamu Alaikum / Greetings ${markEntry.judgeName},\n\nYou have been designated as an Official Adjudicator for ${theme.festivalName}.\nEvent: ${markEntry.competitionName} (${markEntry.categoryName})\nAccess Code: ${markEntry.accessCode || 'JRY-4101'}\n\nDirect Link: ${directLink}`}
           </div>
         </div>
       </div>
