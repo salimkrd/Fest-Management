@@ -95,7 +95,7 @@ export interface Participant {
   categoryId: string;
   categoryName: string;
   classGrade: string;
-  division: string;
+  division?: string; // Legacy field retained for backwards-compatible reads only
   dob: string;
   photoUrl: string;
   registeredEventIds: string[];
