@@ -151,8 +151,10 @@ export default function ParticipantsPage() {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E1E7EF]">
-                {filteredParticipants.map((p) => (
+              <tbody className="divide-y divide-slate-200">
+                {filteredParticipants.length === 0 ? (
+                  <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No participants match your search or filters.</td></tr>
+                ) : filteredParticipants.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-[#111111]">
                       {p.bib}
