@@ -12,7 +12,7 @@ import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
 
 export default function ParticipantsPage() {
-  const { participants, teams, categories, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const { participants, teams, categories, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -61,6 +61,8 @@ export default function ParticipantsPage() {
       }
     }
   };
+
+  const getRegisteredEventCount = (participantId: string) => new Set(registrations.filter(reg => reg.status !== 'REJECTED' && (reg.participantId === participantId || reg.groupLeaderId === participantId)).map(reg => reg.competitionId)).size;
 
   const activeFilterCount = Number(teamFilter !== 'ALL') + Number(categoryFilter !== 'ALL');
 
@@ -182,11 +184,11 @@ export default function ParticipantsPage() {
                       {p.categoryName}
                     </td>
                     <td className="py-3.5 px-4 text-[#526070]">
-                      {p.classGrade} - Div {p.division}
+                      {p.classGrade || '—'}
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <span className="font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                        {(Array.isArray(p.registeredEventIds) ? p.registeredEventIds.length : 0)} Events
+                        {getRegisteredEventCount(p.id)} Events
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center">
@@ -247,8 +249,8 @@ export default function ParticipantsPage() {
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg bg-slate-50 p-3 text-xs">
                   <div className="min-w-0"><p className="text-slate-500">Team</p><p className="font-semibold text-slate-800 break-words">{p.teamName || '—'}{p.teamCode ? ` (${p.teamCode})` : ''}</p></div>
                   <div className="min-w-0"><p className="text-slate-500">Category</p><p className="font-semibold text-slate-800 break-words">{p.categoryName || '—'}</p></div>
-                  <div><p className="text-slate-500">Class / Grade</p><p className="font-medium text-slate-800">{p.classGrade || '—'}{p.division ? ` · Div ${p.division}` : ''}</p></div>
-                  <div><p className="text-slate-500">Registered Events</p><p className="font-semibold text-blue-700">{Array.isArray(p.registeredEventIds) ? p.registeredEventIds.length : 0}</p></div>
+                  <div><p className="text-slate-500">Class / Grade</p><p className="font-medium text-slate-800">{p.classGrade || '—'}</p></div>
+                  <div><p className="text-slate-500">Registered Events</p><p className="font-semibold text-blue-700">{getRegisteredEventCount(p.id)}</p></div>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <Badge variant="success" size="sm">{p.idStatus || 'GENERATED'}</Badge>
