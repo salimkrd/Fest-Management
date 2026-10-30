@@ -149,18 +149,12 @@ export function ParticipantEditorModal({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Class / Grade"
             placeholder="e.g. Std 11"
             value={fields.classGrade}
             onChange={e => update('classGrade', e.target.value)}
-          />
-          <Input
-            label="Division"
-            placeholder="e.g. A"
-            value={fields.division}
-            onChange={e => update('division', e.target.value)}
           />
           <Input
             label="Date of Birth"
