@@ -29,7 +29,7 @@ describe('Digital ID PNG canvas photo rendering', () => {
     drawImage, fillText, fillRect: vi.fn(), strokeRect: vi.fn(),
     beginPath: vi.fn(), arc: vi.fn(), fill: vi.fn(), stroke: vi.fn(),
     roundRect: vi.fn(), measureText: vi.fn((text: string) => ({ width: text.length * 8 })),
-    save: vi.fn(), clip: vi.fn(), restore: vi.fn(),
+    save: vi.fn(), clip: vi.fn(), restore: vi.fn(), scale: vi.fn(),
     fillStyle: '', strokeStyle: '', lineWidth: 0, textAlign: 'left', font: '', letterSpacing: ''
   };
   class FakeImage {
@@ -60,6 +60,7 @@ describe('Digital ID PNG canvas photo rendering', () => {
       token: 'signedtoken', qrPayload: 'secure qr', photoBlob: originalPhoto
     });
     // One draw for the real portrait, one for the signed QR.
+    expect(ctx.scale).toHaveBeenCalledWith(4, 4);
     expect(drawImage).toHaveBeenCalledTimes(2);
     expect((drawImage.mock.calls[0][0] as FakeImage).src).toBe('blob:photo');
     expect(ctx.clip).toHaveBeenCalled();

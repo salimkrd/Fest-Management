@@ -67,14 +67,18 @@ export async function exportDigitalIdAsPng(
     throw new Error('Participant photo must be loaded before the PNG can be exported.');
   }
 
+  // Render at 4x the preview's logical dimensions for print-quality output.
+  // All layout coordinates below remain in the original 640x1080 design space.
   const width = 640;
   const height = 1080;
+  const exportScale = 4;
 
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = width * exportScale;
+  canvas.height = height * exportScale;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  ctx.scale(exportScale, exportScale);
 
   // Background
   ctx.fillStyle = '#FFFFFF';
