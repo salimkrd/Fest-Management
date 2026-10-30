@@ -2148,7 +2148,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   division: dt.division || '',
                   dob: dt.dob || '',
                   photoUrl: dt.photoUrl || '',
-                  registeredEventIds: dt.registeredEventIds || [],
+                  registeredEventIds: Array.isArray(dt.registeredEventIds) ? dt.registeredEventIds.filter((eventId: unknown): eventId is string => typeof eventId === 'string') : [],
                   idStatus: dt.idStatus || 'GENERATED',
                   remarks: dt.remarks
                 };
@@ -2297,7 +2297,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   division: dt.division || '',
                   dob: dt.dob || '',
                   photoUrl: dt.photoUrl || '',
-                  registeredEventIds: dt.registeredEventIds || [],
+                  registeredEventIds: Array.isArray(dt.registeredEventIds) ? dt.registeredEventIds.filter((eventId: unknown): eventId is string => typeof eventId === 'string') : [],
                   idStatus: dt.idStatus || 'GENERATED',
                   remarks: dt.remarks
                 };
