@@ -620,6 +620,12 @@ export default function GreenRoomPage() {
                 </div>
               )}
 
+              {(loadingRoster || filteredRoster.length === 0) && (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center md:hidden">
+                  {loadingRoster ? <><div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /><p className="text-xs font-medium text-slate-500">Syncing Green Room queue…</p></> : <><DoorOpen className="mx-auto mb-2 h-8 w-8 text-slate-400" /><p className="text-sm font-semibold text-slate-800">No contestants found</p><p className="mt-1 text-xs text-slate-500">Check in an approved contestant to begin the lineup.</p></>}
+                </div>
+              )}
+
               {/* Contestants Table */}
               <div className="mt-4 hidden overflow-x-auto md:block">
                 {loadingRoster ? (
