@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
-import { CompetitionResult, ResultStatus, ResultRank } from '@/types/fest';
+import { CompetitionResult, ResultStatus } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -19,7 +19,6 @@ import {
   Trophy,
   ShieldAlert,
   FileCheck,
-  AlertTriangle,
   Send
 } from 'lucide-react';
 import Link from 'next/link';
@@ -158,7 +157,7 @@ export default function ResultManagementPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm md:flex-row md:items-center md:justify-between sm:p-4">
           <div className="relative w-full md:max-w-lg md:flex-1">
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -170,7 +169,7 @@ export default function ResultManagementPage() {
             />
           </div>
 
-          <div className="mt-3 flex w-full flex-col gap-2 sm:flex-row md:mt-0 md:w-auto">
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
             <select
               aria-label="Filter by Publication Status"
               value={statusFilter}
@@ -424,12 +423,11 @@ export default function ResultManagementPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[#DC2626] border-red-200 hover:bg-red-50"
+                    className="w-full border-red-200 text-[#DC2626] hover:bg-red-50 sm:w-auto"
                     leftIcon={<RotateCcw className="w-4 h-4 text-[#DC2626]" />}
                     onClick={() => void handleUnpublish(selectedResult.id, 'Unpublished from Audit Modal')}
                     disabled={savingResult}
                     isLoading={savingResult}
-                    className="w-full sm:w-auto"
                   >
                     Unpublish Result
                   </Button>
