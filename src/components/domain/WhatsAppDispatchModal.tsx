@@ -111,7 +111,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-[#526070] font-medium">Category / Type</span>
-            <span className="font-semibold text-[#111111]">{markEntry.categoryName} · {markEntry.type}</span>
+            <span className="font-semibold text-[#111111]">{markEntry.categoryName} · {markEntry.type === 'SOLO' ? 'Individual' : 'Group'}</span>
           </div>
         </div>
 
@@ -165,7 +165,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
           <label className="block text-xs font-semibold text-[#111111] uppercase tracking-wider mb-1.5">
             Direct Juror Login URL
           </label>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="text"
               readOnly
