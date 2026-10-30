@@ -193,6 +193,22 @@ export default function RegistrationManagementPage() {
           </Button>
         </div>
 
+        {/* Registration overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><ClipboardList className="h-5 w-5" /></div>
+            <div><p className="text-xs font-medium text-slate-500">Total registrations</p><p className="text-2xl font-bold tracking-tight text-slate-900">{registrations.length}</p></div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Check className="h-5 w-5" /></div>
+            <div><p className="text-xs font-medium text-slate-500">Approved</p><p className="text-2xl font-bold tracking-tight text-slate-900">{approvedCount}</p></div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><Filter className="h-5 w-5" /></div>
+            <div><p className="text-xs font-medium text-slate-500">Pending review</p><p className="text-2xl font-bold tracking-tight text-slate-900">{pendingCount}</p></div>
+          </div>
+        </div>
+
         {/* Filter bar */}
         <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="relative flex-1 w-full md:max-w-md">
@@ -228,6 +244,7 @@ export default function RegistrationManagementPage() {
               <option value="ALL">All Statuses</option>
               <option value="APPROVED">Approved</option>
               <option value="PENDING">Pending</option>
+              <option value="REJECTED">Rejected</option>
             </select>
           </div>
         </div>
