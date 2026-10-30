@@ -71,9 +71,11 @@ export async function GET(req: NextRequest) {
       categoryName: data.categoryName || '',
       categoryId: data.categoryId || '',
       classGrade: data.classGrade || '',
-      division: data.division || '',
       photoUrl: data.photoUrl || '',
-      idStatus: data.idStatus || 'GENERATED'
+      idStatus: data.idStatus || 'GENERATED',
+      email: data.email || '',
+      phone: data.phone || '',
+      remarks: data.remarks || ''
     };
     return NextResponse.json({
       profile, events,
