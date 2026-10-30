@@ -108,6 +108,10 @@ export default function StagesPage() {
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError('');
+    if (stagesSyncState === 'error') {
+      setFormError('The live stage feed is unavailable. Reconnect and reload before saving changes.');
+      return;
+    }
     setPageError('');
 
     const cleanName = name.trim();
@@ -166,6 +170,11 @@ export default function StagesPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (stagesSyncState === 'error') {
+      setPageError('The live stage feed is unavailable. Reconnect before removing a stage.');
+      setDeleteTarget(null);
+      return;
+    }
     const activeSlots = scheduledUsageCount(deleteTarget.id);
     if (activeSlots > 0) {
       setPageError(`"${deleteTarget.name}" is used by ${activeSlots} active schedule slot(s). Move or remove those schedule slots before deleting this stage.`);
@@ -427,7 +436,7 @@ export default function StagesPage() {
           footer={
             <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:justify-end">
               <Button variant="outline" size="md" className="w-full sm:w-auto" onClick={() => setDeleteTarget(null)} disabled={deleting}>Keep stage</Button>
-              <Button variant="destructive" size="md" className="w-full sm:w-auto" onClick={() => void handleDelete()} isLoading={deleting} disabled={deleting || (deleteTarget ? scheduledUsageCount(deleteTarget.id) > 0 : false)}>Remove stage</Button>
+              <Button variant="destructive" size="md" className="w-full sm:w-auto" onClick={() => void handleDelete()} isLoading={deleting} disabled={deleting || stagesSyncState === 'error' || (deleteTarget ? scheduledUsageCount(deleteTarget.id) > 0 : false)}>Remove stage</Button>
             </div>
           }
         >
