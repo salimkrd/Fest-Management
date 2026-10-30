@@ -11,7 +11,7 @@ import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import type { Participant } from '@/types/fest';
 
-type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'division' | 'photoUrl' | 'idStatus' | 'email' | 'phone' | 'remarks'>;
+type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'photoUrl' | 'idStatus' | 'email' | 'phone' | 'remarks'>;
 type Entry = {
   registrationId: string; name: string; code: string; type: 'SOLO' | 'GROUP';
   mode: 'STAGE' | 'OFF_STAGE' | null; date: string; timeSlot: string;
