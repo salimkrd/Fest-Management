@@ -103,6 +103,7 @@ interface FestContextType {
 
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
+  resultsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   pointsLedger: PointsLedgerEntry[];
   publishResult: (resultId: string) => Promise<void>;
   unpublishResult: (resultId: string, reason?: string) => Promise<void>;
@@ -1369,7 +1370,7 @@ function readStoredResult(id: string, data: DocumentData): CompetitionResult {
     stageName: data.stageName || '',
     marksStatus: data.marksStatus === 'PARTIAL' ? 'PARTIAL' : 'COMPLETE',
     resultStatus: data.resultStatus,
-    publishedDate: data.publishedDate || data.publishedAt,
+    publishedDate: data.publishedDate === null ? undefined : (data.publishedDate || data.publishedAt),
     posterReleased: false,
     ranks: Array.isArray(data.ranks) ? data.ranks.map((rank: DocumentData) => ({
       rank: [1, 2, 3].includes(rank.rank) ? rank.rank : null,
@@ -1620,6 +1621,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return initialResults;
   });
+  const [resultsSyncState, setResultsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
   // Draft artwork lives only in memory after an authenticated API read. Cached result
   // data never determines whether a poster is publicly available.
@@ -1731,7 +1733,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Read official records from the same source the poster API checks before release.
   // Public subscriptions cannot see unpublished results or private poster drafts.
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      setResultsSyncState(isIsolatedDemoOrTest ? 'ready' : 'error');
+      return;
+    }
     const firestore = db;
     let stopped = false;
     let generation = 0;
@@ -1771,10 +1776,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     const subscribe = async () => {
       const currentGeneration = ++generation;
       ready = false;
+      setResultsSyncState('loading');
       unsubscribeResults?.();
       setPosterMedia({});
       let admin = false;
-      try { admin = (await auth?.currentUser?.getIdTokenResult())?.claims.role === 'ADMIN'; }
+      try { admin = (await auth?.currentUser?.getIdTokenResult(true))?.claims.role === 'ADMIN'; }
       catch (error) { console.warn('[FestContext] Could not verify result access:', error); }
       if (stopped || currentGeneration !== generation) return;
       isAdmin = admin;
@@ -1785,7 +1791,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         if (stopped || currentGeneration !== generation) return;
         const records = snapshot.docs.map(item => readStoredResult(item.id, item.data()));
         setResults(records);
-      }, error => console.warn('[FestContext] Official results synchronization failed:', error));
+        setResultsSyncState('ready');
+      }, error => {
+        setResultsSyncState('error');
+        console.warn('[FestContext] Official results synchronization failed:', error);
+      });
       ready = true;
       void refreshPosters();
     };
@@ -3201,7 +3211,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (r.id === resultId) {
         return {
           ...r,
-          resultStatus: 'REVISION_REQUIRED'
+          resultStatus: 'REVISION_REQUIRED',
+          publishedDate: undefined
         };
       }
       return r;
@@ -3315,6 +3326,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         revokeJudgeAssignment,
         cleanupOrphanedJudgeAssignments,
         results,
+        resultsSyncState,
         pointsLedger,
         publishResult,
         unpublishResult,
