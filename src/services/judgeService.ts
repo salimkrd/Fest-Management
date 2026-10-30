@@ -371,9 +371,21 @@ export class JudgeService {
     const markEntryId = `me-${params.assignmentId}`;
     const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
     const markEntryRef = db.collection('markEntries').doc(markEntryId);
+    const assignRef = db.collection('judgeAssignments').doc(params.assignmentId);
 
     await db.runTransaction(async (transaction) => {
       const lockDoc = await transaction.get(lockRef);
+      const currentAssignment = await transaction.get(assignRef);
+      if (!currentAssignment.exists) {
+        throw new Error('Unauthorized: Judge assignment not found.');
+      }
+      const currentAssignmentData = currentAssignment.data()!;
+      if (currentAssignmentData.revoked || currentAssignmentData.status === 'REVOKED') {
+        throw new Error('Unauthorized: Assignment has been revoked.');
+      }
+      if (currentAssignmentData.status === 'SUBMITTED') {
+        throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
+      }
       if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
       }
@@ -420,6 +432,14 @@ export class JudgeService {
         scores: normalizedScores,
         remarks: params.remarks || '',
         updatedAt
+      });
+
+      // Keep the Admin Mark Entry roster in step with judge draft saves.
+      // The Admin UI subscribes to judgeAssignments, so update its status
+      // atomically with the scorecard write.
+      transaction.update(assignRef, {
+        status: 'IN_PROGRESS',
+        lastDraftAt: updatedAt
       });
     });
 
