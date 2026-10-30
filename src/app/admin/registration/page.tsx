@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Check, Trash2, ClipboardList, Users, UserRound, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Search, Check, Trash2, ClipboardList, Filter } from 'lucide-react';
 
 export default function RegistrationManagementPage() {
   const { registrations, teams, categories, competitions, participants, addRegistration, updateRegistrationStatus, deleteRegistration } = useFest();
@@ -35,7 +35,6 @@ export default function RegistrationManagementPage() {
   const isGroup = selectedCompetition?.type === 'GROUP';
   const approvedCount = registrations.filter(r => r.status === 'APPROVED').length;
   const pendingCount = registrations.filter(r => r.status === 'PENDING').length;
-  const rejectedCount = registrations.filter(r => r.status === 'REJECTED').length;
 
   // Derived available participants for selected team & category using domain eligibility engine
   const availableParticipants = participants.filter(p =>
