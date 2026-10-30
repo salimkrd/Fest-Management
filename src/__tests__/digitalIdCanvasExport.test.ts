@@ -57,7 +57,8 @@ describe('Digital ID PNG canvas photo rendering', () => {
   it('draws real participant photo inside circular avatar and still draws QR', async () => {
     const originalPhoto = new Blob(['participant image'], { type: 'image/jpeg' });
     await exportDigitalIdAsPng(participant, 'SAHITHYOLSAV 2025', {
-      token: 'signedtoken', qrPayload: 'secure qr', photoBlob: originalPhoto
+      token: 'signedtoken', qrPayload: 'secure qr', photoBlob: originalPhoto,
+      institutionName: "Ma'din Suffa Campus Vavoor"
     });
     // One draw for the real portrait, one for the signed QR.
     expect(ctx.scale).toHaveBeenCalledWith(4, 4);
@@ -66,6 +67,7 @@ describe('Digital ID PNG canvas photo rendering', () => {
     expect(ctx.clip).toHaveBeenCalled();
     expect(ctx.restore).toHaveBeenCalled();
     expect(fillText).toHaveBeenCalledWith('SAHITHYOLSAV 2025', 320, 105);
+    expect(fillText).toHaveBeenCalledWith("Ma'din Suffa Campus Vavoor", 320, 140);
     expect(linkClick).toHaveBeenCalledOnce();
     expect(link.download).toContain('Digital_ID_#1001');
     const idLines = fillText.mock.calls.filter(call => call[1] === 70 && call[3] === 245);
