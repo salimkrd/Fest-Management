@@ -70,6 +70,7 @@ interface FestContextType {
   deleteRegistration: (id: string) => Promise<void>;
 
   stages: Stage[];
+  stagesSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addStage: (stage: Omit<Stage, 'id'>) => Promise<void>;
   updateStage: (id: string, stage: Partial<Stage>) => Promise<void>;
   deleteStage: (id: string) => Promise<void>;
@@ -1575,6 +1576,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
+  const [stagesSyncState, setStagesSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
@@ -1953,46 +1956,54 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isIsolatedDemoOrTest]);
 
-  // Realtime Firestore stages synchronization for live production
+  // Realtime Firestore stages synchronization for live production.
+  // The collection is publicly readable, while Firestore rules keep all writes Admin-only.
   useEffect(() => {
-    if (!isIsolatedDemoOrTest && db) {
-      const firestore = db;
-      try {
-        const stagesRef = collection(firestore, 'stages');
-        const unsubscribe = onSnapshot(
-          stagesRef,
-          (snapshot) => {
-            if (snapshot.empty) {
-              setStages([]);
-              return;
-            }
-            const liveStages: Stage[] = snapshot.docs.map(d => {
-              const dt = d.data();
-              return {
-                id: d.id,
-                code: dt.code || '',
-                name: dt.name || '',
-                venue: dt.venue || '',
-                capacity: dt.capacity || 0,
-                managerName: dt.managerName || '',
-                managerPhone: dt.managerPhone || '',
-                audioVisualStatus: dt.audioVisualStatus || 'OPERATIONAL',
-                currentEvent: dt.currentEvent,
-                nextEvent: dt.nextEvent
-              };
-            });
-            setStages(liveStages);
-          },
-          (err) => {
-            console.warn('[FestContext] Firestore stages sync warning:', err);
-          }
-        );
-        return () => unsubscribe();
-      } catch (e) {
-        console.warn('[FestContext] Could not subscribe to stages:', e);
-      }
+    if (isIsolatedDemoOrTest) {
+      setStagesSyncState('ready');
+      return;
     }
-  }, [isIsolatedDemoOrTest]);
+    if (!db) {
+      setStagesSyncState('error');
+      return;
+    }
+
+    const firestore = db;
+    setStagesSyncState('loading');
+    try {
+      const stagesRef = collection(firestore, 'stages');
+      const unsubscribe = onSnapshot(
+        stagesRef,
+        (snapshot) => {
+          const liveStages: Stage[] = snapshot.docs.map(d => {
+            const dt = d.data();
+            return {
+              id: d.id,
+              code: dt.code || '',
+              name: dt.name || '',
+              venue: dt.venue || '',
+              capacity: typeof dt.capacity === 'number' ? dt.capacity : Number(dt.capacity) || 0,
+              managerName: dt.managerName || '',
+              managerPhone: dt.managerPhone || '',
+              audioVisualStatus: dt.audioVisualStatus || 'OPERATIONAL',
+              currentEvent: dt.currentEvent || '',
+              nextEvent: dt.nextEvent || ''
+            };
+          });
+          setStages(liveStages);
+          setStagesSyncState('ready');
+        },
+        (err) => {
+          setStagesSyncState('error');
+          console.warn('[FestContext] Firestore stages sync warning:', err);
+        }
+      );
+      return () => unsubscribe();
+    } catch (e) {
+      setStagesSyncState('error');
+      console.warn('[FestContext] Could not subscribe to stages:', e);
+    }
+  }, [isIsolatedDemoOrTest, db]);
 
   // Realtime Firestore schedules synchronization for live production
   useEffect(() => {
@@ -3312,6 +3323,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         updateRegistrationStatus,
         deleteRegistration,
         stages,
+        stagesSyncState,
         addStage,
         updateStage,
         deleteStage,
