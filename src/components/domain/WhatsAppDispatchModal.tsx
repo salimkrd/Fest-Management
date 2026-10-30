@@ -189,7 +189,7 @@ export const WhatsAppDispatchModal: React.FC<WhatsAppDispatchModalProps> = ({
             Prepared WhatsApp Dispatch Preview
           </label>
           <div className="overflow-x-auto rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-xs font-mono leading-5 text-emerald-950 whitespace-pre-line">
-            {`Assalamu Alaikum / Greetings ${markEntry.judgeName},\n\nYou have been designated as an Official Adjudicator for \${theme.festivalName}.\nEvent: ${markEntry.competitionName} (${markEntry.categoryName})\nAccess Code: ${markEntry.accessCode || 'JRY-4101'}\n\nDirect Link: ${directLink}`}
+            {`Assalamu Alaikum / Greetings ${markEntry.judgeName},\n\nYou have been designated as an Official Adjudicator for ${theme.festivalName}.\nEvent: ${markEntry.competitionName} (${markEntry.categoryName})\nAccess Code: ${markEntry.accessCode || 'JRY-4101'}\n\nDirect Link: ${directLink}`}
           </div>
         </div>
       </div>
