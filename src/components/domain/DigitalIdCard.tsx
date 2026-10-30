@@ -194,7 +194,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <h4 className="relative text-xl sm:text-2xl font-extrabold tracking-tight leading-tight break-words">
               <span className="festival-name">{theme.festivalName}</span>
             </h4>
-            <p className="relative text-xs sm:text-sm text-blue-100 mt-1">Annual Cultural &amp; Literary Festival</p>
+            <p className="relative text-xs sm:text-sm text-blue-100 mt-1">{theme.institutionName}</p>
             <div className="relative flex justify-center mt-5">
               <div className="w-[108px] h-[108px] rounded-full p-1.5 bg-white ring-4 ring-blue-200 shadow-lg">
                 <ParticipantPhoto photoUrl={participant.photoUrl} name={participant.name} shape="circle" size="lg" className="!w-full !h-full border-2 border-[#2563EB]" />
