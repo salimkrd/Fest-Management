@@ -4,13 +4,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Award, CalendarDays, CheckCircle2, Clock3, DoorOpen, IdCard, LogOut, Medal, Trophy, Users2 } from 'lucide-react';
+import { ParticipantProfileEditor } from '@/components/domain/ParticipantProfileEditor';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import type { Participant } from '@/types/fest';
 
-type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'division' | 'photoUrl' | 'idStatus'>;
+type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'division' | 'photoUrl' | 'idStatus' | 'email' | 'phone' | 'remarks'>;
 type Entry = {
   registrationId: string; name: string; code: string; type: 'SOLO' | 'GROUP';
   mode: 'STAGE' | 'OFF_STAGE' | null; date: string; timeSlot: string;
@@ -125,13 +126,13 @@ export default function ParticipantDashboard() {
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#526070]">
               <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">ID: {profile.id}</span>
               <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">Bib: {profile.bib}</span>
-              <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">{profile.classGrade} · Division {profile.division}</span>
+              <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">{profile.classGrade}</span>
             </div>
           </div>
-          <button type="button" onClick={() => setIdOpen(true)}
+          <div className="flex flex-col gap-2 sm:ml-auto w-full sm:w-auto"><ParticipantProfileEditor profile={profile} onSaved={refresh} /><button type="button" onClick={() => setIdOpen(true)}
             className="inline-flex items-center justify-center gap-2 bg-[#2563EB] text-white rounded-xl px-5 py-3 text-sm font-bold hover:bg-[#1D4ED8]">
             <IdCard className="w-5 h-5" /> My Digital ID Card
-          </button>
+          </button></div>
         </section>
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
