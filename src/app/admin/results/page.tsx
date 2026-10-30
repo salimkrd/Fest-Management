@@ -214,7 +214,7 @@ export default function ResultManagementPage() {
                     </td>
                     <td className="py-4 px-6 text-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${res.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                        {res.type}
+                        {res.type === 'SOLO' ? 'Individual' : 'Group'}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-center font-semibold">
