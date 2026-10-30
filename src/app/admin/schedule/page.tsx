@@ -382,7 +382,7 @@ export default function SchedulePage() {
                     </td>
                     <td className="py-4 px-6 text-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${slot.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                        {slot.type}
+                        {slot.type === 'SOLO' ? 'Individual' : 'Group'}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-[#526070]">

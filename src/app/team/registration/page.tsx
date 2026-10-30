@@ -98,7 +98,7 @@ export default function TeamRegistrationPage() {
     }
 
     let participantName = '';
-    if (comp.type === 'SOLO') {
+    if (comp.type !== 'GROUP') {
       const part = teamEligibleParticipants.find(p => p.id === participantId);
       if (!part) {
         setError('Please select a student contestant from your team roster.');
@@ -123,7 +123,7 @@ export default function TeamRegistrationPage() {
     setError('');
     try {
       await addRegistration({
-        participantId: comp.type === 'SOLO' ? participantId : undefined,
+        participantId: comp.type !== 'GROUP' ? participantId : undefined,
         groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
         participantName,
         teamId: team.id,
@@ -134,7 +134,7 @@ export default function TeamRegistrationPage() {
         competitionId: comp.id,
         competitionName: comp.name,
         type: comp.type,
-        chestNumber: chestNumber || (comp.type === 'SOLO'
+        chestNumber: chestNumber || (comp.type !== 'GROUP'
           ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000')
           : `GRP-${team.code}-${comp.code}`),
         status: 'APPROVED'
@@ -167,7 +167,7 @@ export default function TeamRegistrationPage() {
               Competition Registration
             </h1>
             <p className="text-xs text-[#526070] mt-1">
-              Enroll {team?.name} contestants into solo and group competitions
+              Enroll {team?.name} contestants into individual and group competitions
             </p>
           </div>
           <Button
@@ -295,7 +295,7 @@ export default function TeamRegistrationPage() {
               label="Select Competition"
               value={competitionId}
               onChange={(e) => handleCompetitionChange(e.target.value)}
-              options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type})` }))}
+              options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type === 'SOLO' ? 'Individual' : 'Group'})` }))}
             />
 
             {availableCompetitions.length === 0 && (
