@@ -118,7 +118,7 @@ export default function GreenRoomPage() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data() as FirestoreGreenRoomAssignment);
+        const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreGreenRoomAssignment));
         items.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
         setRoster(items);
         setLoadingRoster(false);
@@ -132,7 +132,7 @@ export default function GreenRoomPage() {
     );
 
     return () => unsubscribe();
-  }, [selectedCompId]);
+  }, [selectedCompId, db]);
 
   // Candidate matches for manual search
   const searchResults = useMemo(() => {
@@ -325,9 +325,9 @@ export default function GreenRoomPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 sm:space-y-6">
         {/* Top Header & Competition Selector */}
-        <div className="bg-white rounded-2xl border border-[#E1E7EF] p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 lg:p-6 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#2563EB] border border-blue-200 flex items-center justify-center font-bold">
               <DoorOpen className="w-6 h-6" />
@@ -345,8 +345,8 @@ export default function GreenRoomPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex flex-col text-right">
+          <div className="flex w-full flex-col sm:flex-row sm:items-end xl:w-auto gap-3">
+            <div className="flex min-w-0 flex-1 flex-col text-left">
               <label htmlFor="comp-selector" className="text-[10px] uppercase font-bold text-[#526070] mb-1">
                 Active Competition Desk:
               </label>
@@ -354,7 +354,7 @@ export default function GreenRoomPage() {
                 id="comp-selector"
                 value={selectedCompId}
                 onChange={(e) => setSelectedCompId(e.target.value)}
-                className="px-3 py-2 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl text-xs font-bold text-[#111111] focus:outline-hidden focus:ring-2 focus:ring-[#2563EB]"
+                className="w-full min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
               >
                 {competitions.map((comp) => (
                   <option key={comp.id} value={comp.id}>
@@ -405,7 +405,7 @@ export default function GreenRoomPage() {
         )}
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
           <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] shadow-xs">
             <span className="text-[10px] uppercase font-bold text-[#526070] block">Enrolled Total</span>
             <span className="text-2xl font-black text-[#111111] mt-1 block">{totalEnrolled}</span>
@@ -465,9 +465,9 @@ export default function GreenRoomPage() {
         )}
 
         {/* Main Work Area: Left Scanner & Search, Right Roster Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 lg:gap-6">
           {/* Left Column: Scanner & Search (5 cols) */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="min-w-0 xl:col-span-5 space-y-4 sm:space-y-5">
             {/* Camera QR Scanner */}
             <GreenRoomScanner
               onScanSuccess={(code) => handlePerformCheckIn(code, undefined, 'QR_SCAN')}
@@ -475,7 +475,7 @@ export default function GreenRoomPage() {
             />
 
             {/* Manual Search & Check-in Card */}
-            <div className="bg-white rounded-2xl border border-[#E1E7EF] p-5 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-[#E1E7EF]">
                 <Search className="w-4 h-4 text-[#2563EB]" />
                 <h3 className="text-sm font-bold text-[#111111]">Manual Participant Lookup</h3>
@@ -569,8 +569,8 @@ export default function GreenRoomPage() {
           </div>
 
           {/* Right Column: Checked-In Roster Queue (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="bg-white rounded-2xl border border-[#E1E7EF] p-5 shadow-xs">
+          <div className="min-w-0 xl:col-span-7 space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
               {/* Table Header & Filters */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E1E7EF]">
                 <div>
@@ -595,8 +595,39 @@ export default function GreenRoomPage() {
                 </div>
               </div>
 
+              {/* Mobile roster cards */}
+              {!loadingRoster && filteredRoster.length > 0 && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:hidden">
+                  {filteredRoster.map((item) => (
+                    <article key={item.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white font-mono text-xl font-black shadow-sm">{item.codeLetter}</div>
+                          <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{item.participantName}</p><p className="truncate text-xs text-slate-500">{item.teamName} ({item.teamCode})</p></div>
+                        </div>
+                        <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-[10px] text-slate-600">#{item.codeIndex + 1}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-xs text-slate-500"><span>{item.chestNumber ? `Chest #${item.chestNumber}` : item.registrationCode}</span><span>{new Date(item.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                      <select value={item.status} onChange={(e) => handleUpdateStatus(item.registrationId, e.target.value as GreenRoomContestantStatus)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                        <option value="CHECKED_IN">Waiting (Checked In)</option><option value="ON_STAGE">On Stage</option><option value="COMPLETED">Completed</option><option value="ABSENT">Absent</option>
+                      </select>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" leftIcon={<Printer className="h-3.5 w-3.5" />} onClick={() => { setSelectedAssignmentForSlip(item); setSlipModalOpen(true); }}>Print Code Slip</Button>
+                        <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit2 className="h-3.5 w-3.5" />} onClick={() => { setReassignTarget(item); setNewCodeInput(''); setReassignReason(''); setReassignModalOpen(true); }}>Reassign</Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {(loadingRoster || filteredRoster.length === 0) && (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center md:hidden">
+                  {loadingRoster ? <><div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /><p className="text-xs font-medium text-slate-500">Syncing Green Room queue…</p></> : <><DoorOpen className="mx-auto mb-2 h-8 w-8 text-slate-400" /><p className="text-sm font-semibold text-slate-800">No contestants found</p><p className="mt-1 text-xs text-slate-500">Check in an approved contestant to begin the lineup.</p></>}
+                </div>
+              )}
+
               {/* Contestants Table */}
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4 hidden overflow-x-auto md:block">
                 {loadingRoster ? (
                   <div className="py-12 text-center text-xs text-[#526070]">
                     <div className="w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
