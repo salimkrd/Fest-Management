@@ -10,9 +10,9 @@ import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import {
-  Plus, Edit2, Trash2, MapPin, Users, Radio, Phone, Music, CheckCircle2,
+  Plus, Edit2, Trash2, MapPin, Users, Radio, Phone, Music,
   Search, Building2, Activity, Wrench, Clock3, Wifi, WifiOff, AlertCircle,
-  CalendarDays, ArrowUpRight
+  CalendarDays
 } from 'lucide-react';
 
 type AudioStatus = Stage['audioVisualStatus'];
@@ -84,11 +84,13 @@ export default function StagesPage() {
   };
 
   const handleOpenAdd = () => {
+    setPageError('');
     resetForm();
     setModalOpen(true);
   };
 
   const handleOpenEdit = (stage: Stage) => {
+    setPageError('');
     setEditingStage(stage);
     setName(stage.name || '');
     setCode(stage.code || '');
@@ -219,7 +221,7 @@ export default function StagesPage() {
               Manage stage venues, A/V readiness, audience capacity and stage manager coordination.
             </p>
           </div>
-          <Button variant="primary" size="md" className="w-full shrink-0 sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAdd}>
+          <Button variant="primary" size="md" className="w-full shrink-0 sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAdd} disabled={stagesSyncState === 'error'}>
             Add Stage
           </Button>
         </div>
@@ -313,7 +315,7 @@ export default function StagesPage() {
                   <div className="space-y-4 p-4 sm:p-5">
                     <div className="flex min-w-0 items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-xs font-extrabold text-blue-700 sm:h-12 sm:w-12">{stage.code}</div>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-xs font-extrabold text-blue-700 sm:h-12 sm:w-12"><span className="break-all text-center">{stage.code}</span></div>
                         <div className="min-w-0">
                           <h3 className="break-words text-base font-bold text-slate-950">{stage.name}</h3>
                           <p className="mt-1 flex min-w-0 items-start gap-1.5 text-xs leading-5 text-slate-500"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="break-words">{stage.venue}</span></p>
@@ -356,8 +358,8 @@ export default function StagesPage() {
                   <div className="mt-auto flex flex-col gap-2 border-t border-slate-100 bg-slate-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                     <span className="text-[10px] text-slate-500">{activeSlots > 0 ? `Used by ${activeSlots} active schedule slot(s)` : 'No active schedule dependencies'}</span>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-                      <Button variant="outline" size="sm" className="w-full sm:w-auto" leftIcon={<Edit2 className="h-3.5 w-3.5" />} onClick={() => handleOpenEdit(stage)}>Edit stage</Button>
-                      <Button variant="ghost" size="sm" className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 sm:w-auto" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setDeleteTarget(stage)}>Remove</Button>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" leftIcon={<Edit2 className="h-3.5 w-3.5" />} onClick={() => handleOpenEdit(stage)} disabled={stagesSyncState === 'error'}>Edit stage</Button>
+                      <Button variant="ghost" size="sm" className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 sm:w-auto" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setDeleteTarget(stage)} disabled={stagesSyncState === 'error'}>Remove</Button>
                     </div>
                   </div>
                 </article>
