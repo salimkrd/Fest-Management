@@ -74,6 +74,19 @@ describe('ExportService — Official Published Winners Verification', () => {
     expect(row.eventTotalPoints).toBe(25);
   });
 
+
+  it('escapes commas, quotes, and line breaks in CSV text fields', () => {
+    const rows = ExportService.getOfficialPublishedWinners(sampleResults);
+    const csv = ExportService.generateWinnersCSV([{
+      ...rows[0],
+      competitionName: 'Speech, "Final"\nRound'
+    }]);
+
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    expect(csv).toContain('"Speech, ""Final""\nRound"');
+    expect(csv).toContain('\r\n');
+  });
+
   it('exports grades and official points without raw scores', () => {
     const rows = ExportService.getOfficialPublishedWinners(sampleResults);
     const csv = ExportService.generateWinnersCSV(rows);
