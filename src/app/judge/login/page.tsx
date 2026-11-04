@@ -13,10 +13,12 @@ import Link from 'next/link';
 function JudgeLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { theme } = useFest();
+  const { competitions, theme } = useFest();
 
   const urlCode = searchParams.get('code') || '';
   const urlSecret = searchParams.get('token') || '';
+  const urlCompId = searchParams.get('competitionId') || '';
+  const assignedCompetition = competitions.find((competition) => competition.id === urlCompId);
 
   const [accessCode, setAccessCode] = useState(urlCode);
   const [sessionSecret, setSessionSecret] = useState(urlSecret);
@@ -83,8 +85,8 @@ function JudgeLoginForm() {
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">Assigned Stage Competition</p>
-          <p className="mt-1 text-sm font-semibold text-slate-800">Automatically linked to your access code</p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Your assigned competition is verified securely after you enter the official Juror Access Code. No manual selection is required.</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">{assignedCompetition ? assignedCompetition.name : "Automatically linked to your access code"}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{assignedCompetition ? `${assignedCompetition.code} · ${assignedCompetition.categoryName || "Assigned stage competition"}` : "Your assigned competition is verified securely from your official Juror Access Code. No manual selection is required."}</p>
         </div>
 
         <div>
@@ -139,7 +141,7 @@ export default function JudgeLoginPage() {
   const { theme } = useFest();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/50 flex flex-col justify-center py-10 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <FestivalLogo size={48} />
