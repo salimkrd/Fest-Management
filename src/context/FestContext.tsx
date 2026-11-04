@@ -45,11 +45,13 @@ interface FestContextType {
   updateTheme: (newTheme: Partial<PublicThemeSettings>) => Promise<void>;
 
   categories: Category[];
+  categoriesSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addCategory: (cat: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => Promise<void>;
   updateCategory: (id: string, cat: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 
   teams: Team[];
+  teamsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addTeam: (team: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => Promise<void>;
   updateTeam: (id: string, team: Partial<Team>) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
@@ -61,11 +63,13 @@ interface FestContextType {
   deleteCompetition: (id: string) => Promise<void>;
 
   participants: Participant[];
+  participantsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
   updateParticipant: (id: string, part: Partial<Participant>) => Promise<void>;
   deleteParticipant: (id: string) => Promise<void>;
 
   registrations: Registration[];
+  registrationsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => Promise<void>;
   updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => Promise<void>;
   deleteRegistration: (id: string) => Promise<void>;
@@ -1484,6 +1488,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme.festivalName, theme.logoUrl]);
 
+  const [categoriesSyncState, setCategoriesSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [categories, setCategories] = useState<Category[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
@@ -1676,6 +1682,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Teams with points dynamically updated from the Points Ledger
+  const [teamsSyncState, setTeamsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [teams, setTeams] = useState<Team[]>(() => {
     // In live production, demo fixtures are strictly isolated; authoritative source is Firestore
     if (!isIsolatedDemoOrTest) {
@@ -1837,94 +1845,112 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isIsolatedDemoOrTest]);
 
-  // Realtime Firestore teams synchronization for live production
+  // Realtime Firestore teams synchronization for live production.
   useEffect(() => {
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        const teamsRef = collection(db, 'teams');
-        const unsubscribe = onSnapshot(
-          teamsRef,
-          (snapshot) => {
-            const liveTeams: Team[] = snapshot.docs.map((d, idx) => {
-              const dt = d.data();
-              return {
-                id: d.id,
-                name: dt.name || '',
-                code: dt.code || '',
-                color: dt.color || '#2563EB',
-                managerName: dt.managerName || '',
-                managerEmail: dt.managerEmail || '',
-                managerPhone: dt.managerPhone || '',
-                zone: dt.zone || '',
-                contestantsCount: dt.contestantsCount || 0,
-                eventsCount: dt.eventsCount || 0,
-                totalPoints: dt.totalPoints || 0,
-                soloPoints: dt.soloPoints || 0,
-                groupPoints: dt.groupPoints || 0,
-                rank: dt.rank || idx + 1,
-                firstCount: dt.firstCount || 0,
-                secondCount: dt.secondCount || 0,
-                thirdCount: dt.thirdCount || 0,
-                portalAccess: dt.portalAccess !== false && dt.status !== 'DISABLED',
-                status: dt.status || 'ACTIVE',
-                provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
-                invitationStatus: dt.invitationStatus || 'PENDING',
-                invitationSentAt: dt.invitationSentAt || '',
-                invitationExpiresAt: dt.invitationExpiresAt || ''
-              };
-            });
-            setTeams(liveTeams);
-          },
-          (err) => {
-            console.warn('[FestContext] Firestore realtime teams sync warning:', err);
-          }
-        );
-        return () => unsubscribe();
-      } catch (e) {
-        console.warn('[FestContext] Could not subscribe to realtime teams:', e);
-      }
+    if (isIsolatedDemoOrTest) {
+      setTeamsSyncState('ready');
+      return;
     }
-  }, [isIsolatedDemoOrTest]);
+    if (!db) {
+      setTeamsSyncState('error');
+      return;
+    }
 
-  // Realtime Firestore categories synchronization for live production
-  useEffect(() => {
-    if (!isIsolatedDemoOrTest && db) {
-      const firestore = db;
-      try {
-        const catRef = collection(firestore, 'categories');
-        const unsubscribe = onSnapshot(
-          catRef,
-          (snapshot) => {
-            if (snapshot.empty) {
-              setCategories([]);
-              return;
-            }
-            const liveCategories: Category[] = snapshot.docs.map(d => {
-              const dt = d.data();
-              return {
-                id: d.id,
-                name: dt.name || '',
-                code: dt.code || '',
-                eligibility: dt.eligibility || '',
-                ageRange: dt.ageRange || '',
-                classRange: dt.classRange || '',
-                enrolledCount: dt.enrolledCount || 0,
-                competitionsCount: dt.competitionsCount || 0,
-                status: dt.status || 'ACTIVE'
-              };
-            });
-            setCategories(liveCategories);
-          },
-          (err) => {
-            console.warn('[FestContext] Firestore categories sync warning:', err);
-          }
-        );
-        return () => unsubscribe();
-      } catch (e) {
-        console.warn('[FestContext] Could not subscribe to categories:', e);
-      }
+    setTeamsSyncState('loading');
+    try {
+      const teamsRef = collection(db, 'teams');
+      const unsubscribe = onSnapshot(
+        teamsRef,
+        snapshot => {
+          const liveTeams: Team[] = snapshot.docs.map((d, idx) => {
+            const dt = d.data();
+            return {
+              id: d.id,
+              name: dt.name || '',
+              code: dt.code || '',
+              color: dt.color || '#2563EB',
+              managerName: dt.managerName || '',
+              managerEmail: dt.managerEmail || '',
+              managerPhone: dt.managerPhone || '',
+              zone: dt.zone || '',
+              contestantsCount: dt.contestantsCount || 0,
+              eventsCount: dt.eventsCount || 0,
+              totalPoints: dt.totalPoints || 0,
+              soloPoints: dt.soloPoints || 0,
+              groupPoints: dt.groupPoints || 0,
+              rank: dt.rank || idx + 1,
+              firstCount: dt.firstCount || 0,
+              secondCount: dt.secondCount || 0,
+              thirdCount: dt.thirdCount || 0,
+              portalAccess: dt.portalAccess !== false && dt.status !== 'DISABLED',
+              status: dt.status || 'ACTIVE',
+              provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
+              invitationStatus: dt.invitationStatus || 'PENDING',
+              invitationSentAt: dt.invitationSentAt || '',
+              invitationExpiresAt: dt.invitationExpiresAt || ''
+            };
+          });
+          setTeams(liveTeams);
+          setTeamsSyncState('ready');
+        },
+        err => {
+          setTeamsSyncState('error');
+          console.warn('[FestContext] Firestore realtime teams sync warning:', err);
+        }
+      );
+      return () => unsubscribe();
+    } catch (error) {
+      setTeamsSyncState('error');
+      console.warn('[FestContext] Could not subscribe to realtime teams:', error);
     }
-  }, [isIsolatedDemoOrTest]);
+  }, [isIsolatedDemoOrTest, db]);
+
+  // Realtime Firestore categories synchronization for live production.
+  useEffect(() => {
+    if (isIsolatedDemoOrTest) {
+      setCategoriesSyncState('ready');
+      return;
+    }
+    if (!db) {
+      setCategoriesSyncState('error');
+      return;
+    }
+
+    const firestore = db;
+    setCategoriesSyncState('loading');
+    try {
+      const catRef = collection(firestore, 'categories');
+      const unsubscribe = onSnapshot(
+        catRef,
+        snapshot => {
+          const liveCategories: Category[] = snapshot.docs.map(d => {
+            const dt = d.data();
+            return {
+              id: d.id,
+              name: dt.name || '',
+              code: dt.code || '',
+              eligibility: dt.eligibility || '',
+              ageRange: dt.ageRange || '',
+              classRange: dt.classRange || '',
+              enrolledCount: dt.enrolledCount || 0,
+              competitionsCount: dt.competitionsCount || 0,
+              status: dt.status || 'ACTIVE'
+            };
+          });
+          setCategories(liveCategories);
+          setCategoriesSyncState('ready');
+        },
+        err => {
+          setCategoriesSyncState('error');
+          console.warn('[FestContext] Firestore categories sync warning:', err);
+        }
+      );
+      return () => unsubscribe();
+    } catch (error) {
+      setCategoriesSyncState('error');
+      console.warn('[FestContext] Could not subscribe to categories:', error);
+    }
+  }, [isIsolatedDemoOrTest, db]);
 
   // Realtime Firestore competitions synchronization for live production
   useEffect(() => {
@@ -2205,7 +2231,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const tokenResult = await user.getIdTokenResult(true);
         const role = tokenResult.claims.role || (currentTeamUser ? 'TEAM_MANAGER' : undefined);
         const teamId = (tokenResult.claims.teamId as string | undefined) || currentTeamUser?.id;
-        if (role !== 'ADMIN') {
+        if (role === 'GREEN_ROOM_STAFF') {
+          setParticipantsSyncState('idle');
+          setMarkEntriesSyncState('idle');
+        } else if (role !== 'ADMIN' && role !== 'TEAM_MANAGER') {
           setParticipantsSyncState('idle');
           setRegistrationsSyncState('idle');
           setMarkEntriesSyncState('idle');
@@ -2404,8 +2433,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 };
               });
               setParticipants(liveParts);
+              setParticipantsSyncState('ready');
             },
-            (err) => console.warn('[FestContext] Firestore team participants sync warning:', err)
+            (err) => {
+              setParticipantsSyncState('error');
+              console.warn('[FestContext] Firestore team participants sync warning:', err);
+            }
           );
 
           // 2. Team Manager reads ONLY their own team's registrations
@@ -2437,11 +2470,19 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 };
               });
               setRegistrations(liveRegs);
+              setRegistrationsSyncState('ready');
             },
-            (err) => console.warn('[FestContext] Firestore team registrations sync warning:', err)
+            (err) => {
+              setRegistrationsSyncState('error');
+              console.warn('[FestContext] Firestore team registrations sync warning:', err);
+            }
           );
 
           // Stale local participant/registration auto-migration is disabled to prevent accidental recreation.
+        } else if (role === 'TEAM_MANAGER') {
+          setParticipantsSyncState('error');
+          setRegistrationsSyncState('error');
+          console.warn('[FestContext] Team Manager session is missing an assigned team ID.');
         }
       } catch (authErr) {
         setParticipantsSyncState('error');
@@ -3384,10 +3425,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         theme,
         updateTheme,
         categories,
+        categoriesSyncState,
         addCategory,
         updateCategory,
         deleteCategory,
         teams,
+        teamsSyncState,
         addTeam,
         updateTeam,
         deleteTeam,
@@ -3397,10 +3440,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         updateCompetition,
         deleteCompetition,
         participants,
+        participantsSyncState,
         addParticipant,
         updateParticipant,
         deleteParticipant,
         registrations,
+        registrationsSyncState,
         addRegistration,
         updateRegistrationStatus,
         deleteRegistration,
