@@ -291,7 +291,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         type="button"
         onClick={handleSignOut}
         disabled={signingOut}
-        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-wait disabled:opacity-60"
       >
         {signingOut ? (
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -418,7 +418,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-3">
                 <FestivalLogo size={40} className="rounded-xl" />
                 <span className="min-w-0">
-                  <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-white">
+                  <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-slate-900">
                     {theme.festivalName}
                   </span>
                   <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
