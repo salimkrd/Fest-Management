@@ -40,13 +40,13 @@ export default function ParticipantLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FC] flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/70 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-[#526070] hover:text-[#2563EB] mb-5">
           <ArrowLeft className="w-4 h-4" /> Back to Festival Home
         </Link>
         <div className="mb-3"><FestivalStatusBadge /></div>
-        <div className="rounded-2xl bg-white border border-[#E1E7EF] shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-white border border-[#E1E7EF] shadow-xl shadow-slate-200/60 overflow-hidden">
           <div className="bg-[#225DEE] text-white px-7 py-7">
             <div className="flex items-center gap-2.5 mb-5">
               <FestivalLogo size={44} />
