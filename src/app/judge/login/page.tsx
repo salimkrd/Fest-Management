@@ -169,8 +169,3 @@ export default function JudgeLoginPage() {
     </main>
   );
 }
-
-  );
-}
-  );
-}
