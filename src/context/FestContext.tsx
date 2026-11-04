@@ -106,6 +106,7 @@ interface FestContextType {
   // Official Results & Tabulation Ledger
   results: CompetitionResult[];
   resultsSyncState: 'loading' | 'ready' | 'error' | 'idle';
+  topScorersSyncState: 'loading' | 'ready' | 'error' | 'idle';
   pointsLedger: PointsLedgerEntry[];
   publishResult: (resultId: string) => Promise<void>;
   unpublishResult: (resultId: string, reason?: string) => Promise<void>;
@@ -1501,6 +1502,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
+  const [competitionsSyncState, setCompetitionsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [competitions, setCompetitions] = useState<Competition[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
@@ -1520,6 +1523,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
+  const [participantsSyncState, setParticipantsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [participants, setParticipants] = useState<Participant[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
@@ -1538,6 +1543,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
     return [];
   });
+
+  const [registrationsSyncState, setRegistrationsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
     if (!isIsolatedDemoOrTest) {
@@ -1628,6 +1635,14 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     return initialResults;
   });
   const [resultsSyncState, setResultsSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
+  const topScorersSyncState = useMemo(() => {
+    const states = [competitionsSyncState, participantsSyncState, registrationsSyncState, resultsSyncState];
+    if (states.includes('error')) return 'error' as const;
+    if (states.every(state => state === 'ready')) return 'ready' as const;
+    if (states.includes('idle')) return 'idle' as const;
+    return 'loading' as const;
+  }, [competitionsSyncState, participantsSyncState, registrationsSyncState, resultsSyncState]);
 
   // Draft artwork lives only in memory after an authenticated API read. Cached result
   // data never determines whether a poster is publicly available.
@@ -1912,6 +1927,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   // Realtime Firestore competitions synchronization for live production
   useEffect(() => {
+    if (isIsolatedDemoOrTest) return;
+    if (!db) {
+      setCompetitionsSyncState('error');
+      return;
+    }
+    setCompetitionsSyncState('loading');
     if (!isIsolatedDemoOrTest && db) {
       const firestore = db;
       try {
@@ -1921,6 +1942,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           (snapshot) => {
             if (snapshot.empty) {
               setCompetitions([]);
+              setCompetitionsSyncState('ready');
               return;
             }
             const liveCompetitions: Competition[] = snapshot.docs.map(d => {
@@ -1947,13 +1969,16 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
               };
             });
             setCompetitions(liveCompetitions);
+            setCompetitionsSyncState('ready');
           },
           (err) => {
+            setCompetitionsSyncState('error');
             console.warn('[FestContext] Firestore competitions sync warning:', err);
           }
         );
         return () => unsubscribe();
       } catch (e) {
+        setCompetitionsSyncState('error');
         console.warn('[FestContext] Could not subscribe to competitions:', e);
       }
     }
@@ -2137,7 +2162,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   // Realtime Firestore participants and registrations synchronization for live production
   useEffect(() => {
-    if (isIsolatedDemoOrTest || !db || !auth) return;
+    if (isIsolatedDemoOrTest) return;
+    if (!db || !auth) {
+      setParticipantsSyncState('error');
+      setRegistrationsSyncState('error');
+      return;
+    }
     const firestore = db;
 
     let unsubParts: (() => void) | null = null;
@@ -2145,6 +2175,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     let unsubJudges: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      setParticipantsSyncState('loading');
+      setRegistrationsSyncState('loading');
       if (unsubParts) {
         unsubParts();
         unsubParts = null;
@@ -2161,6 +2193,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (!user) {
         setParticipants([]);
         setRegistrations([]);
+        setParticipantsSyncState('idle');
+        setRegistrationsSyncState('idle');
         setMarkEntries([]);
         setMarkEntriesSyncState('idle');
         return;
@@ -2170,7 +2204,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const tokenResult = await user.getIdTokenResult(true);
         const role = tokenResult.claims.role || (currentTeamUser ? 'TEAM_MANAGER' : undefined);
         const teamId = (tokenResult.claims.teamId as string | undefined) || currentTeamUser?.id;
-        if (role !== 'ADMIN') setMarkEntriesSyncState('idle');
+        if (role !== 'ADMIN') {
+          setParticipantsSyncState('idle');
+          setRegistrationsSyncState('idle');
+          setMarkEntriesSyncState('idle');
+        }
 
         if (role === 'ADMIN') {
           // 1. Admin reads all participants in realtime
@@ -2201,8 +2239,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 };
               });
               setParticipants(liveParts);
+              setParticipantsSyncState('ready');
             },
-            (err) => console.warn('[FestContext] Firestore participants sync warning:', err)
+            (err) => {
+              setParticipantsSyncState('error');
+              console.warn('[FestContext] Firestore participants sync warning:', err);
+            }
           );
 
           // 2. Admin reads all registrations in realtime
@@ -2212,6 +2254,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             (snapshot) => {
               if (snapshot.empty) {
                 setRegistrations([]);
+                setRegistrationsSyncState('ready');
                 return;
               }
               const liveRegs: Registration[] = snapshot.docs.map(d => {
@@ -2238,8 +2281,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 };
               });
               setRegistrations(liveRegs);
+              setRegistrationsSyncState('ready');
             },
-            (err) => console.warn('[FestContext] Firestore registrations sync warning:', err)
+            (err) => {
+              setRegistrationsSyncState('error');
+              console.warn('[FestContext] Firestore registrations sync warning:', err);
+            }
           );
 
           // 3. Admin reads all judge assignments in realtime across browsers
@@ -2396,6 +2443,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           // Stale local participant/registration auto-migration is disabled to prevent accidental recreation.
         }
       } catch (authErr) {
+        setParticipantsSyncState('error');
+        setRegistrationsSyncState('error');
         console.warn('[FestContext] Auth state token check warning:', authErr);
       }
     });
@@ -3371,6 +3420,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         cleanupOrphanedJudgeAssignments,
         results,
         resultsSyncState,
+        topScorersSyncState,
         pointsLedger,
         publishResult,
         unpublishResult,
