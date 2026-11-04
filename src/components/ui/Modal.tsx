@@ -46,43 +46,46 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-fade-in"
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
+      <div
+        className="fixed inset-0 bg-slate-950/45 backdrop-blur-[2px] transition-opacity animate-fade-in"
         onClick={onClose}
       />
 
-      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-        <div 
-          className={`relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all w-full my-8 border border-[#E1E7EF] ${widthClasses[maxWidth]}`}
+      <div className="flex min-h-dvh items-center justify-center p-2.5 sm:min-h-full sm:p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className={`relative my-auto flex max-h-[calc(100dvh-1.25rem)] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl shadow-slate-950/20 sm:my-8 sm:max-h-[calc(100vh-4rem)] ${widthClasses[maxWidth]}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-start justify-between p-6 border-b border-[#E1E7EF]">
-            <div>
-              <h3 className="text-lg font-bold text-[#111111] leading-6">{title}</h3>
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="min-w-0 flex-1">
+              <h3 className="break-words text-base font-bold leading-6 text-slate-950 sm:text-lg" id="modal-title">
+                {title}
+              </h3>
               {description && (
-                <p className="mt-1 text-xs text-[#526070]">{description}</p>
+                <p className="mt-1.5 break-words text-xs leading-5 text-slate-500">
+                  {description}
+                </p>
               )}
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-[#526070] hover:text-[#111111] hover:bg-[#F8FAFC] transition-colors focus:outline-none"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 max-h-[calc(85vh-130px)] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
             {children}
           </div>
 
-          {/* Footer */}
           {footer && (
-            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-[#F8FAFC] border-t border-[#E1E7EF]">
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3.5 sm:px-6 sm:py-4">
               {footer}
             </div>
           )}

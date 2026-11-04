@@ -8,7 +8,6 @@ import {
   Users,
   ClipboardCheck,
   Award,
-  Shield,
   LogOut,
   Trophy,
   FileDown
@@ -97,55 +96,58 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Top Banner with Team Badge */}
-      <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <FestivalLogo size={36} />
+    <div className="flex min-h-dvh flex-col bg-slate-50">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+          <div className="flex min-h-[68px] items-center justify-between gap-3 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+              <FestivalLogo size={34} />
               <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shadow-xs"
-                style={{ backgroundColor: team?.color || '#2563EB' }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-extrabold text-white shadow-sm"
+                style={{ backgroundColor: team.color || '#2563EB' }}
+                aria-label={`Team code ${team.code}`}
               >
-                {team?.code}
+                {team.code}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-bold text-[#111111] leading-none">
-                    {team?.name}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <h1 className="truncate text-sm font-bold leading-tight text-slate-950 sm:text-[15px]">
+                    {team.name}
                   </h1>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
-                    CONTINGENT
+                  <span className="hidden shrink-0 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-700 sm:inline-flex">
+                    Contingent
                   </span>
                 </div>
-                <span className="text-[11px] text-[#526070] font-medium">
-                  <span className="festival-name">{theme.festivalName}</span> · {theme.institutionName}
-                </span>
+                <p className="mt-1 hidden truncate text-[11px] font-medium text-slate-500 sm:block">
+                  <span className="festival-name">{theme.festivalName}</span>
+                  <span className="px-1.5 text-slate-300">·</span>
+                  {theme.institutionName}
+                </p>
+                <p className="mt-1 truncate text-[10px] font-medium text-slate-500 sm:hidden">
+                  <span className="festival-name">{theme.festivalName}</span>
+                </p>
               </div>
             </div>
 
-            {/* Right Team Stats & Controls */}
-            <FestivalStatusBadge className="hidden md:inline-flex" />
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 bg-[#F8FAFC] px-3.5 py-1.5 rounded-lg border border-[#E1E7EF] text-xs">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <FestivalStatusBadge className="hidden md:inline-flex" />
+
+              <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs lg:flex">
                 <div className="flex items-center gap-1.5">
-                  <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-[#526070]">Rank:</span>
-                  <span className="font-extrabold text-[#111111]">#{team?.rank}</span>
+                  <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-slate-500">Rank</span>
+                  <span className="font-bold text-slate-900">#{team.rank || 1}</span>
                 </div>
-                <div className="w-px h-3 bg-neutral-300" />
+                <span className="h-4 w-px bg-slate-200" />
                 <div>
-                  <span className="text-[#526070]">Total Points:</span>{' '}
-                  <span className="font-extrabold text-[#2563EB]">{team?.totalPoints}</span>
+                  <span className="text-slate-500">Points</span>
+                  <span className="ml-1.5 font-bold text-blue-700">{team.totalPoints ?? 0}</span>
                 </div>
               </div>
 
-              {/* Authenticated Team Contingent Display */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#E1E7EF] bg-white text-xs font-bold text-[#111111]">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>{team?.name} ({team?.code})</span>
-              </div>
+              <span className="hidden max-w-40 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 sm:inline-flex">
+                {team.name} ({team.code})
+              </span>
 
               <button
                 type="button"
@@ -153,47 +155,47 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   if (auth) {
                     try {
                       await signOut(auth);
-                    } catch (e) {
-                      console.warn('Sign out error:', e);
+                    } catch (error) {
+                      console.warn('Sign out error:', error);
                     }
                   }
                   setCurrentTeamUser(null);
                   router.push('/team/login');
                 }}
-                className="p-2 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
-                title="Sign out of Team Workspace"
+                aria-label="Sign out of Team Workspace"
+                title="Sign out"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          {/* Navigation Tabs Bar */}
-          <div className="flex space-x-1 border-t border-[#E1E7EF] pt-1 overflow-x-auto">
-            {teamNavItems.map((item) => {
+          <nav aria-label="Team Manager navigation" className="-mx-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 px-3 sm:mx-0 sm:px-0">
+            {teamNavItems.map(item => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs transition-colors whitespace-nowrap ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-12 shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-xs font-semibold whitespace-nowrap transition-colors sm:px-4 ${
                     isActive
-                      ? 'border-[#2563EB] text-[#2563EB]'
-                      : 'border-transparent text-[#526070] hover:text-[#111111] hover:border-neutral-300'
+                      ? 'border-blue-600 bg-blue-50/60 text-blue-700'
+                      : 'border-transparent text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="h-4 w-4" />
                   <span>{item.name}</span>
                 </Link>
               );
             })}
-          </div>
+          </nav>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
         {children}
       </main>
     </div>

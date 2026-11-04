@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TeamLayout } from '@/components/layout/TeamLayout';
+import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
@@ -9,137 +10,154 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Trash2, Calendar, MapPin, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Trash2, ClipboardList, CalendarDays, Users } from 'lucide-react';
 
 export default function TeamRegistrationPage() {
-  const { currentTeamUser, teams, registrations, categories, competitions, participants, addRegistration, deleteRegistration } = useFest();
-  const team = currentTeamUser || teams[0];
+  const {
+    currentTeamUser,
+    registrations,
+    registrationsSyncState,
+    categories,
+    categoriesSyncState,
+    competitions,
+    competitionsSyncState,
+    participants,
+    participantsSyncState,
+    addRegistration,
+    deleteRegistration
+  } = useFest();
 
+  const team = currentTeamUser;
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-
-  // Form State
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
-  const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
+  const [categoryId, setCategoryId] = useState('');
+  const [competitionId, setCompetitionId] = useState('');
   const [participantId, setParticipantId] = useState('');
   const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState('');
 
-  // Scoped to team only!
-  const myRegistrations = registrations.filter(r => r.teamId === team?.id);
-  const myTeamParticipants = participants.filter(p => p.teamId === team?.id);
+  // Firestore data arrives asynchronously. Keep category and competition selections
+  // valid when the live lists first load or change while the manager is signed in.
+  useEffect(() => {
+    if (categories.length === 0) {
+      if (categoryId) setCategoryId('');
+      if (competitionId) setCompetitionId('');
+      return;
+    }
 
-  const selectedCategory = categories.find(c => c.id === categoryId);
-  const availableCompetitions = competitions.filter(c => c.categoryId === categoryId);
-  const selectedCompetition = competitions.find(c => c.id === competitionId);
+    const categoryStillExists = categories.some(category => category.id === categoryId);
+    const nextCategoryId = categoryStillExists ? categoryId : categories[0].id;
+    if (nextCategoryId !== categoryId) setCategoryId(nextCategoryId);
+
+    const competitionsForCategory = competitions.filter(comp => comp.categoryId === nextCategoryId);
+    const selectedIsValid = competitionsForCategory.some(comp => comp.id === competitionId);
+    if (!selectedIsValid) {
+      setCompetitionId(competitionsForCategory[0]?.id || '');
+    }
+  }, [categories, competitions, categoryId, competitionId]);
+
+  // Every list is scoped to the authenticated team; never fall back to the first team.
+  const myRegistrations = registrations.filter(registration => registration.teamId === team?.id);
+  const myTeamParticipants = participants.filter(participant => participant.teamId === team?.id);
+  const selectedCategory = categories.find(category => category.id === categoryId);
+  const availableCompetitions = competitions.filter(comp => comp.categoryId === categoryId);
+  const selectedCompetition = availableCompetitions.find(comp => comp.id === competitionId);
   const isGroup = selectedCompetition?.type === 'GROUP';
 
-  // Available participants from this team eligible for the selected category/competition
-  const teamEligibleParticipants = myTeamParticipants.filter(p =>
-    isParticipantEligibleForCategory(p, selectedCategory, categories)
+  const teamEligibleParticipants = myTeamParticipants.filter(participant =>
+    isParticipantEligibleForCategory(participant, selectedCategory, categories)
   );
 
-  const filtered = myRegistrations.filter(r =>
-    r.participantName.toLowerCase().includes(search.toLowerCase()) ||
-    r.competitionName.toLowerCase().includes(search.toLowerCase()) ||
-    r.code.toLowerCase().includes(search.toLowerCase())
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = myRegistrations.filter(registration =>
+    registration.participantName.toLowerCase().includes(normalizedSearch) ||
+    registration.competitionName.toLowerCase().includes(normalizedSearch) ||
+    registration.code.toLowerCase().includes(normalizedSearch)
   );
 
   const handleOpenAdd = () => {
-    const initialCat = categories[0]?.id || '';
-    setCategoryId(initialCat);
-    const initialComps = competitions.filter(c => c.categoryId === initialCat);
-    setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
+    const initialCategoryId = categories[0]?.id || '';
+    const initialCompetitions = competitions.filter(comp => comp.categoryId === initialCategoryId);
+    setCategoryId(initialCategoryId);
+    setCompetitionId(initialCompetitions[0]?.id || '');
     setParticipantId('');
     setChestNumber('');
     setError('');
     setModalOpen(true);
   };
 
-  const handleCategoryChange = (newCatId: string) => {
-    setCategoryId(newCatId);
-    const matchingComps = competitions.filter(c => c.categoryId === newCatId);
-    if (matchingComps.length > 0) {
-      setCompetitionId(matchingComps[0].id);
-    } else {
-      setCompetitionId('');
-    }
+  const handleCategoryChange = (nextCategoryId: string) => {
+    setCategoryId(nextCategoryId);
+    const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
+    setCompetitionId(matchingCompetitions[0]?.id || '');
     setParticipantId('');
     setChestNumber('');
+    setError('');
   };
 
-  const handleCompetitionChange = (newCompId: string) => {
-    setCompetitionId(newCompId);
-    const comp = competitions.find(c => c.id === newCompId);
-    if (comp && comp.categoryId && comp.categoryId !== categoryId) {
-      setCategoryId(comp.categoryId);
-    }
+  const handleCompetitionChange = (nextCompetitionId: string) => {
+    const competition = competitions.find(comp => comp.id === nextCompetitionId);
+    setCompetitionId(nextCompetitionId);
+    if (competition?.categoryId) setCategoryId(competition.categoryId);
     setParticipantId('');
     setChestNumber('');
+    setError('');
   };
 
-  const handleParticipantChange = (newPartId: string) => {
-    setParticipantId(newPartId);
-    const part = myTeamParticipants.find(p => p.id === newPartId);
-    if (part?.bib) {
-      setChestNumber(part.bib);
-    }
+  const handleParticipantChange = (nextParticipantId: string) => {
+    setParticipantId(nextParticipantId);
+    const participant = myTeamParticipants.find(item => item.id === nextParticipantId);
+    setChestNumber(participant?.bib || '');
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cat = categories.find(c => c.id === categoryId);
-    const comp = competitions.find(c => c.id === competitionId);
+  const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving) return;
 
-    if (!comp) {
-      setError('Please select an active competition.');
+    const category = categories.find(item => item.id === categoryId);
+    const competition = availableCompetitions.find(item => item.id === competitionId);
+    if (!competition) {
+      setError('Choose a competition from the selected category.');
       return;
     }
 
-    let participantName = '';
-    if (comp.type !== 'GROUP') {
-      const part = teamEligibleParticipants.find(p => p.id === participantId);
-      if (!part) {
-        setError('Please select a student contestant from your team roster.');
-        return;
-      }
-      participantName = part.name;
-    } else {
-      const leader = teamEligibleParticipants.find(p => p.id === participantId);
-      if (!leader) {
-        setError('Choose an eligible participant as this group’s leader.');
-        return;
-      }
-      participantName = `${leader.name} & Team`;
+    const selectedParticipant = teamEligibleParticipants.find(item => item.id === participantId);
+    if (!selectedParticipant) {
+      setError(isGroup
+        ? 'Choose an eligible participant as the group leader.'
+        : 'Choose an eligible participant from your team roster.');
+      return;
     }
 
     if (!team) {
-      setError('No active team assigned to this manager session.');
+      setError('No active team is assigned to this manager session.');
       return;
     }
 
     setSaving(true);
     setError('');
     try {
+      const groupEntry = competition.type === 'GROUP';
       await addRegistration({
-        participantId: comp.type !== 'GROUP' ? participantId : undefined,
-        groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
-        participantName,
+        participantId: groupEntry ? undefined : selectedParticipant.id,
+        groupLeaderId: groupEntry ? selectedParticipant.id : undefined,
+        participantName: groupEntry ? `${selectedParticipant.name} & Team` : selectedParticipant.name,
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
-        categoryId: comp.categoryId || categoryId,
-        categoryName: comp.categoryName || cat?.name || 'General',
-        competitionId: comp.id,
-        competitionName: comp.name,
-        type: comp.type,
-        chestNumber: chestNumber || (comp.type !== 'GROUP'
-          ? (teamEligibleParticipants.find(p => p.id === participantId)?.bib || '#1000')
-          : `GRP-${team.code}-${comp.code}`),
+        categoryId: competition.categoryId || categoryId,
+        categoryName: competition.categoryName || category?.name || 'General',
+        competitionId: competition.id,
+        competitionName: competition.name,
+        type: competition.type,
+        chestNumber: chestNumber.trim() || selectedParticipant.bib || (groupEntry ? `GRP-${team.code}-${competition.code}` : '—'),
         status: 'APPROVED'
       });
       setModalOpen(false);
+      setParticipantId('');
+      setChestNumber('');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
     } finally {
@@ -148,206 +166,293 @@ export default function TeamRegistrationPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to cancel event registration for "${name}"?`)) {
-      try {
-        await deleteRegistration(id);
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to cancel registration.');
-      }
+    if (!team || deletingId) return;
+    if (!window.confirm(`Cancel the event registration for "${name}"?`)) return;
+
+    setDeletingId(id);
+    try {
+      await deleteRegistration(id);
+    } catch (deleteError) {
+      window.alert(deleteError instanceof Error ? deleteError.message : 'Failed to cancel registration.');
+    } finally {
+      setDeletingId('');
     }
+  };
+
+  const statusClass = (status: string) => {
+    if (status === 'APPROVED') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (status === 'REJECTED') return 'border-red-200 bg-red-50 text-red-700';
+    return 'border-amber-200 bg-amber-50 text-amber-700';
   };
 
   return (
     <TeamLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
-              Competition Registration
-            </h1>
-            <p className="text-xs text-[#526070] mt-1">
-              Enroll {team?.name} contestants into individual and group competitions
+      <div className="space-y-5 sm:space-y-6">
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+              <ClipboardList className="h-4 w-4" />
+              Event entries
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-[28px]">Competition Registration</h1>
+            <p className="mt-1.5 text-sm leading-5 text-slate-600">
+              Register eligible participants from {team?.name || 'your team'} for individual and group competitions.
             </p>
           </div>
           <Button
             variant="primary"
-            size="md"
-            leftIcon={<Plus className="w-4 h-4" />}
+            size="lg"
+            className="w-full shrink-0 !rounded-xl sm:w-auto"
+            leftIcon={<Plus className="h-4 w-4" />}
             onClick={handleOpenAdd}
+            disabled={!team || categories.length === 0 || competitions.length === 0}
           >
             Enroll in Competition
           </Button>
-        </div>
+        </header>
 
-        {/* Filter bar */}
-        <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative flex-1 w-full sm:max-w-md">
-            <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search enrolled contestant or event..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
-            />
+        <TeamSyncStatus sources={['participants', 'registrations', 'categories', 'competitions']} />
+
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <ClipboardList className="h-4 w-4 text-blue-700" />
+              Event entries
+            </div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{myRegistrations.length}</p>
+            <p className="mt-1 text-xs text-slate-500">For your contingent</p>
           </div>
-          <span className="text-xs text-[#526070]">
-            {filtered.length} Active Event Entries
-          </span>
-        </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <Users className="h-4 w-4 text-emerald-700" />
+              Eligible roster
+            </div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{myTeamParticipants.length}</p>
+            <p className="mt-1 text-xs text-slate-500">Registered team members</p>
+          </div>
+          <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <CalendarDays className="h-4 w-4 text-violet-700" />
+              Competitions available
+            </div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{competitions.length}</p>
+            <p className="mt-1 text-xs text-slate-500">Across all categories</p>
+          </div>
+        </section>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Reg Code</th>
-                  <th className="py-3 px-6">Participant / Ensemble</th>
-                  <th className="py-3 px-6">Competition Title &amp; Code</th>
-                  <th className="py-3 px-6">Category</th>
-                  <th className="py-3 px-6 text-center">Type</th>
-                  <th className="py-3 px-6 text-center">Status</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E1E7EF]">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-[#526070]">
-                      No event entries registered yet for {team?.name}.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map(r => (
-                    <tr key={r.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-4 px-6 font-mono font-bold text-[#2563EB]">
-                        {r.code}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-[#111111] text-sm block">{r.participantName}</span>
-                        <span className="text-[11px] font-mono text-[#526070]">Chest {r.chestNumber}</span>
-                      </td>
-                      <td className="py-4 px-6 font-semibold text-[#111111]">
-                        {r.competitionName}
-                      </td>
-                      <td className="py-4 px-6 text-[#526070]">
-                        {r.categoryName}
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${r.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                          {r.type}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <Badge variant="success" size="sm" dot>{r.status}</Badge>
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(r.id, r.participantName)}
-                          className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
-                          title="Cancel Entry"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <h2 className="text-sm font-bold text-slate-950">Your event registrations</h2>
+              <p className="mt-1 text-xs text-slate-500">Only entries belonging to your assigned team are shown.</p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                aria-label="Search registrations"
+                placeholder="Search contestant, event or code…"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+
+          {registrationsSyncState === 'loading' && myRegistrations.length === 0 ? (
+            <div className="p-10 text-center text-sm text-slate-500">Loading your team registrations…</div>
+          ) : registrationsSyncState === 'error' ? (
+            <div className="p-8 text-center text-sm text-amber-800">Registration data could not be synchronized. Please refresh after your connection is restored.</div>
+          ) : filtered.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <ClipboardList className="mx-auto h-9 w-9 text-slate-300" />
+              <h3 className="mt-3 text-sm font-semibold text-slate-900">
+                {myRegistrations.length === 0 ? 'No event registrations yet' : 'No registrations match this search'}
+              </h3>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">
+                {myRegistrations.length === 0
+                  ? 'Enroll an eligible participant in an available competition to create your first entry.'
+                  : 'Try another contestant name, competition title or registration code.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 p-3 md:hidden">
+                {filtered.map(registration => (
+                  <article key={registration.id} className="rounded-xl border border-slate-200 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-slate-950">{registration.participantName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{registration.competitionName}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusClass(registration.status)}`}>
+                        {registration.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs">
+                      <div><span className="text-slate-500">Reg. code</span><p className="mt-0.5 font-mono font-semibold text-slate-800">{registration.code}</p></div>
+                      <div><span className="text-slate-500">Category / type</span><p className="mt-0.5 font-medium text-slate-800">{registration.categoryName} · {registration.type === 'SOLO' ? 'Individual' : 'Group'}</p></div>
+                      <div><span className="text-slate-500">Bib / chest</span><p className="mt-0.5 font-mono font-semibold text-slate-800">{registration.chestNumber || '—'}</p></div>
+                    </div>
+                    <div className="mt-3 flex justify-end border-t border-slate-100 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(registration.id, registration.participantName)}
+                        disabled={!!deletingId}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingId === registration.id ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-200 border-t-red-700" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        Cancel entry
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-[800px] w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3.5">Reg. code</th>
+                      <th className="px-5 py-3.5">Participant / group</th>
+                      <th className="px-5 py-3.5">Competition</th>
+                      <th className="px-5 py-3.5">Category</th>
+                      <th className="px-5 py-3.5">Type</th>
+                      <th className="px-5 py-3.5 text-center">Status</th>
+                      <th className="px-5 py-3.5 text-right">Action</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filtered.map(registration => (
+                      <tr key={registration.id} className="transition hover:bg-slate-50/80">
+                        <td className="px-5 py-4 font-mono text-xs font-semibold text-blue-700">{registration.code}</td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-slate-900">{registration.participantName}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Bib / chest: {registration.chestNumber || '—'}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm font-medium text-slate-800">{registration.competitionName}</td>
+                        <td className="px-5 py-4 text-sm text-slate-600">{registration.categoryName}</td>
+                        <td className="px-5 py-4 text-sm text-slate-600">{registration.type === 'SOLO' ? 'Individual' : 'Group'}</td>
+                        <td className="px-5 py-4 text-center">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusClass(registration.status)}`}>{registration.status}</span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(registration.id, registration.participantName)}
+                            disabled={!!deletingId}
+                            aria-label={`Cancel ${registration.participantName} registration`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                          >
+                            {deletingId === registration.id ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-red-600" /> : <Trash2 className="h-4 w-4" />}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
 
-        {/* Add Modal */}
         <Modal
           isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          title={`Enroll Contestant: ${team?.name}`}
-          description="Register squad member into an active event with automatic category check"
+          onClose={() => {
+            if (!saving) setModalOpen(false);
+          }}
+          title={`Enroll Contestant: ${team?.name || 'My Team'}`}
+          description="Choose a category, competition and eligible team participant."
           maxWidth="md"
           footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" size="md" className="w-full sm:w-auto" onClick={() => setModalOpen(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
-                {saving ? 'Registering...' : 'Confirm Entry'}
+              <Button
+                variant="primary"
+                size="md"
+                className="w-full sm:w-auto"
+                type="submit"
+                form="team-registration-form"
+                disabled={saving || !selectedCompetition || !participantId}
+                isLoading={saving}
+              >
+                Confirm Entry
               </Button>
             </div>
           }
         >
-          <form onSubmit={handleSave} className="space-y-4">
-            {error && (
-              <p className="text-xs text-[#DC2626] font-semibold">{error}</p>
-            )}
+          <form id="team-registration-form" onSubmit={handleSave} className="space-y-4">
+            {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs font-medium leading-5 text-red-700">{error}</p>}
 
             <Select
-              label="Select Category Tier"
+              label="Select Category"
               value={categoryId}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              options={categories.map(c => ({ value: c.id, label: c.name }))}
+              onChange={event => handleCategoryChange(event.target.value)}
+              options={categories.map(category => ({ value: category.id, label: category.name }))}
             />
 
             <Select
               label="Select Competition"
               value={competitionId}
-              onChange={(e) => handleCompetitionChange(e.target.value)}
-              options={availableCompetitions.map(c => ({ value: c.id, label: `${c.name} (${c.type === 'SOLO' ? 'Individual' : 'Group'})` }))}
+              onChange={event => handleCompetitionChange(event.target.value)}
+              options={availableCompetitions.map(comp => ({
+                value: comp.id,
+                label: `${comp.name} (${comp.type === 'SOLO' ? 'Individual' : 'Group'})`
+              }))}
             />
 
-            {availableCompetitions.length === 0 && (
-              <p className="text-xs text-amber-600 italic">
-                No active competitions available for {selectedCategory?.name || 'this category'}.
+            {categoriesSyncState === 'loading' || competitionsSyncState === 'loading' ? (
+              <p className="rounded-xl bg-blue-50 px-3.5 py-3 text-xs text-blue-800">Loading the latest categories and competitions…</p>
+            ) : availableCompetitions.length === 0 ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-800">
+                No competitions are currently listed under {selectedCategory?.name || 'this category'}.
               </p>
+            ) : null}
+
+            {selectedCompetition && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-700">
+                <p className="font-semibold text-slate-900">{selectedCompetition.name}</p>
+                <p className="mt-0.5">{selectedCompetition.code} · {selectedCompetition.type === 'SOLO' ? 'Individual event' : `Group event · ${selectedCompetition.groupSize || 'Group size not set'} members`}</p>
+              </div>
             )}
 
-            {isGroup ? (
-              <div className="space-y-2">
-                <Select
-                  label="Group Leader (registered participant)"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[{ value: '', label: '-- Select Group Leader --' }, ...teamEligibleParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib})` }))]}
-                  required
-                />
-                <p className="text-xs text-[#526070]">{selectedCompetition?.groupSize || 'Not set'} members per group. Select one leader only; the entry will appear as &quot;Leader &amp; Team&quot;. Group points credit the team, not its leader.</p>
-              </div>
-            ) : (
-              <div>
-                <Select
-                  label="Select Team Contestant"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[
-                    { value: '', label: '-- Select Enrolled Team Member --' },
-                    ...teamEligibleParticipants.map(p => ({
-                      value: p.id,
-                      label: `${p.name} (${p.bib || 'No Bib'} - ${p.categoryName || p.classGrade || 'Contestant'})`
-                    }))
-                  ]}
-                  required
-                />
-                {teamEligibleParticipants.length === 0 && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                    <p className="text-xs text-amber-800 font-medium">
-                      {myTeamParticipants.length === 0
-                        ? `No participants enrolled under ${team?.name || 'this team'} yet. Please add contestants in 'My Participants' first.`
-                        : `No participants in ${team?.name || 'this team'} eligible for ${selectedCategory?.name || 'this category'}. (Total team members: ${myTeamParticipants.length})`
-                      }
-                    </p>
-                  </div>
-                )}
-              </div>
+            <Select
+              label={isGroup ? 'Select Group Leader' : 'Select Team Participant'}
+              value={participantId}
+              onChange={event => handleParticipantChange(event.target.value)}
+              required
+              options={[
+                { value: '', label: isGroup ? 'Choose a group leader' : 'Choose a team participant' },
+                ...teamEligibleParticipants.map(participant => ({
+                  value: participant.id,
+                  label: `${participant.name} (${participant.bib || 'No Bib'})`
+                }))
+              ]}
+            />
+
+            {participantsSyncState === 'loading' ? (
+              <p className="text-xs text-blue-700">Loading your team roster…</p>
+            ) : teamEligibleParticipants.length === 0 ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-800">
+                {myTeamParticipants.length === 0
+                  ? 'Your team has no participants yet. Add participants from My Participants first.'
+                  : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
+              </p>
+            ) : null}
+
+            {isGroup && selectedCompetition && (
+              <p className="text-xs leading-5 text-slate-500">
+                Select one leader for the group entry. Championship points are credited to the team, not to the group leader as an individual.
+              </p>
             )}
 
             <Input
               label="Assigned Chest / Bib Number"
-              placeholder="#1042"
+              placeholder="Auto-filled from participant Bib"
               value={chestNumber}
-              onChange={(e) => setChestNumber(e.target.value)}
+              onChange={event => setChestNumber(event.target.value)}
             />
           </form>
         </Modal>

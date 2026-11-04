@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { TeamLayout } from '@/components/layout/TeamLayout';
+import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Trophy, Award, Medal, Search, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
 
 export default function TeamResultsPage() {
   const { currentTeamUser, teams, results } = useFest();
@@ -15,171 +15,212 @@ export default function TeamResultsPage() {
     : null;
 
   const [search, setSearch] = useState('');
+  const teamRankings = results
+    .filter(result => result.resultStatus === 'PUBLISHED')
+    .flatMap(result =>
+      result.ranks
+        .filter(rank => rank.teamId === team?.id)
+        .map(rank => ({
+          ...rank,
+          competitionName: result.competitionName,
+          competitionCode: result.competitionCode,
+          categoryName: result.categoryName,
+          type: result.type,
+          competitionId: result.competitionId,
+          publishedDate: result.publishedDate
+        }))
+    );
 
-  // Extract all ranks won by this team across all published results
-  const teamRankings = results.flatMap(res => {
-    if (res.resultStatus !== 'PUBLISHED') return [];
-    return res.ranks
-      .filter(rk => rk.teamId === team?.id)
-      .map(rk => ({
-        ...rk,
-        competitionName: res.competitionName,
-        competitionCode: res.competitionCode,
-        categoryName: res.categoryName,
-        type: res.type,
-        competitionId: res.competitionId,
-        publishedDate: res.publishedDate
-      }));
-  });
-
-  const filtered = teamRankings.filter(r =>
-    r.candidateName.toLowerCase().includes(search.toLowerCase()) ||
-    r.competitionName.toLowerCase().includes(search.toLowerCase()) ||
-    r.competitionCode.toLowerCase().includes(search.toLowerCase())
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = teamRankings.filter(rank =>
+    rank.candidateName.toLowerCase().includes(normalizedSearch) ||
+    rank.competitionName.toLowerCase().includes(normalizedSearch) ||
+    rank.competitionCode.toLowerCase().includes(normalizedSearch) ||
+    (rank.bib || '').toLowerCase().includes(normalizedSearch)
   );
+
+  const firstPlaces = teamRankings.filter(rank => rank.rank === 1).length;
+  const secondPlaces = teamRankings.filter(rank => rank.rank === 2).length;
+  const thirdPlaces = teamRankings.filter(rank => rank.rank === 3).length;
+
+  const placeLabel = (rank: number | null | undefined) => {
+    if (rank === 1) return '1st Place';
+    if (rank === 2) return '2nd Place';
+    if (rank === 3) return '3rd Place';
+    return 'Grade only';
+  };
+
+  const placeTone = (rank: number | null | undefined) => {
+    if (rank === 1) return 'border-amber-200 bg-amber-50 text-amber-800';
+    if (rank === 2) return 'border-slate-200 bg-slate-100 text-slate-700';
+    if (rank === 3) return 'border-orange-200 bg-orange-50 text-orange-800';
+    return 'border-blue-100 bg-blue-50 text-blue-700';
+  };
 
   return (
     <TeamLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
-              My Team Results &amp; Championship Tally
-            </h1>
-            <p className="text-xs text-[#526070] mt-1">
-              Published grades, prize positions, and Sahithyolsav points accredited to {team?.name}
+      <div className="space-y-5 sm:space-y-6">
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+              <Trophy className="h-4 w-4" />
+              Official results
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-[28px]">Team Results &amp; Standings</h1>
+            <p className="mt-1.5 text-sm leading-5 text-slate-600">
+              Published grades, prize positions and championship standings for {team?.name || 'your team'}.
             </p>
           </div>
-          <Link href="/public/championship" target="_blank">
-            <Button variant="outline" size="sm" leftIcon={<Trophy className="w-4 h-4 text-amber-500" />}>
-              Live Public Championship Standings
+          <Link href="/public/championship" target="_blank" rel="noreferrer" className="w-full sm:w-auto">
+            <Button variant="outline" size="md" className="w-full !rounded-xl sm:w-auto" leftIcon={<ExternalLink className="h-4 w-4" />}>
+              Public championship standings
             </Button>
           </Link>
-        </div>
+        </header>
 
-        {/* Team Championship Points Banner */}
-        <div className="bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="col-span-2 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-[#E1E7EF] pb-4 lg:pb-0 lg:pr-6">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#526070]">
-              Accumulated Total Points
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-4xl font-black text-[#2563EB]">{team?.totalPoints}</span>
-              <span className="text-sm font-bold text-[#526070]">Official Points</span>
+        <TeamSyncStatus sources={['teams', 'results']} />
+
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
+          <article className="col-span-2 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm sm:p-5 xl:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Total championship points</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-950">{team?.totalPoints ?? 0}</span>
+              <span className="text-xs font-semibold text-slate-500">official points</span>
             </div>
-            <p className="text-xs text-[#526070] mt-1">
-              Currently holding <strong className="text-[#111111]">Rank #{team?.rank}</strong> in overall festival championship
+            <p className="mt-1.5 text-xs text-slate-600">
+              Current overall position: <strong className="text-slate-900">#{team?.rank || 1}</strong>
             </p>
-          </div>
+          </article>
 
-          <div className="p-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#526070]">Solo Item Points</span>
-            <span className="text-2xl font-bold text-[#111111] block mt-1">{team?.soloPoints} pts</span>
-            <span className="text-[10px] text-[#526070]">Individual events</span>
-          </div>
+          <MetricTile label="Individual points" value={team?.soloPoints ?? 0} detail="Individual events" />
+          <MetricTile label="Group points" value={team?.groupPoints ?? 0} detail="Credited to the team" />
+          <article className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 xl:col-span-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <Medal className="h-4 w-4 text-amber-600" />
+              Prize positions
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-sm font-bold">
+              <span className="text-amber-600">🥇 {firstPlaces}</span>
+              <span className="text-slate-300">/</span>
+              <span className="text-slate-600">🥈 {secondPlaces}</span>
+              <span className="text-slate-300">/</span>
+              <span className="text-orange-700">🥉 {thirdPlaces}</span>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-500">1st / 2nd / 3rd</p>
+          </article>
+        </section>
 
-          <div className="p-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#526070]">Group Item Points</span>
-            <span className="text-2xl font-bold text-[#111111] block mt-1">{team?.groupPoints} pts</span>
-            <span className="text-[10px] text-[#526070]">Troupe ensembles</span>
-          </div>
-
-          <div className="p-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#526070]">Laureate Medals</span>
-            <div className="flex items-center gap-2 mt-1 text-xs font-bold">
-              <span className="text-amber-600">🥇 {team?.firstCount}</span>
-              <span>•</span>
-              <span className="text-slate-600">🥈 {team?.secondCount}</span>
-              <span>•</span>
-              <span className="text-amber-800">🥉 {team?.thirdCount}</span>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <h2 className="text-sm font-bold text-slate-950">Published team results</h2>
+              <p className="mt-1 text-xs text-slate-500">Only officially released grades and prize positions are listed.</p>
+            </div>
+            <div className="flex w-full items-center gap-3 sm:w-auto">
+              <div className="relative min-w-0 flex-1 sm:w-72">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  aria-label="Search published results"
+                  placeholder="Search event, contestant or Bib…"
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{filtered.length} entries</span>
             </div>
           </div>
-        </div>
 
-        {/* Results Table */}
-        <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-[#E1E7EF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="relative flex-1 sm:max-w-md">
-              <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search contestant or event..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
-              />
+          {filtered.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <Award className="mx-auto h-9 w-9 text-slate-300" />
+              <h3 className="mt-3 text-sm font-semibold text-slate-900">
+                {teamRankings.length === 0 ? 'No published results yet' : 'No results match this search'}
+              </h3>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">
+                {teamRankings.length === 0
+                  ? 'Your team’s grades and prize positions will appear here after results are officially published.'
+                  : 'Try another event name, contestant name or Bib number.'}
+              </p>
             </div>
-            <span className="text-xs text-[#526070]">
-              {filtered.length} Awarded Placings
-            </span>
-          </div>
+          ) : (
+            <>
+              <div className="space-y-3 p-3 md:hidden">
+                {filtered.map(rank => (
+                  <article key={rank.registrationId} className="rounded-xl border border-slate-200 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-slate-950">{rank.competitionName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{rank.competitionCode} · {rank.categoryName}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${placeTone(rank.rank)}`}>
+                        {placeLabel(rank.rank)}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-slate-800">{rank.candidateName}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{rank.bib || '—'} · {rank.type === 'SOLO' ? 'Individual' : 'Group'}</p>
+                      </div>
+                      <span className="shrink-0 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">
+                        Grade {rank.grade || '—'}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                  <th className="py-3 px-6">Competition &amp; Code</th>
-                  <th className="py-3 px-6">Participant / Ensemble</th>
-                  <th className="py-3 px-6">Category</th>
-                  <th className="py-3 px-6 text-center">Type</th>
-                  <th className="py-3 px-6 text-center">Official Grade</th>
-                  <th className="py-3 px-6 text-center">Prize Rank</th>
-                  <th className="py-3 px-6 text-right">Team Championship Points</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E1E7EF]">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-[#526070]">
-                      No results published yet for competitions featuring {team?.name}.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map(r => (
-                    <tr key={r.registrationId} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                            {r.competitionCode}
-                          </span>
-                          <span className="font-bold text-[#111111]">{r.competitionName}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-[#111111] block">{r.candidateName}</span>
-                        <span className="text-[11px] font-mono text-[#526070]">{r.bib}</span>
-                      </td>
-                      <td className="py-4 px-6 font-semibold text-[#111111]">
-                        {r.categoryName}
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${r.type === 'SOLO' ? 'bg-slate-100 text-slate-800' : 'bg-purple-100 text-purple-800'}`}>
-                          {r.type}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className="font-bold text-[#2563EB] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-                          Grade {r.grade}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        {r.rank === 1 && <span className="font-extrabold text-amber-600">🥇 1st Place</span>}
-                        {r.rank === 2 && <span className="font-extrabold text-slate-600">🥈 2nd Place</span>}
-                        {r.rank === 3 && <span className="font-extrabold text-amber-800">🥉 3rd Place</span>}
-                      </td>
-                      <td className="py-4 px-6 text-right font-extrabold text-emerald-600 text-sm">
-                        +{r.officialPoints ?? r.totalEarnedPoints ?? 0} pts
-                        {r.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
-                      </td>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-[760px] w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3.5">Competition</th>
+                      <th className="px-5 py-3.5">Participant / group</th>
+                      <th className="px-5 py-3.5">Category</th>
+                      <th className="px-5 py-3.5">Type</th>
+                      <th className="px-5 py-3.5 text-center">Grade</th>
+                      <th className="px-5 py-3.5 text-center">Prize position</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filtered.map(rank => (
+                      <tr key={rank.registrationId} className="transition hover:bg-slate-50/80">
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-slate-900">{rank.competitionName}</p>
+                          <p className="mt-0.5 font-mono text-xs text-blue-700">{rank.competitionCode}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-slate-900">{rank.candidateName}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{rank.bib || '—'}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-slate-600">{rank.categoryName || '—'}</td>
+                        <td className="px-5 py-4 text-sm text-slate-600">{rank.type === 'SOLO' ? 'Individual' : 'Group'}</td>
+                        <td className="px-5 py-4 text-center">
+                          <span className="inline-flex rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-800">Grade {rank.grade || '—'}</span>
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${placeTone(rank.rank)}`}>{placeLabel(rank.rank)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
       </div>
     </TeamLayout>
+  );
+}
+
+function MetricTile({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{value}</p>
+      <p className="mt-1 truncate text-[11px] text-slate-500">{detail}</p>
+    </article>
   );
 }

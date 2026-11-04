@@ -84,13 +84,14 @@ export function ParticipantEditorModal({
       description="Use the same participant details in the Admin and Team Manager portals."
       maxWidth="xl"
       footer={
-        <div className="flex items-center justify-end gap-2 w-full">
-          <Button type="button" variant="outline" size="sm" onClick={close} disabled={saving}>Cancel</Button>
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" size="md" className="w-full sm:w-auto" onClick={close} disabled={saving}>Cancel</Button>
           <Button
             type="submit"
             form={formId}
             variant="primary"
-            size="sm"
+            size="md"
+            className="w-full sm:w-auto"
             isLoading={saving}
             disabled={saving || !selectedTeam || !effectiveCategoryId}
           >

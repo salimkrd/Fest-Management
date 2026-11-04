@@ -3,225 +3,264 @@
 import React from 'react';
 import Link from 'next/link';
 import { TeamLayout } from '@/components/layout/TeamLayout';
+import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
-import { StatCard } from '@/components/ui/StatCard';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import {
   Users,
   Trophy,
   ClipboardList,
   Award,
-  PlusCircle,
-  Calendar,
-  IdCard,
+  Plus,
+  CalendarDays,
   ChevronRight,
-  ArrowRight,
-  Sparkles
+  ArrowUpRight,
+  FileDown
 } from 'lucide-react';
 
 export default function TeamManagerDashboardPage() {
-  const { currentTeamUser, teams, participants, registrations, schedules, results } = useFest();
+  const {
+    currentTeamUser,
+    teams,
+    participants,
+    registrations,
+    schedules,
+    results
+  } = useFest();
+
   const team = currentTeamUser
     ? teams.find(candidate => candidate.id === currentTeamUser.id) || currentTeamUser
     : null;
 
-  // Scoped team data
-  const teamParticipants = participants.filter(p => p.teamId === team?.id);
-  const teamRegistrations = registrations.filter(r => r.teamId === team?.id);
+  const teamParticipants = participants.filter(participant => participant.teamId === team?.id);
+  const teamRegistrations = registrations.filter(registration => registration.teamId === team?.id);
+  const registeredCompetitionIds = new Set(teamRegistrations.map(registration => registration.competitionId));
 
-  // Team upcoming schedules
-  const upcomingTeamEvents = schedules.filter(s => {
-    return teamRegistrations.some(r => r.competitionId === s.competitionId);
-  }).slice(0, 4);
+  const upcomingTeamEvents = schedules
+    .filter(slot => registeredCompetitionIds.has(slot.competitionId))
+    .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
+    .slice(0, 4);
 
-  // Recent Activity
-  const recentTeamRegistrations = [...teamRegistrations].reverse().slice(0, 4);
+  const recentTeamRegistrations = [...teamRegistrations]
+    .sort((a, b) => String(b.registeredAt || '').localeCompare(String(a.registeredAt || '')))
+    .slice(0, 5);
+  const publishedAwards = results
+    .filter(result => result.resultStatus === 'PUBLISHED')
+    .reduce((total, result) => total + result.ranks.filter(rank => rank.teamId === team?.id).length, 0);
+
+  const quickLinks = [
+    {
+      href: '/team/participants',
+      title: 'Manage participants',
+      description: 'Add contestants and update their profiles',
+      icon: Users,
+      tone: 'bg-blue-50 text-blue-700'
+    },
+    {
+      href: '/team/registration',
+      title: 'Competition registration',
+      description: 'Enroll eligible team members in events',
+      icon: ClipboardList,
+      tone: 'bg-emerald-50 text-emerald-700'
+    },
+    {
+      href: '/team/results',
+      title: 'Results and standings',
+      description: 'Review published grades and team standings',
+      icon: Award,
+      tone: 'bg-amber-50 text-amber-700'
+    },
+    {
+      href: '/team/export',
+      title: 'Export team results',
+      description: 'Download your official results register',
+      icon: FileDown,
+      tone: 'bg-violet-50 text-violet-700'
+    }
+  ];
+
+  const statusClass = (status: string) => {
+    if (status === 'APPROVED') return 'bg-emerald-50 text-emerald-700';
+    if (status === 'REJECTED') return 'bg-red-50 text-red-700';
+    return 'bg-amber-50 text-amber-700';
+  };
 
   return (
     <TeamLayout>
-      <div className="space-y-8">
-        {/* Welcome Banner */}
-        <div className="bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: team?.color || '#2563EB' }}
-              />
-              <span className="text-xs font-bold uppercase tracking-wider text-[#526070]">
-                {team?.zone} · House Contingent
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#111111] tracking-tight mt-1">
-              {team?.name} ({team?.code}) Workspace
-            </h1>
-            <p className="text-xs text-[#526070] mt-0.5">
-              Team Manager: {team?.managerName} · Contact: {team?.managerPhone}
-            </p>
-          </div>
+      <div className="space-y-5 sm:space-y-6">
+        <TeamSyncStatus sources={['teams', 'participants', 'registrations', 'schedules', 'results']} />
 
-          <div className="flex items-center gap-3">
-            <Link href="/team/registration">
-              <Button variant="primary" size="sm" leftIcon={<PlusCircle className="w-4 h-4" />}>
-                Register Contestant in Event
-              </Button>
+        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <div
+            className="absolute inset-y-0 left-0 w-1.5"
+            style={{ backgroundColor: team?.color || '#2563EB' }}
+          />
+          <div className="flex flex-col gap-5 pl-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {team?.zone || 'Festival'} · House contingent
+              </p>
+              <h1 className="mt-2 break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-[30px]">
+                {team?.name || 'Team Workspace'}
+              </h1>
+              <p className="mt-1.5 text-sm text-slate-600">
+                {team?.code ? `Contingent code: ${team.code}` : 'Your team management overview'}
+                {team?.managerName ? ` · Manager: ${team.managerName}` : ''}
+              </p>
+              {team?.managerPhone && <p className="mt-1 text-xs text-slate-500">Contact: {team.managerPhone}</p>}
+            </div>
+            <Link
+              href="/team/registration"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              Register for an event
             </Link>
           </div>
-        </div>
+        </section>
 
-        {/* 4 Team Metrics */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label="Total Contestants"
-            value={teamParticipants.length}
-            subValue="Roster members"
-            icon={<Users className="w-4 h-4" />}
-          />
-          <StatCard
-            label="Event Registrations"
-            value={teamRegistrations.length}
-            subValue="Solo &amp; Group entries"
-            icon={<ClipboardList className="w-4 h-4" />}
-          />
-          <StatCard
-            label="Championship Points"
-            value={team?.totalPoints || 0}
-            subValue={`Solo: ${team?.soloPoints} | Group: ${team?.groupPoints}`}
-            icon={<Trophy className="w-4 h-4 text-amber-500" />}
-          />
-          <StatCard
-            label="Leaderboard Rank"
-            value={`#${team?.rank || 1}`}
-            subValue="Live standings"
-            icon={<Award className="w-4 h-4 text-[#2563EB]" />}
-            badge={team?.rank === 1 ? 'LEADER' : undefined}
-          />
-        </div>
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <MetricCard label="Participants" value={teamParticipants.length} detail="Team roster" icon={<Users className="h-5 w-5" />} tone="blue" />
+          <MetricCard label="Event entries" value={teamRegistrations.length} detail="Individual and group" icon={<ClipboardList className="h-5 w-5" />} tone="emerald" />
+          <MetricCard label="Published results" value={publishedAwards} detail="Officially released team records" icon={<Award className="h-5 w-5" />} tone="amber" />
+          <MetricCard label="Championship points" value={team?.totalPoints ?? 0} detail={`Rank #${team?.rank || 1} · Live standings`} icon={<Trophy className="h-5 w-5" />} tone="violet" />
+        </section>
 
-        {/* Two Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Upcoming Team Competitions */}
-          <div className="lg:col-span-7 bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-[#E1E7EF]">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#2563EB]" />
-                  <h3 className="text-sm font-bold text-[#111111]">Upcoming Team Competitions</h3>
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-5">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <CalendarDays className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-950">Upcoming team competitions</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">Schedule slots linked to your registrations</p>
                 </div>
-                <Link href="/team/registration" className="text-xs text-[#2563EB] hover:underline font-semibold flex items-center gap-1">
-                  All Registrations <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
               </div>
-
-              <div className="mt-4 space-y-3">
-                {upcomingTeamEvents.length === 0 ? (
-                  <p className="text-xs text-[#526070] italic py-6 text-center">
-                    No active schedule slots found for enrolled competitions.
-                  </p>
-                ) : (
-                  upcomingTeamEvents.map(slot => (
-                    <div
-                      key={slot.id}
-                      className="p-3.5 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-[#111111]">{slot.competitionName}</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-[#2563EB]">
-                            {slot.categoryName}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#526070] block mt-1">
-                          Stage: {slot.stageName} · {slot.date}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-[#111111]">{slot.startTime}</span>
-                        <span className="text-[10px] text-[#526070] block">{slot.status}</span>
+              <Link href="/team/registration" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800">
+                Registrations <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div className="space-y-3 p-4 sm:p-5">
+              {upcomingTeamEvents.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+                  <CalendarDays className="mx-auto h-7 w-7 text-slate-300" />
+                  <p className="mt-2 text-sm font-medium text-slate-700">No linked schedule slots yet</p>
+                  <p className="mt-1 text-xs text-slate-500">Your registered competitions will appear here when the schedule is published.</p>
+                </div>
+              ) : (
+                upcomingTeamEvents.map(slot => (
+                  <article key={slot.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="break-words text-sm font-semibold text-slate-900">{slot.competitionName}</h3>
+                      <p className="mt-1 text-xs text-slate-500">{slot.categoryName} · {slot.stageName || 'Stage not assigned'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                      <div className="text-left sm:text-right">
+                        <p className="text-xs font-semibold text-slate-800">{slot.date || 'Date to be announced'}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{slot.startTime || 'Time to be announced'} · {slot.status}</p>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  </article>
+                ))
+              )}
             </div>
-
-            <div className="mt-4 pt-3 border-t border-[#E1E7EF] text-right">
-              <Link href="/team/participants" className="text-xs text-[#526070] hover:text-[#111111] font-semibold">
-                View My Team Participants Roster →
+            <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
+              <Link href="/team/participants" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 transition hover:text-blue-700">
+                View participant roster <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>
 
-          {/* Quick Actions & Recent Activity */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs">
-              <h3 className="text-sm font-bold text-[#111111] pb-3 border-b border-[#E1E7EF]">
-                Quick Operations
-              </h3>
-              <div className="mt-3 space-y-2">
-                <Link
-                  href="/team/participants"
-                  className="p-3 rounded-lg border border-[#E1E7EF] hover:border-[#2563EB] hover:bg-blue-50/20 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Users className="w-4 h-4 text-[#2563EB]" />
-                    <span className="text-xs font-bold text-[#111111] group-hover:text-[#2563EB]">
-                      Add New Team Participant
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#526070]" />
-                </Link>
-
-                <Link
-                  href="/team/registration"
-                  className="p-3 rounded-lg border border-[#E1E7EF] hover:border-[#2563EB] hover:bg-blue-50/20 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <ClipboardList className="w-4 h-4 text-[#2563EB]" />
-                    <span className="text-xs font-bold text-[#111111] group-hover:text-[#2563EB]">
-                      Enroll Contestant into Event
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#526070]" />
-                </Link>
-
-                <Link
-                  href="/team/results"
-                  className="p-3 rounded-lg border border-[#E1E7EF] hover:border-[#2563EB] hover:bg-blue-50/20 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Award className="w-4 h-4 text-[#2563EB]" />
-                    <span className="text-xs font-bold text-[#111111] group-hover:text-[#2563EB]">
-                      Published Results &amp; Points Breakdown
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#526070]" />
-                </Link>
+          <div className="space-y-5 xl:col-span-2">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <h2 className="text-sm font-bold text-slate-950">Quick actions</h2>
+              <div className="mt-3 grid grid-cols-1 gap-2.5">
+                {quickLinks.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-blue-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}>
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{item.title}</span>
+                        <span className="mt-0.5 block text-xs leading-4 text-slate-500">{item.description}</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-700" />
+                    </Link>
+                  );
+                })}
               </div>
-            </div>
+            </section>
 
-            {/* Recent Registration Activity */}
-            <div className="bg-white rounded-xl border border-[#E1E7EF] p-5 shadow-xs">
-              <h3 className="text-sm font-bold text-[#111111] pb-3 border-b border-[#E1E7EF]">
-                Recent Team Activity
-              </h3>
-              <div className="mt-3 space-y-2.5">
-                {recentTeamRegistrations.map(r => (
-                  <div key={r.id} className="text-xs flex items-center justify-between p-2 rounded-lg bg-[#F8FAFC]">
-                    <div>
-                      <span className="font-bold text-[#111111]">{r.participantName}</span>
-                      <span className="text-[#526070] text-[11px] block">{r.competitionName}</span>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
+                <h2 className="text-sm font-bold text-slate-950">Recent team activity</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Latest event registrations</p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {recentTeamRegistrations.length === 0 ? (
+                  <p className="px-4 py-7 text-center text-xs text-slate-500">No registrations to show yet.</p>
+                ) : (
+                  recentTeamRegistrations.map(registration => (
+                    <div key={registration.id} className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
+                      <div className="min-w-0">
+                        <p className="break-words text-xs font-semibold text-slate-900">{registration.participantName}</p>
+                        <p className="mt-0.5 break-words text-xs text-slate-500">{registration.competitionName}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${statusClass(registration.status)}`}>
+                        {registration.status}
+                      </span>
                     </div>
-                    <Badge variant="success" size="sm">CONFIRMED</Badge>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-            </div>
+              <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
+                <Link href="/team/registration" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-800">
+                  View all registrations <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </section>
           </div>
-        </div>
+        </section>
       </div>
     </TeamLayout>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  icon,
+  tone
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  icon: React.ReactNode;
+  tone: 'blue' | 'emerald' | 'amber' | 'violet';
+}) {
+  const iconTone = {
+    blue: 'bg-blue-50 text-blue-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    violet: 'bg-violet-50 text-violet-700'
+  }[tone];
+
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconTone}`}>{icon}</span>
+      </div>
+      <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-950 sm:text-[28px]">{value}</p>
+      <p className="mt-1 truncate text-[11px] text-slate-500">{detail}</p>
+    </article>
   );
 }
