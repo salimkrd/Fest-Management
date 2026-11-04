@@ -1,453 +1,513 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { TabulationPrintSheet } from '@/components/domain/TabulationPrintSheet';
 import {
-  FileDown,
-  Printer,
-  FileSpreadsheet,
-  FileText,
-  Search,
-  CheckCircle2,
-  Calendar,
-  Layers,
-  CheckSquare,
-  Square,
-  Trophy,
-  ShieldAlert,
-  ArrowRight,
-  Database
+  FileDown, Printer, FileSpreadsheet, FileText, Search, CheckCircle2, Layers,
+  CheckSquare, Square, Trophy, ShieldAlert, ArrowRight, Database, LoaderCircle,
+  AlertCircle, RefreshCw, Filter, Award
 } from 'lucide-react';
 import Link from 'next/link';
 import { ExportService } from '@/services/exportService';
 import { DataBackupMigrationModal } from '@/components/domain/DataBackupMigrationModal';
 
-export default function ExportManagementPage() {
-  const { results, theme, categories } = useFest();
+type ExportNotice = { tone: 'success' | 'error'; message: string };
 
+export default function ExportManagementPage() {
+  const { results, theme, categories, resultsSyncState } = useFest();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER'>('WINNERS');
-  const [printWinnersOpen, setPrintWinnersOpen] = useState(false);
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
-  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<ExportNotice | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectionInitialized = useRef(false);
+  const knownPublishedIds = useRef<Set<string>>(new Set());
 
-  // CRITICAL RULE: Filter ONLY published results as official winners!
-  const publishedResults = results.filter(r => r.resultStatus === 'PUBLISHED');
+  // Keep selection aligned with the authoritative live results snapshot.
+  const publishedResults = useMemo(
+    () => results.filter(result => result.resultStatus === 'PUBLISHED'),
+    [results]
+  );
+  const publishedIds = useMemo(() => publishedResults.map(result => result.id), [publishedResults]);
 
-  const filteredResults = publishedResults.filter(r => {
-    const matchesSearch = r.competitionName.toLowerCase().includes(search.toLowerCase()) ||
-                          r.competitionCode.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = categoryFilter === 'ALL' || r.categoryName === categoryFilter;
-    return matchesSearch && matchesCat;
-  });
+  useEffect(() => {
+    if (resultsSyncState !== 'ready') return;
+    const availableIds = new Set(publishedIds);
+    const newlyPublishedIds = publishedIds.filter(id => !knownPublishedIds.current.has(id));
+    knownPublishedIds.current = availableIds;
+    setSelectedIds(current => {
+      if (!selectionInitialized.current) {
+        selectionInitialized.current = true;
+        return publishedIds;
+      }
+      const retained = current.filter(id => availableIds.has(id));
+      return Array.from(new Set([...retained, ...newlyPublishedIds]));
+    });
+  }, [publishedIds, resultsSyncState]);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>(publishedResults.map(r => r.id));
+  useEffect(() => {
+    if (!exportNotice) return;
+    const timeout = window.setTimeout(() => setExportNotice(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [exportNotice]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const filteredResults = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return publishedResults.filter(result => {
+      const matchesSearch = !term ||
+        result.competitionName.toLowerCase().includes(term) ||
+        result.competitionCode.toLowerCase().includes(term);
+      return matchesSearch && (categoryFilter === 'ALL' || result.categoryName === categoryFilter);
+    });
+  }, [publishedResults, search, categoryFilter]);
+  const selectedResults = useMemo(
+    () => publishedResults.filter(result => selectedIdSet.has(result.id)),
+    [publishedResults, selectedIdSet]
+  );
+  const allVisibleSelected = filteredResults.length > 0 &&
+    filteredResults.every(result => selectedIdSet.has(result.id));
+  const syncIsReady = resultsSyncState === 'ready';
+  const canExport = syncIsReady && selectedResults.length > 0;
+  const safeFestivalName = (theme.festivalName || 'Festival').trim().replace(/\s+/g, '_') || 'Festival';
+
+  const notifyExport = (message: string, tone: ExportNotice['tone'] = 'success') => {
+    setExportNotice({ message, tone });
+  };
+  const ensureExportReady = () => {
+    if (!syncIsReady) {
+      notifyExport('Results are not synchronized yet. Wait for the results feed to become ready, then retry.', 'error');
+      return false;
+    }
+    if (selectedResults.length === 0) {
+      notifyExport('Select at least one published competition before continuing.', 'error');
+      return false;
+    }
+    return true;
+  };
 
   const handleToggleSelectAll = () => {
-    if (selectedIds.length === filteredResults.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredResults.map(r => r.id));
-    }
+    const visibleIds = filteredResults.map(result => result.id);
+    if (visibleIds.length === 0) return;
+    setSelectedIds(current => {
+      const next = new Set(current);
+      const shouldDeselect = visibleIds.every(id => next.has(id));
+      visibleIds.forEach(id => shouldDeselect ? next.delete(id) : next.add(id));
+      return Array.from(next);
+    });
   };
-
   const handleToggleSelectOne = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(prev => prev.filter(item => item !== id));
-    } else {
-      setSelectedIds(prev => [...prev, id]);
-    }
+    setSelectedIds(current =>
+      current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+    );
   };
 
-  const selectedResults = publishedResults.filter(r => selectedIds.includes(r.id));
-
-  // Export 1: Primary Official Published Winners CSV
   const handleExportWinnersCSV = () => {
-    if (selectedResults.length === 0) {
-      alert('Please select at least one published competition to export.');
-      return;
+    if (!ensureExportReady()) return;
+    try {
+      const rows = ExportService.getOfficialPublishedWinners(selectedResults);
+      ExportService.downloadWinnersCSV(rows, safeFestivalName + '_Official_Published_Winners.csv');
+      notifyExport('Official Published Winners CSV downloaded successfully.');
+    } catch (error) {
+      notifyExport('CSV export failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
-    const rows = ExportService.getOfficialPublishedWinners(selectedResults);
-    const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.csv`;
-    ExportService.downloadWinnersCSV(rows, filename);
-
-    setExportNotice('Official Published Winners CSV (.csv) generated and downloaded successfully.');
-    setTimeout(() => setExportNotice(null), 4000);
   };
-
-  // Export 2: Official Published Winners OpenXML XLSX Format (.xlsx)
   const handleExportWinnersExcel = () => {
-    if (selectedResults.length === 0) {
-      alert('Please select at least one published competition to export.');
-      return;
+    if (!ensureExportReady()) return;
+    try {
+      const rows = ExportService.getOfficialPublishedWinners(selectedResults);
+      ExportService.downloadWinnersXLSX(rows, safeFestivalName + '_Official_Published_Winners.xlsx');
+      notifyExport('Excel workbook downloaded with a Winners Summary sheet and a Full Details sheet.');
+    } catch (error) {
+      notifyExport('Excel export failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
-    const rows = ExportService.getOfficialPublishedWinners(selectedResults);
-    const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.xlsx`;
-    ExportService.downloadWinnersXLSX(rows, filename);
-
-    setExportNotice('Excel workbook downloaded with a readable Winners Summary sheet and a complete Full Details sheet.');
-    setTimeout(() => setExportNotice(null), 4000);
   };
-
-  // Export 3: Official Published Winners Downloadable PDF (.pdf)
   const handleDownloadWinnersPDF = () => {
-    if (selectedResults.length === 0) {
-      alert('Please select at least one published competition to export.');
-      return;
+    if (!ensureExportReady()) return;
+    try {
+      const rows = ExportService.getOfficialPublishedWinners(selectedResults);
+      ExportService.downloadWinnersPDF(
+        rows, theme.festivalName, theme.institutionName,
+        safeFestivalName + '_Official_Published_Winners.pdf'
+      );
+      notifyExport('Official Published Winners PDF downloaded successfully.');
+    } catch (error) {
+      notifyExport('PDF export failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
-    const rows = ExportService.getOfficialPublishedWinners(selectedResults);
-    const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.pdf`;
-    ExportService.downloadWinnersPDF(rows, theme.festivalName, theme.institutionName, filename);
-
-    setExportNotice('Official Published Winners Tabulation PDF (.pdf) generated and downloaded successfully.');
-    setTimeout(() => setExportNotice(null), 4000);
   };
-
-  // Print a dedicated A4 landscape document rather than the admin dashboard.
   const handlePrintWinnersSheet = () => {
-    if (selectedResults.length === 0) {
-      alert('Please select at least one published competition to print.');
-      return;
-    }
+    if (!ensureExportReady()) return;
+    const cleanup = () => document.body.classList.remove('print-winners-mode');
     document.body.classList.add('print-winners-mode');
-    window.addEventListener('afterprint', () => {
-      document.body.classList.remove('print-winners-mode');
-    }, { once: true });
-    window.print();
+    window.addEventListener('afterprint', cleanup, { once: true });
+    try {
+      window.print();
+    } catch {
+      cleanup();
+      notifyExport('The print dialog could not be opened. Please try again.', 'error');
+    }
   };
+  const handleRetrySync = () => window.location.reload();
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E1E7EF]">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight">
-              Export Management &amp; Official Tabulation
-            </h1>
-            <p className="text-xs text-[#526070] mt-1">
-              Official export center: Export verified published winners in real XLSX, PDF, and CSV formats.
+      <div className="mx-auto w-full max-w-[1440px] space-y-6 pb-8">
+        <header className="flex flex-col gap-4 border-b border-[#E1E7EF] pb-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                <Trophy className="h-3.5 w-3.5" /> Official records
+              </span>
+              <span className="text-[11px] font-medium text-[#64748B]">Admin workspace</span>
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-[#111827] sm:text-2xl">Export &amp; Official Tabulation</h1>
+            <p className="mt-1.5 max-w-2xl text-xs leading-5 text-[#64748B] sm:text-sm">
+              Prepare accurate records from competitions that have been reviewed and officially published.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<Database className="w-4 h-4 text-amber-600" />}
-              onClick={() => setMigrationModalOpen(true)}
-            >
-              Backup &amp; Migration
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Printer className="w-4 h-4 text-[#526070]" />}
-              onClick={handlePrintWinnersSheet}
-            >
+          <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:w-auto xl:min-w-[560px]">
+            <div className="col-span-2 sm:col-span-1">
+              <Button variant="secondary" size="sm" leftIcon={<Database className="h-4 w-4 text-amber-600" />} onClick={() => setMigrationModalOpen(true)}>
+                Backup &amp; Migration
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" leftIcon={<Printer className="h-4 w-4" />} onClick={handlePrintWinnersSheet} disabled={!canExport}>
               Print View
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<FileText className="w-4 h-4 text-red-600" />}
-              onClick={handleDownloadWinnersPDF}
-            >
+            <Button variant="outline" size="sm" leftIcon={<FileText className="h-4 w-4 text-red-600" />} onClick={handleDownloadWinnersPDF} disabled={!canExport}>
               Download PDF
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
-              onClick={handleExportWinnersExcel}
-            >
+            <Button variant="outline" size="sm" leftIcon={<FileSpreadsheet className="h-4 w-4 text-emerald-600" />} onClick={handleExportWinnersExcel} disabled={!canExport}>
               Export XLSX
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              leftIcon={<FileDown className="w-4 h-4" />}
-              onClick={handleExportWinnersCSV}
-            >
+            <Button variant="primary" size="sm" leftIcon={<FileDown className="h-4 w-4" />} onClick={handleExportWinnersCSV} disabled={!canExport}>
               Export CSV
             </Button>
           </div>
-        </div>
+        </header>
 
-        {/* Notice Banner */}
+        <section
+          className={
+            'flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ' +
+            (resultsSyncState === 'ready' ? 'border-emerald-200 bg-emerald-50/70' :
+              resultsSyncState === 'error' ? 'border-red-200 bg-red-50' : 'border-blue-200 bg-blue-50/70')
+          }
+          aria-live="polite"
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            {resultsSyncState === 'ready' ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /> :
+              resultsSyncState === 'error' || resultsSyncState === 'idle' ? <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" /> :
+                <LoaderCircle className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-blue-600" />}
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1F2937]">
+                {resultsSyncState === 'ready' ? 'Results data is synchronized' :
+                  resultsSyncState === 'error' ? 'Results synchronization failed' :
+                    resultsSyncState === 'idle' ? 'Results synchronization is unavailable' : 'Synchronizing official results…'}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-4 text-[#526070]">
+                {resultsSyncState === 'ready'
+                  ? 'The published-results feed is ready. New publications and status changes are reflected automatically.'
+                  : resultsSyncState === 'error' || resultsSyncState === 'idle'
+                    ? 'Export actions are paused so incomplete or stale results are not downloaded.'
+                    : 'Export actions will become available after the first authoritative results snapshot arrives.'}
+              </p>
+            </div>
+          </div>
+          {resultsSyncState === 'error' || resultsSyncState === 'idle' ? (
+            <Button variant="outline" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={handleRetrySync}>Retry sync</Button>
+          ) : (
+            <span className="shrink-0 rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[10px] font-bold text-[#475569]">
+              {resultsSyncState === 'ready' ? 'Live feed ready' : 'Sync in progress'}
+            </span>
+          )}
+        </section>
+
         {exportNotice && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{exportNotice}</span>
+          <div
+            className={'flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ' +
+              (exportNotice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800')}
+            role={exportNotice.tone === 'error' ? 'alert' : 'status'}
+          >
+            {exportNotice.tone === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> :
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+            <span>{exportNotice.message}</span>
           </div>
         )}
 
-        {/* Strict Scope Alert */}
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-[#2563EB] shrink-0" />
-            <span>
-              <strong>Official Published Winners Focus:</strong> Only verified, admin-published results appear here. Unpublished drafts are excluded to protect institutional tabulation integrity.
-            </span>
+        <section className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-white px-4 py-3 sm:px-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-white p-2 text-blue-600 shadow-sm"><ShieldAlert className="h-5 w-5" /></div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xs font-bold text-blue-950">Official Published Winners Focus</h2>
+                <span className="text-[11px] font-bold text-blue-700">{publishedResults.length} published {publishedResults.length === 1 ? 'event' : 'events'}</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-5 text-blue-900/80">
+                Only admin-published results are included. Drafts, results awaiting review, and unpublished revisions are excluded from official exports.
+              </p>
+            </div>
           </div>
-          <span className="font-bold text-[#2563EB]">{publishedResults.length} Events Published</span>
-        </div>
+        </section>
 
-        {/* Primary / Optional Tabs */}
-        <div className="flex items-center gap-2 border-b border-[#E1E7EF]">
-          <button
-            onClick={() => setActiveTab('WINNERS')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
-              activeTab === 'WINNERS'
-                ? 'border-[#2563EB] text-[#2563EB]'
-                : 'border-transparent text-[#526070] hover:text-[#111111]'
-            }`}
-          >
-            <Trophy className="w-4 h-4" />
-            <span>Official Published Winners (Primary)</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-[#2563EB]">
-              {publishedResults.length}
-            </span>
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02]">
+            <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold text-[#64748B]">Published competitions</span><Layers className="h-4 w-4 text-blue-600" /></div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-[#111827]">{publishedResults.length}</p>
+            <p className="mt-1 text-[10px] text-[#94A3B8]">Officially released results</p>
+          </div>
+          <div className="rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02]">
+            <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold text-[#64748B]">Selected for export</span><CheckSquare className="h-4 w-4 text-emerald-600" /></div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-[#111827]">{selectedResults.length}</p>
+            <p className="mt-1 text-[10px] text-[#94A3B8]">Your current export selection</p>
+          </div>
+          <div className="rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02]">
+            <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold text-[#64748B]">Visible after filters</span><Filter className="h-4 w-4 text-violet-600" /></div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-[#111827]">{filteredResults.length}</p>
+            <p className="mt-1 text-[10px] text-[#94A3B8]">Search and category results</p>
+          </div>
+        </section>
+
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#E1E7EF] pb-2" role="tablist" aria-label="Export views">
+          <button type="button" role="tab" aria-selected={activeTab === 'WINNERS'} onClick={() => setActiveTab('WINNERS')}
+            className={'inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ' +
+              (activeTab === 'WINNERS' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-transparent text-[#64748B] hover:border-[#E1E7EF] hover:bg-white hover:text-[#111827]')}>
+            <Trophy className="h-4 w-4" /> Official Published Winners
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] tabular-nums text-blue-700">{publishedResults.length}</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('SCORE_REGISTER')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
-              activeTab === 'SCORE_REGISTER'
-                ? 'border-[#2563EB] text-[#2563EB]'
-                : 'border-transparent text-[#526070] hover:text-[#111111]'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Full Results / Tabulation Register</span>
+          <button type="button" role="tab" aria-selected={activeTab === 'SCORE_REGISTER'} onClick={() => setActiveTab('SCORE_REGISTER')}
+            className={'inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ' +
+              (activeTab === 'SCORE_REGISTER' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-transparent text-[#64748B] hover:border-[#E1E7EF] hover:bg-white hover:text-[#111827]')}>
+            <FileText className="h-4 w-4" /> Full Results Register
           </button>
         </div>
 
         {activeTab === 'WINNERS' ? (
-          <>
-            {/* Search and Filters */}
-            <div className="bg-white p-4 rounded-xl border border-[#E1E7EF] flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="relative flex-1 w-full md:max-w-md">
-                <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Filter published competitions..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] focus:outline-none focus:bg-white focus:border-[#2563EB]"
-                />
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02] md:flex-row md:items-center md:justify-between">
+              <div className="relative min-w-0 flex-1 md:max-w-lg">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                <input type="search" placeholder="Search by competition name or code…" value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-[#DCE3EC] bg-[#F8FAFC] pl-9 pr-3 text-xs text-[#111827] outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100" />
               </div>
-
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <select
-                  aria-label="Filter by Category"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none focus:bg-white"
-                >
-                  <option value="ALL">All Categories</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
+              <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+                <label className="sr-only" htmlFor="export-category-filter">Filter by category</label>
+                <select id="export-category-filter" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)}
+                  className="h-10 w-full min-w-0 rounded-lg border border-[#DCE3EC] bg-[#F8FAFC] px-3 text-xs font-semibold text-[#334155] outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-auto sm:min-w-[180px]">
+                  <option value="ALL">All categories</option>
+                  {categories.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
                 </select>
+                <button type="button" onClick={handleToggleSelectAll} disabled={!syncIsReady || filteredResults.length === 0}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#DCE3EC] bg-white px-3 text-xs font-bold text-[#475569] transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50">
+                  {allVisibleSelected ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4" />}
+                  {allVisibleSelected ? 'Deselect visible' : 'Select visible'}
+                </button>
               </div>
             </div>
 
-            {/* Published Winners Table */}
-            <div className="bg-white rounded-xl border border-[#E1E7EF] shadow-xs overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#E1E7EF] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleToggleSelectAll}
-                    className="text-xs text-[#526070] hover:text-[#111111] font-semibold flex items-center gap-1.5"
-                  >
-                    {selectedIds.length === filteredResults.length && filteredResults.length > 0 ? (
-                      <CheckSquare className="w-4 h-4 text-[#2563EB]" />
-                    ) : (
-                      <Square className="w-4 h-4 text-[#526070]" />
-                    )}
-                    <span>Select All ({selectedResults.length} selected)</span>
-                  </button>
+            <div className="overflow-hidden rounded-xl border border-[#E1E7EF] bg-white shadow-sm shadow-slate-900/[0.02]">
+              <div className="flex flex-col gap-1 border-b border-[#E1E7EF] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div>
+                  <h2 className="text-xs font-bold text-[#111827]">Published winners</h2>
+                  <p className="mt-0.5 text-[10px] text-[#64748B]">{selectedResults.length} selected of {publishedResults.length} published competitions</p>
                 </div>
-                <span className="text-xs text-[#526070]">
-                  Official Published Results Register
-                </span>
+                <span className="text-[10px] font-semibold text-[#94A3B8]">Selection is preserved while filters change</span>
               </div>
 
-              {filteredResults.length === 0 ? (
-                <div className="p-12 text-center">
-                  <ShieldAlert className="w-10 h-10 text-amber-500 mx-auto mb-2" />
-                  <h4 className="text-sm font-bold text-[#111111]">No Published Results Available for Export</h4>
-                  <p className="text-xs text-[#526070] mt-1 max-w-md mx-auto">
-                    Only competitions that have been evaluated and officially published by an Admin appear here. Visit the Results page to publish reviewed marks.
+              {resultsSyncState === 'loading' ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-4 py-14 text-center">
+                  <LoaderCircle className="h-7 w-7 animate-spin text-blue-600" />
+                  <p className="text-xs font-semibold text-[#334155]">Loading published results</p>
+                  <p className="text-[11px] text-[#94A3B8]">Waiting for the first synchronized snapshot.</p>
+                </div>
+              ) : resultsSyncState === 'error' || resultsSyncState === 'idle' ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-4 py-14 text-center">
+                  <AlertCircle className="h-8 w-8 text-red-500" />
+                  <h3 className="text-sm font-bold text-[#111827]">Results are not available</h3>
+                  <p className="max-w-md text-xs leading-5 text-[#64748B]">Reconnect to the results feed before exporting. The page will not use stale data.</p>
+                  <Button variant="outline" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={handleRetrySync}>Retry synchronization</Button>
+                </div>
+              ) : filteredResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-4 py-14 text-center">
+                  <ShieldAlert className="h-9 w-9 text-amber-500" />
+                  <h3 className="text-sm font-bold text-[#111827]">{publishedResults.length === 0 ? 'No published results yet' : 'No competitions match these filters'}</h3>
+                  <p className="max-w-md text-xs leading-5 text-[#64748B]">
+                    {publishedResults.length === 0
+                      ? 'Only reviewed competitions published by an Admin appear in the official export register.'
+                      : 'Change the search text or category filter to see other published competitions.'}
                   </p>
-                  <div className="mt-4">
-                    <Link href="/admin/results">
-                      <Button variant="outline" size="sm" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                        Go to Results Management
-                      </Button>
+                  {publishedResults.length === 0 ? (
+                    <Link href="/admin/results" className="mt-2 inline-flex">
+                      <Button variant="outline" size="sm" rightIcon={<ArrowRight className="h-4 w-4" />}>Go to Results Management</Button>
                     </Link>
-                  </div>
+                  ) : (
+                    <button type="button" onClick={() => { setSearch(''); setCategoryFilter('ALL'); }} className="mt-2 text-xs font-bold text-blue-700 hover:text-blue-800">Clear filters</button>
+                  )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
-                        <th className="py-3 px-4 w-10"></th>
-                        <th className="py-3 px-4">Competition &amp; Category</th>
-                        <th className="py-3 px-4">🥇 1st Prize Winner</th>
-                        <th className="py-3 px-4">🥈 2nd Prize Winner</th>
-                        <th className="py-3 px-4">🥉 3rd Prize Winner</th>
-                        <th className="py-3 px-4 text-right">Event Points</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E1E7EF]">
-                      {filteredResults.map((res) => {
-                        const isSelected = selectedIds.includes(res.id);
-                        const r1 = res.ranks.find(r => r.rank === 1);
-                        const r2 = res.ranks.find(r => r.rank === 2);
-                        const r3 = res.ranks.find(r => r.rank === 3);
-
-                        const r1Pts = r1 ? (r1.officialPoints ?? r1.totalEarnedPoints) : 0;
-                        const r2Pts = r2 ? (r2.officialPoints ?? r2.totalEarnedPoints) : 0;
-                        const r3Pts = r3 ? (r3.officialPoints ?? r3.totalEarnedPoints) : 0;
-                        const eventTotal = r1Pts + r2Pts + r3Pts;
-
-                        return (
-                          <tr key={res.id} className={`hover:bg-[#F8FAFC] transition-colors ${isSelected ? 'bg-blue-50/20' : ''}`}>
-                            <td className="py-4 px-4">
-                              <button onClick={() => handleToggleSelectOne(res.id)} aria-label="Select competition">
-                                {isSelected ? (
-                                  <CheckSquare className="w-4 h-4 text-[#2563EB]" />
-                                ) : (
-                                  <Square className="w-4 h-4 text-[#526070]" />
-                                )}
-                              </button>
-                            </td>
-
-                            <td className="py-4 px-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-[11px] font-bold text-[#2563EB] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                  {res.competitionCode}
-                                </span>
-                                <div>
-                                  <span className="font-bold text-[#111111] text-sm block">{res.competitionName}</span>
-                                  <span className="text-[11px] text-[#526070]">
-                                    {res.categoryName} · {res.type}
-                                  </span>
-                                </div>
+                <>
+                  <div className="space-y-3 p-3 lg:hidden">
+                    {filteredResults.map(result => {
+                      const first = result.ranks.find(rank => rank.rank === 1);
+                      const second = result.ranks.find(rank => rank.rank === 2);
+                      const third = result.ranks.find(rank => rank.rank === 3);
+                      const points = [first, second, third].reduce((total, rank) =>
+                        total + (rank ? (rank.officialPoints ?? rank.totalEarnedPoints ?? 0) : 0), 0);
+                      const isSelected = selectedIdSet.has(result.id);
+                      const winnerCard = (label: string, winner: typeof first) => (
+                        <div className="min-w-0 rounded-lg border border-[#E8EDF3] bg-[#FAFBFD] p-3">
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">{label}</span>
+                            {winner && <span className="text-[10px] font-bold text-blue-700">Grade {winner.grade}</span>}
+                          </div>
+                          {winner ? (
+                            <>
+                              <p className="break-words text-xs font-bold text-[#1F2937]">{winner.candidateName}</p>
+                              <p className="mt-1 text-[10px] text-[#64748B]">{winner.teamName} · {winner.teamCode}</p>
+                              <p className="mt-1 text-[10px] font-semibold text-emerald-700">+{winner.officialPoints ?? winner.totalEarnedPoints ?? 0} pts</p>
+                            </>
+                          ) : <p className="text-xs italic text-[#94A3B8]">No prize awarded</p>}
+                        </div>
+                      );
+                      return (
+                        <article key={result.id} className={'rounded-xl border p-3 transition-colors ' +
+                          (isSelected ? 'border-blue-200 bg-blue-50/20' : 'border-[#E1E7EF] bg-white')}>
+                          <div className="flex items-start gap-3">
+                            <button type="button" onClick={() => handleToggleSelectOne(result.id)}
+                              aria-label={(isSelected ? 'Deselect ' : 'Select ') + result.competitionName} aria-pressed={isSelected}
+                              className="mt-0.5 shrink-0 rounded p-0.5 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                              {isSelected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5 text-[#94A3B8]" />}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700">{result.competitionCode}</span>
+                                <span className="text-[10px] text-[#64748B]">{result.categoryName} · {result.type}</span>
                               </div>
-                            </td>
+                              <h3 className="mt-1 break-words text-sm font-bold leading-5 text-[#111827]">{result.competitionName}</h3>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <span className="block text-[9px] font-semibold uppercase text-[#94A3B8]">Event points</span>
+                              <span className="text-sm font-extrabold tabular-nums text-[#111827]">{points}</span>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            {winnerCard('1st Prize', first)}
+                            {winnerCard('2nd Prize', second)}
+                            {winnerCard('3rd Prize', third)}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
 
-                            <td className="py-4 px-4">
-                              {r1 ? (
-                                <div>
-                                  <span className="font-bold text-[#111111] block">{r1.candidateName}</span>
-                                  <div className="flex items-center gap-1.5 text-[11px] text-[#526070] mt-0.5">
-                                    <span className="font-semibold text-[#111111]">{r1.teamCode}</span>
-                                    <span>·</span>
-                                    <span className="font-bold text-[#2563EB]">Grade {r1.grade}</span>
-                                    <span>·</span>
-                                    <span className="text-emerald-600 font-extrabold">+{r1Pts} pts</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-neutral-400 italic">None</span>
-                              )}
-                            </td>
-
-                            <td className="py-4 px-4">
-                              {r2 ? (
-                                <div>
-                                  <span className="font-bold text-[#111111] block">{r2.candidateName}</span>
-                                  <div className="flex items-center gap-1.5 text-[11px] text-[#526070] mt-0.5">
-                                    <span className="font-semibold text-[#111111]">{r2.teamCode}</span>
-                                    <span>·</span>
-                                    <span className="font-bold text-[#2563EB]">Grade {r2.grade}</span>
-                                    <span>·</span>
-                                    <span className="text-emerald-600 font-extrabold">+{r2Pts} pts</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-neutral-400 italic">None</span>
-                              )}
-                            </td>
-
-                            <td className="py-4 px-4">
-                              {r3 ? (
-                                <div>
-                                  <span className="font-bold text-[#111111] block">{r3.candidateName}</span>
-                                  <div className="flex items-center gap-1.5 text-[11px] text-[#526070] mt-0.5">
-                                    <span className="font-semibold text-[#111111]">{r3.teamCode}</span>
-                                    <span>·</span>
-                                    <span className="font-bold text-[#2563EB]">Grade {r3.grade}</span>
-                                    <span>·</span>
-                                    <span className="text-emerald-600 font-extrabold">+{r3Pts} pts</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-neutral-400 italic">None</span>
-                              )}
-                            </td>
-
-                            <td className="py-4 px-4 text-right">
-                              <span className="font-extrabold text-sm text-[#111111]">
-                                {eventTotal} pts
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                  <div className="hidden overflow-x-auto lg:block">
+                    <table className="w-full min-w-[1080px] text-left text-xs">
+                      <thead><tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
+                        <th className="w-12 px-4 py-3"></th>
+                        <th className="px-4 py-3">Competition &amp; category</th>
+                        <th className="px-4 py-3">1st prize winner</th>
+                        <th className="px-4 py-3">2nd prize winner</th>
+                        <th className="px-4 py-3">3rd prize winner</th>
+                        <th className="px-4 py-3 text-right">Event points</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-[#EEF2F6]">
+                        {filteredResults.map(result => {
+                          const first = result.ranks.find(rank => rank.rank === 1);
+                          const second = result.ranks.find(rank => rank.rank === 2);
+                          const third = result.ranks.find(rank => rank.rank === 3);
+                          const points = [first, second, third].reduce((total, rank) =>
+                            total + (rank ? (rank.officialPoints ?? rank.totalEarnedPoints ?? 0) : 0), 0);
+                          const isSelected = selectedIdSet.has(result.id);
+                          const desktopWinner = (winner: typeof first) => winner ? (
+                            <div className="min-w-[150px]">
+                              <span className="block font-bold text-[#1F2937]">{winner.candidateName}</span>
+                              <span className="mt-1 block text-[10px] text-[#64748B]">{winner.teamName} · {winner.teamCode}</span>
+                              <span className="mt-1 block text-[10px] font-bold text-blue-700">Grade {winner.grade}</span>
+                              <span className="mt-0.5 block text-[10px] font-semibold text-emerald-700">+{winner.officialPoints ?? winner.totalEarnedPoints ?? 0} pts</span>
+                            </div>
+                          ) : <span className="text-[11px] italic text-[#94A3B8]">No prize</span>;
+                          return (
+                            <tr key={result.id} className={isSelected ? 'bg-blue-50/20 hover:bg-blue-50/40' : 'hover:bg-[#FAFBFD]'}>
+                              <td className="px-4 py-4 align-top">
+                                <button type="button" onClick={() => handleToggleSelectOne(result.id)}
+                                  aria-label={(isSelected ? 'Deselect ' : 'Select ') + result.competitionName} aria-pressed={isSelected}
+                                  className="rounded p-0.5 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                                  {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-[#94A3B8]" />}
+                                </button>
+                              </td>
+                              <td className="max-w-[240px] px-4 py-4 align-top">
+                                <span className="inline-flex rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700">{result.competitionCode}</span>
+                                <span className="mt-1.5 block font-bold leading-5 text-[#111827]">{result.competitionName}</span>
+                                <span className="mt-1 block text-[10px] text-[#64748B]">{result.categoryName} · {result.type}</span>
+                              </td>
+                              <td className="px-4 py-4 align-top">{desktopWinner(first)}</td>
+                              <td className="px-4 py-4 align-top">{desktopWinner(second)}</td>
+                              <td className="px-4 py-4 align-top">{desktopWinner(third)}</td>
+                              <td className="px-4 py-4 text-right align-top">
+                                <span className="text-sm font-extrabold tabular-nums text-[#111827]">{points}</span><span className="ml-1 text-[10px] text-[#64748B]">pts</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
-            </div>
-          </>
-        ) : (
-          /* Optional Tab: Full Score Register */
-          <div className="bg-white p-6 rounded-xl border border-[#E1E7EF] space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-[#111111]">Comprehensive Tabulation Register</h3>
-                <p className="text-xs text-[#526070] mt-0.5">
-                  Print the official published-results register with candidate names, prize positions, grades, and official points.
-                </p>
+              <div className="flex flex-col gap-1 border-t border-[#E1E7EF] bg-[#FAFBFD] px-4 py-2.5 text-[10px] text-[#64748B] sm:flex-row sm:items-center sm:justify-between">
+                <span>Official register · Published results only</span>
+                <span>{selectedResults.length} competition(s) currently selected</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Printer className="w-4 h-4" />}
-                onClick={() => setPrintScoreRegisterOpen(true)}
-              >
-                Open Printable Tabulation Register
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02] sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="rounded-xl bg-blue-50 p-3 text-blue-700"><Award className="h-5 w-5" /></div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-[#111827]">Comprehensive Tabulation Register</h2>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-[#64748B]">
+                    Prepare the formal published-results register with candidate names, prize positions, grades, official points, and signature fields.
+                  </p>
+                </div>
+              </div>
+              <Button variant="primary" size="sm" leftIcon={<Printer className="h-4 w-4" />}
+                onClick={() => setPrintScoreRegisterOpen(true)} disabled={!syncIsReady || publishedResults.length === 0}>
+                Open Printable Register
               </Button>
             </div>
-
-            <div className="p-4 bg-[#F8FAFC] rounded-lg border border-[#E1E7EF] text-xs text-[#526070]">
-              Available for formal institutional records. Contains published candidate rows, grades, points, and signature lines; raw scores are omitted.
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-[#E8EDF3] bg-[#FAFBFD] p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Published events</span>
+                <span className="mt-1 block text-lg font-bold tabular-nums text-[#111827]">{publishedResults.length}</span>
+              </div>
+              <div className="rounded-lg border border-[#E8EDF3] bg-[#FAFBFD] p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Register scope</span>
+                <span className="mt-1 block text-sm font-bold text-[#111827]">All published results</span>
+              </div>
+              <div className="rounded-lg border border-[#E8EDF3] bg-[#FAFBFD] p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Document format</span>
+                <span className="mt-1 block text-sm font-bold text-[#111827]">A4 print-ready</span>
+              </div>
             </div>
-          </div>
+            {!syncIsReady && <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">The printable register will be available when results synchronization is complete.</p>}
+          </section>
         )}
 
-        {/* Tabulation Print Sheet Modal */}
         <TabulationPrintSheet
           isOpen={printScoreRegisterOpen}
           onClose={() => setPrintScoreRegisterOpen(false)}
           results={publishedResults}
+          festTitle={theme.festivalName}
+          institutionName={theme.institutionName}
         />
-
-        {/* Local Data Backup & Firestore Migration Modal */}
-        <DataBackupMigrationModal
-          isOpen={migrationModalOpen}
-          onClose={() => setMigrationModalOpen(false)}
-        />
+        <DataBackupMigrationModal isOpen={migrationModalOpen} onClose={() => setMigrationModalOpen(false)} />
       </div>
 
       {/* A dedicated print-only document; the admin interface is hidden on paper. */}

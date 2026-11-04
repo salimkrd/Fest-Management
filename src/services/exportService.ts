@@ -77,15 +77,36 @@ export class ExportService {
    * Generates standard RFC 4180 CSV string of official published winners.
    */
   static generateWinnersCSV(rows: PublishedWinnerRow[]): string {
-    const header = 'Competition Code,Competition Name,Category,Type,1st Winner,1st Bib,1st Team,1st Grade,1st Points,2nd Winner,2nd Bib,2nd Team,2nd Grade,2nd Points,3rd Winner,3rd Bib,3rd Team,3rd Grade,3rd Points,Event Total Points\n';
+    const header = 'Competition Code,Competition Name,Category,Type,1st Winner,1st Bib,1st Team,1st Grade,1st Points,2nd Winner,2nd Bib,2nd Team,2nd Grade,2nd Points,3rd Winner,3rd Bib,3rd Team,3rd Grade,3rd Points,Event Total Points';
+    const quote = (value: string | number): string =>
+      '"' + String(value ?? '').replace(/"/g, '""') + '"';
 
-    const lines = rows.map(r => 
-      `"${r.competitionCode}","${r.competitionName}","${r.categoryName}","${r.type}","${r.rank1Name}","${r.rank1Bib}","${r.rank1Team}","${r.rank1Grade}",${r.rank1Points},"${r.rank2Name}","${r.rank2Bib}","${r.rank2Team}","${r.rank2Grade}",${r.rank2Points},"${r.rank3Name}","${r.rank3Bib}","${r.rank3Team}","${r.rank3Grade}",${r.rank3Points},${r.eventTotalPoints}`
-    );
+    const lines = rows.map(row => [
+      quote(row.competitionCode),
+      quote(row.competitionName),
+      quote(row.categoryName),
+      quote(row.type),
+      quote(row.rank1Name),
+      quote(row.rank1Bib),
+      quote(row.rank1Team),
+      quote(row.rank1Grade),
+      String(row.rank1Points),
+      quote(row.rank2Name),
+      quote(row.rank2Bib),
+      quote(row.rank2Team),
+      quote(row.rank2Grade),
+      String(row.rank2Points),
+      quote(row.rank3Name),
+      quote(row.rank3Bib),
+      quote(row.rank3Team),
+      quote(row.rank3Grade),
+      String(row.rank3Points),
+      String(row.eventTotalPoints)
+    ].join(','));
 
-    return header + lines.join('\n');
+    // UTF-8 BOM helps spreadsheet applications identify the file's encoding.
+    return '\uFEFF' + header + '\r\n' + lines.join('\r\n');
   }
-
   /**
    * Generates and triggers download of a genuine RFC 4180 CSV file.
    */
@@ -101,7 +122,7 @@ export class ExportService {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /**
