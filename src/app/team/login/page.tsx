@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
-import { LoginPortalSwitcher } from '@/components/domain/LoginPortalSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Users2, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Info } from 'lucide-react';
@@ -281,7 +280,6 @@ function TeamLoginForm() {
           </div>
         </div>
 
-        <LoginPortalSwitcher />
         <div className="mt-4 text-center text-xs text-slate-500">
           <Link href="/" className="font-semibold text-blue-600 hover:underline">Public Website</Link>
         </div>
