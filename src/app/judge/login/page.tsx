@@ -4,24 +4,22 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
+import { LoginPortalSwitcher } from '@/components/domain/LoginPortalSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, Gavel } from 'lucide-react';
 import Link from 'next/link';
 
 function JudgeLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { competitions, markEntries, theme } = useFest();
+  const { theme } = useFest();
 
   const urlCode = searchParams.get('code') || '';
   const urlSecret = searchParams.get('token') || '';
-  const urlCompId = searchParams.get('competitionId') || '';
 
   const [accessCode, setAccessCode] = useState(urlCode);
   const [sessionSecret, setSessionSecret] = useState(urlSecret);
-  const [competitionId, setCompetitionId] = useState(urlCompId || competitions[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,7 +42,6 @@ function JudgeLoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accessCode: cleanCode,
-          competitionId,
           secret: sessionSecret
         })
       });
@@ -84,16 +81,10 @@ function JudgeLoginForm() {
       )}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        <div>
-          <Select
-            label="Assigned Stage Competition"
-            value={competitionId}
-            onChange={(e) => setCompetitionId(e.target.value)}
-            options={competitions.map(c => ({
-              value: c.id,
-              label: `${c.name} (${c.code} - ${c.categoryName})`
-            }))}
-          />
+        <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">Assigned Stage Competition</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">Automatically linked to your access code</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Your assigned competition is verified securely after you enter the official Juror Access Code. No manual selection is required.</p>
         </div>
 
         <div>
@@ -168,11 +159,10 @@ export default function JudgeLoginPage() {
           <JudgeLoginForm />
         </Suspense>
 
-        <div className="mt-6 text-center text-xs text-[#526070]">
+        <LoginPortalSwitcher />
+        <div className="mt-4 text-center text-xs text-[#526070]">
           <span>Need convener assistance? </span>
-          <Link href="/" className="text-[#2563EB] font-bold hover:underline">
-            Return to Public Results Portal
-          </Link>
+          <Link href="/" className="text-[#2563EB] font-bold hover:underline">Public Website</Link>
         </div>
       </div>
     </div>
