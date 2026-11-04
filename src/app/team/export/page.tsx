@@ -233,7 +233,7 @@ export default function TeamExportPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-3 p-3 md:hidden">
+              <div className="team-export-mobile space-y-3 p-3 md:hidden">
                 {filteredRows.map(row => (
                   <article key={row.id} className="rounded-xl border border-slate-200 p-3.5">
                     <div className="flex items-start justify-between gap-3">
@@ -254,7 +254,7 @@ export default function TeamExportPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="team-export-table-wrap hidden overflow-x-auto md:block">
                 <table className="team-export-table min-w-[860px] w-full text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <tr>
@@ -306,7 +306,8 @@ export default function TeamExportPage() {
           body.print-team-export .team-export-metrics,
           body.print-team-export .team-export-filters,
           body.print-team-export .team-export-empty,
-          body.print-team-export .md\\:hidden { display: none !important; }
+          body.print-team-export .team-export-mobile { display: none !important; }
+          body.print-team-export .team-export-table-wrap { display: block !important; overflow: visible !important; }
           body.print-team-export .team-export-print-heading { display: block !important; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 9px; }
           body.print-team-export .team-export-print-heading .print-kicker { color: #2563eb; font-size: 7pt; font-weight: 800; letter-spacing: 1px; }
           body.print-team-export .team-export-print-heading h1 { margin: 3px 0 1px; font-size: 16pt; line-height: 1.1; font-weight: 800; text-transform: uppercase; }
