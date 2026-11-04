@@ -385,13 +385,6 @@ export default function SchedulePage() {
     }
   };
 
-  const statusPillClass = (slotStatus: ScheduleSlot['status']) => {
-    if (slotStatus === 'LIVE') return 'border-red-200 bg-red-50 text-red-700';
-    if (slotStatus === 'COMPLETED') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    if (slotStatus === 'DELAYED') return 'border-amber-200 bg-amber-50 text-amber-700';
-    return 'border-slate-200 bg-slate-50 text-slate-700';
-  };
-
   return (
     <AdminLayout>
       <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-8 sm:space-y-6">
@@ -551,6 +544,12 @@ export default function SchedulePage() {
               <RefreshCw className="mb-3 h-6 w-6 animate-spin text-blue-600" />
               <p className="text-sm font-semibold text-slate-800">Loading schedule entries</p>
               <p className="mt-1 text-xs text-slate-500">The latest timetable is being retrieved.</p>
+            </div>
+          ) : schedulesSyncState === 'error' && schedules.length === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
+              <AlertCircle className="mb-3 h-6 w-6 text-red-600" />
+              <p className="text-sm font-semibold text-slate-800">Schedule data could not be loaded</p>
+              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">Check the administrator connection and Firestore access, then reload this page. Editing remains disabled while sync is unavailable.</p>
             </div>
           ) : sortedSchedules.length === 0 ? (
             <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
