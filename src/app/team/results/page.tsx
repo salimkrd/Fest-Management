@@ -100,11 +100,11 @@ export default function TeamResultsPage() {
               Prize positions
             </div>
             <div className="mt-3 flex items-center gap-2 text-sm font-bold">
-              <span className="text-amber-600">🥇 {team?.firstCount ?? firstPlaces}</span>
+              <span className="text-amber-600">🥇 {firstPlaces}</span>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-600">🥈 {team?.secondCount ?? secondPlaces}</span>
+              <span className="text-slate-600">🥈 {secondPlaces}</span>
               <span className="text-slate-300">/</span>
-              <span className="text-orange-700">🥉 {team?.thirdCount ?? thirdPlaces}</span>
+              <span className="text-orange-700">🥉 {thirdPlaces}</span>
             </div>
             <p className="mt-1.5 text-[11px] text-slate-500">1st / 2nd / 3rd</p>
           </article>
