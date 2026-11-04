@@ -56,6 +56,19 @@ describe('Star of the Fest / Pen of the Fest scorer calculation', () => {
     expect(oneEvent.map(x => x.position)).toEqual([1, 1, 1]);
   });
 
+  it('excludes registrations and participants that do not match the competition category', () => {
+    const events = [{ ...competition('e', 'STAGE'), categoryId: 'cat-a' } as Competition];
+    const people = [{ ...participant('a'), categoryId: 'cat-b' } as Participant];
+    const regs = [{ ...registration('r', 'e', 'a'), categoryId: 'cat-a' } as Registration];
+    const results = [result('res', 'e', 'r', 95)];
+
+    expect(calculateTopScorers('STAGE', events, results, regs, people)).toEqual([]);
+
+    const matchingPerson = [{ ...participant('a'), categoryId: 'cat-a' } as Participant];
+    const mismatchedRegistration = [{ ...registration('r', 'e', 'a'), categoryId: 'cat-b' } as Registration];
+    expect(calculateTopScorers('STAGE', events, results, mismatchedRegistration, matchingPerson)).toEqual([]);
+  });
+
   it('deduplicates duplicate result ranks and rejects invalid scores', () => {
     const events = [competition('e', 'STAGE')];
     const regs = [registration('r', 'e', 'a')];
