@@ -8,6 +8,7 @@ export interface TopScorerRow {
   teamCode: string;
   categoryName: string;
   totalMarks: number;
+  totalPoints: number;
   averagePercentage: number;
   competitionsCount: number;
   position: number;
@@ -51,6 +52,8 @@ export function calculateTopScorers(
           entry.competitionId !== competition.id || !entry.participantId) continue;
       const participant = people.get(entry.participantId);
       if (!participant || participant.teamId !== entry.teamId ||
+          (entry.categoryId && competition.categoryId && entry.categoryId !== competition.categoryId) ||
+          (participant.categoryId && competition.categoryId && participant.categoryId !== competition.categoryId) ||
           !Number.isFinite(rank.score) || rank.score < 0 || rank.score > maxMarks) continue;
       const id = result.id + ':' + entry.id;
       if (counted.has(id)) continue;
@@ -58,6 +61,8 @@ export function calculateTopScorers(
 
       const previous = totals.get(participant.id);
       const normalizedScore = (rank.score / maxMarks) * 100;
+      const rawPoints = Number(rank.officialPoints ?? rank.totalEarnedPoints ?? 0);
+      const awardedPoints = Number.isFinite(rawPoints) && rawPoints >= 0 ? rawPoints : 0;
       totals.set(participant.id, {
         participantId: participant.id,
         name: participant.name,
@@ -66,6 +71,7 @@ export function calculateTopScorers(
         teamCode: participant.teamCode,
         categoryName: participant.categoryName,
         totalMarks: (previous?.totalMarks || 0) + normalizedScore,
+        totalPoints: (previous?.totalPoints || 0) + awardedPoints,
         averagePercentage: 0,
         competitionsCount: (previous?.competitionsCount || 0) + 1
       });
@@ -75,6 +81,7 @@ export function calculateTopScorers(
   const ordered = Array.from(totals.values()).map(row => ({
     ...row,
     totalMarks: Math.round(row.totalMarks * 100) / 100,
+    totalPoints: Math.round(row.totalPoints * 100) / 100,
     averagePercentage: Math.round((row.totalMarks / row.competitionsCount) * 100) / 100
   })).sort((a, b) => b.totalMarks - a.totalMarks || a.name.localeCompare(b.name));
 
