@@ -1,220 +1,297 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
+import {
+  Activity,
+  ArrowRight,
+  CheckCircle2,
+  Gavel,
+  Globe2,
+  IdCard,
+  ShieldCheck,
+  Trophy,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
-import {
-  ShieldAlert,
-  Users2,
-  IdCard,
-  Gavel,
-  Sparkles,
-  ArrowRight,
-  Trophy,
-  CheckCircle2,
-  Calendar,
-  Layers,
-  MapPin
-} from 'lucide-react';
 
-export default function HomePage() {
-  const { theme, teams, competitions, participants, results } = useFest();
+type SyncState = 'loading' | 'ready' | 'error' | 'idle';
 
-  const publishedCount = results.filter(r => r.resultStatus === 'PUBLISHED').length;
+type PortalCard = {
+  href: string;
+  title: string;
+  tag: string;
+  description: string;
+  action: string;
+  icon: LucideIcon;
+  iconStyle: string;
+  tagStyle: string;
+  hoverStyle: string;
+  actionStyle: string;
+};
+
+const portals: PortalCard[] = [
+  {
+    href: '/admin',
+    title: 'Admin Control Center',
+    tag: 'Full authority',
+    description: 'Manage festival settings, categories, teams, competitions, registrations, green room, judging, results, schedules, media, and exports.',
+    action: 'Open admin dashboard',
+    icon: ShieldCheck,
+    iconStyle: 'bg-blue-50 text-blue-700 ring-blue-100',
+    tagStyle: 'bg-blue-50 text-blue-700 border-blue-100',
+    hoverStyle: 'hover:border-blue-300 hover:shadow-blue-950/5',
+    actionStyle: 'text-blue-700',
+  },
+  {
+    href: '/team',
+    title: 'Team Manager Workspace',
+    tag: 'Team operations',
+    description: 'Register contestants, manage team entries, generate digital ID cards, and review published competition results.',
+    action: 'Open team workspace',
+    icon: UsersRound,
+    iconStyle: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    tagStyle: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    hoverStyle: 'hover:border-emerald-300 hover:shadow-emerald-950/5',
+    actionStyle: 'text-emerald-700',
+  },
+  {
+    href: '/judge/login',
+    title: 'Judge Secure Evaluation',
+    tag: 'Jury access',
+    description: 'Open your assigned judging session, enter criteria-based marks, and submit the evaluation securely.',
+    action: 'Continue to judge login',
+    icon: Gavel,
+    iconStyle: 'bg-violet-50 text-violet-700 ring-violet-100',
+    tagStyle: 'bg-violet-50 text-violet-700 border-violet-100',
+    hoverStyle: 'hover:border-violet-300 hover:shadow-violet-950/5',
+    actionStyle: 'text-violet-700',
+  },
+  {
+    href: '/',
+    title: 'Public Results & Championship',
+    tag: 'Public portal',
+    description: 'Explore published results, winners, team championship standings, participant search, and released event posters.',
+    action: 'View public portal',
+    icon: Globe2,
+    iconStyle: 'bg-amber-50 text-amber-700 ring-amber-100',
+    tagStyle: 'bg-amber-50 text-amber-700 border-amber-100',
+    hoverStyle: 'hover:border-amber-300 hover:shadow-amber-950/5',
+    actionStyle: 'text-amber-700',
+  },
+  {
+    href: '/participant/login',
+    title: 'Participant Portal',
+    tag: 'Personal access',
+    description: 'Sign in with your Bib Number and Date of Birth to view your registered events, published results, and digital ID card.',
+    action: 'Open participant login',
+    icon: IdCard,
+    iconStyle: 'bg-sky-50 text-sky-700 ring-sky-100',
+    tagStyle: 'bg-sky-50 text-sky-700 border-sky-100',
+    hoverStyle: 'hover:border-sky-300 hover:shadow-sky-950/5',
+    actionStyle: 'text-sky-700',
+  },
+];
+
+function syncLabel(state: SyncState) {
+  if (state === 'ready') return 'Live';
+  if (state === 'loading') return 'Syncing';
+  if (state === 'error') return 'Unavailable';
+  return 'Restricted';
+}
+
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+  state,
+}: {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  state: SyncState;
+}) {
+  const valueText = state === 'ready' ? value.toLocaleString('en-IN') : '—';
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between">
-      {/* Top Banner */}
-      <header className="bg-white border-b border-[#E1E7EF] py-4 px-6 sm:px-12">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <FestivalLogo size={40} />
-            <div>
-              <h1 className="text-base font-extrabold text-[#111111] tracking-tight leading-tight">
+    <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-slate-500 sm:text-sm">{label}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-600">
+          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <p className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl" aria-live="polite">
+          {valueText}
+        </p>
+        <span className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          {syncLabel(state)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function ManagementPage() {
+  const {
+    theme,
+    competitions,
+    competitionsSyncState,
+    results,
+    resultsSyncState,
+  } = useFest();
+
+  const publishedCount = results.filter((result) => result.resultStatus === 'PUBLISHED').length;
+  const hasSyncError = competitionsSyncState === 'error' || resultsSyncState === 'error';
+  const isSynced = competitionsSyncState === 'ready' && resultsSyncState === 'ready';
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#F5F7FB] text-slate-900">
+      <header className="border-b border-slate-200/80 bg-white/95">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <FestivalLogo size={46} className="rounded-xl" />
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-extrabold leading-tight tracking-tight text-slate-950 sm:text-lg">
                 <span className="festival-name">{theme.festivalName}</span>
               </h1>
-              <p className="text-xs text-[#526070] font-medium">{theme.institutionName} · Single-Fest System</p>
+              <p className="mt-0.5 truncate text-xs font-medium text-slate-500 sm:text-sm">
+                {theme.institutionName} <span className="px-1 text-slate-300">/</span> Festival management
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <FestivalStatusBadge />
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+              Operations hub
+            </span>
+            <FestivalStatusBadge className="shrink-0" />
           </div>
         </div>
       </header>
 
-      {/* Hero Welcome */}
-      <main className="max-w-6xl mx-auto px-6 py-12 flex-1 w-full">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-[#2563EB] bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-            Unified Festival Operations Platform
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#111111] tracking-tight mt-4">
-            Fest Management System
-          </h2>
-          <p className="mt-2 text-sm text-[#526070] leading-relaxed">
-            Select your operational role below to enter the portal. Administrative controls, team registrations, judge score entry, and public results are synchronized in real-time.
-          </p>
-
-          {/* Quick Metrics */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-[#526070] font-semibold">
-            <span className="flex items-center gap-1.5">
-              <Users2 className="w-4 h-4 text-[#2563EB]" /> {participants.length} Contestants
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-[#D97706]" /> {competitions.length} Competitions
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {publishedCount} Results Published
-            </span>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-7 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+        <section className="grid gap-7 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] xl:items-end">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700 sm:text-[11px]">
+              <Activity className="h-3.5 w-3.5" aria-hidden="true" />
+              Unified festival operations platform
+            </div>
+            <h2 className="mt-5 text-[2.15rem] font-extrabold leading-[1.12] tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+              Every role.
+              <span className="block text-blue-700">One festival hub.</span>
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">
+              Choose the workspace that matches your role. Each portal provides the tools and information required for your part in the festival.
+            </p>
           </div>
-        </div>
 
-        {/* Festival Portals Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {/* 1. Admin Portal */}
-          <Link
-            href="/admin"
-            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-[#2563EB] hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] group-hover:scale-105 transition-transform">
-                  <ShieldAlert className="w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-[#2563EB] border border-blue-200">
-                  Full Authority
-                </span>
+          <aside className="rounded-3xl border border-slate-200 bg-slate-100/80 p-4 sm:p-5" aria-label="Festival data overview">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Festival overview</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {hasSyncError
+                    ? 'Some overview data could not be synchronized.'
+                    : isSynced
+                      ? 'Overview figures update automatically as records change.'
+                      : 'Waiting for the latest overview data.'}
+                </p>
               </div>
-              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-[#2563EB] transition-colors">
-                Admin Control Center
-              </h3>
-              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Access the 12 core administrative pages: Categories, Teams, Competitions, Registration, Mark Entry, Result Verification, Stages, Schedules, Media Studio, and Data Export.
-              </p>
+              <span className={'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ' + (
+                hasSyncError
+                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                  : isSynced
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-blue-200 bg-blue-50 text-blue-700'
+              )}>
+                {hasSyncError ? (
+                  <Activity className="h-3 w-3" aria-hidden="true" />
+                ) : isSynced ? (
+                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                ) : (
+                  <Activity className="h-3 w-3 animate-pulse" aria-hidden="true" />
+                )}
+                {hasSyncError ? 'Sync issue' : isSynced ? 'Connected' : 'Syncing'}
+              </span>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-[#2563EB]">
-              <span>Enter Admin Dashboard</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MetricCard
+                label="Competitions"
+                value={competitions.length}
+                icon={Trophy}
+                state={competitionsSyncState}
+              />
+              <MetricCard
+                label="Published results"
+                value={publishedCount}
+                icon={CheckCircle2}
+                state={resultsSyncState}
+              />
             </div>
-          </Link>
+          </aside>
+        </section>
 
-          {/* 2. Team Manager Portal */}
-          <Link
-            href="/team"
-            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-emerald-600 hover:shadow-md transition-all flex flex-col justify-between"
-          >
+        <section className="mt-10 sm:mt-12" aria-labelledby="portal-heading">
+          <div className="mb-5 flex flex-col gap-1 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
-                  <Users2 className="w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Contingents
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-emerald-600 transition-colors">
-                Team Manager Workspace
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-700">Choose your destination</p>
+              <h3 id="portal-heading" className="mt-1 text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">
+                Access a portal
               </h3>
-              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Dedicated workspace for house managers: register team contestants, enroll squad members in stage &amp; off-stage competitions, generate digital ID cards, and review scores.
-              </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-emerald-700">
-              <span>Enter Team Workspace</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+            <p className="text-xs text-slate-500 sm:text-sm">Select a card to continue</p>
+          </div>
 
-          {/* 3. Judge Portal */}
-          <Link
-            href="/judge/login"
-            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-neutral-900 hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-800 group-hover:scale-105 transition-transform">
-                  <Gavel className="w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-neutral-100 text-neutral-800 border border-neutral-300">
-                  Jury Session
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-neutral-900 transition-colors">
-                Judge Secure Evaluation
-              </h3>
-              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Stage roster scoring sheet: input marks with criteria steppers, auto-tally totals, sign off evaluation rosters, and generate official cryptographically sealed receipts.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-[#111111]">
-              <span>Authenticate Jury Link</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+            {portals.map((portal) => {
+              const Icon = portal.icon;
+              return (
+                <Link
+                  key={portal.href}
+                  href={portal.href}
+                  aria-label={portal.action + ': ' + portal.title}
+                  className={'group flex min-h-[248px] min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 sm:p-6 ' + portal.hoverStyle}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ' + portal.iconStyle}>
+                      <Icon className="h-6 w-6" strokeWidth={1.9} aria-hidden="true" />
+                    </span>
+                    <span className={'max-w-[55%] rounded-full border px-2.5 py-1 text-center text-[9px] font-bold uppercase tracking-[0.1em] ' + portal.tagStyle}>
+                      {portal.tag}
+                    </span>
+                  </div>
 
-          {/* 4. Public Result Website */}
-          <Link
-            href="/"
-            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-amber-500 hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-amber-50 text-amber-800 border border-amber-200">
-                  Public Domain
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-amber-600 transition-colors">
-                Public Results &amp; Championship
-              </h3>
-              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Themed public experience: live contestant search, published winners feed, laureate podiums, released media posters, and official team championship leaderboard.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-amber-700">
-              <span>View Public Portal</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+                  <div className="mt-5 min-w-0">
+                    <h4 className="text-base font-bold leading-snug tracking-tight text-slate-950 sm:text-lg">
+                      {portal.title}
+                    </h4>
+                    <p className="mt-2 text-xs leading-6 text-slate-500 sm:text-[13px]">
+                      {portal.description}
+                    </p>
+                  </div>
 
-          {/* 5. Participant Portal */}
-          <Link
-            href="/participant/login"
-            className="group p-6 bg-white rounded-2xl border border-[#E1E7EF] shadow-xs hover:border-[#2563EB] hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-[#2563EB] group-hover:scale-105 transition-transform flex items-center justify-center">
-                  <IdCard className="w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-800 border border-blue-200">
-                  Personal Access
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-[#111111] mt-4 group-hover:text-[#2563EB] transition-colors">
-                Participant Portal
-              </h3>
-              <p className="text-xs text-[#526070] mt-1.5 leading-relaxed">
-                Sign in with your short Bib Number and Date of Birth to view your competitions, published results,
-                individual points, and digitally verified participant ID card.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex items-center justify-between text-xs font-bold text-[#2563EB]">
-              <span>Participant Login</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
-        </div>
+                  <div className={'mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4 ' + portal.actionStyle}>
+                    <span className="text-xs font-bold">{portal.action}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[#E1E7EF] py-4 text-center text-xs text-[#526070]">
-        <span>{theme.institutionName} · <span className="festival-name">{theme.festivalName}</span> · Single-Organization Fest v2.0</span>
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-1 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:text-left lg:px-8">
+          <span>
+            {theme.institutionName} <span className="px-1 text-slate-300">·</span>
+            <span className="festival-name">{theme.festivalName}</span>
+          </span>
+          <span className="font-medium text-slate-400">Festival Management System</span>
+        </div>
       </footer>
     </div>
   );
