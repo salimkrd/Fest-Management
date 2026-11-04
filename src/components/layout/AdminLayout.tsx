@@ -119,7 +119,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
           console.warn('[AdminLayout] User is missing ADMIN or GREEN_ROOM_STAFF claim.');
-          await signOut(auth);
+          if (auth) await signOut(auth);
           setAuthorizedUser(null);
           setUserRole(null);
           setAuthChecking(false);
@@ -132,7 +132,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           const userDocSnap = await getDoc(doc(db, 'users', user.uid));
           if (!userDocSnap.exists()) {
             console.warn('[AdminLayout] Authoritative user document missing.');
-            await signOut(auth);
+            if (auth) await signOut(auth);
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
@@ -148,7 +148,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             userData?.disabled === true
           ) {
             console.warn('[AdminLayout] User profile inactive, disabled, or unauthorized role.');
-            await signOut(auth);
+            if (auth) await signOut(auth);
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
@@ -168,7 +168,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         }
       } catch (authErr) {
         console.warn('[AdminLayout] Auth verification error:', authErr);
-        await signOut(auth);
+        if (auth) await signOut(auth);
         setAuthorizedUser(null);
         setUserRole(null);
         setAuthChecking(false);
@@ -207,7 +207,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     setSigningOut(true);
 
     try {
-      if (auth) await signOut(auth);
+      if (auth) if (auth) await signOut(auth);
       setAuthorizedUser(null);
       setMobileMenuOpen(false);
       router.replace('/admin/login');
