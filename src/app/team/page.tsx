@@ -40,7 +40,9 @@ export default function TeamManagerDashboardPage() {
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
     .slice(0, 4);
 
-  const recentTeamRegistrations = [...teamRegistrations].reverse().slice(0, 5);
+  const recentTeamRegistrations = [...teamRegistrations]
+    .sort((a, b) => String(b.registeredAt || '').localeCompare(String(a.registeredAt || '')))
+    .slice(0, 5);
   const publishedAwards = results
     .filter(result => result.resultStatus === 'PUBLISHED')
     .reduce((total, result) => total + result.ranks.filter(rank => rank.teamId === team?.id).length, 0);
