@@ -54,7 +54,7 @@ export function TeamSyncStatus({ sources, className = '' }: TeamSyncStatusProps)
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
         <span>
           <strong className="font-semibold">Live sync issue.</strong>{' '}
-          Some information may be out of date. The page will continue listening for Firestore updates.
+          Some information may be out of date. Check your connection or access permissions, then refresh this page to retry.
         </span>
       </div>
     );
