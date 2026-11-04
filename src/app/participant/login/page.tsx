@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { CalendarDays, IdCard, LogIn, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
+import { LoginPortalSwitcher } from '@/components/domain/LoginPortalSwitcher';
 
 export default function ParticipantLoginPage() {
   const router = useRouter();
@@ -89,6 +90,7 @@ export default function ParticipantLoginPage() {
             </p>
           </form>
         </div>
+        <LoginPortalSwitcher />
       </div>
     </div>
   );
