@@ -242,6 +242,11 @@ export default function TopScorersPage() {
   const highestTotal = activeRows[0]?.totalMarks;
   const activeTitle = activeMode === 'STAGE' ? 'Star of the Fest' : 'Pen of the Fest';
 
+  const handleSelectMode = (mode: PerformanceMode) => {
+    setActiveMode(mode);
+    setCategoryFilter('ALL');
+  };
+
   const handleRetrySync = () => window.location.reload();
 
   return (
@@ -397,7 +402,7 @@ export default function TopScorersPage() {
                   mode="STAGE"
                   rows={stageRows}
                   active={activeMode === 'STAGE'}
-                  onSelect={setActiveMode}
+                  onSelect={handleSelectMode}
                 />
                 <AwardOverviewCard
                   title="Pen of the Fest"
@@ -461,7 +466,7 @@ export default function TopScorersPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setActiveMode('STAGE')}
+                    onClick={() => handleSelectMode('STAGE')}
                     aria-pressed={activeMode === 'STAGE'}
                     className={[
                       'inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors',
@@ -472,7 +477,7 @@ export default function TopScorersPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveMode('OFF_STAGE')}
+                    onClick={() => handleSelectMode('OFF_STAGE')}
                     aria-pressed={activeMode === 'OFF_STAGE'}
                     className={[
                       'inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors',
