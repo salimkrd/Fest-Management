@@ -4,7 +4,6 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
-import { LoginPortalSwitcher } from '@/components/domain/LoginPortalSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, Gavel } from 'lucide-react';
@@ -161,7 +160,6 @@ export default function JudgeLoginPage() {
           <JudgeLoginForm />
         </Suspense>
 
-        <LoginPortalSwitcher />
         <div className="mt-4 text-center text-xs text-[#526070]">
           <span>Need convener assistance? </span>
           <Link href="/" className="text-[#2563EB] font-bold hover:underline">Public Website</Link>
