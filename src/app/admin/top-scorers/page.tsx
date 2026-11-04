@@ -63,7 +63,7 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <span className="block text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">Total</span>
+                <span className="block text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">Total marks</span>
                 <span className="text-base font-extrabold tabular-nums text-[#1D4ED8]">{row.totalMarks.toFixed(2)}</span>
               </div>
             </div>
@@ -77,8 +77,8 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
                 <span className="mt-0.5 block text-sm font-bold tabular-nums text-[#1F2937]">{row.averagePercentage.toFixed(2)}</span>
               </div>
               <div className="px-2 py-2 text-center">
-                <span className="block text-[9px] font-semibold uppercase tracking-wide text-[#94A3B8]">Total marks</span>
-                <span className="mt-0.5 block text-sm font-bold tabular-nums text-[#1F2937]">{row.totalMarks.toFixed(2)}</span>
+                <span className="block text-[9px] font-semibold uppercase tracking-wide text-[#94A3B8]">Total points</span>
+                <span className="mt-0.5 block text-sm font-extrabold tabular-nums text-emerald-700">{row.totalPoints.toFixed(2)}</span>
               </div>
             </div>
           </article>
@@ -86,7 +86,7 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[820px] text-left text-xs">
+        <table className="w-full min-w-[920px] text-left text-xs">
           <thead>
             <tr className="border-y border-[#E8EDF3] bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
               <th className="w-24 px-4 py-3.5">Position</th>
@@ -95,6 +95,7 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
               <th className="px-4 py-3.5 text-right">Events</th>
               <th className="px-4 py-3.5 text-right">Average / 100</th>
               <th className="px-4 py-3.5 text-right">Total marks</th>
+              <th className="px-4 py-3.5 text-right">Total points</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF2F6]">
@@ -114,6 +115,7 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
                 <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.competitionsCount}</td>
                 <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.averagePercentage.toFixed(2)}</td>
                 <td className="px-4 py-4 text-right align-middle text-sm font-extrabold tabular-nums text-[#1D4ED8]">{row.totalMarks.toFixed(2)}</td>
+                <td className="px-4 py-4 text-right align-middle text-sm font-extrabold tabular-nums text-emerald-700">{row.totalPoints.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -180,7 +182,10 @@ function AwardOverviewCard({
             </p>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-[11px] text-[#64748B]">{leaders[0].teamName}</span>
-              <span className="text-sm font-extrabold tabular-nums text-blue-700">{leaders[0].totalMarks.toFixed(2)} marks</span>
+              <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-extrabold tabular-nums">
+                <span className="text-blue-700">{leaders[0].totalMarks.toFixed(2)} marks</span>
+                <span className="text-emerald-700">{leaders[0].totalPoints.toFixed(2)} pts</span>
+              </span>
             </div>
           </>
         ) : (
@@ -410,7 +415,7 @@ export default function TopScorersPage() {
                   mode="OFF_STAGE"
                   rows={offStageRows}
                   active={activeMode === 'OFF_STAGE'}
-                  onSelect={setActiveMode}
+                  onSelect={handleSelectMode}
                 />
               </div>
             </section>
@@ -432,7 +437,7 @@ export default function TopScorersPage() {
                     <h2 className="mt-2 text-base font-extrabold text-[#111827]">{activeTitle} — Rankings</h2>
                     <p className="mt-1 text-xs text-[#64748B]">
                       {totalEventEntries} published individual event entries included
-                      {highestTotal !== undefined ? ' · Leading total ' + highestTotal.toFixed(2) : ''}
+                      {highestTotal !== undefined ? ' · Leading total ' + highestTotal.toFixed(2) + ' marks · ' + activeRows[0].totalPoints.toFixed(2) + ' points' : ''}
                     </p>
                   </div>
 
