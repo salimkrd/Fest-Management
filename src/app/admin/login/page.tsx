@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
+import { LoginPortalSwitcher } from '@/components/domain/LoginPortalSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
@@ -215,19 +216,9 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        {/* Alternative Portals */}
-        <div className="mt-6 flex items-center justify-center gap-4 text-xs text-[#526070]">
-          <Link href="/team/login" className="hover:text-[#111111] hover:underline font-medium">
-            Team Manager Login
-          </Link>
-          <span>•</span>
-          <Link href="/judge/login" className="hover:text-[#111111] hover:underline font-medium">
-            Judge Secure Link
-          </Link>
-          <span>•</span>
-          <Link href="/" className="hover:text-[#111111] hover:underline font-medium">
-            Public Website
-          </Link>
+        <LoginPortalSwitcher />
+        <div className="mt-4 text-center text-xs text-slate-500">
+          <Link href="/" className="font-semibold text-blue-600 hover:underline">Public Website</Link>
         </div>
       </div>
     </div>
