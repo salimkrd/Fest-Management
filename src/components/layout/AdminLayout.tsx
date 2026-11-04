@@ -106,7 +106,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           try {
             const syncRes = await fetch('/api/auth/sync-claims', {
               method: 'POST',
-              headers: { Authorization: \`Bearer \${await user.getIdToken()}\` }
+              headers: { Authorization: 'Bearer ' + await user.getIdToken() }
             });
             if (syncRes.ok) {
               tokenResult = await user.getIdTokenResult(true);
