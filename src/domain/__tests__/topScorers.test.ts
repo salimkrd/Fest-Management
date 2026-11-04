@@ -9,9 +9,9 @@ const participant = (id: string) =>
 const registration = (id: string, competitionId: string, participantId: string, type: 'SOLO' | 'GROUP' = 'SOLO') =>
   ({ id, competitionId, participantId, teamId: 't1', status: 'APPROVED', type } as Registration);
 const result = (id: string, competitionId: string, registrationId: string, score: number,
-  type: 'SOLO' | 'GROUP' = 'SOLO', resultStatus: 'PUBLISHED' | 'REVISION_REQUIRED' = 'PUBLISHED') =>
+  type: 'SOLO' | 'GROUP' = 'SOLO', resultStatus: 'PUBLISHED' | 'REVISION_REQUIRED' = 'PUBLISHED', officialPoints = 0) =>
   ({ id, competitionId, type, resultStatus,
-    ranks: [{ registrationId, score }] } as CompetitionResult);
+    ranks: [{ registrationId, score, officialPoints, totalEarnedPoints: officialPoints }] } as CompetitionResult);
 
 describe('Star of the Fest / Pen of the Fest scorer calculation', () => {
   it('segregates stage and off-stage results', () => {
@@ -54,6 +54,27 @@ describe('Star of the Fest / Pen of the Fest scorer calculation', () => {
     expect(ranking.slice(1).map(x => x.position)).toEqual([2, 2]);
     const oneEvent = calculateTopScorers('OFF_STAGE', [events[0]], [results[0]], regs, [participant('a'), participant('b'), participant('c')]);
     expect(oneEvent.map(x => x.position)).toEqual([1, 1, 1]);
+  });
+
+  it('adds published solo official points to participant totals without changing mark-based ranking', () => {
+    const events = [competition('e1', 'STAGE'), competition('e2', 'STAGE')];
+    const regs = [
+      registration('r1', 'e1', 'a'),
+      registration('r2', 'e2', 'a'),
+      registration('r3', 'e1', 'b')
+    ];
+    const results = [
+      result('res1', 'e1', 'r1', 80, 'SOLO', 'PUBLISHED', 6),
+      result('res2', 'e2', 'r2', 85, 'SOLO', 'PUBLISHED', 10),
+      result('res3', 'e1', 'r3', 90, 'SOLO', 'PUBLISHED', 11)
+    ];
+
+    const ranking = calculateTopScorers('STAGE', events, results, regs, [participant('a'), participant('b')]);
+
+    expect(ranking).toMatchObject([
+      { participantId: 'a', totalMarks: 165, totalPoints: 16, competitionsCount: 2, position: 1 },
+      { participantId: 'b', totalMarks: 90, totalPoints: 11, competitionsCount: 1, position: 2 }
+    ]);
   });
 
   it('excludes registrations and participants that do not match the competition category', () => {
