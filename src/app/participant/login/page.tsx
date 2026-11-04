@@ -39,57 +39,95 @@ export default function ParticipantLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FC] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-[#526070] hover:text-[#2563EB] mb-5">
-          <ArrowLeft className="w-4 h-4" /> Back to Festival Home
-        </Link>
-        <div className="mb-3"><FestivalStatusBadge /></div>
-        <div className="rounded-2xl bg-white border border-[#E1E7EF] shadow-sm overflow-hidden">
-          <div className="bg-[#225DEE] text-white px-7 py-7">
-            <div className="flex items-center gap-2.5 mb-5">
-              <FestivalLogo size={44} />
-              <div>
-                <p className="text-xs font-semibold text-blue-100"><span className="festival-name">{theme.festivalName}</span> · Participant Portal</p>
-                <h1 className="text-2xl font-extrabold tracking-tight">Participant Login</h1>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-50 via-slate-50 to-white px-4 py-6 sm:px-6 sm:py-10">
+      <div className="w-full max-w-[440px]">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <Link href="/" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg text-xs font-semibold text-slate-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            <ArrowLeft className="h-4 w-4" />
+            Festival Home
+          </Link>
+          <FestivalStatusBadge />
+        </div>
+
+        <section className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,0.24)]">
+          <header className="bg-gradient-to-br from-blue-700 to-blue-600 px-5 py-6 text-white sm:px-8 sm:py-7">
+            <div className="mb-5 flex items-center gap-3">
+              <FestivalLogo size={48} className="border border-white/20" />
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-blue-100">
+                  <span className="festival-name">{theme.festivalName}</span> · Participant Portal
+                </p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight">Participant Login</h1>
               </div>
             </div>
-            <p className="text-sm text-blue-50">Access your competition schedule, published scores, individual points, and verified digital ID card.</p>
-          </div>
-          <form className="p-7 space-y-5" onSubmit={handleLogin}>
+            <p className="max-w-sm text-[13px] leading-5 text-blue-50">
+              Sign in to view your competition schedule, published results and digital ID card.
+            </p>
+          </header>
+
+          <form className="space-y-5 p-5 sm:p-8" onSubmit={handleLogin}>
             <div>
-              <label htmlFor="participant-bib" className="block text-sm font-bold text-[#111827] mb-2">Bib Number</label>
+              <label htmlFor="participant-bib" className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">Bib Number <span className="text-red-600">*</span></label>
               <div className="relative">
-                <IdCard className="w-4 h-4 text-[#526070] absolute left-3 top-3.5" />
-                <input id="participant-bib" name="bib" type="text" required
-                  inputMode="numeric" autoComplete="username" maxLength={10} value={bib}
+                <IdCard className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  id="participant-bib"
+                  name="bib"
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  autoComplete="username"
+                  maxLength={10}
+                  value={bib}
                   onChange={e => setBib(e.target.value)}
                   placeholder="e.g. 1042 or #1042"
-                  className="w-full border border-[#CBD5E1] bg-white rounded-lg text-sm p-3 pl-10 text-[#111827] focus:ring-2 focus:ring-[#2563EB] outline-none" />
+                  className="min-h-[50px] w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
-              <p className="text-xs text-[#64748B] mt-1">Enter the short Bib Number printed on your Digital ID Card. Both 1042 and #1042 work.</p>
+              <p className="mt-1.5 text-xs leading-5 text-slate-500">Enter the short Bib Number printed on your Digital ID Card. Both 1042 and #1042 work.</p>
             </div>
+
             <div>
-              <label htmlFor="participant-dob" className="block text-sm font-bold text-[#111827] mb-2">Date of Birth</label>
+              <label htmlFor="participant-dob" className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">Date of Birth <span className="text-red-600">*</span></label>
               <div className="relative">
-                <CalendarDays className="w-4 h-4 text-[#526070] absolute left-3 top-3.5" />
-                <input id="participant-dob" name="dob" type="date" required
-                  autoComplete="bday" value={dob} onChange={e => setDob(e.target.value)}
-                  className="w-full border border-[#CBD5E1] bg-white rounded-lg text-sm p-3 pl-10 text-[#111827] focus:ring-2 focus:ring-[#2563EB] outline-none" />
+                <CalendarDays className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  id="participant-dob"
+                  name="dob"
+                  type="date"
+                  required
+                  autoComplete="bday"
+                  value={dob}
+                  onChange={e => setDob(e.target.value)}
+                  className="min-h-[50px] w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
             </div>
-            {error && <p role="alert" className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3">{error}</p>}
-            <button type="submit" disabled={!bib.trim() || !dob || submitting}
-              className="w-full rounded-lg bg-[#2563EB] disabled:opacity-60 text-white text-sm font-bold py-3 flex items-center justify-center gap-2 hover:bg-[#1D4ED8] transition-colors">
-              <LogIn className="w-4 h-4" /> {submitting ? 'Signing In...' : 'Sign In to My Portal'}
+
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!bib.trim() || !dob || submitting}
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              {submitting ? 'Signing In...' : 'Sign In to My Portal'}
             </button>
-            <p className="flex items-start gap-2 text-xs text-[#64748B] leading-relaxed">
-              <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
-              Only information belonging to the signed-in participant is accessible. Ask your Team Manager if your Bib Number or registered Date of Birth is incorrect.
-            </p>
+
+            <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+              <span>Only information belonging to the signed-in participant is accessible. Ask your Team Manager if your Bib Number or registered Date of Birth is incorrect.</span>
+            </div>
           </form>
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

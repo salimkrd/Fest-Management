@@ -6,22 +6,21 @@ import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, Gavel } from 'lucide-react';
+import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 function JudgeLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { competitions, markEntries, theme } = useFest();
+  const { competitions, theme } = useFest();
 
   const urlCode = searchParams.get('code') || '';
   const urlSecret = searchParams.get('token') || '';
   const urlCompId = searchParams.get('competitionId') || '';
+  const assignedCompetition = competitions.find((competition) => competition.id === urlCompId);
 
   const [accessCode, setAccessCode] = useState(urlCode);
   const [sessionSecret, setSessionSecret] = useState(urlSecret);
-  const [competitionId, setCompetitionId] = useState(urlCompId || competitions[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,7 +43,6 @@ function JudgeLoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accessCode: cleanCode,
-          competitionId,
           secret: sessionSecret
         })
       });
@@ -75,72 +73,70 @@ function JudgeLoginForm() {
   };
 
   return (
-    <div className="bg-white py-8 px-6 shadow-xs rounded-2xl border border-[#E1E7EF] sm:px-10">
+    <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.24)] sm:p-8">
+      <div className="mb-6">
+        <p className="text-sm font-semibold text-slate-900">Judge authentication</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Enter the official credentials issued by the fest convener.</p>
+      </div>
+
       {error && (
-        <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-[#DC2626] flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div role="alert" className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        <div>
-          <Select
-            label="Assigned Stage Competition"
-            value={competitionId}
-            onChange={(e) => setCompetitionId(e.target.value)}
-            options={competitions.map(c => ({
-              value: c.id,
-              label: `${c.name} (${c.code} - ${c.categoryName})`
-            }))}
-          />
+        <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-4 sm:px-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">Assigned Stage Competition</p>
+          <p className="mt-1.5 text-sm font-semibold leading-5 text-slate-900">
+            {assignedCompetition ? assignedCompetition.name : "Automatically linked to your access code"}
+          </p>
+          <p className="mt-1.5 text-xs leading-5 text-slate-600">
+            {assignedCompetition ? `${assignedCompetition.code} · ${assignedCompetition.categoryName || "Assigned stage competition"}` : "Your assigned competition is verified securely from your official Juror Access Code. No manual selection is required."}
+          </p>
         </div>
 
-        <div>
-          <Input
-            label="Official Juror Access Code"
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value)}
-            required
-            placeholder="JRY-XXXX (e.g. JRY-4101)"
-            leftIcon={<Key className="w-4 h-4" />}
-            helperText="Provided via official WhatsApp dispatch by the fest convener"
-          />
-        </div>
+        <Input
+          label="Official Juror Access Code"
+          value={accessCode}
+          onChange={(e) => setAccessCode(e.target.value)}
+          required
+          placeholder="JRY-XXXX (e.g. JRY-4101)"
+          leftIcon={<Key className="h-4 w-4" />}
+          helperText="Provided via official WhatsApp dispatch by the fest convener."
+          className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-violet-600 focus:!ring-2 focus:!ring-violet-100"
+        />
 
-        <div>
-          <Input
-            label="Juror Confidential Session Secret (PIN)"
-            type="password"
-            value={sessionSecret}
-            onChange={(e) => setSessionSecret(e.target.value)}
-            placeholder="Enter one-time secret or PIN"
-            leftIcon={<Lock className="w-4 h-4" />}
-            helperText="Confidential verification credential"
-          />
-        </div>
+        <Input
+          label="Juror Confidential Session Secret (PIN)"
+          type="password"
+          autoComplete="current-password"
+          value={sessionSecret}
+          onChange={(e) => setSessionSecret(e.target.value)}
+          placeholder="Enter your one-time PIN"
+          leftIcon={<Lock className="h-4 w-4" />}
+          helperText="Keep this verification credential confidential."
+          className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-violet-600 focus:!ring-2 focus:!ring-violet-100"
+        />
 
-        <div>
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            className="w-full font-bold bg-[#111111] hover:bg-neutral-800"
-            isLoading={loading}
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-          >
-            Authenticate Jury Session
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="mt-1 w-full !min-h-[52px] !rounded-xl !bg-slate-900 !font-semibold shadow-sm shadow-slate-900/10 hover:!bg-slate-800 focus:!ring-slate-700"
+          isLoading={loading}
+          rightIcon={<ArrowRight className="h-4 w-4" />}
+        >
+          Authenticate Jury Session
+        </Button>
       </form>
 
-      <div className="mt-6 pt-6 border-t border-[#E1E7EF] text-center">
-        <div className="inline-flex items-center gap-1.5 text-[11px] text-[#526070] font-medium bg-[#F8FAFC] px-3 py-1 rounded-full border border-[#E1E7EF]">
-          <ShieldCheck className="w-3.5 h-3.5 text-neutral-800" />
-          <span>Assignment-Bound Cryptographic Authentication</span>
-        </div>
+      <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-700" />
+        <span>Access is restricted to your assigned judging session.</span>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -148,33 +144,28 @@ export default function JudgeLoginPage() {
   const { theme } = useFest();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <FestivalLogo size={48} />
-        </div>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-50 via-slate-50 to-white px-4 py-8 sm:px-6 sm:py-12">
+      <div className="w-full max-w-[440px]">
+        <header className="mb-7 text-center">
+          <div className="mb-4 flex justify-center"><FestivalLogo size={52} /></div>
+          <h1 className="text-[25px] font-bold tracking-tight text-slate-950 sm:text-[28px]">Secure Jury Access</h1>
+          <p className="mt-2 text-[13px] leading-5 text-slate-600">
+            <span className="festival-name font-semibold text-slate-800">{theme.festivalName}</span>
+            <span className="px-1.5 text-slate-300">·</span>
+            Adjudicator Session Portal
+          </p>
+          <div className="mt-4 flex justify-center"><FestivalStatusBadge /></div>
+        </header>
 
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#111111]">
-          Secure Jury Access
-        </h2>
-        <p className="mt-1 text-center text-xs text-[#526070]">
-          <span className="festival-name">{theme.festivalName}</span> · Adjudicator Session Portal
-        </p>
-        <div className="mt-3 flex justify-center"><FestivalStatusBadge /></div>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <Suspense fallback={<div className="bg-white p-8 rounded-2xl border text-center text-xs text-[#526070]">Loading jury credentials...</div>}>
+        <Suspense fallback={<div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">Loading jury credentials...</div>}>
           <JudgeLoginForm />
         </Suspense>
 
-        <div className="mt-6 text-center text-xs text-[#526070]">
+        <footer className="mt-6 text-center text-xs text-slate-500">
           <span>Need convener assistance? </span>
-          <Link href="/" className="text-[#2563EB] font-bold hover:underline">
-            Return to Public Results Portal
-          </Link>
-        </div>
+          <Link href="/" className="font-semibold text-violet-700 underline-offset-4 transition hover:text-violet-800 hover:underline">Public Website</Link>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }
