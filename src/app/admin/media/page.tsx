@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, Download, Globe, Image as ImageIcon, Layers3, ShieldCheck, Sparkles, Palette, Users } from 'lucide-react';
+import { ArrowUpRight, Download, Globe, Layers3, ShieldCheck, Sparkles, Palette, Users } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { PosterTemplateEditor } from '@/components/domain/PosterTemplateEditor';
 
