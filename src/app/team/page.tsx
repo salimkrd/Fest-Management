@@ -14,7 +14,6 @@ import {
   CalendarDays,
   ChevronRight,
   ArrowUpRight,
-  IdCard,
   FileDown
 } from 'lucide-react';
 
