@@ -126,7 +126,7 @@ export function PosterTemplateEditor() {
       void refreshTemplates(true).catch(() => undefined);
     });
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible' && auth.currentUser) {
+      if (document.visibilityState === 'visible' && auth?.currentUser) {
         void refreshTemplates(false).catch(() => undefined);
       }
     };
