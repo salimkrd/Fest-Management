@@ -11,7 +11,6 @@ const row: TeamResultExportRow = {
   bib: '1042',
   grade: 'A+',
   rank: 1,
-  points: 11,
   publishedDate: '2026-10-27'
 };
 
@@ -23,15 +22,16 @@ describe('TeamExportService', () => {
     expect(csv).toContain('"Ameen ""A.J."" Farhan"');
     expect(csv).toContain('"1st Place"');
     expect(csv).toContain('"A+"');
-    expect(csv).toContain('"11"');
+    expect(csv).not.toContain('Team Points');
+    expect(csv).not.toContain('"11"');
     expect(csv).not.toContain('Score');
     expect(csv).not.toContain('"94"');
   });
 
   it('keeps the grade-only/no-prize placement label in CSV output', () => {
-    const noPrizeRow: TeamResultExportRow = { ...row, rank: null, points: 5 };
+    const noPrizeRow: TeamResultExportRow = { ...row, rank: null };
     const csv = TeamExportService.generateCSV([noPrizeRow]);
     expect(csv).toContain('"Grade-only / No Prize"');
-    expect(csv).toContain('"5"');
+    expect(csv).not.toContain('Team Points');
   });
 });
