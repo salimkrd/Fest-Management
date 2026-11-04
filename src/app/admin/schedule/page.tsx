@@ -357,20 +357,6 @@ export default function SchedulePage() {
     doc.save(safeName + '_Competition_Schedule_A4.pdf');
   };
 
-  const getStatusBadge = (st: ScheduleSlot['status']) => {
-    switch (st) {
-      case 'LIVE':
-        return <Badge variant="error" size="sm" dot>LIVE ON STAGE</Badge>;
-      case 'COMPLETED':
-        return <Badge variant="success" size="sm" dot>COMPLETED</Badge>;
-      case 'DELAYED':
-        return <Badge variant="warning" size="sm" dot>DELAYED</Badge>;
-      case 'SCHEDULED':
-      default:
-        return <Badge variant="default" size="sm" dot>SCHEDULED</Badge>;
-    }
-  };
-
   const getStatusBadge = (slotStatus: ScheduleSlot['status']) => {
     switch (slotStatus) {
       case 'LIVE':
