@@ -158,14 +158,15 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
       description="Printable festival accreditation badge with security verification code"
       maxWidth="md"
       footer={
-        <div className="flex items-center justify-between w-full">
-          <Button variant="outline" size="sm" onClick={onClose}>
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="outline" size="md" className="w-full sm:w-auto" onClick={onClose}>
             Close
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
             <Button
               variant="secondary"
-              size="sm"
+              size="md"
+              className="w-full sm:w-auto"
               leftIcon={<Download className="w-4 h-4" />}
               onClick={handleDownload}
               isLoading={exporting}
@@ -173,7 +174,14 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             >
               Download PNG
             </Button>
-            <Button variant="primary" size="sm" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint} disabled={loading}>
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full sm:w-auto"
+              leftIcon={<Printer className="w-4 h-4" />}
+              onClick={handlePrint}
+              disabled={loading}
+            >
               Print ID Badge
             </Button>
           </div>
