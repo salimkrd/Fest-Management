@@ -19,8 +19,6 @@ export default function TeamParticipantsPage() {
     participants,
     participantsSyncState,
     categories,
-    categoriesSyncState,
-    teamsSyncState,
     addParticipant,
     updateParticipant,
     deleteParticipant
