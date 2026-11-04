@@ -51,6 +51,8 @@ export function calculateTopScorers(
           entry.competitionId !== competition.id || !entry.participantId) continue;
       const participant = people.get(entry.participantId);
       if (!participant || participant.teamId !== entry.teamId ||
+          (entry.categoryId && competition.categoryId && entry.categoryId !== competition.categoryId) ||
+          (participant.categoryId && competition.categoryId && participant.categoryId !== competition.categoryId) ||
           !Number.isFinite(rank.score) || rank.score < 0 || rank.score > maxMarks) continue;
       const id = result.id + ':' + entry.id;
       if (counted.has(id)) continue;
