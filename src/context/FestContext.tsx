@@ -76,6 +76,7 @@ interface FestContextType {
   deleteStage: (id: string) => Promise<void>;
 
   schedules: ScheduleSlot[];
+  schedulesSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addSchedule: (slot: Omit<ScheduleSlot, 'id'>) => Promise<void>;
   updateSchedule: (id: string, slot: Partial<ScheduleSlot>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
@@ -1578,6 +1579,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
   const [stagesSyncState, setStagesSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
+  const [schedulesSyncState, setSchedulesSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
+
   const [schedules, setSchedules] = useState<ScheduleSlot[]>(() => {
     if (!isIsolatedDemoOrTest) {
       return [];
@@ -2005,47 +2008,66 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isIsolatedDemoOrTest, db]);
 
-  // Realtime Firestore schedules synchronization for live production
+  // Realtime Firestore schedules synchronization for live production.
+  // Every snapshot, including an empty collection, is authoritative and marks the feed ready.
   useEffect(() => {
-    if (!isIsolatedDemoOrTest && db) {
-      const firestore = db;
-      try {
-        const schedulesRef = collection(firestore, 'schedules');
-        const unsubscribe = onSnapshot(
-          schedulesRef,
-          (snapshot) => {
-            if (snapshot.empty) {
-              setSchedules([]);
-              return;
-            }
-            const liveSchedules: ScheduleSlot[] = snapshot.docs.map(d => {
-              const dt = d.data();
-              return {
-                id: d.id,
-                competitionId: dt.competitionId || '',
-                competitionName: dt.competitionName || '',
-                categoryName: dt.categoryName || '',
-                type: dt.type || 'SOLO',
-                stageId: dt.stageId || '',
-                stageName: dt.stageName || '',
-                date: dt.date || '',
-                startTime: dt.startTime || '',
-                endTime: dt.endTime || '',
-                status: dt.status || 'SCHEDULED'
-              };
-            });
-            setSchedules(liveSchedules);
-          },
-          (err) => {
-            console.warn('[FestContext] Firestore schedules sync warning:', err);
-          }
-        );
-        return () => unsubscribe();
-      } catch (e) {
-        console.warn('[FestContext] Could not subscribe to schedules:', e);
-      }
+    if (isIsolatedDemoOrTest) {
+      setSchedulesSyncState('ready');
+      return;
     }
-  }, [isIsolatedDemoOrTest]);
+    if (!db) {
+      setSchedulesSyncState('error');
+      return;
+    }
+
+    const firestore = db;
+    let active = true;
+    setSchedulesSyncState('loading');
+    try {
+      const schedulesRef = collection(firestore, 'schedules');
+      const unsubscribe = onSnapshot(
+        schedulesRef,
+        snapshot => {
+          if (!active) return;
+          const liveSchedules: ScheduleSlot[] = snapshot.docs.map(d => {
+            const dt = d.data();
+            const rawStatus = dt.status;
+            const safeStatus = ['SCHEDULED', 'LIVE', 'COMPLETED', 'DELAYED'].includes(rawStatus)
+              ? rawStatus as ScheduleSlot['status']
+              : 'SCHEDULED';
+            return {
+              id: d.id,
+              competitionId: dt.competitionId || '',
+              competitionName: dt.competitionName || '',
+              categoryName: dt.categoryName || '',
+              type: dt.type || 'SOLO',
+              stageId: dt.stageId || '',
+              stageName: dt.stageName || '',
+              date: dt.date || '',
+              startTime: dt.startTime || '',
+              endTime: dt.endTime || '',
+              status: safeStatus
+            };
+          });
+          setSchedules(liveSchedules);
+          setSchedulesSyncState('ready');
+        },
+        err => {
+          if (!active) return;
+          setSchedulesSyncState('error');
+          console.warn('[FestContext] Firestore schedules sync warning:', err);
+        }
+      );
+      return () => {
+        active = false;
+        unsubscribe();
+      };
+    } catch (error) {
+      active = false;
+      setSchedulesSyncState('error');
+      console.warn('[FestContext] Could not subscribe to schedules:', error);
+    }
+  }, [isIsolatedDemoOrTest, db]);
 
   // Realtime Firestore points ledger synchronization for live production
   useEffect(() => {
@@ -2880,21 +2902,30 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       ...slotData,
       id: newId
     };
-    if (!isIsolatedDemoOrTest && db) {
+    if (!isIsolatedDemoOrTest) {
+      if (!db || !auth?.currentUser) {
+        throw new Error('Administrator sign-in and a live Firestore connection are required to save schedule changes.');
+      }
       await setDoc(doc(db, 'schedules', newId), sanitizeForFirestore(newSlot));
     }
     setSchedules(prev => [...prev.filter(s => s.id !== newId), newSlot]);
   };
 
   const updateSchedule = async (id: string, updated: Partial<ScheduleSlot>) => {
-    if (!isIsolatedDemoOrTest && db) {
+    if (!isIsolatedDemoOrTest) {
+      if (!db || !auth?.currentUser) {
+        throw new Error('Administrator sign-in and a live Firestore connection are required to save schedule changes.');
+      }
       await updateDoc(doc(db, 'schedules', id), sanitizeForFirestore(updated));
     }
     setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
   };
 
   const deleteSchedule = async (id: string) => {
-    if (!isIsolatedDemoOrTest && db) {
+    if (!isIsolatedDemoOrTest) {
+      if (!db || !auth?.currentUser) {
+        throw new Error('Administrator sign-in and a live Firestore connection are required to save schedule changes.');
+      }
       await deleteDoc(doc(db, 'schedules', id));
     }
     setSchedules(prev => prev.filter(s => s.id !== id));
@@ -3328,6 +3359,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         updateStage,
         deleteStage,
         schedules,
+        schedulesSyncState,
         addSchedule,
         updateSchedule,
         deleteSchedule,
