@@ -119,7 +119,7 @@ export default function TeamManagerDashboardPage() {
         <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <MetricCard label="Participants" value={teamParticipants.length} detail="Team roster" icon={<Users className="h-5 w-5" />} tone="blue" />
           <MetricCard label="Event entries" value={teamRegistrations.length} detail="Individual and group" icon={<ClipboardList className="h-5 w-5" />} tone="emerald" />
-          <MetricCard label="Published awards" value={publishedAwards} detail="Officially released placings" icon={<Award className="h-5 w-5" />} tone="amber" />
+          <MetricCard label="Published results" value={publishedAwards} detail="Officially released team records" icon={<Award className="h-5 w-5" />} tone="amber" />
           <MetricCard label="Championship points" value={team?.totalPoints ?? 0} detail={`Rank #${team?.rank || 1} · Live standings`} icon={<Trophy className="h-5 w-5" />} tone="violet" />
         </section>
 
