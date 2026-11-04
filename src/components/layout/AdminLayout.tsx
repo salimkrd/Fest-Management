@@ -255,13 +255,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     onClick={mobile ? () => setMobileMenuOpen(false) : undefined}
                     aria-current={active ? 'page' : undefined}
                     className={
-                      'group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ' +
+                      'group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white ' +
                       (active
-                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/20'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white')
+                        ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-inset ring-blue-100'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950')
                     }
                   >
-                    <Icon className={'h-[18px] w-[18px] shrink-0 transition-colors ' + (active ? 'text-white' : 'text-slate-400 group-hover:text-white')} strokeWidth={1.9} aria-hidden="true" />
+                    <Icon className={'h-[18px] w-[18px] shrink-0 transition-colors ' + (active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700')} strokeWidth={1.9} aria-hidden="true" />
                     <span className="min-w-0 flex-1">{item.name}</span>
                     {active ? (
                       <ChevronRight className="h-4 w-4 shrink-0 text-blue-100" aria-hidden="true" />
@@ -277,21 +277,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   );
 
   const renderUserPanel = (mobile = false) => (
-    <div className={mobile ? 'border-t border-slate-800 bg-slate-950 p-4' : 'border-t border-slate-800 bg-slate-900/70 p-4'}>
+    <div className={mobile ? 'border-t border-slate-200 bg-white p-4' : 'border-t border-slate-200 bg-slate-50 p-4'}>
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-xs font-bold text-blue-200 ring-1 ring-inset ring-blue-400/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-100">
           {userInitials}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-bold text-white">{roleLabel}</p>
-          <p className="mt-0.5 truncate text-[11px] text-slate-400">{authorizedUser?.email || 'Administrator account'}</p>
+          <p className="truncate text-xs font-bold text-slate-900">{roleLabel}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">{authorizedUser?.email || 'Administrator account'}</p>
         </div>
       </div>
       <button
         type="button"
         onClick={handleSignOut}
         disabled={signingOut}
-        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition-colors hover:border-rose-300/40 hover:bg-rose-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"
       >
         {signingOut ? (
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -323,15 +323,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-[#F5F7FB] text-slate-900">
       {/* Desktop navigation */}
-      <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col bg-slate-950 text-white lg:flex xl:w-[288px]">
-        <div className="flex h-[76px] shrink-0 items-center border-b border-slate-800 px-5">
+      <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col border-r border-slate-200 bg-white text-slate-900 shadow-sm lg:flex xl:w-[288px]">
+        <div className="flex h-[76px] shrink-0 items-center border-b border-slate-200 px-5">
           <Link href="/admin" className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
             <FestivalLogo size={40} className="rounded-xl" />
             <span className="min-w-0">
-              <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-white">
+              <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-slate-900">
                 {theme.festivalName}
               </span>
-              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Admin workspace
               </span>
             </span>
@@ -412,9 +412,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             role="dialog"
             aria-modal="true"
             aria-label="Admin navigation menu"
-            className="flex h-[100dvh] w-[min(88vw,360px)] max-w-full flex-col border-r border-slate-800 bg-slate-950 text-white shadow-2xl shadow-slate-950/30"
+            className="flex h-[100dvh] w-[min(88vw,360px)] max-w-full flex-col border-r border-slate-200 bg-white text-slate-900 shadow-2xl shadow-slate-950/15"
           >
-            <div className="flex min-h-[76px] shrink-0 items-center justify-between border-b border-slate-800 px-4">
+            <div className="flex min-h-[76px] shrink-0 items-center justify-between border-b border-slate-200 px-4">
               <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-3">
                 <FestivalLogo size={40} className="rounded-xl" />
                 <span className="min-w-0">
@@ -429,7 +429,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="ml-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="ml-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                 aria-label="Close navigation menu"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
