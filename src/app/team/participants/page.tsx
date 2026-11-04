@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { TeamLayout } from '@/components/layout/TeamLayout';
 import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
+import { buildParticipantEventRegistrationCounts } from '@/domain/registrationCounts';
 import { Participant } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -18,6 +19,8 @@ export default function TeamParticipantsPage() {
     teams,
     participants,
     participantsSyncState,
+    registrations,
+    registrationsSyncState,
     categories,
     addParticipant,
     updateParticipant,
@@ -37,6 +40,9 @@ export default function TeamParticipantsPage() {
 
   // The Firestore query is scoped to the authenticated manager's team.
   const myParticipants = participants.filter(participant => participant.teamId === team?.id);
+  const myRegistrations = registrations.filter(registration => registration.teamId === team?.id);
+  const eventRegistrationCounts = buildParticipantEventRegistrationCounts(myRegistrations);
+  const registrationCountsReady = registrationsSyncState === 'ready';
   const normalizedSearch = search.trim().toLowerCase();
 
   const filtered = myParticipants.filter(participant => {
@@ -116,7 +122,7 @@ export default function TeamParticipantsPage() {
           </Button>
         </header>
 
-        <TeamSyncStatus sources={['teams', 'categories', 'participants']} />
+        <TeamSyncStatus sources={['teams', 'categories', 'participants', 'registrations']} />
 
         <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -220,7 +226,7 @@ export default function TeamParticipantsPage() {
                     </div>
                     <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
                       <span className="text-xs font-medium text-slate-600">
-                        {(participant.registeredEventIds || []).length} event registrations
+                        {registrationCountsReady ? (eventRegistrationCounts.get(participant.id) ?? 0) : '—'} event registrations
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button type="button" onClick={() => setSelectedIdCard(participant)} aria-label={`Open ID card for ${participant.name}`} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
@@ -246,7 +252,7 @@ export default function TeamParticipantsPage() {
                       <th className="px-5 py-3.5">Participant</th>
                       <th className="px-5 py-3.5">Category</th>
                       <th className="px-5 py-3.5">Class</th>
-                      <th className="px-5 py-3.5 text-center">Events</th>
+                      <th className="px-5 py-3.5 text-center">Event registrations</th>
                       <th className="px-5 py-3.5 text-center">Digital ID</th>
                       <th className="px-5 py-3.5 text-right">Actions</th>
                     </tr>
@@ -266,7 +272,7 @@ export default function TeamParticipantsPage() {
                         </td>
                         <td className="px-5 py-4 text-sm text-slate-700">{participant.categoryName || '—'}</td>
                         <td className="px-5 py-4 text-sm text-slate-600">{participant.classGrade || '—'}</td>
-                        <td className="px-5 py-4 text-center text-sm font-semibold tabular-nums text-slate-700">{(participant.registeredEventIds || []).length}</td>
+                        <td className="px-5 py-4 text-center text-sm font-semibold tabular-nums text-slate-700">{registrationCountsReady ? (eventRegistrationCounts.get(participant.id) ?? 0) : '—'}</td>
                         <td className="px-5 py-4 text-center"><Badge variant="success" size="sm">{participant.idStatus || 'ID READY'}</Badge></td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-1">
