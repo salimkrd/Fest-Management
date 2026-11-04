@@ -63,13 +63,20 @@ describe('participant event registration counts', () => {
     expect(counts.get('part-2')).toBe(1);
   });
 
-  it('does not assign entries by participant display name and keeps recorded rejected entries visible in the total', () => {
+  it('counts rejected registrations that remain in the registration records', () => {
+    const counts = buildParticipantEventRegistrationCounts([
+      makeRegistration({ participantId: 'part-1', status: 'REJECTED' })
+    ]);
+
+    expect(counts.get('part-1')).toBe(1);
+  });
+
+  it('does not assign an entry by participant display name alone', () => {
     const counts = buildParticipantEventRegistrationCounts([
       makeRegistration({
         participantId: undefined,
         groupLeaderId: undefined,
-        groupMembers: undefined,
-        status: 'REJECTED'
+        groupMembers: undefined
       })
     ]);
 
