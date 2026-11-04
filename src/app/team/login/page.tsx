@@ -7,7 +7,7 @@ import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Users2, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Info } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Info } from 'lucide-react';
 import { auth, db } from '@/lib/firebase/client';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -202,89 +202,89 @@ function TeamLoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 flex flex-col justify-center py-10 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <FestivalLogo size={48} />
-        </div>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-white px-4 py-8 sm:px-6 sm:py-12">
+      <div className="w-full max-w-[440px]">
+        <header className="mb-7 text-center">
+          <div className="mb-4 flex justify-center"><FestivalLogo size={52} /></div>
+          <h1 className="text-[25px] font-bold tracking-tight text-slate-950 sm:text-[28px]">Team Manager Portal</h1>
+          <p className="mt-2 text-[13px] leading-5 text-slate-600">
+            <span className="festival-name font-semibold text-slate-800">{theme.festivalName}</span>
+            <span className="px-1.5 text-slate-300">·</span>
+            Contingent House Administration
+          </p>
+          <div className="mt-4 flex justify-center"><FestivalStatusBadge /></div>
+        </header>
 
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#111111]">
-          Team Manager Portal
-        </h2>
-        <p className="mt-1 text-center text-xs text-[#526070]">
-          <span className="festival-name">{theme.festivalName}</span> · Contingent House Administration
-        </p>
-        <div className="mt-3 flex justify-center"><FestivalStatusBadge /></div>
-      </div>
+        <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.24)] sm:p-8">
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-slate-900">Manager sign in</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Sign in with the email and password provided for your team.</p>
+          </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-xs rounded-2xl border border-[#E1E7EF] sm:px-10">
           {notice && (
-            <div className="mb-6 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-[#2563EB] flex items-center gap-2">
-              <Info className="w-4 h-4 shrink-0" />
+            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-5 text-blue-800">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{notice}</span>
             </div>
           )}
 
           {error && (
-            <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-[#DC2626] flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div role="alert" className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <Input
-                label="Team Manager Work Email"
-                type="email"
-                placeholder="manager@domain.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                leftIcon={<Mail className="w-4 h-4" />}
-              />
-            </div>
+            <Input
+              label="Team Manager Work Email"
+              type="email"
+              autoComplete="username"
+              placeholder="manager@domain.com"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              leftIcon={<Mail className="h-4 w-4" />}
+              className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-emerald-600 focus:!ring-2 focus:!ring-emerald-100"
+            />
 
-            <div>
-              <Input
-                label="Manager Password"
-                type="password"
-                placeholder="••••••••••••"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                leftIcon={<Lock className="w-4 h-4" />}
-              />
-            </div>
+            <Input
+              label="Manager Password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              leftIcon={<Lock className="h-4 w-4" />}
+              className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-emerald-600 focus:!ring-2 focus:!ring-emerald-100"
+            />
 
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                className="w-full font-bold bg-emerald-600 hover:bg-emerald-700"
-                isLoading={loading}
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-              >
-                Access Team Workspace
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="mt-1 w-full !min-h-[52px] !rounded-xl !bg-emerald-700 !font-semibold shadow-sm shadow-emerald-900/10 hover:!bg-emerald-800 focus:!ring-emerald-600"
+              isLoading={loading}
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+            >
+              Access Team Workspace
+            </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-[#E1E7EF] text-center">
-            <div className="inline-flex items-center gap-1.5 text-[11px] text-[#526070] font-medium bg-[#F8FAFC] px-3 py-1 rounded-full border border-[#E1E7EF]">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Contingent Workspace · Single Fest Management</span>
-            </div>
+          <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+            <span>Secure access to your assigned contingent workspace.</span>
           </div>
-        </div>
+        </section>
 
-        <div className="mt-4 text-center text-xs text-slate-500">
-          <Link href="/" className="font-semibold text-blue-600 hover:underline">Public Website</Link>
-        </div>
+        <footer className="mt-6 text-center text-xs text-slate-500">
+          <Link href="/" className="font-semibold text-emerald-700 underline-offset-4 transition hover:text-emerald-800 hover:underline">
+            Public Website
+          </Link>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -293,5 +293,8 @@ export default function TeamManagerLoginPage() {
     <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-xs text-[#526070]">Loading Team Portal...</div>}>
       <TeamLoginForm />
     </Suspense>
+  );
+}
+
   );
 }
