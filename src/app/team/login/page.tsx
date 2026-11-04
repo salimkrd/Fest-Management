@@ -295,6 +295,3 @@ export default function TeamManagerLoginPage() {
     </Suspense>
   );
 }
-
-  );
-}
