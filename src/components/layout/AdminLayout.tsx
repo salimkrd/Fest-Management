@@ -20,8 +20,10 @@ import {
   ExternalLink,
   Menu,
   X,
-  Bell,
-  Sparkles
+  Sparkles,
+  LogOut,
+  LoaderCircle,
+  ChevronRight,
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
@@ -33,6 +35,43 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+const navGroups = [
+  {
+    label: 'Workspace',
+    items: [
+      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Festival setup',
+    items: [
+      { name: 'Categories', href: '/admin/categories', icon: Layers },
+      { name: 'Teams', href: '/admin/teams', icon: Users2 },
+      { name: 'Competitions', href: '/admin/competitions', icon: Trophy },
+      { name: 'Participants', href: '/admin/participants', icon: UserCheck },
+      { name: 'Registration', href: '/admin/registration', icon: ClipboardList },
+    ],
+  },
+  {
+    label: 'Live operations',
+    items: [
+      { name: 'Green Room', href: '/admin/green-room', icon: DoorOpen },
+      { name: 'Mark Entry', href: '/admin/mark-entry', icon: Edit3 },
+      { name: 'Results', href: '/admin/results', icon: Award },
+      { name: 'Stages', href: '/admin/stages', icon: MapPin },
+      { name: 'Schedule', href: '/admin/schedule', icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'Insights & tools',
+    items: [
+      { name: 'Media', href: '/admin/media', icon: ImageIcon },
+      { name: 'Export', href: '/admin/export', icon: FileDown },
+      { name: 'Top Scorers', href: '/admin/top-scorers', icon: Trophy },
+    ],
+  },
+];
+
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
@@ -41,6 +80,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [authorizedUser, setAuthorizedUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'ADMIN' | 'GREEN_ROOM_STAFF' | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     if (!auth) {
@@ -66,7 +106,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           try {
             const syncRes = await fetch('/api/auth/sync-claims', {
               method: 'POST',
-              headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+              headers: { Authorization: \`Bearer \${await user.getIdToken()}\` }
             });
             if (syncRes.ok) {
               tokenResult = await user.getIdTokenResult(true);
@@ -79,7 +119,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         if (role !== 'ADMIN' && role !== 'GREEN_ROOM_STAFF') {
           console.warn('[AdminLayout] User is missing ADMIN or GREEN_ROOM_STAFF claim.');
-          if (auth) await signOut(auth);
+          await signOut(auth);
           setAuthorizedUser(null);
           setUserRole(null);
           setAuthChecking(false);
@@ -87,12 +127,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           return;
         }
 
-        // Validate authoritative Firestore user document
+        // Validate authoritative Firestore user document.
         if (db) {
           const userDocSnap = await getDoc(doc(db, 'users', user.uid));
           if (!userDocSnap.exists()) {
             console.warn('[AdminLayout] Authoritative user document missing.');
-            if (auth) await signOut(auth);
+            await signOut(auth);
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
@@ -108,7 +148,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             userData?.disabled === true
           ) {
             console.warn('[AdminLayout] User profile inactive, disabled, or unauthorized role.');
-            if (auth) await signOut(auth);
+            await signOut(auth);
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
@@ -122,13 +162,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         setUserRole(effectiveRole);
         setAuthChecking(false);
 
-        // If GREEN_ROOM_STAFF tries to access non-green-room routes, scope them to /admin/green-room
+        // GREEN_ROOM_STAFF is restricted to the Green Room workspace.
         if (effectiveRole === 'GREEN_ROOM_STAFF' && pathname && !pathname.startsWith('/admin/green-room')) {
           router.replace('/admin/green-room');
         }
       } catch (authErr) {
         console.warn('[AdminLayout] Auth verification error:', authErr);
-        if (auth) await signOut(auth);
+        await signOut(auth);
         setAuthorizedUser(null);
         setUserRole(null);
         setAuthChecking(false);
@@ -139,211 +179,268 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return () => unsubscribe();
   }, [router, pathname]);
 
+  // Close the mobile drawer after navigation so it never remains over the new page.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Keep the page from scrolling behind the drawer and support the Escape key.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   const handleSignOut = async () => {
-    if (auth) {
-      try {
-        await signOut(auth);
-      } catch (err) {
-        console.warn('[AdminLayout] Sign out error:', err);
-      }
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      if (auth) await signOut(auth);
+      setAuthorizedUser(null);
+      setMobileMenuOpen(false);
+      router.replace('/admin/login');
+      router.refresh();
+    } catch (err) {
+      console.warn('[AdminLayout] Sign out error:', err);
+      setSigningOut(false);
     }
-    router.push('/admin/login');
   };
 
-  // Authoritative Sidebar Navigation Items (with Green Room between Registration and Mark Entry)
-  const allNavItems = [
-    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Categories', href: '/admin/categories', icon: Layers },
-    { name: 'Teams', href: '/admin/teams', icon: Users2 },
-    { name: 'Competitions', href: '/admin/competitions', icon: Trophy },
-    { name: 'Participants', href: '/admin/participants', icon: UserCheck },
-    { name: 'Registration', href: '/admin/registration', icon: ClipboardList },
-    { name: 'Green Room', href: '/admin/green-room', icon: DoorOpen },
-    { name: 'Mark Entry', href: '/admin/mark-entry', icon: Edit3 },
-    { name: 'Result', href: '/admin/results', icon: Award },
-    { name: 'Stages', href: '/admin/stages', icon: MapPin },
-    { name: 'Schedule', href: '/admin/schedule', icon: CalendarDays },
-    { name: 'Media', href: '/admin/media', icon: ImageIcon },
-    { name: 'Export', href: '/admin/export', icon: FileDown },
-    { name: 'Top Scorers', href: '/admin/top-scorers', icon: Trophy },
-  ];
+  const filteredGroups = userRole === 'GREEN_ROOM_STAFF'
+    ? navGroups
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => item.href === '/admin/green-room'),
+      }))
+      .filter(group => group.items.length > 0)
+    : navGroups;
 
-  const navItems = userRole === 'GREEN_ROOM_STAFF'
-    ? allNavItems.filter(item => item.href === '/admin/green-room')
-    : allNavItems;
+  const isItemActive = (href: string) =>
+    pathname === href || (href !== '/admin' && Boolean(pathname?.startsWith(href + '/')));
 
+  const currentPage = filteredGroups.flatMap(group => group.items).find(item => isItemActive(item.href));
+  const userInitials = authorizedUser?.email
+    ? authorizedUser.email.slice(0, 2).toUpperCase()
+    : 'AD';
+  const roleLabel = userRole === 'GREEN_ROOM_STAFF' ? 'Green Room Staff' : 'Chief Administrator';
+
+  const renderNavigation = (mobile = false) => (
+    <nav aria-label="Admin navigation" className={mobile ? 'min-h-0 flex-1 overflow-y-auto px-3 py-4' : 'min-h-0 flex-1 overflow-y-auto px-3 py-5'}>
+      <div className="space-y-5">
+        {filteredGroups.map(group => (
+          <section key={group.label} aria-label={group.label}>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map(item => {
+                const active = isItemActive(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={mobile ? () => setMobileMenuOpen(false) : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    className={
+                      'group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ' +
+                      (active
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/20'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white')
+                    }
+                  >
+                    <Icon className={'h-[18px] w-[18px] shrink-0 transition-colors ' + (active ? 'text-white' : 'text-slate-400 group-hover:text-white')} strokeWidth={1.9} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">{item.name}</span>
+                    {active ? (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-blue-100" aria-hidden="true" />
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </nav>
+  );
+
+  const renderUserPanel = (mobile = false) => (
+    <div className={mobile ? 'border-t border-slate-800 bg-slate-950 p-4' : 'border-t border-slate-800 bg-slate-900/70 p-4'}>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-xs font-bold text-blue-200 ring-1 ring-inset ring-blue-400/20">
+          {userInitials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-bold text-white">{roleLabel}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-400">{authorizedUser?.email || 'Administrator account'}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        disabled={signingOut}
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition-colors hover:border-rose-300/40 hover:bg-rose-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"
+      >
+        {signingOut ? (
+          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+        )}
+        {signingOut ? 'Signing out…' : 'Sign out'}
+      </button>
+    </div>
+  );
 
   if (authChecking) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-bold text-lg shadow-md animate-pulse">
-            S
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-lg font-bold text-white shadow-lg shadow-blue-600/20">
+            <FestivalLogo size={28} />
           </div>
-          <p className="text-xs font-semibold text-[#526070] tracking-wide">
-            Verifying Fest Administrator Session...
+          <p className="text-xs font-semibold tracking-wide text-slate-500">
+            Verifying administrator session…
           </p>
         </div>
       </div>
     );
   }
 
-  if (!authorizedUser) {
-    return null;
-  }
-
-  const userInitials = authorizedUser.email
-    ? authorizedUser.email.slice(0, 2).toUpperCase()
-    : 'AD';
+  if (!authorizedUser) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-white border-r border-[#E1E7EF] shrink-0 sticky top-0 h-screen">
-        {/* Brand Header */}
-        <div className="h-16 px-6 border-b border-[#E1E7EF] flex items-center justify-between">
-          <Link href="/admin" className="flex items-center gap-2.5">
-            <FestivalLogo size={32} />
-            <div>
-              <span className="font-bold text-[#111111] text-sm tracking-tight block leading-tight">
-                <span className="festival-name">{theme.festivalName}</span>
+    <div className="flex min-h-screen bg-[#F5F7FB] text-slate-900">
+      {/* Desktop navigation */}
+      <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col bg-slate-950 text-white lg:flex xl:w-[288px]">
+        <div className="flex h-[76px] shrink-0 items-center border-b border-slate-800 px-5">
+          <Link href="/admin" className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+            <FestivalLogo size={40} className="rounded-xl" />
+            <span className="min-w-0">
+              <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-white">
+                {theme.festivalName}
               </span>
-              <span className="text-[10px] text-[#526070] font-semibold uppercase tracking-wider block">
-                Control Center
+              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Admin workspace
               </span>
-            </div>
+            </span>
           </Link>
         </div>
-
-        {/* Navigation Items (Exact 12 items) */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                  isActive
-                    ? 'bg-[#2563EB] text-white shadow-xs'
-                    : 'text-[#526070] hover:text-[#111111] hover:bg-[#F8FAFC]'
-                }`}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#526070]'}`} />
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-[#E1E7EF] bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center justify-center">
-              {userInitials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-bold text-[#111111] truncate block">{userRole === 'GREEN_ROOM_STAFF' ? 'Green Room Staff' : 'Chief Administrator'}</span>
-              <span className="text-[10px] text-[#526070] truncate block">{authorizedUser.email || 'admin@fest.institution.org'}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="text-[10px] font-semibold text-[#DC2626] hover:underline cursor-pointer"
-              title="Sign out"
-            >
-              Exit
-            </button>
-          </div>
-        </div>
+        {renderNavigation()}
+        {renderUserPanel()}
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-[#E1E7EF] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+      {/* Main workspace */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-3 shadow-sm shadow-slate-900/[0.02] backdrop-blur sm:px-5 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-lg text-[#526070] hover:bg-[#F8FAFC]"
-              aria-label="Toggle Navigation"
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 lg:hidden"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="admin-mobile-navigation"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-
-            <div className="flex items-center gap-3">
-              <FestivalStatusBadge className="hidden sm:inline-flex" />
-              <span className="text-xs text-[#526070] hidden md:inline">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-900 sm:text-base">
+                {currentPage?.name || 'Admin workspace'}
+              </p>
+              <p className="hidden truncate text-[11px] text-slate-500 sm:block">
                 {theme.institutionName}
-              </span>
+              </p>
             </div>
           </div>
 
-          {/* Header Actions */}
-          <div className="flex items-center gap-3">
-            {/* Public View Button as required: Accessed through Dashboard/Header, not sidebar */}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <FestivalStatusBadge className="hidden md:inline-flex" />
             <Link
               href="/"
               target="_blank"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg border border-[#E1E7EF] bg-white text-[#111111] hover:bg-[#F8FAFC] shadow-xs transition-colors"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 sm:px-3.5"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Public View</span>
-              <ExternalLink className="w-3.5 h-3.5 text-[#526070]" />
+              <Sparkles className="h-4 w-4 text-amber-500" aria-hidden="true" />
+              <span className="hidden sm:inline">Public view</span>
+              <ExternalLink className="hidden h-3.5 w-3.5 text-slate-400 sm:inline" aria-hidden="true" />
             </Link>
-
             <button
               type="button"
-              className="p-2 rounded-lg text-[#526070] hover:text-[#111111] hover:bg-[#F8FAFC] relative"
-              aria-label="Notifications"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 lg:hidden"
+              aria-label={signingOut ? 'Signing out' : 'Sign out'}
+              title="Sign out"
             >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#2563EB]" />
+              {signingOut ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              )}
             </button>
           </div>
         </header>
 
-        {/* Mobile Navigation Drawer */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
-            <div className="w-64 bg-white h-full flex flex-col p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between pb-4 border-b border-[#E1E7EF]">
-                <span className="font-bold text-sm text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span>
-                <button onClick={() => setMobileMenuOpen(false)}>
-                  <X className="w-5 h-5 text-[#526070]" />
-                </button>
-              </div>
-              <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
-                {navItems.map((item) => {
-                  const isActive = pathname === item.href;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold ${
-                        isActive
-                          ? 'bg-[#2563EB] text-white'
-                          : 'text-[#526070] hover:text-[#111111] hover:bg-[#F8FAFC]'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          </div>
-        )}
-
-        {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>
+
+      {/* Mobile navigation drawer */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setMobileMenuOpen(false);
+          }}
+        >
+          <aside
+            id="admin-mobile-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Admin navigation menu"
+            className="flex h-[100dvh] w-[min(88vw,360px)] max-w-full flex-col border-r border-slate-800 bg-slate-950 text-white shadow-2xl shadow-slate-950/30"
+          >
+            <div className="flex min-h-[76px] shrink-0 items-center justify-between border-b border-slate-800 px-4">
+              <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-3">
+                <FestivalLogo size={40} className="rounded-xl" />
+                <span className="min-w-0">
+                  <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-white">
+                    {theme.festivalName}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    Admin workspace
+                  </span>
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="ml-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                aria-label="Close navigation menu"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {renderNavigation(true)}
+            {renderUserPanel(true)}
+          </aside>
+        </div>
+      )}
     </div>
   );
 };
