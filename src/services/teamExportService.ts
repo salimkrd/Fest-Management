@@ -198,7 +198,7 @@ export class TeamExportService {
         doc.setFillColor(...(index % 2 === 0 ? [255, 255, 255] as [number, number, number] : [248, 250, 252] as [number, number, number]));
         doc.setDrawColor(226, 232, 240);
         doc.rect(x, y, widths[columnIndex], rowHeight, 'FD');
-        const centered = [0, 3, 6, 7, 8].includes(columnIndex);
+        const centered = [0, 3, 6, 7].includes(columnIndex);
         doc.setFont('helvetica', columnIndex === 0 || columnIndex === 2 ? 'bold' : 'normal');
         doc.setFontSize(columnIndex === 2 ? 7.2 : 6.9);
         doc.setTextColor(columnIndex === 0 ? 37 : 51, columnIndex === 0 ? 99 : 65, columnIndex === 0 ? 235 : 85);
