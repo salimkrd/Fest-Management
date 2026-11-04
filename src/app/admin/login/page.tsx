@@ -128,97 +128,88 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/70 flex flex-col justify-center py-10 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand Icon */}
-        <div className="flex justify-center">
-          <FestivalLogo size={48} />
-        </div>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-50 via-slate-50 to-white px-4 py-8 sm:px-6 sm:py-12">
+      <div className="w-full max-w-[440px]">
+        <header className="mb-7 text-center">
+          <div className="mb-4 flex justify-center">
+            <FestivalLogo size={52} />
+          </div>
+          <h1 className="text-[25px] font-bold tracking-tight text-slate-950 sm:text-[28px]">
+            Fest Control Center
+          </h1>
+          <p className="mx-auto mt-2 max-w-sm text-[13px] leading-5 text-slate-600">
+            <span className="festival-name font-semibold text-slate-800">{theme.festivalName}</span>
+            <span className="px-1.5 text-slate-300">·</span>
+            {theme.institutionName}
+          </p>
+          <div className="mt-4 flex justify-center"><FestivalStatusBadge /></div>
+        </header>
 
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#111111]">
-          Fest Control Center
-        </h2>
-        <p className="mt-1 text-center text-xs text-[#526070]">
-          <span className="festival-name">{theme.festivalName}</span> · {theme.institutionName}
-        </p>
-        <div className="flex justify-center mt-3"><FestivalStatusBadge /></div>
-      </div>
+        <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.24)] sm:p-8">
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-slate-900">Administrator sign in</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Use your authorized administrator credentials to continue.</p>
+          </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-xs rounded-2xl border border-[#E1E7EF] sm:px-10">
           {error && (
-            <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-[#DC2626] flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div role="alert" className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <Input
-                label="Admin Work Email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@fest.org"
-                leftIcon={<Mail className="w-4 h-4" />}
-              />
-            </div>
+            <Input
+              label="Admin Work Email"
+              type="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@fest.org"
+              leftIcon={<Mail className="h-4 w-4" />}
+              className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-100"
+            />
 
-            <div>
-              <Input
-                label="Portal Password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                leftIcon={<Lock className="w-4 h-4" />}
-              />
-            </div>
+            <Input
+              label="Portal Password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              leftIcon={<Lock className="h-4 w-4" />}
+              className="!min-h-[50px] !rounded-xl !border-slate-300 !text-sm focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-100"
+            />
 
-            <div className="flex items-center justify-between text-xs">
-              <label className="flex items-center gap-2 text-[#526070] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="rounded border-[#E1E7EF] text-[#2563EB] focus:ring-[#2563EB]"
-                />
-                <span>Remember this terminal</span>
-              </label>
-              <a href="#" className="font-semibold text-[#2563EB] hover:underline">
-                Forgot access?
-              </a>
-            </div>
-
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                className="w-full font-bold"
-                isLoading={loading}
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-              >
-                Sign In to Fest Control Center
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="mt-1 w-full !min-h-[52px] !rounded-xl !font-semibold shadow-sm shadow-blue-900/10"
+              isLoading={loading}
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+            >
+              Sign In to Fest Control Center
+            </Button>
           </form>
 
-          {/* Institutional Security Notice */}
-          <div className="mt-6 pt-6 border-t border-[#E1E7EF] text-center">
-            <div className="inline-flex items-center gap-1.5 text-[11px] text-[#526070] font-medium bg-[#F8FAFC] px-3 py-1 rounded-full border border-[#E1E7EF]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
-              <span>One Institution · Fest Operations v2.0</span>
-            </div>
+          <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+            <span>Protected access for authorized festival operations staff.</span>
           </div>
-        </div>
+        </section>
 
-        <div className="mt-4 text-center text-xs text-slate-500">
-          <Link href="/" className="font-semibold text-blue-600 hover:underline">Public Website</Link>
-        </div>
+        <footer className="mt-6 text-center text-xs text-slate-500">
+          <Link href="/" className="font-semibold text-blue-700 underline-offset-4 transition hover:text-blue-800 hover:underline">
+            Public Website
+          </Link>
+        </footer>
       </div>
-    </div>
+    </main>
+  );
+}
+
   );
 }
