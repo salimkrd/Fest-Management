@@ -55,6 +55,7 @@ interface FestContextType {
   deleteTeam: (id: string) => Promise<void>;
 
   competitions: Competition[];
+  competitionsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addCompetition: (comp: Omit<Competition, 'id' | 'entriesCount'>) => Promise<void>;
   updateCompetition: (id: string, comp: Partial<Competition>) => Promise<void>;
   deleteCompetition: (id: string) => Promise<void>;
@@ -3391,6 +3392,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         updateTeam,
         deleteTeam,
         competitions,
+        competitionsSyncState,
         addCompetition,
         updateCompetition,
         deleteCompetition,
