@@ -12,7 +12,7 @@ import { DEFAULT_FESTIVAL_NAME_FONT } from '@/domain/festivalFonts';
 
 interface Props { isOpen: boolean; onClose: () => void }
 export function FestivalSettingsModal({ isOpen, onClose }: Props) {
-  const { theme, updateTheme } = useFest();
+  const { theme, themeSyncState, updateTheme } = useFest();
   const [form, setForm] = useState({
     festivalName: theme.festivalName, festivalNameFont: theme.festivalNameFont || DEFAULT_FESTIVAL_NAME_FONT,
     institutionName: theme.institutionName, logoUrl: theme.logoUrl || '', festivalStartDate: theme.festivalStartDate || '',
@@ -32,16 +32,16 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
   }, [logoFile]);
   useEffect(() => setLogoPreviewFailed(false), [form.logoUrl]);
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || themeSyncState === 'loading') return;
     setForm({
       festivalName: theme.festivalName, festivalNameFont: theme.festivalNameFont || DEFAULT_FESTIVAL_NAME_FONT,
       institutionName: theme.institutionName, logoUrl: theme.logoUrl || '', festivalStartDate: theme.festivalStartDate || '',
       festivalEndDate: theme.festivalEndDate || ''
     });
     setLogoFile(null);
-    setError('');
+    setError(themeSyncState === 'error' ? 'Live festival settings could not be loaded. Refresh before editing.' : '');
     setSaved(false);
-  }, [isOpen]); // Reset once when opened; do not overwrite in-progress edits from snapshots
+  }, [isOpen, themeSyncState]); // Initialize only after the authoritative settings snapshot has loaded
 
   const change = (key: keyof typeof form, value: string) => {
     setForm(old => ({ ...old, [key]: value }));
@@ -94,9 +94,11 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
     footer={<div className="w-full flex justify-end gap-2">
       <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Close</Button>
       <Button variant="primary" size="sm" type="submit" form="festival-settings-form"
-        isLoading={saving} disabled={saving}>Save Settings</Button>
+        isLoading={saving} disabled={saving || themeSyncState !== 'ready'}>Save Settings</Button>
     </div>}>
     <form id="festival-settings-form" onSubmit={submit} className="space-y-5">
+      {themeSyncState === 'loading' && <p role="status" className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">Loading the latest published festival settings…</p>}
+      {themeSyncState === 'error' && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">Could not load the latest festival settings. Refresh the page before making changes.</p>}
       <p className="text-xs text-[#526070] rounded-lg bg-blue-50 border border-blue-100 p-3">
         Changes are published across Admin, Team Manager, Judge, Green Room, Participant and Public portals.
         Festival dates follow Asia/Kolkata (Indian Standard Time).
