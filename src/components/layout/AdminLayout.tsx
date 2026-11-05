@@ -419,7 +419,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <FestivalLogo size={40} className="rounded-xl" />
                 <span className="min-w-0">
                   <span className="festival-name block truncate text-sm font-extrabold tracking-tight text-slate-900">
-                    {theme.festivalName}
+                    {theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}
                   </span>
                   <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Admin workspace
