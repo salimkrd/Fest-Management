@@ -17,7 +17,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
   competitionTitle = 'Evaluation Workspace',
   isLocked = false
 }) => {
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
@@ -28,7 +28,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
             <FestivalLogo size={32} />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span>
+                <span className="text-xs font-bold text-[#111111]"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
                   SECURE JURY SESSION
                 </span>
