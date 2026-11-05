@@ -124,7 +124,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}
                 </p>
                 <p className="mt-1 truncate text-[10px] font-medium text-slate-500 sm:hidden">
-                  <span className="festival-name">{theme.festivalName}</span>
+                  <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
                 </p>
               </div>
             </div>
