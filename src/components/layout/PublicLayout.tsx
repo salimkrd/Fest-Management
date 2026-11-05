@@ -13,7 +13,7 @@ interface PublicLayoutProps {
 
 function PublicNavLinks() {
   const pathname = usePathname();
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
 
   const navLinks = [
     { name: 'Latest Results', href: '/', icon: Sparkles },
@@ -91,11 +91,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         style={{ backgroundColor: theme.primaryColor }}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
-          <span className="font-bold tracking-wide uppercase"><span className="festival-name">{theme.festivalName}</span></span>
+          <span className="font-bold tracking-wide uppercase"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
           <span>·</span>
           <span>Official Real-Time Results &amp; Championship Tabulation Center</span>
           <span className="hidden sm:inline">·</span>
-          <span className="hidden sm:inline text-white/80">{theme.institutionName}</span>
+          <span className="hidden sm:inline text-white/80">{theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}</span>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#526070]">
             <div>
-              <span className="font-bold text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span> — {theme.tagline}
+              <span className="font-bold text-[#111111]"><span className="festival-name">{theme.festivalName}</span></span> — {theme.tagline || (themeSyncState === 'loading' ? 'Loading festival settings…' : '')}
               <p className="text-[11px] mt-0.5">Results authenticated by the Central Board of Fest Adjudication</p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
