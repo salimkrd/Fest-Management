@@ -25,7 +25,7 @@ type PortalData = { profile: Profile; events: Entry[]; summary: {
 
 export default function ParticipantDashboard() {
   const router = useRouter();
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
