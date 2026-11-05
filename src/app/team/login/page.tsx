@@ -208,7 +208,7 @@ function TeamLoginForm() {
           <div className="mb-4 flex justify-center"><FestivalLogo size={52} /></div>
           <h1 className="text-[25px] font-bold tracking-tight text-slate-950 sm:text-[28px]">Team Manager Portal</h1>
           <p className="mt-2 text-[13px] leading-5 text-slate-600">
-            <span className="festival-name font-semibold text-slate-800">{theme.festivalName}</span>
+            <span className="festival-name font-semibold text-slate-800">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
             <span className="px-1.5 text-slate-300">·</span>
             Contingent House Administration
           </p>
