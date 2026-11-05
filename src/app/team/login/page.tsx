@@ -15,7 +15,7 @@ import { doc, getDoc } from 'firebase/firestore';
 function TeamLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { teams, setCurrentTeamUser, theme } = useFest();
+  const { teams, setCurrentTeamUser, theme, themeSyncState } = useFest();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
