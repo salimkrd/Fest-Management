@@ -24,7 +24,7 @@ interface TeamLayoutProps {
 export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentTeamUser, teams, setCurrentTeamUser, theme } = useFest();
+  const { currentTeamUser, teams, setCurrentTeamUser, theme, themeSyncState } = useFest();
   const [checking, setChecking] = React.useState(!currentTeamUser);
 
   const team = currentTeamUser
@@ -119,9 +119,9 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   </span>
                 </div>
                 <p className="mt-1 hidden truncate text-[11px] font-medium text-slate-500 sm:block">
-                  <span className="festival-name">{theme.festivalName}</span>
+                  <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
                   <span className="px-1.5 text-slate-300">·</span>
-                  {theme.institutionName}
+                  {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}
                 </p>
                 <p className="mt-1 truncate text-[10px] font-medium text-slate-500 sm:hidden">
                   <span className="festival-name">{theme.festivalName}</span>
