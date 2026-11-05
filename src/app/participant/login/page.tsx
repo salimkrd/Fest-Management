@@ -9,7 +9,7 @@ import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalB
 
 export default function ParticipantLoginPage() {
   const router = useRouter();
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
   const [bib, setBib] = useState('');
   const [dob, setDob] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +55,7 @@ export default function ParticipantLoginPage() {
               <FestivalLogo size={48} className="border border-white/20" />
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold text-blue-100">
-                  <span className="festival-name">{theme.festivalName}</span> · Participant Portal
+                  <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span> · Participant Portal
                 </p>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight">Participant Login</h1>
               </div>

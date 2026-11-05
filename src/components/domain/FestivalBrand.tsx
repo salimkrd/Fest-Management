@@ -5,11 +5,15 @@ import { useFest } from '@/context/FestContext';
 import { getFestivalStatus, type FestivalStatus } from '@/domain/festivalSettings';
 
 export function FestivalLogo({ size = 36, className = '' }: { size?: number; className?: string }) {
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
   const url = theme.logoUrl?.trim() || '';
   const [failed, setFailed] = useState<'proxy' | 'direct' | null>(null);
   useEffect(() => { setFailed(null); }, [url]);
   const initials = theme.festivalName.trim().charAt(0).toUpperCase() || 'F';
+  if (themeSyncState === 'loading' && !url) {
+    return <span aria-hidden="true" className={'shrink-0 animate-pulse rounded-lg bg-slate-200 ' + className}
+      style={{ width: size, height: size }} />;
+  }
   if (url && failed !== 'direct') {
     // Same-origin proxy first: avoids hotlink protection and external image restrictions.
     // If this provider does not support the format, retry the saved direct URL.
@@ -27,14 +31,21 @@ export function FestivalLogo({ size = 36, className = '' }: { size?: number; cla
 
 /** Date-based status shared by all portals; recalculated after Indian midnight. */
 export function FestivalStatusBadge({ className = '' }: { className?: string }) {
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
   const [status, setStatus] = useState<FestivalStatus>({ phase: 'UNCONFIGURED', label: 'DATES NOT SET' });
   useEffect(() => {
+    if (themeSyncState !== 'ready') return;
     const refresh = () => setStatus(getFestivalStatus(theme));
     refresh();
     const timer = window.setInterval(refresh, 60_000);
     return () => window.clearInterval(timer);
-  }, [theme.festivalStartDate, theme.festivalEndDate]);
+  }, [themeSyncState, theme.festivalStartDate, theme.festivalEndDate]);
+  if (themeSyncState === 'loading') {
+    return <span aria-live="polite" className={'inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-700 ' + className}>SYNCING SETTINGS</span>;
+  }
+  if (themeSyncState === 'error') {
+    return <span role="status" className={'inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800 ' + className}>SETTINGS UNAVAILABLE</span>;
+  }
   const live = status.phase === 'LIVE';
   const upcoming = status.phase === 'UPCOMING';
   const style = live ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :

@@ -15,7 +15,7 @@ import { doc, getDoc } from 'firebase/firestore';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -138,9 +138,9 @@ export default function AdminLoginPage() {
             Fest Control Center
           </h1>
           <p className="mx-auto mt-2 max-w-sm text-[13px] leading-5 text-slate-600">
-            <span className="festival-name font-semibold text-slate-800">{theme.festivalName}</span>
+            <span className="festival-name font-semibold text-slate-800">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
             <span className="px-1.5 text-slate-300">·</span>
-            {theme.institutionName}
+            {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}
           </p>
           <div className="mt-4 flex justify-center"><FestivalStatusBadge /></div>
         </header>

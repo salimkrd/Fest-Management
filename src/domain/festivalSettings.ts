@@ -2,6 +2,39 @@ import type { PublicThemeSettings } from '@/types/fest';
 import { DEFAULT_FESTIVAL_NAME_FONT, isFestivalNameFont } from '@/domain/festivalFonts';
 
 const DAY_MS = 86400000;
+/**
+ * Live portals must never briefly render demo identity while the published settings
+ * are being fetched. Keep the visual theme defaults, but clear all per-festival
+ * identity until a server-confirmed publicTheme snapshot is available.
+ */
+export function createUnloadedFestivalTheme(defaults: PublicThemeSettings): PublicThemeSettings {
+  return {
+    ...defaults,
+    festivalName: '',
+    institutionName: '',
+    tagline: '',
+    year: '',
+    heroBannerText: '',
+    logoUrl: ''
+  };
+}
+
+/** Merge a Firestore publicTheme document without falling back to sample identity. */
+export function mergePublishedFestivalTheme(
+  defaults: PublicThemeSettings,
+  published: Partial<PublicThemeSettings> | null | undefined
+): PublicThemeSettings {
+  const merged = { ...defaults, ...(published || {}) };
+  return {
+    ...merged,
+    festivalName: typeof published?.festivalName === 'string' ? published.festivalName.trim() : '',
+    institutionName: typeof published?.institutionName === 'string' ? published.institutionName.trim() : '',
+    tagline: typeof published?.tagline === 'string' ? published.tagline : '',
+    year: typeof published?.year === 'string' ? published.year : '',
+    heroBannerText: typeof published?.heroBannerText === 'string' ? published.heroBannerText : '',
+  };
+}
+
 export type FestivalPhase = 'UNCONFIGURED' | 'UPCOMING' | 'LIVE' | 'COMPLETED';
 export type FestivalStatus = {
   phase: FestivalPhase;

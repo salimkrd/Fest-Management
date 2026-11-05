@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getFestivalStatus, indiaCalendarDate, normalizeFestivalSettings, validateFestivalDates } from '@/domain/festivalSettings';
+import { createUnloadedFestivalTheme, getFestivalStatus, indiaCalendarDate, mergePublishedFestivalTheme, normalizeFestivalSettings, validateFestivalDates } from '@/domain/festivalSettings';
 import { FESTIVAL_NAME_FONTS, festivalNameFontFamily, isFestivalNameFont, festivalFontStylesheet } from '@/domain/festivalFonts';
 
 const range = { festivalStartDate: '2026-10-16', festivalEndDate: '2026-10-18' };
@@ -45,4 +45,40 @@ describe('Chief Admin festival settings and live status', () => {
     });
     expect(() => normalizeFestivalSettings({ ...normalized, logoUrl: 'https://chatgpt.com/c/xyz' })).toThrow();
   });
+  it('never uses legacy demo festival identity while live settings are loading', () => {
+    const defaults = {
+      festivalName: 'Sahithyolsav 2025', institutionName: 'Markaz Knowledge City',
+      tagline: 'Legacy tagline', year: '2025', primaryColor: '#2563EB', secondaryColor: '#111111',
+      accentColor: '#D97706', headingFont: 'Montserrat', bodyFont: 'Montserrat', fontFamily: 'Montserrat',
+      backgroundStyle: 'clean-white' as const, cardStyle: 'elevated' as const,
+      heroBannerText: 'Legacy hero'
+    };
+    const loading = createUnloadedFestivalTheme(defaults);
+    expect(loading.festivalName).toBe('');
+    expect(loading.institutionName).toBe('');
+    expect(loading.tagline).toBe('');
+    expect(loading.year).toBe('');
+    expect(loading.logoUrl).toBe('');
+  });
+
+  it('uses only published identity fields when live settings arrive', () => {
+    const defaults = {
+      festivalName: 'Sahithyolsav 2025', institutionName: 'Markaz Knowledge City',
+      tagline: 'Legacy tagline', year: '2025', primaryColor: '#2563EB', secondaryColor: '#111111',
+      accentColor: '#D97706', headingFont: 'Montserrat', bodyFont: 'Montserrat', fontFamily: 'Montserrat',
+      backgroundStyle: 'clean-white' as const, cardStyle: 'elevated' as const,
+      heroBannerText: 'Legacy hero'
+    };
+    const published = mergePublishedFestivalTheme(defaults, {
+      festivalName: 'INSPIRATH', institutionName: 'Suffa Campus Vavoor',
+      tagline: 'Proactive Paradigms', year: '2026'
+    });
+    expect(published.festivalName).toBe('INSPIRATH');
+    expect(published.institutionName).toBe('Suffa Campus Vavoor');
+    expect(published.tagline).toBe('Proactive Paradigms');
+    expect(published.year).toBe('2026');
+    expect(mergePublishedFestivalTheme(defaults, null).festivalName).toBe('');
+    expect(mergePublishedFestivalTheme(defaults, { festivalName: 'INSPIRATH' }).institutionName).toBe('');
+  });
+
 });

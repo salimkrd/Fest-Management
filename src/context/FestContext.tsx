@@ -7,6 +7,7 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where
 import type { DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 import { festivalNameFontFamily, festivalFontStylesheet } from '@/domain/festivalFonts';
+import { createUnloadedFestivalTheme, mergePublishedFestivalTheme } from '@/domain/festivalSettings';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
 import {
   Category,
@@ -42,6 +43,7 @@ import {
 
 interface FestContextType {
   theme: PublicThemeSettings;
+  themeSyncState: 'loading' | 'ready' | 'error' | 'idle';
   updateTheme: (newTheme: Partial<PublicThemeSettings>) => Promise<void>;
 
   categories: Category[];
@@ -1439,16 +1441,41 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         try { return { ...defaultTheme, ...JSON.parse(saved) }; } catch (e) { console.error(e); }
       }
     }
-    // Never use stale browser localStorage as an override on live settings.
-    return defaultTheme;
+    // Production and emulator sessions start without sample festival identity.
+    // This prevents "Sahithyolsav 2025 / Markaz Knowledge City" flashing on refresh.
+    return isIsolatedDemoOrTest ? defaultTheme : createUnloadedFestivalTheme(defaultTheme);
   });
+  const [themeSyncState, setThemeSyncState] = useState<'loading' | 'ready' | 'error' | 'idle'>(isIsolatedDemoOrTest ? 'ready' : 'loading');
 
   useEffect(() => {
-    if (!db) return;
-    return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
-      setTheme(snapshot.exists() ? { ...defaultTheme, ...snapshot.data() } : defaultTheme);
-    }, error => console.warn('[FestContext] Festival settings synchronization failed:', error));
-  }, []);
+    if (isIsolatedDemoOrTest) {
+      setThemeSyncState('ready');
+      return;
+    }
+    if (!db) {
+      setThemeSyncState('error');
+      return;
+    }
+
+    // Ignore cache-only snapshots; only a server-confirmed settings document may
+    // replace the neutral loading identity shown across portals.
+    return onSnapshot(
+      doc(db, 'settings', 'publicTheme'),
+      { includeMetadataChanges: true },
+      snapshot => {
+        if (snapshot.metadata.fromCache) return;
+        const published = snapshot.exists()
+          ? snapshot.data() as Partial<PublicThemeSettings>
+          : null;
+        setTheme(mergePublishedFestivalTheme(defaultTheme, published));
+        setThemeSyncState('ready');
+      },
+      error => {
+        setThemeSyncState('error');
+        console.warn('[FestContext] Festival settings synchronization failed:', error);
+      }
+    );
+  }, [isIsolatedDemoOrTest]);
 
   // Only branded festival name text changes fonts; no portal body/control typography is modified.
   useEffect(() => {
@@ -1475,7 +1502,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Browser title and favicon follow the published festival identity.
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.title = theme.festivalName + ' | Festival Management';
+    document.title = theme.festivalName.trim()
+      ? theme.festivalName + ' | Festival Management'
+      : 'Festival Management';
     const existing = document.querySelector<HTMLLinkElement>('link[data-festival-icon="true"]');
     if (theme.logoUrl?.trim()) {
       const icon = existing || document.createElement('link');
@@ -2551,6 +2580,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     // Firestore rules enforce ADMIN. Await the actual write and propagate failure.
     // The public Firestore listener publishes the authoritative values to all portals.
     await setDoc(doc(db, 'settings', 'publicTheme'), sanitizeForFirestore(newTheme), { merge: true });
+    // Update the current session immediately after the authoritative write succeeds;
+    // the publicTheme onSnapshot listener then confirms the same values for all portals.
+    setTheme(prev => ({ ...prev, ...newTheme }));
+    setThemeSyncState('ready');
   };
 
   const addCategory = async (catData: Omit<Category, 'id' | 'enrolledCount' | 'competitionsCount'>) => {
@@ -3423,6 +3456,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     <FestContext.Provider
       value={{
         theme,
+        themeSyncState,
         updateTheme,
         categories,
         categoriesSyncState,

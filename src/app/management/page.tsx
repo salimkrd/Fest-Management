@@ -137,6 +137,7 @@ function MetricCard({
 export default function ManagementPage() {
   const {
     theme,
+    themeSyncState,
     competitions,
     competitionsSyncState,
     results,
@@ -155,10 +156,10 @@ export default function ManagementPage() {
             <FestivalLogo size={46} className="rounded-xl" />
             <div className="min-w-0">
               <h1 className="truncate text-base font-extrabold leading-tight tracking-tight text-slate-950 sm:text-lg">
-                <span className="festival-name">{theme.festivalName}</span>
+                <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
               </h1>
               <p className="mt-0.5 truncate text-xs font-medium text-slate-500 sm:text-sm">
-                {theme.institutionName} <span className="px-1 text-slate-300">/</span> Festival management
+                {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')} <span className="px-1 text-slate-300">/</span> Festival management
               </p>
             </div>
           </div>
@@ -287,8 +288,8 @@ export default function ManagementPage() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-1 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:text-left lg:px-8">
           <span>
-            {theme.institutionName} <span className="px-1 text-slate-300">·</span>
-            <span className="festival-name">{theme.festivalName}</span>
+            {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')} <span className="px-1 text-slate-300">·</span>
+            <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
           </span>
           <span className="font-medium text-slate-400">Festival Management System</span>
         </div>
