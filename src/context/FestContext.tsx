@@ -1502,7 +1502,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Browser title and favicon follow the published festival identity.
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.title = theme.festivalName + ' | Festival Management';
+    document.title = theme.festivalName.trim()
+      ? theme.festivalName + ' | Festival Management'
+      : 'Festival Management';
     const existing = document.querySelector<HTMLLinkElement>('link[data-festival-icon="true"]');
     if (theme.logoUrl?.trim()) {
       const icon = existing || document.createElement('link');
