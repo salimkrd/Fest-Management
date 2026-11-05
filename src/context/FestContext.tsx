@@ -124,10 +124,10 @@ interface FestContextType {
 }
 
 const defaultTheme: PublicThemeSettings = {
-  festivalName: 'Sahithyolsav 2025',
-  institutionName: 'Markaz Knowledge City',
-  tagline: 'Annual Arts & Cultural Fest',
-  year: '2025',
+  festivalName: 'INSPIRATH',
+  institutionName: "Ma'din Suffa Campus Vavoor",
+  tagline: 'Suffa Campus Vavoor Art Festival',
+  year: '2026',
   primaryColor: '#2563EB',
   secondaryColor: '#111111',
   accentColor: '#D97706',
@@ -1397,7 +1397,13 @@ function readStoredResult(id: string, data: DocumentData): CompetitionResult {
   };
 }
 
-export function FestProvider({ children }: { children: React.ReactNode }) {
+export function FestProvider({
+  children,
+  initialTheme,
+}: {
+  children: React.ReactNode;
+  initialTheme?: Partial<PublicThemeSettings> | null;
+}) {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   const isEmulator = !isProduction && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
   const isDemoMode = !isProduction && process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -1432,23 +1438,40 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   const isDemoPointsLedgerEntry = (l: PointsLedgerEntry) =>
     initialPointsLedger.some(init => init.id === l.id) || DEMO_TEAM_IDS.includes(l.teamId);
 
+  // Seed the first render with the server-read public theme. In production this
+  // prevents old hard-coded branding from appearing before the Firestore listener
+  // receives its first snapshot.
+  const [themeReady, setThemeReady] = useState(() => isIsolatedDemoOrTest || Boolean(initialTheme));
   const [theme, setTheme] = useState<PublicThemeSettings>(() => {
     if (isIsolatedDemoOrTest && typeof window !== 'undefined') {
       const saved = localStorage.getItem('fest_theme_settings_v2');
       if (saved) {
-        try { return { ...defaultTheme, ...JSON.parse(saved) }; } catch (e) { console.error(e); }
+        try { return { ...defaultTheme, ...initialTheme, ...JSON.parse(saved) }; } catch (e) { console.error(e); }
       }
     }
-    // Never use stale browser localStorage as an override on live settings.
-    return defaultTheme;
+    return { ...defaultTheme, ...(initialTheme || {}) };
   });
 
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      setThemeReady(true);
+      return;
+    }
+
     return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
-      setTheme(snapshot.exists() ? { ...defaultTheme, ...snapshot.data() } : defaultTheme);
-    }, error => console.warn('[FestContext] Festival settings synchronization failed:', error));
-  }, []);
+      // Preserve the server-provided theme if the settings document is not yet
+      // created in a new environment; never revert to the obsolete legacy brand.
+      setTheme(snapshot.exists()
+        ? { ...defaultTheme, ...snapshot.data() }
+        : { ...defaultTheme, ...(initialTheme || {}) });
+      setThemeReady(true);
+    }, error => {
+      console.warn('[FestContext] Festival settings synchronization failed:', error);
+      // Keep the server value when available; otherwise allow the app to fall
+      // back to the current festival identity defaults rather than block access.
+      setThemeReady(true);
+    });
+  }, [initialTheme]);
 
   // Only branded festival name text changes fonts; no portal body/control typography is modified.
   useEffect(() => {
@@ -3418,6 +3441,14 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       throw err;
     }
   }, [isIsolatedDemoOrTest, competitions]);
+
+  if (!themeReady && !isIsolatedDemoOrTest) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5 text-sm font-medium text-slate-600">
+        Loading the latest festival settings…
+      </div>
+    );
+  }
 
   return (
     <FestContext.Provider
