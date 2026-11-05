@@ -1458,19 +1458,28 @@ export function FestProvider({
       return;
     }
 
-    return onSnapshot(doc(db, 'settings', 'publicTheme'), snapshot => {
-      // Preserve the server-provided theme if the settings document is not yet
-      // created in a new environment; never revert to the obsolete legacy brand.
-      setTheme(snapshot.exists()
-        ? { ...defaultTheme, ...snapshot.data() }
-        : { ...defaultTheme, ...(initialTheme || {}) });
-      setThemeReady(true);
-    }, error => {
-      console.warn('[FestContext] Festival settings synchronization failed:', error);
-      // Keep the server value when available; otherwise allow the app to fall
-      // back to the current festival identity defaults rather than block access.
-      setThemeReady(true);
-    });
+    return onSnapshot(
+      doc(db, 'settings', 'publicTheme'),
+      { includeMetadataChanges: true },
+      snapshot => {
+        // Do not let a stale local Firestore cache overwrite the server-rendered
+        // settings. Wait for the server snapshot before resolving an unseeded page.
+        if (snapshot.metadata.fromCache) return;
+
+        // Preserve the server-provided theme if the settings document is not yet
+        // created in a new environment; never revert to the obsolete legacy brand.
+        setTheme(snapshot.exists()
+          ? { ...defaultTheme, ...snapshot.data() }
+          : { ...defaultTheme, ...(initialTheme || {}) });
+        setThemeReady(true);
+      },
+      error => {
+        console.warn('[FestContext] Festival settings synchronization failed:', error);
+        // Keep the server value when available; otherwise allow the app to fall
+        // back to the current festival identity defaults rather than block access.
+        setThemeReady(true);
+      }
+    );
   }, [initialTheme]);
 
   // Only branded festival name text changes fonts; no portal body/control typography is modified.
