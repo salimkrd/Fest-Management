@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       }))
       .sort((a, b) => a.codeIndex - b.codeIndex);
 
-    const codeByRegistration = new Map(roster.map(item => [item.registrationId, item.codeLetter]));
+    const codeByRegistration = new Map<string, string>(roster.map(item => [item.registrationId, item.codeLetter] as [string, string]));
     const rawMarkEntry = markEntryDoc.exists ? markEntryDoc.data() || {} : {};
     const rawScores = rawMarkEntry.status === 'DRAFT' && rawMarkEntry.scores && typeof rawMarkEntry.scores === 'object'
       ? rawMarkEntry.scores as Record<string, unknown>
@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       isSubmitted,
-      verificationHash: isSubmitted ? assignment.verificationHash || rawMarkEntry.verificationHash || '' : '',
-      submittedAt: isSubmitted ? assignment.submittedAt || rawMarkEntry.submittedAt || '' : '',
+      verificationHash: isSubmitted ? (assignment as any).verificationHash || rawMarkEntry.verificationHash || '' : '',
+      submittedAt: isSubmitted ? (assignment as any).submittedAt || rawMarkEntry.submittedAt || '' : '',
       assignment: {
         id: assignmentDoc.id,
         competitionId,
