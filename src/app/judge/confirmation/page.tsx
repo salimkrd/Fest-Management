@@ -106,7 +106,7 @@ function ConfirmationContent() {
   };
 
   return (
-    <JudgeLayout competitionTitle={receipt?.competition.name || 'Submission receipt'} isLocked={true}>
+    <JudgeLayout competitionTitle={receipt?.competition.name || 'Submission receipt'} isLocked={Boolean(receipt)}>
       <div className="mx-auto w-full max-w-4xl space-y-5 pb-8 sm:space-y-6">
         {loading && (
           <div className="rounded-2xl border border-slate-200 bg-white px-5 py-16 text-center shadow-sm">
