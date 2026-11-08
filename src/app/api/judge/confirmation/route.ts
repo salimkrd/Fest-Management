@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       return error('This scorecard has not been finalized as an official submission.', 409);
     }
 
-    const storedHash = String(assignment.verificationHash || markEntry.verificationHash || '');
+    const storedHash = String((assignment as any).verificationHash || markEntry.verificationHash || '');
     if (!storedHash || storedHash !== verificationHash || String(markEntry.verificationHash || '') !== verificationHash) {
       return error('The digital verification hash does not match the archived scorecard.', 403);
     }
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       verificationHash: storedHash,
-      submittedAt: String(markEntry.submittedAt || assignment.submittedAt || ''),
+      submittedAt: String(markEntry.submittedAt || (assignment as any).submittedAt || ''),
       marksRecorded: scoreRegistrationIds.length,
       competition: {
         id: competitionDoc.id,
