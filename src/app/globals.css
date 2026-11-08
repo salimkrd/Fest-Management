@@ -78,3 +78,147 @@
 .festival-name {
   font-family: var(--festival-name-font, var(--font-montserrat), sans-serif) !important;
 }
+
+
+/* Judge receipt PDF: print only the verified receipt on clean A4 pages. */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .judge-receipt-print,
+  .judge-receipt-print * {
+    visibility: visible !important;
+  }
+
+  .judge-receipt-print {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    font-size: 10pt !important;
+  }
+
+  .judge-receipt-print .judge-receipt-mobile {
+    display: none !important;
+  }
+
+  .judge-receipt-print .judge-receipt-table {
+    display: block !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+
+  .judge-receipt-print table {
+    display: table !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  .judge-receipt-print thead {
+    display: table-header-group !important;
+  }
+
+  .judge-receipt-print tr,
+  .judge-receipt-print td,
+  .judge-receipt-print th,
+  .judge-receipt-print section,
+  .judge-receipt-print footer {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .judge-receipt-print .overflow-hidden,
+  .judge-receipt-print .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  .judge-receipt-print .shadow-sm,
+  .judge-receipt-print .shadow-xs {
+    box-shadow: none !important;
+  }
+
+  .judge-receipt-print .no-print,
+  .no-print {
+    display: none !important;
+  }
+
+  .judge-receipt-print img {
+    max-height: 14mm !important;
+    max-width: 42mm !important;
+  }
+
+  .judge-receipt-print h1 {
+    font-size: 21pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .judge-receipt-print h2 {
+    font-size: 12pt !important;
+  }
+
+  .judge-receipt-print p,
+  .judge-receipt-print span,
+  .judge-receipt-print th,
+  .judge-receipt-print td {
+    overflow-wrap: anywhere !important;
+  }
+
+  .judge-receipt-print .rounded-2xl,
+  .judge-receipt-print .rounded-xl {
+    border-radius: 5pt !important;
+  }
+
+  .judge-receipt-print .border {
+    border-color: #cbd5e1 !important;
+  }
+
+  .judge-receipt-print .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  .judge-receipt-print .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 10pt !important;
+  }
+
+  .judge-receipt-print .px-5 {
+    padding-left: 8pt !important;
+    padding-right: 8pt !important;
+  }
+
+  .judge-receipt-print .py-3 {
+    padding-top: 6pt !important;
+    padding-bottom: 6pt !important;
+  }
+
+  .judge-receipt-print .text-\[10px\],
+  .judge-receipt-print .text-\[11px\] {
+    font-size: 8pt !important;
+  }
+
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
