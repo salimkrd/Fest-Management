@@ -102,6 +102,15 @@ function ConfirmationContent() {
   }, [assignmentId, competitionId, verificationHash, secret]);
 
   const downloadReceiptPdf = () => {
+    if (!receipt) return;
+    const previousTitle = document.title;
+    const safeCompetition = receipt.competition.code || receipt.competition.name || 'Competition';
+    document.title = (theme.festivalName || 'Festival') + ' - ' + safeCompetition + ' - Adjudication Receipt';
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener('afterprint', restoreTitle);
+    };
+    window.addEventListener('afterprint', restoreTitle, { once: true });
     window.print();
   };
 
@@ -149,7 +158,7 @@ function ConfirmationContent() {
                 <div className="mt-4 text-center">
                   {theme.logoUrl && <img src={theme.logoUrl} alt="" className="mx-auto mb-3 hidden h-12 max-w-[180px] object-contain print:block" />}
                   <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-slate-500">{theme.festivalName || 'Official Festival'}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">{theme.institutionName}</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">{theme.institutionName || ''}</p>
                 </div>
                 <Badge variant="success" size="md" className="mt-4">EVALUATION OFFICIALLY SEALED</Badge>
                 <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Official Adjudication Receipt</h1>
