@@ -652,6 +652,29 @@ export class JudgeService {
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key)!, value])
     );
 
+    // Freeze the anonymous code-letter mapping into the immutable receipt so a later
+    // Green Room roster change cannot alter what this judge actually evaluated.
+    const greenRoomSnapshot = await db.collection('greenRoomAssignments')
+      .where('competitionId', '==', params.competitionId)
+      .get();
+    const rosterByRegistration = new Map<string, { codeLetter: string; codeIndex: number }>();
+    greenRoomSnapshot.docs.forEach((doc, index) => {
+      const item = doc.data();
+      if (typeof item.registrationId === 'string' && typeof item.codeLetter === 'string') {
+        rosterByRegistration.set(item.registrationId, {
+          codeLetter: item.codeLetter.trim().toUpperCase(),
+          codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : index
+        });
+      }
+    });
+    const anonymousRoster = Array.from(resolvedRegistrations.values())
+      .map(registrationId => rosterByRegistration.get(registrationId))
+      .filter((item): item is { codeLetter: string; codeIndex: number } => Boolean(item))
+      .sort((a, b) => a.codeIndex - b.codeIndex);
+    if (anonymousRoster.length !== Object.keys(normalizedScores).length) {
+      throw new Error('Stale Mapping Error: The anonymous Green Room roster changed. Refresh the roster and verify each score before submitting.');
+    }
+
     const submittedAt = new Date().toISOString();
     const hashPayload = `${params.assignmentId}:${params.competitionId}:${submittedAt}:${JSON.stringify(normalizedScores)}`;
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
@@ -713,6 +736,7 @@ export class JudgeService {
         submitted: true,
         isFinal: true,
         scores: normalizedScores,
+        anonymousRoster,
         submittedAt,
         verificationHash
       });

@@ -78,3 +78,140 @@
 .festival-name {
   font-family: var(--festival-name-font, var(--font-montserrat), sans-serif) !important;
 }
+
+
+/* Judge receipt PDF: named A4 page keeps all other print workflows unchanged. */
+@page judge-receipt {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+.judge-receipt-print {
+  page: judge-receipt;
+}
+
+@media print {
+  body.judge-receipt-page {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body.judge-receipt-page * {
+    visibility: hidden !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print,
+  body.judge-receipt-page .judge-receipt-print * {
+    visibility: visible !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    font-size: 10pt !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .judge-receipt-mobile {
+    display: none !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .judge-receipt-table {
+    display: block !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print table {
+    display: table !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print thead {
+    display: table-header-group !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print tr,
+  body.judge-receipt-page .judge-receipt-print td,
+  body.judge-receipt-page .judge-receipt-print th,
+  body.judge-receipt-page .judge-receipt-print section,
+  body.judge-receipt-page .judge-receipt-print footer {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .overflow-hidden,
+  body.judge-receipt-page .judge-receipt-print .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .shadow-sm,
+  body.judge-receipt-page .judge-receipt-print .shadow-xs {
+    box-shadow: none !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print img {
+    max-height: 14mm !important;
+    max-width: 42mm !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print h1 {
+    font-size: 21pt !important;
+    line-height: 1.15 !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print h2 {
+    font-size: 12pt !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print p,
+  body.judge-receipt-page .judge-receipt-print span,
+  body.judge-receipt-page .judge-receipt-print th,
+  body.judge-receipt-page .judge-receipt-print td {
+    overflow-wrap: anywhere !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .rounded-2xl,
+  body.judge-receipt-page .judge-receipt-print .rounded-xl {
+    border-radius: 5pt !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .border {
+    border-color: #cbd5e1 !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  body.judge-receipt-page .judge-receipt-print .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 10pt !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .px-5 {
+    padding-left: 8pt !important;
+    padding-right: 8pt !important;
+  }
+
+  body.judge-receipt-page .judge-receipt-print .py-3 {
+    padding-top: 6pt !important;
+    padding-bottom: 6pt !important;
+  }
+
+  body.judge-receipt-page a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
