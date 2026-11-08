@@ -23,8 +23,8 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
       {/* Top Header */}
       <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30 shadow-xs">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-3 px-3 py-2 sm:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
             <FestivalLogo size={32} />
             <div>
               <div className="flex items-center gap-2">
@@ -39,7 +39,7 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             <FestivalStatusBadge className="hidden sm:inline-flex" />
             {isLocked ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
