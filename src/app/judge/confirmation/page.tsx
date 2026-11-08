@@ -71,6 +71,12 @@ function ConfirmationContent() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!receipt) return;
+    document.body.classList.add('judge-receipt-page');
+    return () => document.body.classList.remove('judge-receipt-page');
+  }, [receipt]);
+
+  useEffect(() => {
     let active = true;
     const loadReceipt = async () => {
       if (!assignmentId || !competitionId || !verificationHash || !secret) {
