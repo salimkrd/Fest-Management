@@ -306,7 +306,7 @@ function JudgeMarkingContent() {
                 <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-700">
                   {competition?.code || 'ASSIGNED EVENT'}
                 </span>
-                <Badge variant={syncState === 'ready' ? 'success' : syncState === 'error' ? 'danger' : 'warning'} size="sm" dot>
+                <Badge variant={syncState === 'ready' ? 'success' : syncState === 'error' ? 'error' : 'warning'} size="sm" dot>
                   {syncState === 'ready' ? 'SESSION VERIFIED' : syncState === 'error' ? 'SYNC ERROR' : 'SYNCING'}
                 </Badge>
               </div>
