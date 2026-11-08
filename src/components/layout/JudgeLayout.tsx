@@ -26,14 +26,14 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
         <div className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-3 px-3 py-2 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
             <FestivalLogo size={32} />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#111111]"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="max-w-[42vw] truncate text-xs font-bold text-[#111111] sm:max-w-none"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
                   SECURE JURY SESSION
                 </span>
               </div>
-              <span className="text-[11px] text-[#526070] font-medium block leading-tight">
+              <span className="block max-w-[48vw] truncate text-[10px] font-medium leading-tight text-[#526070] sm:max-w-[360px] sm:text-[11px]">
                 {competitionTitle}
               </span>
             </div>
