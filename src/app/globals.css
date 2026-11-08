@@ -210,11 +210,6 @@
     padding-bottom: 6pt !important;
   }
 
-  body.judge-receipt-page .judge-receipt-print .text-\\[10px\\],
-  body.judge-receipt-page .judge-receipt-print .text-\\[11px\\] {
-    font-size: 8pt !important;
-  }
-
   body.judge-receipt-page a {
     color: inherit !important;
     text-decoration: none !important;
