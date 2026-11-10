@@ -4,6 +4,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { POST as loginRoute } from '@/app/api/participant/login/route';
 import { POST as logoutRoute } from '@/app/api/participant/logout/route';
 import { GET as meRoute } from '@/app/api/participant/me/route';
+import { PATCH as patchParticipantProfileRoute } from '@/app/api/participant/profile/route';
 import { GET as qrRoute } from '@/app/api/participant/qr/route';
 import { createHash } from 'node:crypto';
 import { normalizeBib, PARTICIPANT_COOKIE_NAME } from '@/services/participantPortalAuth';
@@ -260,6 +261,18 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
     return new NextRequest(url, {
       method: 'GET',
       headers
+    });
+  }
+
+  function createPatchRequest(url: string, cookieValue: string, body: unknown) {
+    return new NextRequest(url, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        origin: new URL(url).origin,
+        cookie: PARTICIPANT_COOKIE_NAME + '=' + cookieValue
+      },
+      body: JSON.stringify(body)
     });
   }
 
@@ -593,17 +606,59 @@ describe('Participant Portal Emulator End-to-End Integration Tests', () => {
       expect(data.profile.bib).toBe('#1042');
       expect(data.profile.teamName).toBe('Al-Shamama');
 
-      // Privacy: Sensitive fields MUST NEVER be exposed in the response
-      expect(data.profile.email).toBeUndefined();
-      expect(data.profile.phone).toBeUndefined();
+      // Participants may read their own editable contact details, but never DOB
+      // or confidential administrative remarks from the legacy remarks field.
+      expect(data.profile.email).toBe('rayan.private@secret.org');
+      expect(data.profile.phone).toBe('+91 99999 11111');
       expect(data.profile.dob).toBeUndefined();
-      expect(data.profile.remarks).toBeUndefined();
+      expect(data.profile.remarks).toBe('');
 
       // Registrations belong to Participant A
       const eventIds = data.events.map((e: { registrationId: string }) => e.registrationId);
       expect(eventIds).toContain(testRegSoloId);
       expect(eventIds).toContain(testRegGroupId);
       expect(eventIds).toContain(testRegDraftId);
+    });
+
+    it('updates only the six participant-editable fields and keeps admin remarks private', async () => {
+      const url = 'http://localhost:3000/api/participant/profile';
+      const patch = createPatchRequest(url, sessionTokenA, {
+        name: 'Rayan Updated',
+        classGrade: 'Grade 13',
+        email: 'rayan.updated@example.org',
+        phone: '+91 90000 00000',
+        photoUrl: 'https://example.com/updated-rayan.jpg',
+        remarks: 'Please provide a quiet waiting area.'
+      });
+      const response = await patchParticipantProfileRoute(patch);
+      expect(response.status).toBe(200);
+
+      const stored = (await db.collection('participants').doc(testPartIdA).get()).data()!;
+      expect(stored.name).toBe('Rayan Updated');
+      expect(stored.email).toBe('rayan.updated@example.org');
+      expect(stored.phone).toBe('+91 90000 00000');
+      expect(stored.classGrade).toBe('Grade 13');
+      expect(stored.photoUrl).toBe('https://example.com/updated-rayan.jpg');
+      expect(stored.participantRemarks).toBe('Please provide a quiet waiting area.');
+      expect(stored.remarks).toBe('Confidential administrative note');
+
+      const refreshed = await meRoute(createGetRequest('http://localhost:3000/api/participant/me', sessionTokenA));
+      const data = await refreshed.json();
+      expect(data.profile.name).toBe('Rayan Updated');
+      expect(data.profile.remarks).toBe('Please provide a quiet waiting area.');
+      expect(data.profile.dob).toBeUndefined();
+    });
+
+    it('rejects protected fields when a participant attempts to edit their own profile', async () => {
+      const patch = createPatchRequest('http://localhost:3000/api/participant/profile', sessionTokenA, {
+        teamId: 'team-spoofed',
+        categoryId: 'category-spoofed'
+      });
+      const response = await patchParticipantProfileRoute(patch);
+      expect(response.status).toBe(400);
+      const stored = (await db.collection('participants').doc(testPartIdA).get()).data()!;
+      expect(stored.teamId).toBe('team-1');
+      expect(stored.categoryId).toBe('cat-3');
     });
 
     it('Participant B cannot access Participant A data even if query params are spoofed', async () => {
