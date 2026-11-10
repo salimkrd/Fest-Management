@@ -48,6 +48,9 @@ export default function ParticipantDashboard() {
         headers: { Accept: 'application/json' }
       });
       if (res.status === 401) {
+        setData(null);
+        hasLoadedOnce.current = false;
+        setError('');
         router.replace('/participant/login');
         return;
       }
