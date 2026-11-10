@@ -219,6 +219,11 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     });
 
     await signInWithCustomToken(clientAuth, activeToken);
+    // Judge tokens must not be able to read assignment documents containing secretHash/salt.
+    // The judge portal gets a sanitized assignment payload via /api/judge/session instead.
+    const assignmentRef = doc(clientDb, 'judgeAssignments', 'asgn-active-test');
+    await expect(getDoc(assignmentRef)).rejects.toThrow();
+
     const entryRef = doc(clientDb, 'markEntries', 'mark-active-draft');
 
     // Direct client write is strictly rejected by rules (allow write: if false)
