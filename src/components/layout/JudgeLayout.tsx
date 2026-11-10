@@ -22,43 +22,49 @@ export const JudgeLayout: React.FC<JudgeLayoutProps> = ({
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
       {/* Top Header */}
-      <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30 shadow-xs">
-        <div className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-3 px-3 py-2 sm:px-6">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+      <header className="sticky top-0 z-30 border-b border-[#E1E7EF] bg-white shadow-xs">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2.5 px-3 py-2.5 sm:min-h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-2">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <FestivalLogo size={32} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <span className="max-w-[42vw] truncate text-xs font-bold text-[#111111] sm:max-w-none"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
-                  SECURE JURY SESSION
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="min-w-0 max-w-[62vw] truncate text-xs font-bold text-[#111111] sm:max-w-[360px] sm:text-sm">
+                  <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#2563EB] sm:px-2 sm:text-[10px]">
+                  <span className="sm:hidden">JUDGE</span>
+                  <span className="hidden sm:inline">SECURE JURY SESSION</span>
                 </span>
               </div>
-              <span className="block max-w-[48vw] truncate text-[10px] font-medium leading-tight text-[#526070] sm:max-w-[360px] sm:text-[11px]">
+              <span className="mt-0.5 block max-w-full break-words text-[10px] font-medium leading-tight text-[#526070] [overflow-wrap:anywhere] sm:max-w-[360px] sm:truncate sm:text-[11px]">
                 {competitionTitle}
               </span>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <div className="flex w-full shrink-0 items-center justify-between gap-2 border-t border-slate-100 pt-2 sm:w-auto sm:justify-end sm:gap-3 sm:border-0 sm:pt-0">
             <FestivalStatusBadge className="hidden sm:inline-flex" />
             {isLocked ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-                <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                SIGNED &amp; LOCKED
+              <span className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800 sm:px-3 sm:text-xs">
+                <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <span className="sm:hidden">LOCKED</span>
+                <span className="hidden sm:inline">SIGNED &amp; LOCKED</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200 text-xs font-bold">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
-                SESSION ACTIVE
+              <span className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-[#2563EB] sm:px-3 sm:text-xs">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#2563EB]" />
+                <span className="sm:hidden">ACTIVE</span>
+                <span className="hidden sm:inline">SESSION ACTIVE</span>
               </span>
             )}
 
             <Link
               href="/judge/login"
-              className="p-2 text-[#526070] hover:text-[#DC2626] rounded-lg hover:bg-neutral-100 transition-colors"
+              aria-label="Exit Jury Session"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#526070] transition-colors hover:bg-neutral-100 hover:text-[#DC2626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               title="Exit Jury Session"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
             </Link>
           </div>
         </div>
