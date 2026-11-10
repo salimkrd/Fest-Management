@@ -192,23 +192,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <span className="font-bold text-[#111111]"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span> — {theme.tagline || (themeSyncState === 'loading' ? 'Loading festival settings…' : '')}
               <p className="text-[11px] mt-0.5">Results authenticated by the Central Board of Fest Adjudication</p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <Link href="/management" className="hover:text-[#111111] hover:underline font-semibold">
-                Management Hub
-              </Link>
-              <span>•</span>
-              <Link href="/admin/login" className="hover:text-[#111111] hover:underline font-semibold">
-                Admin Portal
-              </Link>
-              <span>•</span>
-              <Link href="/team/login" className="hover:text-[#111111] hover:underline font-semibold">
-                Team Manager Portal
-              </Link>
-              <span>•</span>
-              <Link href="/judge/login" className="hover:text-[#111111] hover:underline font-semibold">
-                Jury Access
-              </Link>
-            </div>
+
           </div>
         </div>
       </footer>
