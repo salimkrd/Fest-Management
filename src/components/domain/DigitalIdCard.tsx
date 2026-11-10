@@ -32,13 +32,15 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const [exporting, setExporting] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const participantId = participant?.id;
 
   useEffect(() => {
-    if (!participant || !isOpen) {
+    if (!participantId || !isOpen) {
       setQrDataUrl('');
       setSignedToken('');
       setSignedPayload('');
       setFetchError(null);
+      setLoading(false);
       return;
     }
 
@@ -55,7 +57,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         }
 
         const res = await fetch(
-          authMode === 'participant' ? '/api/participant/qr' : `/api/participants/${participant.id}/qr`,
+          authMode === 'participant' ? '/api/participant/qr' : `/api/participants/${participantId}/qr`,
           { headers: authMode === 'firebase' ? { Authorization: `Bearer ${idToken}` } : {}, cache: 'no-store' }
         );
 
@@ -98,7 +100,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [participant, isOpen, authMode]);
+  }, [participantId, isOpen, authMode]);
 
   if (!participant) return null;
 
