@@ -208,7 +208,17 @@ export default function ParticipantDashboard() {
               <h2 className="text-lg font-extrabold text-[#111827]">My Competitions & Results</h2>
               <p className="text-xs text-[#526070] mt-1">Events assigned to your participant record; published grades and awarded points are shown here.</p>
             </div>
-            <button onClick={() => void refresh()} className="px-3 py-2 border border-[#E1E7EF] rounded-lg text-xs font-semibold text-[#2563EB]">Refresh Results</button>
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
+              <button type="button" onClick={() => void refresh()} disabled={refreshing}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#CBD5E1] bg-white px-3.5 py-2 text-xs font-bold text-[#2563EB] transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-60 sm:w-auto">
+                {refreshing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {refreshing ? 'Refreshing…' : 'Refresh Portal'}
+              </button>
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-[#64748B]">
+                <CloudCheck className="h-3.5 w-3.5 text-emerald-600" />
+                {lastSyncedAt ? 'Updated at ' + lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · Auto-sync on' : 'Connecting to your latest data…'}
+              </span>
+            </div>
           </div>
           {events.length ? (
             <div className="divide-y divide-[#E1E7EF]">
@@ -219,7 +229,7 @@ export default function ParticipantDashboard() {
                       <span className="text-xs font-mono text-[#2563EB] font-bold">{event.code}</span>
                       <span className={'text-[10px] font-bold px-2 py-1 rounded-full ' +
                         (event.type === 'SOLO' ? 'bg-blue-50 text-blue-800' : 'bg-purple-50 text-purple-800')}>
-                        {event.type === 'SOLO' ? 'SOLO' : 'GROUP · Team points only'}
+                        {event.type === 'SOLO' ? 'INDIVIDUAL' : 'GROUP · Team points only'}
                       </span>
                       <span className="text-[10px] font-semibold rounded-full px-2 py-1 bg-[#F1F5F9] text-[#526070]">
                         {event.mode === 'STAGE' ? 'STAGE' : event.mode === 'OFF_STAGE' ? 'OFF STAGE' : 'UNCLASSIFIED'}
