@@ -7,8 +7,8 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: 'Authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
 
     const { id, data, db } = session;
-    // Full roster, unpublished marks, other participants, phone and DOB are never
-    // disclosed. Registrations are queried only by the authenticated participant.
+    // Only the authenticated participant's own editable contact details are returned.
+    // DOB, admin-only remarks, unpublished marks, the full roster, and other participants stay private.
     const [solo, leader, legacy] = await Promise.all([
       db.collection('registrations').where('participantId', '==', id).get(),
       db.collection('registrations').where('groupLeaderId', '==', id).get(),
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       idStatus: data.idStatus || 'GENERATED',
       email: data.email || '',
       phone: data.phone || '',
-      remarks: data.remarks || ''
+      remarks: data.participantRemarks || ''
     };
     return NextResponse.json({
       profile, events,
