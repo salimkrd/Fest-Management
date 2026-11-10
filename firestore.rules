@@ -48,13 +48,6 @@ service cloud.firestore {
         get(/databases/$(database)/documents/teams/$(teamId)).data.status == 'ACTIVE';
     }
 
-    function isJudgeForAssignment(assignmentId) {
-      return isSignedIn() && (
-        request.auth.token.role == 'JUDGE' &&
-        request.auth.token.assignmentId == assignmentId
-      );
-    }
-
     function isJudgeAssignmentActive(assignmentId, compId) {
       return isSignedIn() &&
         request.auth.token.role == 'JUDGE' &&
@@ -183,15 +176,15 @@ service cloud.firestore {
 
     // ==========================================
     // JUDGES & ASSIGNMENTS
-    // Credentials/hashes must NEVER be publicly readable.
-    // Admin can manage assignments. Judges can read only their own assignment metadata.
+    // Assignment records contain secret hashes and salts; only Admin may read them.
+    // Judges receive a sanitized view through the authenticated judge session API.
     // ==========================================
     match /judges/{judgeId} {
       allow read, write: if isAdmin();
     }
 
     match /judgeAssignments/{assignmentId} {
-      allow read: if isAdmin() || isJudgeForAssignment(assignmentId);
+      allow read: if isAdmin();
       allow write: if isAdmin();
     }
 
