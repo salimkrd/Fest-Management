@@ -101,6 +101,7 @@ export interface Participant {
   registeredEventIds: string[];
   idStatus: 'GENERATED' | 'PENDING';
   remarks?: string;
+  participantRemarks?: string;
 }
 
 export interface Registration {
