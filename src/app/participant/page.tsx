@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Award, CalendarDays, CheckCircle2, Clock3, DoorOpen, IdCard, LogOut, Medal, Trophy, Users2 } from 'lucide-react';
+import { AlertCircle, Award, CalendarDays, CheckCircle2, Clock3, CloudCheck, DoorOpen, IdCard, LoaderCircle, LogOut, Medal, RefreshCw, Trophy, Users2 } from 'lucide-react';
 import { ParticipantProfileEditor } from '@/components/domain/ParticipantProfileEditor';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
@@ -28,37 +28,79 @@ export default function ParticipantDashboard() {
   const { theme, themeSyncState } = useFest();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [idOpen, setIdOpen] = useState(false);
+  const requestInFlight = useRef(false);
+  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    if (hasLoadedOnce.current) setRefreshing(true);
+    else setLoading(true);
     try {
-      const res = await fetch('/api/participant/me', { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetch('/api/participant/me', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
       if (res.status === 401) {
         router.replace('/participant/login');
         return;
       }
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Could not load dashboard.');
+      if (!json.profile || !Array.isArray(json.events) || !json.summary) {
+        throw new Error('The participant dashboard returned incomplete data. Please retry.');
+      }
       setData(json);
+      hasLoadedOnce.current = true;
+      setLastSyncedAt(new Date());
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load participant details.');
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
+      setRefreshing(false);
     }
   }, [router]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Participant data stays behind the authenticated API. Refresh on focus and
+  // periodically so new registrations and published results appear without reload.
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [refresh]);
+
   const logout = async () => {
+    if (logoutLoading) return;
+    setLogoutLoading(true);
     try {
-      await fetch('/api/participant/logout', { method: 'POST', credentials: 'same-origin' });
-    } finally {
-      setData(null);
-      router.replace('/participant/login');
-      router.refresh();
+      const response = await fetch('/api/participant/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to end the session. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to end the session.');
+      setLogoutLoading(false);
+      return;
     }
+    setData(null);
+    router.replace('/participant/login');
+    router.refresh();
   };
 
   if (loading) return (
@@ -87,7 +129,7 @@ export default function ParticipantDashboard() {
   };
   const summaryCards = [
     { label: 'My Competitions', value: summary.competitions, icon: Trophy },
-    { label: 'Solo Competitions', value: summary.soloEvents, icon: Medal },
+    { label: 'Individual Competitions', value: summary.soloEvents, icon: Medal },
     { label: 'Group Competitions', value: summary.groupEvents, icon: Users2 },
     { label: 'My Official Points', value: summary.individualPoints, icon: Award }
   ];
@@ -148,7 +190,7 @@ export default function ParticipantDashboard() {
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-[#2563EB]" />
           <p className="text-xs leading-relaxed text-blue-900">
-            Individual points come from <strong>published SOLO results only</strong>.
+            Individual points come from <strong>published Individual results only</strong>.
             Group competition awards count toward the team championship and never increase your individual points.
             Unpublished results remain confidential.
           </p>
