@@ -104,8 +104,14 @@ export default function ParticipantDashboard() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#F5F7FC] flex items-center justify-center text-[#526070] text-sm">
-      Loading your Participant Portal...
+    <div className="min-h-screen bg-[#F5F7FC] px-4 py-8">
+      <div className="mx-auto max-w-6xl animate-pulse space-y-5">
+        <div className="h-[68px] rounded-2xl border border-slate-200 bg-white" />
+        <div className="h-44 rounded-2xl border border-slate-200 bg-white" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map(item => <div key={item} className="h-28 rounded-xl border border-slate-200 bg-white" />)}</div>
+        <div className="h-64 rounded-2xl border border-slate-200 bg-white" />
+        <p className="text-center text-xs font-medium text-[#64748B]">Loading your Participant Portal…</p>
+      </div>
     </div>
   );
   if (!data) return (
@@ -136,58 +142,58 @@ export default function ParticipantDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FC]">
-      <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <FestivalLogo size={40} />
-            <div>
-              <span className="block text-sm font-extrabold text-[#111827]"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
+      <header className="sticky top-0 z-30 border-b border-[#E1E7EF] bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto flex min-h-[68px] max-w-7xl items-center justify-between gap-2 px-3 sm:min-h-[76px] sm:gap-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <FestivalLogo size={38} />
+            <div className="min-w-0">
+              <span className="block truncate text-sm font-extrabold text-[#111827] sm:text-base"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
               <span className="block text-[11px] text-[#526070]">Participant Dashboard</span>
             </div>
           </div>
           <div className="hidden sm:block"><FestivalStatusBadge /></div>
           <button type="button" onClick={() => void logout()}
-            className="inline-flex items-center gap-1.5 text-xs font-bold border border-[#E1E7EF] rounded-lg px-3 py-2 text-[#526070] hover:bg-[#F8FAFC]">
-            <LogOut className="w-4 h-4" /> Logout
+            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#E1E7EF] px-2.5 py-2 text-xs font-bold text-[#526070] transition hover:bg-[#F8FAFC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-60 sm:px-3.5">
+            {logoutLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}<span>{logoutLoading ? 'Signing out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-6">
-        <section className="rounded-2xl border border-[#E1E7EF] bg-white p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5">
+      <main className="mx-auto w-full max-w-7xl space-y-5 px-3 py-5 sm:space-y-6 sm:px-6 sm:py-7 lg:px-8">
+        {error && <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-900 sm:px-4"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Could not refresh the latest portal data. Showing the last successfully loaded information. {error}</span></div>}<section className="flex flex-col gap-4 rounded-2xl border border-[#E1E7EF] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-5 sm:p-6 lg:p-7">
           <ParticipantPhoto
             photoUrl={profile.photoUrl}
             name={profile.name}
             shape="rounded"
             size="lg"
-            className="border border-[#E1E7EF] shrink-0"
+            className="shrink-0 border border-[#E1E7EF] shadow-sm"
           />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-[#2563EB] uppercase tracking-widest">My Participant Profile</p>
-            <h1 className="text-2xl font-extrabold text-[#111827] mt-1">{profile.name}</h1>
-            <p className="text-sm text-[#526070] mt-1">{profile.teamName} ({profile.teamCode}) · {profile.categoryName}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#526070]">
-              <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">ID: {profile.id}</span>
-              <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">Bib: {profile.bib}</span>
-              <span className="px-2.5 py-1.5 rounded-lg bg-[#F5F7FC] border border-[#E1E7EF]">{profile.classGrade}</span>
+            <h1 className="mt-1 break-words text-xl font-extrabold tracking-tight text-[#111827] sm:text-2xl">{profile.name}</h1>
+            <p className="mt-1 break-words text-sm text-[#526070]">{profile.teamName} ({profile.teamCode}) · {profile.categoryName}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-[#526070] sm:text-xs">
+              <span className="max-w-full break-all rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">ID: {profile.id}</span>
+              <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Bib: {profile.bib}</span>
+              <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Class: {profile.classGrade || '—'}</span>
             </div>
           </div>
-          <div className="flex flex-col gap-2 sm:ml-auto w-full sm:w-auto"><ParticipantProfileEditor profile={profile} onSaved={refresh} /><button type="button" onClick={() => setIdOpen(true)}
-            className="inline-flex items-center justify-center gap-2 bg-[#2563EB] text-white rounded-xl px-5 py-3 text-sm font-bold hover:bg-[#1D4ED8]">
-            <IdCard className="w-5 h-5" /> My Digital ID Card
+          <div className="grid w-full grid-cols-1 gap-2 sm:ml-auto sm:w-auto sm:min-w-[190px]"><ParticipantProfileEditor profile={profile} onSaved={refresh} /><button type="button" onClick={() => setIdOpen(true)}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+            <IdCard className="h-5 w-5" /> My Digital ID Card
           </button></div>
         </section>
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <section aria-label="Participant summary" className="grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">
           {summaryCards.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl border border-[#E1E7EF] bg-white p-5">
+            <div key={label} className="min-w-0 rounded-xl border border-[#E1E7EF] bg-white p-3.5 shadow-sm sm:p-5">
               <div className="w-9 h-9 rounded-lg bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mb-3"><Icon className="w-5 h-5" /></div>
-              <p className="text-3xl font-black text-[#111827]">{value}</p>
+              <p className="text-2xl font-black tabular-nums text-[#111827] sm:text-3xl">{value}</p>
               <p className="text-xs text-[#526070] mt-1">{label}</p>
             </div>
           ))}
         </section>
 
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex items-start gap-3">
+        <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3.5 sm:px-5 sm:py-4">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-[#2563EB]" />
           <p className="text-xs leading-relaxed text-blue-900">
             Individual points come from <strong>published Individual results only</strong>.
@@ -197,7 +203,7 @@ export default function ParticipantDashboard() {
         </div>
 
         <section className="bg-white rounded-2xl border border-[#E1E7EF] overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 border-b border-[#E1E7EF] gap-3">
+          <div className="flex flex-col gap-3 border-b border-[#E1E7EF] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div>
               <h2 className="text-lg font-extrabold text-[#111827]">My Competitions & Results</h2>
               <p className="text-xs text-[#526070] mt-1">Events assigned to your participant record; published grades and awarded points are shown here.</p>
@@ -207,7 +213,7 @@ export default function ParticipantDashboard() {
           {events.length ? (
             <div className="divide-y divide-[#E1E7EF]">
               {events.map(event => (
-                <article key={event.registrationId} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <article key={event.registrationId} className="flex flex-col gap-3.5 p-4 sm:gap-4 sm:p-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-xs font-mono text-[#2563EB] font-bold">{event.code}</span>
@@ -227,7 +233,7 @@ export default function ParticipantDashboard() {
                       {event.stageName && <span className="flex items-center gap-1"><DoorOpen className="w-3.5 h-3.5" /> {event.stageName}</span>}
                     </div>
                   </div>
-                  <div className="md:text-right shrink-0">
+                  <div className="shrink-0 rounded-xl bg-slate-50 p-3 md:bg-transparent md:p-0 md:text-right">
                     {event.published ? (
                       <>
                         <p className="text-sm font-black text-[#111827]">Grade {event.grade || '—'}</p>
@@ -248,12 +254,12 @@ export default function ParticipantDashboard() {
               ))}
             </div>
           ) : (
-            <div className="py-14 text-center text-sm text-[#526070]">
+            <div className="px-4 py-12 text-center text-sm text-[#526070] sm:py-14">
               No registrations are linked to this Participant ID yet. Contact your Team Manager.
             </div>
           )}
         </section>
-        <p className="text-xs text-[#64748B] text-center">This is a read-only participant workspace. Competition registration is managed by the authorized Team Manager.</p>
+        <p className="px-3 pb-2 text-center text-[11px] leading-5 text-[#64748B] sm:text-xs">This is a read-only participant workspace. Competition registration is managed by the authorized Team Manager.</p>
       </main>
       <DigitalIdCard participant={cardParticipant} isOpen={idOpen} onClose={() => setIdOpen(false)} authMode="participant" />
     </div>
