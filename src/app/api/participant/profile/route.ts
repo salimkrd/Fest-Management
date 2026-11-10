@@ -66,8 +66,12 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // Participant-entered accommodation notes are stored separately from the
+    // legacy administrative "remarks" field, which may contain confidential staff notes.
+    const { remarks: participantRemarks, ...profileUpdates } = updates;
     await session.db.collection('participants').doc(session.id).update({
-      ...updates,
+      ...profileUpdates,
+      ...(participantRemarks !== undefined ? { participantRemarks } : {}),
       profileUpdatedAt: new Date().toISOString(),
       profileUpdatedBy: 'PARTICIPANT'
     });
