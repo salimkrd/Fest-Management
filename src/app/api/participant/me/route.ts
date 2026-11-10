@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       idStatus: data.idStatus || 'GENERATED',
       email: data.email || '',
       phone: data.phone || '',
-      remarks: data.remarks || ''
+      remarks: data.participantRemarks || ''
     };
     return NextResponse.json({
       profile, events,
