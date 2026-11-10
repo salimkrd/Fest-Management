@@ -152,14 +152,15 @@ export default function ParticipantDashboard() {
             </div>
           </div>
           <div className="hidden sm:block"><FestivalStatusBadge /></div>
-          <button type="button" onClick={() => void logout()}
+          <button type="button" onClick={() => void logout()} disabled={logoutLoading}
             className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#E1E7EF] px-2.5 py-2 text-xs font-bold text-[#526070] transition hover:bg-[#F8FAFC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-60 sm:px-3.5">
             {logoutLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}<span>{logoutLoading ? 'Signing out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl space-y-5 px-3 py-5 sm:space-y-6 sm:px-6 sm:py-7 lg:px-8">
-        {error && <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-900 sm:px-4"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Could not refresh the latest portal data. Showing the last successfully loaded information. {error}</span></div>}<section className="flex flex-col gap-4 rounded-2xl border border-[#E1E7EF] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-5 sm:p-6 lg:p-7">
+        {error && <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-900 sm:px-4"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Could not refresh the latest portal data. Showing the last successfully loaded information. {error}</span></div>}
+        <section className="flex flex-col gap-4 rounded-2xl border border-[#E1E7EF] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-5 sm:p-6 lg:p-7">
           <ParticipantPhoto
             photoUrl={profile.photoUrl}
             name={profile.name}
@@ -229,7 +230,7 @@ export default function ParticipantDashboard() {
                       <span className="text-xs font-mono text-[#2563EB] font-bold">{event.code}</span>
                       <span className={'text-[10px] font-bold px-2 py-1 rounded-full ' +
                         (event.type === 'SOLO' ? 'bg-blue-50 text-blue-800' : 'bg-purple-50 text-purple-800')}>
-                        {event.type === 'SOLO' ? 'INDIVIDUAL' : 'GROUP · Team points only'}
+                        {event.type === 'SOLO' ? 'Individual' : 'Group · Team points only'}
                       </span>
                       <span className="text-[10px] font-semibold rounded-full px-2 py-1 bg-[#F1F5F9] text-[#526070]">
                         {event.mode === 'STAGE' ? 'STAGE' : event.mode === 'OFF_STAGE' ? 'OFF STAGE' : 'UNCLASSIFIED'}
