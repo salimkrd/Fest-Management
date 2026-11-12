@@ -3,11 +3,12 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, runTransaction } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 import { festivalNameFontFamily, festivalFontStylesheet } from '@/domain/festivalFonts';
 import { createUnloadedFestivalTheme, mergePublishedFestivalTheme } from '@/domain/festivalSettings';
+import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import type { PosterMediaRecord, ReleasedPoster } from '@/services/posterService';
 import {
   Category,
@@ -26,19 +27,12 @@ import {
   PointsLedgerEntry
 } from '@/types/fest';
 import {
-  calculateGradeFromPercentage,
-  getChampionshipPoints,
-  Grade
-} from '@/domain/scoring';
-import {
   commitResultToLedger,
   reverseResultInLedger,
   recalculateTeamChampionship
 } from '@/domain/ledger';
 import {
-  createJudgeAssignment,
-  verifyJudgeAssignment,
-  buildWhatsAppDispatchUrl
+  createJudgeAssignment
 } from '@/domain/judgeAuth';
 
 interface FestContextType {
@@ -69,11 +63,19 @@ interface FestContextType {
   addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
   updateParticipant: (id: string, part: Partial<Participant>) => Promise<void>;
   deleteParticipant: (id: string) => Promise<void>;
+  checkParticipantCategoryConflicts: (participantId: string, newCategoryId: string) => Promise<Array<{
+    registrationId: string;
+    registrationCode: string;
+    competitionId: string;
+    competitionName: string;
+    competitionCode: string;
+    competitionCategoryName: string;
+  }>>;
 
   registrations: Registration[];
   registrationsSyncState: 'loading' | 'ready' | 'error' | 'idle';
   addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => Promise<void>;
-  updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => Promise<void>;
+  updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => Promise<void>;
   deleteRegistration: (id: string) => Promise<void>;
 
   stages: Stage[];
@@ -140,13 +142,6 @@ const defaultTheme: PublicThemeSettings = {
   cardStyle: 'elevated',
   heroBannerText: 'Celebrating Art, Literature, Eloquence & Cultural Heritage'
 };
-
-const initialCategories: Category[] = [
-  { id: 'cat-1', name: 'Sub Junior', code: 'CAT-SJ', eligibility: 'Class 5 to 7', ageRange: '10 - 12 Years', classRange: 'Std 5 - 7', enrolledCount: 94, competitionsCount: 10, status: 'ACTIVE' },
-  { id: 'cat-2', name: 'Junior', code: 'CAT-JR', eligibility: 'Class 8 to 10', ageRange: '13 - 15 Years', classRange: 'Std 8 - 10', enrolledCount: 148, competitionsCount: 14, status: 'ACTIVE' },
-  { id: 'cat-3', name: 'Senior', code: 'CAT-SR', eligibility: 'Class 11 to 12', ageRange: '16 - 18 Years', classRange: 'Std 11 - 12', enrolledCount: 162, competitionsCount: 16, status: 'ACTIVE' },
-  { id: 'cat-4', name: 'General', code: 'CAT-GEN', eligibility: 'All Eligible Students', ageRange: 'Open Tier', classRange: 'Campus Wide', enrolledCount: 78, competitionsCount: 8, status: 'ACTIVE' }
-];
 
 const initialBaseTeams: Team[] = [
   {
@@ -228,716 +223,6 @@ const initialBaseTeams: Team[] = [
     secondCount: 0,
     thirdCount: 0,
     portalAccess: true
-  }
-];
-
-const initialCompetitions: Competition[] = [
-  {
-    id: 'cmp-1',
-    code: 'CMP-01',
-    name: 'Extempore Speech (English)',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    entriesCount: 8,
-    stageId: 'stg-1',
-    stageName: 'Main Auditorium',
-    assignedJudges: ['Dr. Tariq Jameel', 'Prof. Sarah Khan'],
-    status: 'PUBLISHED',
-    date: '2025-11-14',
-    timeSlot: '09:30 AM - 11:30 AM',
-    durationMinutes: 120,
-    maxEntriesPerTeam: 2,
-    criteria: [
-      { id: 'crt-1', name: 'Clarity & Articulation', maxMarks: 30 },
-      { id: 'crt-2', name: 'Content & Vocabulary', maxMarks: 40 },
-      { id: 'crt-3', name: 'Poise & Confidence', maxMarks: 30 }
-    ]
-  },
-  {
-    id: 'cmp-2',
-    code: 'CMP-02',
-    name: 'Quran Recitation (Tajweed)',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    type: 'SOLO',
-    entriesCount: 12,
-    stageId: 'stg-2',
-    stageName: 'Seminar Hall A',
-    assignedJudges: ['Usthad Abdullah', 'Qari Zubair'],
-    status: 'PUBLISHED',
-    date: '2025-11-14',
-    timeSlot: '11:45 AM - 01:45 PM',
-    durationMinutes: 120,
-    maxEntriesPerTeam: 2,
-    criteria: [
-      { id: 'crt-4', name: 'Tajweed Rules & Makharidj', maxMarks: 40 },
-      { id: 'crt-5', name: 'Voice Tone & Modulation', maxMarks: 30 },
-      { id: 'crt-6', name: 'Fluency & Memorization', maxMarks: 30 }
-    ]
-  },
-  {
-    id: 'cmp-3',
-    code: 'CMP-03',
-    name: 'Sufi & Cultural Group Song',
-    categoryId: 'cat-4',
-    categoryName: 'General',
-    type: 'GROUP',
-    entriesCount: 4,
-    stageId: 'stg-3',
-    stageName: 'Open Amphitheatre',
-    assignedJudges: ['Ustad Fayyaz', 'Rashid Qawwal'],
-    status: 'PUBLISHED',
-    date: '2025-11-14',
-    timeSlot: '02:30 PM - 04:30 PM',
-    durationMinutes: 120,
-    maxEntriesPerTeam: 1,
-    criteria: [
-      { id: 'crt-7', name: 'Harmony & Synchronization', maxMarks: 35 },
-      { id: 'crt-8', name: 'Rhythm & Tal', maxMarks: 35 },
-      { id: 'crt-9', name: 'Presentation & Attire', maxMarks: 30 }
-    ]
-  },
-  {
-    id: 'cmp-4',
-    code: 'CMP-04',
-    name: 'Arabic Calligraphy',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    entriesCount: 10,
-    stageId: 'stg-2',
-    stageName: 'Seminar Hall A',
-    assignedJudges: ['Usthad Nooruddin'],
-    status: 'MARKS_ENTERED',
-    date: '2025-11-15',
-    timeSlot: '09:00 AM - 11:00 AM',
-    durationMinutes: 120,
-    maxEntriesPerTeam: 2,
-    criteria: [
-      { id: 'crt-10', name: 'Script Precision (Thuluth/Naskh)', maxMarks: 40 },
-      { id: 'crt-11', name: 'Composition & Balance', maxMarks: 30 },
-      { id: 'crt-12', name: 'Ink & Nib Execution', maxMarks: 30 }
-    ]
-  },
-  {
-    id: 'cmp-5',
-    code: 'CMP-05',
-    name: 'Elocution (Malayalam)',
-    categoryId: 'cat-1',
-    categoryName: 'Sub Junior',
-    type: 'SOLO',
-    entriesCount: 8,
-    stageId: 'stg-1',
-    stageName: 'Main Auditorium',
-    assignedJudges: ['Dr. Vijayan Menon'],
-    status: 'SCHEDULED',
-    date: '2025-11-15',
-    timeSlot: '11:15 AM - 01:00 PM',
-    durationMinutes: 105,
-    maxEntriesPerTeam: 2,
-    criteria: [
-      { id: 'crt-13', name: 'Language & Pronunciation', maxMarks: 35 },
-      { id: 'crt-14', name: 'Subject Depth', maxMarks: 35 },
-      { id: 'crt-15', name: 'Body Language', maxMarks: 30 }
-    ]
-  },
-  {
-    id: 'cmp-6',
-    code: 'CMP-06',
-    name: 'Daf Muttu Performance',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    type: 'GROUP',
-    entriesCount: 4,
-    stageId: 'stg-3',
-    stageName: 'Open Amphitheatre',
-    assignedJudges: ['Usthad Moideen', 'Salim Ustad'],
-    status: 'SCHEDULED',
-    date: '2025-11-15',
-    timeSlot: '02:00 PM - 04:30 PM',
-    durationMinutes: 150,
-    maxEntriesPerTeam: 1,
-    criteria: [
-      { id: 'crt-16', name: 'Acrobatic Formations & Movements', maxMarks: 40 },
-      { id: 'crt-17', name: 'Beat Synchronization', maxMarks: 35 },
-      { id: 'crt-18', name: 'Bait Recitation & Energy', maxMarks: 25 }
-    ]
-  }
-];
-
-const initialParticipants: Participant[] = [
-  {
-    id: 'part-1',
-    bib: '#1042',
-    name: 'Rayan Siddiqui',
-    email: 'rayan.s@fest.org',
-    phone: '+91 98471 10001',
-    teamId: 'team-1',
-    teamCode: 'ABH',
-    teamName: 'Al-Bayan House',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    classGrade: 'Grade 12',
-    division: 'A',
-    dob: '2008-04-12',
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-1'],
-    idStatus: 'GENERATED'
-  },
-  {
-    id: 'part-2',
-    bib: '#1018',
-    name: 'Faris Ibrahim',
-    email: 'faris.i@fest.org',
-    phone: '+91 98471 10002',
-    teamId: 'team-2',
-    teamCode: 'BSH',
-    teamName: 'Badr Squad',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    classGrade: 'Grade 11',
-    division: 'B',
-    dob: '2009-02-18',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-1'],
-    idStatus: 'GENERATED'
-  },
-  {
-    id: 'part-3',
-    bib: '#1035',
-    name: 'Hassan Bilgrami',
-    email: 'hassan.b@fest.org',
-    phone: '+91 98471 10003',
-    teamId: 'team-3',
-    teamCode: 'KAH',
-    teamName: 'Khalid Al-Walid',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    classGrade: 'Grade 12',
-    division: 'C',
-    dob: '2008-09-05',
-    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-1'],
-    idStatus: 'GENERATED'
-  },
-  {
-    id: 'part-4',
-    bib: '#2011',
-    name: 'Aasim Faizee',
-    email: 'aasim.f@fest.org',
-    phone: '+91 98471 10004',
-    teamId: 'team-1',
-    teamCode: 'ABH',
-    teamName: 'Al-Bayan House',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    classGrade: 'Grade 9',
-    division: 'A',
-    dob: '2010-06-22',
-    photoUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-2'],
-    idStatus: 'GENERATED'
-  },
-  {
-    id: 'part-5',
-    bib: '#2045',
-    name: 'Zayd Imran',
-    email: 'zayd.i@fest.org',
-    phone: '+91 98471 10005',
-    teamId: 'team-2',
-    teamCode: 'BSH',
-    teamName: 'Badr Squad',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    classGrade: 'Grade 10',
-    division: 'B',
-    dob: '2009-11-14',
-    photoUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-2'],
-    idStatus: 'GENERATED'
-  },
-  {
-    id: 'part-6',
-    bib: '#2062',
-    name: 'Bilal Madani',
-    email: 'bilal.m@fest.org',
-    phone: '+91 98471 10006',
-    teamId: 'team-3',
-    teamCode: 'KAH',
-    teamName: 'Khalid Al-Walid',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    classGrade: 'Grade 10',
-    division: 'A',
-    dob: '2010-01-30',
-    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=256',
-    registeredEventIds: ['cmp-2'],
-    idStatus: 'GENERATED'
-  }
-];
-
-const initialRegistrations: Registration[] = [
-  {
-    id: 'reg-1',
-    code: 'REG-8821',
-    participantId: 'part-1',
-    participantName: 'Rayan Siddiqui',
-    teamId: 'team-1',
-    teamCode: 'ABH',
-    teamName: 'Al-Bayan House',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    type: 'SOLO',
-    chestNumber: '1042',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 10:20 AM'
-  },
-  {
-    id: 'reg-2',
-    code: 'REG-8822',
-    participantId: 'part-2',
-    participantName: 'Faris Ibrahim',
-    teamId: 'team-2',
-    teamCode: 'BSH',
-    teamName: 'Badr Squad',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    type: 'SOLO',
-    chestNumber: '1018',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 11:15 AM'
-  },
-  {
-    id: 'reg-3',
-    code: 'REG-8823',
-    participantId: 'part-3',
-    participantName: 'Hassan Bilgrami',
-    teamId: 'team-3',
-    teamCode: 'KAH',
-    teamName: 'Khalid Al-Walid',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    type: 'SOLO',
-    chestNumber: '1035',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 11:40 AM'
-  },
-  {
-    id: 'reg-4',
-    code: 'REG-8824',
-    participantName: 'Tariq Niyas',
-    teamId: 'team-4',
-    teamCode: 'FSH',
-    teamName: 'Fathul Mubeen',
-    categoryId: 'cat-3',
-    categoryName: 'Senior',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    type: 'SOLO',
-    chestNumber: '1088',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 12:05 PM'
-  },
-  {
-    id: 'reg-5',
-    code: 'REG-8825',
-    participantId: 'part-4',
-    participantName: 'Aasim Faizee',
-    teamId: 'team-1',
-    teamCode: 'ABH',
-    teamName: 'Al-Bayan House',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    competitionId: 'cmp-2',
-    competitionName: 'Quran Recitation (Tajweed)',
-    type: 'SOLO',
-    chestNumber: '2011',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 02:10 PM'
-  },
-  {
-    id: 'reg-6',
-    code: 'REG-8826',
-    participantId: 'part-5',
-    participantName: 'Zayd Imran',
-    teamId: 'team-2',
-    teamCode: 'BSH',
-    teamName: 'Badr Squad',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    competitionId: 'cmp-2',
-    competitionName: 'Quran Recitation (Tajweed)',
-    type: 'SOLO',
-    chestNumber: '2045',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 02:30 PM'
-  },
-  {
-    id: 'reg-7',
-    code: 'REG-8827',
-    participantId: 'part-6',
-    participantName: 'Bilal Madani',
-    teamId: 'team-3',
-    teamCode: 'KAH',
-    teamName: 'Khalid Al-Walid',
-    categoryId: 'cat-2',
-    categoryName: 'Junior',
-    competitionId: 'cmp-2',
-    competitionName: 'Quran Recitation (Tajweed)',
-    type: 'SOLO',
-    chestNumber: '2062',
-    status: 'APPROVED',
-    registeredAt: '2025-11-10 03:00 PM'
-  },
-  {
-    id: 'reg-grp-1',
-    code: 'REG-8828',
-    participantName: 'Al-Bayan Harmony Troupe',
-    teamId: 'team-1',
-    teamCode: 'ABH',
-    teamName: 'Al-Bayan House',
-    categoryId: 'cat-4',
-    categoryName: 'General',
-    competitionId: 'cmp-3',
-    competitionName: 'Sufi & Cultural Group Song',
-    type: 'GROUP',
-    chestNumber: 'GRP-ABH',
-    status: 'APPROVED',
-    registeredAt: '2025-11-11 09:15 AM'
-  },
-  {
-    id: 'reg-grp-2',
-    code: 'REG-8829',
-    participantName: 'Badr Voice Ensemble',
-    teamId: 'team-2',
-    teamCode: 'BSH',
-    teamName: 'Badr Squad',
-    categoryId: 'cat-4',
-    categoryName: 'General',
-    competitionId: 'cmp-3',
-    competitionName: 'Sufi & Cultural Group Song',
-    type: 'GROUP',
-    chestNumber: 'GRP-BSH',
-    status: 'APPROVED',
-    registeredAt: '2025-11-11 09:30 AM'
-  },
-  {
-    id: 'reg-grp-3',
-    code: 'REG-8830',
-    participantName: 'Khalid Al-Walid Choral Choir',
-    teamId: 'team-3',
-    teamCode: 'KAH',
-    teamName: 'Khalid Al-Walid',
-    categoryId: 'cat-4',
-    categoryName: 'General',
-    competitionId: 'cmp-3',
-    competitionName: 'Sufi & Cultural Group Song',
-    type: 'GROUP',
-    chestNumber: 'GRP-KAH',
-    status: 'APPROVED',
-    registeredAt: '2025-11-11 10:00 AM'
-  }
-];
-
-const initialStages: Stage[] = [
-  {
-    id: 'stg-1',
-    code: 'STG-01',
-    name: 'Main Auditorium',
-    venue: 'Block A Central Complex',
-    capacity: 1200,
-    managerName: 'Shafiq Rahman',
-    managerPhone: '+91 98471 40001',
-    audioVisualStatus: 'OPERATIONAL',
-    currentEvent: 'Extempore Speech (Senior)',
-    nextEvent: 'Elocution (Sub Junior)'
-  },
-  {
-    id: 'stg-2',
-    code: 'STG-02',
-    name: 'Seminar Hall A',
-    venue: 'Academic Wing Level 2',
-    capacity: 350,
-    managerName: 'Zubair Al-Hindi',
-    managerPhone: '+91 98471 40002',
-    audioVisualStatus: 'OPERATIONAL',
-    currentEvent: 'Quran Recitation (Junior)',
-    nextEvent: 'Arabic Calligraphy'
-  },
-  {
-    id: 'stg-3',
-    code: 'STG-03',
-    name: 'Open Amphitheatre',
-    venue: 'Courtyard Greens',
-    capacity: 2500,
-    managerName: 'Muneer Ahmad',
-    managerPhone: '+91 98471 40003',
-    audioVisualStatus: 'STANDBY',
-    currentEvent: 'Sufi & Cultural Group Song',
-    nextEvent: 'Daf Muttu Performance'
-  }
-];
-
-const initialSchedules: ScheduleSlot[] = [
-  {
-    id: 'sch-1',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    stageId: 'stg-1',
-    stageName: 'Main Auditorium',
-    date: '2025-11-14',
-    startTime: '09:30 AM',
-    endTime: '11:30 AM',
-    status: 'COMPLETED'
-  },
-  {
-    id: 'sch-2',
-    competitionId: 'cmp-2',
-    competitionName: 'Quran Recitation (Tajweed)',
-    categoryName: 'Junior',
-    type: 'SOLO',
-    stageId: 'stg-2',
-    stageName: 'Seminar Hall A',
-    date: '2025-11-14',
-    startTime: '11:45 AM',
-    endTime: '01:45 PM',
-    status: 'COMPLETED'
-  },
-  {
-    id: 'sch-3',
-    competitionId: 'cmp-3',
-    competitionName: 'Sufi & Cultural Group Song',
-    categoryName: 'General',
-    type: 'GROUP',
-    stageId: 'stg-3',
-    stageName: 'Open Amphitheatre',
-    date: '2025-11-14',
-    startTime: '02:30 PM',
-    endTime: '04:30 PM',
-    status: 'COMPLETED'
-  },
-  {
-    id: 'sch-4',
-    competitionId: 'cmp-4',
-    competitionName: 'Arabic Calligraphy',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    stageId: 'stg-2',
-    stageName: 'Seminar Hall A',
-    date: '2025-11-15',
-    startTime: '09:00 AM',
-    endTime: '11:00 AM',
-    status: 'LIVE'
-  },
-  {
-    id: 'sch-5',
-    competitionId: 'cmp-5',
-    competitionName: 'Elocution (Malayalam)',
-    categoryName: 'Sub Junior',
-    type: 'SOLO',
-    stageId: 'stg-1',
-    stageName: 'Main Auditorium',
-    date: '2025-11-15',
-    startTime: '11:15 AM',
-    endTime: '01:00 PM',
-    status: 'SCHEDULED'
-  },
-  {
-    id: 'sch-6',
-    competitionId: 'cmp-6',
-    competitionName: 'Daf Muttu Performance',
-    categoryName: 'Senior',
-    type: 'GROUP',
-    stageId: 'stg-3',
-    stageName: 'Open Amphitheatre',
-    date: '2025-11-15',
-    startTime: '02:00 PM',
-    endTime: '04:30 PM',
-    status: 'SCHEDULED'
-  }
-];
-
-// Initial Mark Entries with hashed secrets
-const initialMarkEntries: MarkEntry[] = [
-  {
-    id: 'me-1',
-    competitionId: 'cmp-1',
-    competitionName: 'Extempore Speech (English)',
-    competitionCode: 'CMP-01',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    judgeName: 'Dr. Tariq Jameel',
-    judgePhone: '+91 98471 50001',
-    accessCode: 'JRY-4101',
-    secretHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    salt: 'salt-cmp-1',
-    status: 'SUBMITTED',
-    submittedAt: '2025-11-14 11:20 AM',
-    verificationHash: 'SHA256:88fa291bce99',
-    scores: [
-      {
-        registrationId: 'reg-1',
-        participantName: 'Rayan Siddiqui',
-        bib: '#1042',
-        teamCode: 'ABH',
-        teamName: 'Al-Bayan House',
-        criteriaMarks: { 'crt-1': 29, 'crt-2': 38, 'crt-3': 28 },
-        totalMarks: 95
-      },
-      {
-        registrationId: 'reg-2',
-        participantName: 'Faris Ibrahim',
-        bib: '#1018',
-        teamCode: 'BSH',
-        teamName: 'Badr Squad',
-        criteriaMarks: { 'crt-1': 27, 'crt-2': 35, 'crt-3': 27 },
-        totalMarks: 89
-      },
-      {
-        registrationId: 'reg-3',
-        participantName: 'Hassan Bilgrami',
-        bib: '#1035',
-        teamCode: 'KAH',
-        teamName: 'Khalid Al-Walid',
-        criteriaMarks: { 'crt-1': 24, 'crt-2': 33, 'crt-3': 25 },
-        totalMarks: 82
-      }
-    ]
-  },
-  {
-    id: 'me-2',
-    competitionId: 'cmp-2',
-    competitionName: 'Quran Recitation (Tajweed)',
-    competitionCode: 'CMP-02',
-    categoryName: 'Junior',
-    type: 'SOLO',
-    judgeName: 'Usthad Abdullah',
-    judgePhone: '+91 98471 50002',
-    accessCode: 'JRY-4102',
-    secretHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    salt: 'salt-cmp-2',
-    status: 'SUBMITTED',
-    submittedAt: '2025-11-14 01:35 PM',
-    verificationHash: 'SHA256:77da812efc44',
-    scores: [
-      {
-        registrationId: 'reg-5',
-        participantName: 'Aasim Faizee',
-        bib: '#2011',
-        teamCode: 'ABH',
-        teamName: 'Al-Bayan House',
-        criteriaMarks: { 'crt-4': 39, 'crt-5': 30, 'crt-6': 29 },
-        totalMarks: 98
-      },
-      {
-        registrationId: 'reg-6',
-        participantName: 'Zayd Imran',
-        bib: '#2045',
-        teamCode: 'BSH',
-        teamName: 'Badr Squad',
-        criteriaMarks: { 'crt-4': 37, 'crt-5': 28, 'crt-6': 28 },
-        totalMarks: 93
-      },
-      {
-        registrationId: 'reg-7',
-        participantName: 'Bilal Madani',
-        bib: '#2062',
-        teamCode: 'KAH',
-        teamName: 'Khalid Al-Walid',
-        criteriaMarks: { 'crt-4': 34, 'crt-5': 26, 'crt-6': 26 },
-        totalMarks: 86
-      }
-    ]
-  },
-  {
-    id: 'me-3',
-    competitionId: 'cmp-3',
-    competitionName: 'Sufi & Cultural Group Song',
-    competitionCode: 'CMP-03',
-    categoryName: 'General',
-    type: 'GROUP',
-    judgeName: 'Ustad Fayyaz',
-    judgePhone: '+91 98471 50003',
-    accessCode: 'JRY-4103',
-    secretHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    salt: 'salt-cmp-3',
-    status: 'SUBMITTED',
-    submittedAt: '2025-11-14 04:20 PM',
-    verificationHash: 'SHA256:99ac331bbd12',
-    scores: [
-      {
-        registrationId: 'reg-grp-1',
-        participantName: 'Al-Bayan Harmony Troupe',
-        bib: '#GRP-ABH',
-        teamCode: 'ABH',
-        teamName: 'Al-Bayan House',
-        criteriaMarks: { 'crt-7': 34, 'crt-8': 34, 'crt-9': 28 },
-        totalMarks: 96
-      },
-      {
-        registrationId: 'reg-grp-2',
-        participantName: 'Badr Voice Ensemble',
-        bib: '#GRP-BSH',
-        teamCode: 'BSH',
-        teamName: 'Badr Squad',
-        criteriaMarks: { 'crt-7': 32, 'crt-8': 31, 'crt-9': 28 },
-        totalMarks: 91
-      },
-      {
-        registrationId: 'reg-grp-3',
-        participantName: 'Khalid Al-Walid Choral Choir',
-        bib: '#GRP-KAH',
-        teamCode: 'KAH',
-        teamName: 'Khalid Al-Walid',
-        criteriaMarks: { 'crt-7': 30, 'crt-8': 29, 'crt-9': 26 },
-        totalMarks: 85
-      }
-    ]
-  },
-  {
-    id: 'me-4',
-    competitionId: 'cmp-4',
-    competitionName: 'Arabic Calligraphy',
-    competitionCode: 'CMP-04',
-    categoryName: 'Senior',
-    type: 'SOLO',
-    judgeName: 'Usthad Nooruddin',
-    judgePhone: '+91 98471 50004',
-    accessCode: 'JRY-4104',
-    secretHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    salt: 'salt-cmp-4',
-    status: 'SUBMITTED',
-    submittedAt: '2025-11-15 10:45 AM',
-    verificationHash: 'SHA256:11dd884aef55',
-    scores: [
-      {
-        registrationId: 'reg-8',
-        participantName: 'Luqman Hakim',
-        bib: '#1055',
-        teamCode: 'ABH',
-        teamName: 'Al-Bayan House',
-        criteriaMarks: { 'crt-10': 38, 'crt-11': 28, 'crt-12': 28 },
-        totalMarks: 94
-      },
-      {
-        registrationId: 'reg-9',
-        participantName: 'Sufyan Ali',
-        bib: '#1072',
-        teamCode: 'BSH',
-        teamName: 'Badr Squad',
-        criteriaMarks: { 'crt-10': 35, 'crt-11': 27, 'crt-12': 26 },
-        totalMarks: 88
-      }
-    ]
   }
 ];
 
@@ -1407,32 +692,6 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Live production and local Firebase Emulator connect to Firestore for dynamic realtime sync.
   // Isolated mock demo mode is strictly for offline showcase (NEXT_PUBLIC_DEMO_MODE=true) or tests without DB.
   const isIsolatedDemoOrTest = isDemoMode || (isTestEnv && !isEmulator);
-
-  const DEMO_TEAM_IDS = ['team-1', 'team-2', 'team-3', 'team-4'];
-  const DEMO_CATEGORY_IDS = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
-  const DEMO_COMPETITION_IDS = ['cmp-1', 'cmp-2', 'cmp-3', 'cmp-4', 'cmp-5', 'cmp-6'];
-  const DEMO_STAGE_IDS = ['stg-1', 'stg-2', 'stg-3'];
-  const DEMO_SCHEDULE_IDS = ['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-5', 'sch-6'];
-
-  const isDemoCategory = (c: Category) =>
-    initialCategories.some(init => init.id === c.id) || DEMO_CATEGORY_IDS.includes(c.id);
-  const isDemoCompetition = (comp: Competition) =>
-    initialCompetitions.some(init => init.id === comp.id) || DEMO_COMPETITION_IDS.includes(comp.id);
-  const isDemoStage = (s: Stage) =>
-    initialStages.some(init => init.id === s.id) || DEMO_STAGE_IDS.includes(s.id);
-  const isDemoSchedule = (sch: ScheduleSlot) =>
-    initialSchedules.some(init => init.id === sch.id) || DEMO_SCHEDULE_IDS.includes(sch.id);
-  const isDemoParticipant = (p: Participant) =>
-    initialParticipants.some(init => init.id === p.id) || DEMO_TEAM_IDS.includes(p.teamId);
-  const isDemoRegistration = (r: Registration) =>
-    initialRegistrations.some(init => init.id === r.id) || DEMO_TEAM_IDS.includes(r.teamId);
-  const isDemoMarkEntry = (m: MarkEntry) =>
-    initialMarkEntries.some(init => init.id === m.id);
-  const isDemoResult = (res: CompetitionResult) =>
-    initialResults.some(init => init.id === res.id) ||
-    res.ranks.some(rk => DEMO_TEAM_IDS.includes(rk.teamId));
-  const isDemoPointsLedgerEntry = (l: PointsLedgerEntry) =>
-    initialPointsLedger.some(init => init.id === l.id) || DEMO_TEAM_IDS.includes(l.teamId);
 
   const [theme, setTheme] = useState<PublicThemeSettings>(() => {
     if (isIsolatedDemoOrTest && typeof window !== 'undefined') {
@@ -2526,7 +1785,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       if (unsubRegs) unsubRegs();
       if (unsubJudges) unsubJudges();
     };
-  }, [isIsolatedDemoOrTest, currentTeamUser?.id]);
+  }, [isIsolatedDemoOrTest, currentTeamUser, setMarkEntries]);
 
   // Sync state to localStorage only in offline demo mode
   useEffect(() => {
@@ -2749,20 +2008,21 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addTeam = async (teamData: Omit<Team, 'id' | 'totalPoints' | 'soloPoints' | 'groupPoints' | 'rank' | 'firstCount' | 'secondCount' | 'thirdCount' | 'contestantsCount' | 'eventsCount'> & { id?: string }) => {
-    const customId = (teamData as any).id;
+    const optionalFields = teamData as Partial<Team>;
+    const customId = optionalFields.id;
     const newId = customId || ('team-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6));
     const newTeam: Team = {
       ...teamData,
       id: newId,
-      contestantsCount: (teamData as any).contestantsCount || 0,
-      eventsCount: (teamData as any).eventsCount || 0,
-      totalPoints: (teamData as any).totalPoints || 0,
-      soloPoints: (teamData as any).soloPoints || 0,
-      groupPoints: (teamData as any).groupPoints || 0,
-      firstCount: (teamData as any).firstCount || 0,
-      secondCount: (teamData as any).secondCount || 0,
-      thirdCount: (teamData as any).thirdCount || 0,
-      rank: (teamData as any).rank || (teams.length + 1)
+      contestantsCount: optionalFields.contestantsCount || 0,
+      eventsCount: optionalFields.eventsCount || 0,
+      totalPoints: optionalFields.totalPoints || 0,
+      soloPoints: optionalFields.soloPoints || 0,
+      groupPoints: optionalFields.groupPoints || 0,
+      firstCount: optionalFields.firstCount || 0,
+      secondCount: optionalFields.secondCount || 0,
+      thirdCount: optionalFields.thirdCount || 0,
+      rank: optionalFields.rank || (teams.length + 1)
     };
     if (!isIsolatedDemoOrTest && db) {
       await setDoc(doc(db, 'teams', newId), sanitizeForFirestore(newTeam), { merge: true });
@@ -2906,11 +2166,143 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
   };
 
-  const updateParticipant = async (id: string, updated: Partial<Participant>) => {
+  const checkParticipantCategoryConflicts = useCallback(async (
+    participantId: string,
+    newCategoryId: string
+  ): Promise<Array<{
+    registrationId: string;
+    registrationCode: string;
+    competitionId: string;
+    competitionName: string;
+    competitionCode: string;
+    competitionCategoryName: string;
+  }>> => {
+    const part = participants.find(p => p.id === participantId);
+    if (!part) return [];
+    if (part.categoryId === newCategoryId) return [];
+
+    let allCats = categories;
+    let targetCat = allCats.find(c => c.id === newCategoryId);
+    let allComps = competitions;
+    let relevantRegs: Registration[] = [];
+
     if (!isIsolatedDemoOrTest && db) {
-      await updateDoc(doc(db, 'participants', id), sanitizeForFirestore(updated));
+      const firestore = db;
+      try {
+        const [catsSnap, compsSnap, regsSnap, grpRegsSnap] = await Promise.all([
+          getDocs(collection(firestore, 'categories')),
+          getDocs(collection(firestore, 'competitions')),
+          getDocs(query(collection(firestore, 'registrations'), where('participantId', '==', participantId))),
+          getDocs(query(collection(firestore, 'registrations'), where('groupLeaderId', '==', participantId)))
+        ]);
+
+        allCats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+        targetCat = allCats.find(c => c.id === newCategoryId);
+        allComps = compsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Competition));
+
+        const seenRegIds = new Set<string>();
+        const fetchedRegs: Registration[] = [];
+        for (const snap of [...regsSnap.docs, ...grpRegsSnap.docs]) {
+          if (!seenRegIds.has(snap.id)) {
+            seenRegIds.add(snap.id);
+            fetchedRegs.push({ id: snap.id, ...snap.data() } as Registration);
+          }
+        }
+        relevantRegs = fetchedRegs;
+      } catch (err) {
+        console.warn('[FestContext] Firestore conflict check fallback to state:', err);
+        relevantRegs = registrations.filter(r => r.participantId === participantId || r.groupLeaderId === participantId);
+      }
+    } else {
+      relevantRegs = registrations.filter(r => r.participantId === participantId || r.groupLeaderId === participantId);
     }
+
+    const activeRegs = relevantRegs.filter(r => (r.status as string) !== 'REJECTED' && (r.status as string) !== 'CANCELLED');
+    const simulatedParticipant: Participant = {
+      ...part,
+      categoryId: newCategoryId,
+      categoryName: targetCat?.name || part.categoryName
+    };
+
+    const conflicts: Array<{
+      registrationId: string;
+      registrationCode: string;
+      competitionId: string;
+      competitionName: string;
+      competitionCode: string;
+      competitionCategoryName: string;
+    }> = [];
+
+    for (const reg of activeRegs) {
+      const comp = allComps.find(c => c.id === reg.competitionId);
+      if (!comp) continue;
+      const compCat = allCats.find(c => c.id === comp.categoryId);
+      const isEligible = isParticipantEligibleForCategory(simulatedParticipant, compCat, allCats);
+      if (!isEligible) {
+        conflicts.push({
+          registrationId: reg.id,
+          registrationCode: reg.code || 'REG',
+          competitionId: comp.id,
+          competitionName: comp.name || 'Competition',
+          competitionCode: comp.code || 'CMP',
+          competitionCategoryName: comp.categoryName || compCat?.name || 'Category'
+        });
+      }
+    }
+
+    return conflicts;
+  }, [categories, competitions, isIsolatedDemoOrTest, participants, registrations]);
+
+  const updateParticipant = async (id: string, updated: Partial<Participant>) => {
+    const currentParticipant = participants.find(p => p.id === id);
+
+    // F-01: Category Switching Validation (Enforce at Context / State Layer)
+    if (updated.categoryId && currentParticipant && updated.categoryId !== currentParticipant.categoryId) {
+      const conflicts = await checkParticipantCategoryConflicts(id, updated.categoryId);
+      if (conflicts.length > 0) {
+        const compList = conflicts.map(c => `${c.competitionCode} (${c.competitionName})`).join(', ');
+        throw new Error(
+          `Validation Error: Cannot change category for participant "${currentParticipant.name}". Conflicting active registrations exist in: ${compList}. Please resolve conflicting registrations first.`
+        );
+      }
+    }
+
+    // F-02: Team Switching Counter Synchronization
+    const oldTeamId = currentParticipant?.teamId;
+    const newTeamId = updated.teamId;
+    const isTeamChanged = Boolean(newTeamId && oldTeamId && newTeamId !== oldTeamId);
+
+    if (!isIsolatedDemoOrTest && db) {
+      const user = auth?.currentUser;
+      if (!user) throw new Error('Unauthorized: Sign in before updating a participant.');
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/participants/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updated)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update participant.');
+      }
+    }
+
+    // Synchronize local React state
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+    if (isTeamChanged) {
+      setTeams(prev => prev.map(t => {
+        if (t.id === oldTeamId) {
+          return { ...t, contestantsCount: Math.max(0, (t.contestantsCount ?? 0) - 1) };
+        }
+        if (t.id === newTeamId) {
+          return { ...t, contestantsCount: (t.contestantsCount ?? 0) + 1 };
+        }
+        return t;
+      }));
+    }
   };
 
   const deleteParticipant = async (id: string) => {
@@ -2918,7 +2310,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (!isIsolatedDemoOrTest && db) {
       await deleteDoc(doc(db, 'participants', id));
       if (partToDelete?.teamId) {
-        updateDoc(doc(db, 'teams', partToDelete.teamId), {
+        await updateDoc(doc(db, 'teams', partToDelete.teamId), {
           contestantsCount: Math.max(0, (teams.find(t => t.id === partToDelete.teamId)?.contestantsCount || 1) - 1)
         }).catch(() => {});
       }
@@ -2971,26 +2363,273 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
   };
 
-  const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED') => {
+  const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => {
+    let targetCompId: string | undefined;
+    let targetPartId: string | undefined;
+    let targetGroupMembers: string[] = [];
+    let prevStatus: string | undefined;
+
     if (!isIsolatedDemoOrTest && db) {
-      await updateDoc(doc(db, 'registrations', id), { status });
+      const firestore = db;
+      let otherActiveCompRegs: DocumentData[] = [];
+
+      const existingReg = registrations.find(r => r.id === id);
+      const estCompId = existingReg?.competitionId;
+      if (estCompId) {
+        try {
+          const qSnap = await getDocs(query(
+            collection(firestore, 'registrations'),
+            where('competitionId', '==', estCompId)
+          ));
+          otherActiveCompRegs = qSnap.docs
+            .filter(d => d.id !== id)
+            .map(d => d.data())
+            .filter(data => data.status !== 'REJECTED' && data.status !== 'CANCELLED');
+        } catch {
+          otherActiveCompRegs = registrations.filter(r =>
+            r.id !== id &&
+            r.competitionId === estCompId &&
+            r.status !== 'REJECTED' &&
+            r.status !== 'CANCELLED'
+          );
+        }
+      }
+
+      await runTransaction(firestore, async (transaction) => {
+        const regRef = doc(firestore, 'registrations', id);
+        const regSnap = await transaction.get(regRef);
+        if (!regSnap.exists()) return;
+
+        const regData = regSnap.data();
+        prevStatus = regData.status;
+        targetCompId = regData.competitionId;
+        targetPartId = regData.participantId || regData.groupLeaderId;
+        targetGroupMembers = Array.isArray(regData.groupMembers) ? regData.groupMembers : [];
+
+        if (prevStatus === status) return;
+
+        const allAffectedPartIds = Array.from(new Set([targetPartId, ...targetGroupMembers])).filter(Boolean) as string[];
+        const wasApproved = prevStatus === 'APPROVED';
+        const isApproved = status === 'APPROVED';
+
+        let compSnap = null;
+        if (targetCompId && (wasApproved !== isApproved)) {
+          compSnap = await transaction.get(doc(firestore, 'competitions', targetCompId));
+        }
+
+        const partSnaps = await Promise.all(
+          allAffectedPartIds.map(pId => transaction.get(doc(firestore, 'participants', pId)))
+        );
+
+        // 1. Update status
+        transaction.update(regRef, { status });
+
+        // 2. Manage entriesCount
+        if (wasApproved && !isApproved && compSnap && compSnap.exists()) {
+          const currentEntries = Number(compSnap.data().entriesCount ?? 0);
+          transaction.update(doc(firestore, 'competitions', targetCompId!), { entriesCount: Math.max(0, currentEntries - 1) });
+        } else if (!wasApproved && isApproved && compSnap && compSnap.exists()) {
+          const currentEntries = Number(compSnap.data().entriesCount ?? 0);
+          transaction.update(doc(firestore, 'competitions', targetCompId!), { entriesCount: currentEntries + 1 });
+        }
+
+        // 3. Manage registeredEventIds transitions
+        if (status === 'REJECTED' || status === 'CANCELLED') {
+          partSnaps.forEach((pSnap, idx) => {
+            if (pSnap.exists() && targetCompId) {
+              const pId = allAffectedPartIds[idx];
+              const hasOtherActive = otherActiveCompRegs.some(r =>
+                r.participantId === pId ||
+                r.groupLeaderId === pId ||
+                (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId))
+              );
+              if (!hasOtherActive) {
+                const existingEvents: string[] = Array.isArray(pSnap.data().registeredEventIds)
+                  ? pSnap.data().registeredEventIds
+                  : [];
+                transaction.update(doc(firestore, 'participants', pId), {
+                  registeredEventIds: existingEvents.filter(eId => eId !== targetCompId)
+                });
+              }
+            }
+          });
+        } else if (status === 'APPROVED' || status === 'PENDING') {
+          partSnaps.forEach((pSnap, idx) => {
+            if (pSnap.exists() && targetCompId) {
+              const pId = allAffectedPartIds[idx];
+              const existingEvents: string[] = Array.isArray(pSnap.data().registeredEventIds)
+                ? pSnap.data().registeredEventIds
+                : [];
+              transaction.update(doc(firestore, 'participants', pId), {
+                registeredEventIds: Array.from(new Set([...existingEvents, targetCompId]))
+              });
+            }
+          });
+        }
+      });
     }
-    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+
+    // Synchronize local React state
+    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: status as 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED' } : r));
+    const wasApproved = (prevStatus || registrations.find(r => r.id === id)?.status) === 'APPROVED';
+    const isApproved = status === 'APPROVED';
+
+    if (wasApproved && !isApproved && targetCompId) {
+      setCompetitions(prev => prev.map(c => c.id === targetCompId ? { ...c, entriesCount: Math.max(0, (c.entriesCount ?? 0) - 1) } : c));
+    } else if (!wasApproved && isApproved && targetCompId) {
+      setCompetitions(prev => prev.map(c => c.id === targetCompId ? { ...c, entriesCount: (c.entriesCount ?? 0) + 1 } : c));
+    }
+
+    if (targetCompId) {
+      const allAffectedPartIds = Array.from(new Set([targetPartId, ...targetGroupMembers])).filter(Boolean) as string[];
+      const otherActiveLocal = registrations.filter(r =>
+        r.id !== id &&
+        r.competitionId === targetCompId &&
+        r.status !== 'REJECTED' &&
+        r.status !== 'CANCELLED'
+      );
+
+      if (status === 'REJECTED' || status === 'CANCELLED') {
+        setParticipants(prev => prev.map(p => {
+          if (allAffectedPartIds.includes(p.id)) {
+            const hasOtherActive = otherActiveLocal.some(r =>
+              r.participantId === p.id ||
+              r.groupLeaderId === p.id ||
+              (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id))
+            );
+            if (!hasOtherActive) {
+              const existingEvents = p.registeredEventIds || [];
+              return { ...p, registeredEventIds: existingEvents.filter(eId => eId !== targetCompId) };
+            }
+          }
+          return p;
+        }));
+      } else if (status === 'APPROVED' || status === 'PENDING') {
+        setParticipants(prev => prev.map(p => {
+          if (allAffectedPartIds.includes(p.id)) {
+            const existingEvents = p.registeredEventIds || [];
+            return { ...p, registeredEventIds: Array.from(new Set([...existingEvents, targetCompId!])) };
+          }
+          return p;
+        }));
+      }
+    }
   };
 
   const deleteRegistration = async (id: string) => {
     const regToDelete = registrations.find(r => r.id === id);
+    let targetCompId = regToDelete?.competitionId;
+    let targetPartId = regToDelete?.participantId || regToDelete?.groupLeaderId;
+    let targetGroupMembers: string[] = Array.isArray(regToDelete?.groupMembers) ? regToDelete.groupMembers : [];
+    let wasApproved = regToDelete ? (regToDelete.status === 'APPROVED' || !regToDelete.status) : false;
+
     if (!isIsolatedDemoOrTest && db) {
-      await deleteDoc(doc(db, 'registrations', id));
-      if (regToDelete?.competitionId) {
-        updateDoc(doc(db, 'competitions', regToDelete.competitionId), {
-          entriesCount: Math.max(0, (competitions.find(c => c.id === regToDelete.competitionId)?.entriesCount || 1) - 1)
-        }).catch(() => {});
+      const firestore = db;
+      let otherActiveCompRegs: DocumentData[] = [];
+      if (targetCompId) {
+        try {
+          const qSnap = await getDocs(query(
+            collection(firestore, 'registrations'),
+            where('competitionId', '==', targetCompId)
+          ));
+          otherActiveCompRegs = qSnap.docs
+            .filter(d => d.id !== id)
+            .map(d => d.data())
+            .filter(data => data.status !== 'REJECTED' && data.status !== 'CANCELLED');
+        } catch {
+          otherActiveCompRegs = registrations.filter(r =>
+            r.id !== id &&
+            r.competitionId === targetCompId &&
+            r.status !== 'REJECTED' &&
+            r.status !== 'CANCELLED'
+          );
+        }
       }
+
+      await runTransaction(firestore, async (transaction) => {
+        const regRef = doc(firestore, 'registrations', id);
+        const regSnap = await transaction.get(regRef);
+        if (!regSnap.exists()) {
+          // Document already deleted or missing (safe idempotency against duplicate deletes)
+          return;
+        }
+
+        const regData = regSnap.data();
+        targetCompId = regData.competitionId || targetCompId;
+        targetPartId = regData.participantId || regData.groupLeaderId || targetPartId;
+        targetGroupMembers = Array.isArray(regData.groupMembers) ? regData.groupMembers : targetGroupMembers;
+        wasApproved = regData.status === 'APPROVED' || !regData.status;
+
+        const allAffectedPartIds = Array.from(new Set([targetPartId, ...targetGroupMembers])).filter(Boolean) as string[];
+
+        let compSnap = null;
+        if (targetCompId && wasApproved) {
+          compSnap = await transaction.get(doc(firestore, 'competitions', targetCompId));
+        }
+
+        const partSnaps = await Promise.all(
+          allAffectedPartIds.map(pId => transaction.get(doc(firestore, 'participants', pId)))
+        );
+
+        // 1. Delete registration
+        transaction.delete(regRef);
+
+        // 2. Decrement competition entriesCount only if registration was approved (prevent negative counts)
+        if (wasApproved && compSnap && compSnap.exists()) {
+          const currentEntries = Number(compSnap.data().entriesCount ?? 0);
+          const newEntries = Math.max(0, currentEntries - 1);
+          transaction.update(doc(firestore, 'competitions', targetCompId!), { entriesCount: newEntries });
+        }
+
+        // 3. Remove competitionId from participant registeredEventIds ONLY IF no other active registration exists
+        partSnaps.forEach((pSnap, idx) => {
+          if (pSnap.exists() && targetCompId) {
+            const pId = allAffectedPartIds[idx];
+            const hasOtherActive = otherActiveCompRegs.some(r =>
+              r.participantId === pId ||
+              r.groupLeaderId === pId ||
+              (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId))
+            );
+            if (!hasOtherActive) {
+              const existingEvents: string[] = Array.isArray(pSnap.data().registeredEventIds)
+                ? pSnap.data().registeredEventIds
+                : [];
+              const updatedEvents = existingEvents.filter(eId => eId !== targetCompId);
+              transaction.update(doc(firestore, 'participants', pId), { registeredEventIds: updatedEvents });
+            }
+          }
+        });
+      });
     }
+
+    // Synchronize local React state
     setRegistrations(prev => prev.filter(r => r.id !== id));
-    if (regToDelete?.competitionId) {
-      setCompetitions(prev => prev.map(c => c.id === regToDelete.competitionId ? { ...c, entriesCount: Math.max(0, c.entriesCount - 1) } : c));
+    if (wasApproved && targetCompId) {
+      setCompetitions(prev => prev.map(c => c.id === targetCompId ? { ...c, entriesCount: Math.max(0, (c.entriesCount ?? 0) - 1) } : c));
+    }
+    if (targetCompId) {
+      const allAffectedPartIds = Array.from(new Set([targetPartId, ...targetGroupMembers])).filter(Boolean) as string[];
+      const otherActiveLocal = registrations.filter(r =>
+        r.id !== id &&
+        r.competitionId === targetCompId &&
+        r.status !== 'REJECTED' &&
+        r.status !== 'CANCELLED'
+      );
+
+      setParticipants(prev => prev.map(p => {
+        if (allAffectedPartIds.includes(p.id)) {
+          const hasOtherActive = otherActiveLocal.some(r =>
+            r.participantId === p.id ||
+            r.groupLeaderId === p.id ||
+            (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id))
+          );
+          if (!hasOtherActive) {
+            const existingEvents = p.registeredEventIds || [];
+            return { ...p, registeredEventIds: existingEvents.filter(eId => eId !== targetCompId) };
+          }
+        }
+        return p;
+      }));
     }
   };
 
@@ -3478,6 +3117,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         addParticipant,
         updateParticipant,
         deleteParticipant,
+        checkParticipantCategoryConflicts,
         registrations,
         registrationsSyncState,
         addRegistration,
@@ -3524,3 +3164,9 @@ export function useFest() {
   }
   return context;
 }
+
+export function useSafeFest() {
+  return useContext(FestContext);
+}
+
+export { defaultTheme };

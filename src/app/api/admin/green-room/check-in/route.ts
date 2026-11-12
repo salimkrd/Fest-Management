@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GreenRoomService } from '@/services/greenRoomService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
-function extractToken(req: NextRequest, body?: any): string {
+function extractToken(req: NextRequest, body?: unknown): string {
   const authorization = req.headers.get('authorization') || '';
   if (authorization.startsWith('Bearer ')) {
     return authorization.slice(7).trim();
   }
-  if (body?.idToken && typeof body.idToken === 'string') {
-    return body.idToken.trim();
+  if (body && typeof body === 'object' && 'idToken' in body) {
+    const idToken = (body as { idToken?: unknown }).idToken;
+    if (typeof idToken === 'string') {
+      return idToken.trim();
+    }
   }
   return '';
 }
@@ -43,12 +46,13 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(result, { status: 200 });
-  } catch (error: any) {
-    if (error?.message?.includes('Eligibility Error')) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('Eligibility Error')) {
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
-    if (error?.message?.includes('Conflict Error')) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
+    if (msg.includes('Conflict Error')) {
+      return NextResponse.json({ error: msg }, { status: 409 });
     }
     return handleApiError(error);
   }

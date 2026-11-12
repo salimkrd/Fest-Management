@@ -32,7 +32,7 @@ async function performBackup() {
   console.log(`Preserving secure backup to: ${backupDir}\n`);
 
   // 1. Auth Users
-  const authUsers: any[] = [];
+  const authUsers: unknown[] = [];
   let pageToken: string | undefined = undefined;
   do {
     const listResult = await auth.listUsers(1000, pageToken);
@@ -45,12 +45,13 @@ async function performBackup() {
 
   // 2. Collections
   const collectionsToBackup = ['users', 'competitions', 'judgeAssignments', 'markEntries', 'registrations', 'settings'];
-  const manifest: Record<string, any> = {
+  const collectionsMap: Record<string, unknown> = {};
+  const manifest = {
     targetProject: TARGET_PROJECT,
     backupTimestamp: new Date().toISOString(),
     backupDirectory: backupDir,
     authUsersCount: authUsers.length,
-    collections: {}
+    collections: collectionsMap
   };
 
   for (const colName of collectionsToBackup) {
@@ -61,7 +62,7 @@ async function performBackup() {
       ...d.data()
     }));
     fs.writeFileSync(path.join(backupDir, `firestore_${colName}.json`), JSON.stringify(docs, null, 2), 'utf8');
-    manifest.collections[colName] = {
+    collectionsMap[colName] = {
       count: docs.length,
       docIds: docs.map(d => d._id)
     };

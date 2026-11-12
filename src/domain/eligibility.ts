@@ -1,16 +1,48 @@
-import type { Category, Participant } from '@/types/fest';
+import { Category, CategoryParticipantEligibility, Participant } from '@/types/fest';
 
 const normalize = (value: string | undefined): string => (value || '').trim().toLocaleLowerCase();
 
 /**
- * Determines if a participant belongs to the selected registration category.
- *
- * A General/open tier is intentionally available to all participants. For every
- * other tier, a non-empty participant category name is treated as an explicit
- * category assignment and must not be overridden by a legacy ID alias. This
- * prevents records such as { categoryId: "cat-3", categoryName: "Test CAT 26" }
- * from being incorrectly accepted as Senior just because "cat-3" is a legacy
- * Senior identifier.
+ * Resolves the category eligibility policy, falling back to legacy General/Open heuristics
+ * for existing category documents in Firestore that pre-date the explicit participantEligibility property.
+ */
+export function resolveCategoryEligibilityPolicy(category?: Category): CategoryParticipantEligibility {
+  if (!category) return 'CATEGORY_ONLY';
+
+  if (category.participantEligibility === 'OPEN_TO_ALL') {
+    return 'OPEN_TO_ALL';
+  }
+  if (category.participantEligibility === 'CATEGORY_ONLY') {
+    return 'CATEGORY_ONLY';
+  }
+
+  // Backward-compatibility fallback for existing/legacy categories without explicit participantEligibility
+  const code = (category.code || '').trim().toUpperCase();
+  const id = normalize(category.id);
+  const name = normalize(category.name);
+
+  const isLegacyGeneral =
+    code === 'CAT-GEN' ||
+    code === 'GEN' ||
+    id === 'cat-4' ||
+    id === 'cat-gen' ||
+    name === 'general' ||
+    name === 'general category' ||
+    name === 'campus wide' ||
+    name === 'campus-wide';
+
+  return isLegacyGeneral ? 'OPEN_TO_ALL' : 'CATEGORY_ONLY';
+}
+
+/**
+ * Determines whether a participant is eligible to register for a given category/competition.
+ * 
+ * Rules:
+ * 1. If targetCategory is missing, returns false.
+ * 2. OPEN_TO_ALL: Open to ANY enrolled participant from any academic category (Sub Junior, Junior, Senior, etc.).
+ * 3. CATEGORY_ONLY: Restricted to participants whose assigned category matches the target category
+ *    either by direct categoryId, normalized categoryName ("Senior" === "Senior"), or verified aliases.
+ *    Explicit participant category name is authoritative and cannot be overridden by a stale legacy ID alias.
  */
 export function isParticipantEligibleForCategory(
   participant: Participant,
@@ -19,23 +51,19 @@ export function isParticipantEligibleForCategory(
 ): boolean {
   if (!targetCategory) return false;
 
+  // 1. If category policy is OPEN_TO_ALL, all participants are eligible regardless of category
+  const policy = resolveCategoryEligibilityPolicy(targetCategory);
+  if (policy === 'OPEN_TO_ALL') {
+    return true;
+  }
+
   const targetName = normalize(targetCategory.name);
   const targetCode = normalize(targetCategory.code).toUpperCase();
 
-  // General/open eligibility must be derived from category identity. Do not
-  // treat descriptive fields (eligibility or classRange) as evidence that every
-  // participant belongs to the category; broad metadata on a specific tier,
-  // such as Senior, must not bypass category isolation.
-  const isGeneralTier =
-    targetCode === 'CAT-GEN' ||
-    targetCode === 'GEN' ||
-    targetName === 'general' ||
-    targetName.includes('general') ||
-    normalize(targetCategory.id) === 'cat-4' ||
-    normalize(targetCategory.id) === 'cat-gen' ||
-    normalize(targetCategory.id).includes('gen');
-
-  if (isGeneralTier) return true;
+  // 2. Direct categoryId exact match
+  if (participant.categoryId && participant.categoryId === targetCategory.id) {
+    return true;
+  }
 
   const participantName = normalize(participant.categoryName);
   const participantId = (participant.categoryId || '').trim();
@@ -70,10 +98,11 @@ export function isParticipantEligibleForCategory(
     const sameId = participantCategory.id === targetCategory.id;
     const participantCode = normalize(participantCategory.code).toUpperCase();
     const sameCode = Boolean(participantCode && targetCode && participantCode === targetCode);
-    return sameId || sameCode;
+    if (sameId || sameCode) return true;
+    if (participantCategory.name && normalize(participantCategory.name) === targetName) return true;
   }
 
-  // Older records without a categoryName can still use known legacy identifiers.
+  // Standard tier code and name aliases for older records without a categoryName
   const isTargetSJ =
     targetCode === 'CAT-SJ' || targetName.includes('sub') ||
     normalize(targetCategory.id) === 'cat-1' || normalize(targetCategory.id) === 'cat-sj';

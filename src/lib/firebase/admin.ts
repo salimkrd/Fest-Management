@@ -58,7 +58,7 @@ export function getWorkloadIdentityAudience(): string {
  * Generates the Google Cloud External Account credential configuration JSON
  * adhering to Google Application Default Credentials (ADC) format for Workload Identity Federation.
  */
-export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<string, any> {
+export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<string, unknown> {
   if (process.env.GCP_WORKLOAD_IDENTITY_CONFIG?.trim()) {
     let rawConfig = process.env.GCP_WORKLOAD_IDENTITY_CONFIG.trim();
     if ((rawConfig.startsWith('"') && rawConfig.endsWith('"')) || (rawConfig.startsWith("'") && rawConfig.endsWith("'"))) {
@@ -71,7 +71,6 @@ export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<st
     return parsed;
   }
 
-  const provider = process.env.GCP_WORKLOAD_IDENTITY_PROVIDER!.trim();
   const saEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL!.trim();
   const impersonationUrl = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${saEmail}:generateAccessToken`;
   const tokenUrl = process.env.GCP_WORKLOAD_IDENTITY_STS_URL?.trim() || 'https://sts.googleapis.com/v1/token';
@@ -143,7 +142,7 @@ export class WorkloadIdentityCredential implements Credential {
       );
     }
     // Calculate token expiry in seconds from cachedAccessToken or default to 1 hour
-    const expiryDate = (this.client as any).cachedAccessToken?.expiry_date;
+    const expiryDate = (this.client as unknown as { cachedAccessToken?: { expiry_date?: number } }).cachedAccessToken?.expiry_date;
     const expiresIn = expiryDate
       ? Math.max(60, Math.floor((expiryDate - Date.now()) / 1000))
       : 3600;
@@ -394,7 +393,7 @@ export function getAdminApp(): App | null {
         projectId: (projectId && projectId !== 'inspirath-d6778') ? projectId : 'demo-sahithyolsav-2025'
       });
       return adminApp;
-    } catch (err) {
+    } catch {
       return null;
     }
   }

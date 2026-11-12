@@ -159,7 +159,7 @@ export function formatWinnerPosition(rank: 1 | 2 | 3, format: NonNullable<Poster
     case 'roman': return roman[rank];
     case 'dots': return '.'.repeat(rank);
     case 'padded-place':
-    default: return `${String(rank).padStart(2, '0')}  /  ${uppercaseWords[rank]} PLACE`;
+    default: return `${String(rank).padStart(2, '0')} / ${uppercaseWords[rank]} PLACE`;
   }
 }
 
@@ -179,18 +179,24 @@ export function normalizePosterConfig(config?: PosterConfig): PosterConfig {
     accentColor: config?.accentColor ?? palette.accent, textColor: config?.textColor ?? palette.text,
     winnerPositionFormat: config?.winnerPositionFormat ?? 'padded-place' as const,
     elements: config?.elements ?? fallback.elements?.map(element => ({ ...element, color: element.color === fallback.accentColor ? palette.accent : palette.text })),
-    winnerContainer: config?.winnerContainer ? {
-      ...config.winnerContainer,
-      // Older saved templates may still contain the photo slot; it is no longer
-      // part of the reusable Winner Item and is stripped on load.
-      layers: config.winnerContainer.layers.filter(layer => (layer as { field: string }).field !== 'photo'),
-    } : fallback.winnerContainer,
+    winnerContainer: config && 'winnerContainer' in config
+      ? (config.winnerContainer ? {
+          ...config.winnerContainer,
+          // Older saved templates may still contain the photo slot; it is no longer
+          // part of the reusable Winner Item and is stripped on load.
+          layers: config.winnerContainer.layers.filter(layer => (layer as { field: string }).field !== 'photo'),
+        } : undefined)
+      : fallback.winnerContainer,
   };
   if (!config?.elements && config?.customTitle) normalized.elements = normalized.elements?.map(element => element.id === 'announcement' ? { ...element, text: config.customTitle! } : element);
   // Migrate earlier templates that stored separate rank-1/2/3 layers to one
   // reusable winner-item container. The container then repeats for all winners,
   // including ties, while unrelated text and image layers remain untouched.
-  if (!config?.winnerContainer && config?.elements?.length) {
+  const hasLegacyWinnerLayers = (normalized.elements ?? []).some(element => {
+    const b = legacyWinnerBinding(element);
+    return b && (b.field === 'position' || /^(place|name|team)-[123]$/i.test(element.id));
+  });
+  if (!normalized.winnerContainer && hasLegacyWinnerLayers) {
     const migrated = migrateLegacyWinnerContainer(normalized.elements ?? []);
     normalized.elements = migrated.elements;
     if (migrated.winnerContainer) normalized.winnerContainer = migrated.winnerContainer;
@@ -343,6 +349,7 @@ export function resolvePosterField(element: PosterElement, result: CompetitionRe
 const escapeXml = (value: string) => value.replace(/[<>&"']/g, character => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[character]!);
 function wrapText(text: string, capacity: number): string[] {
   return text.split('\n').flatMap(paragraph => {
+    if (paragraph.length <= capacity) return [paragraph];
     const words = paragraph.split(/\s+/).filter(Boolean); const lines: string[] = []; let line = '';
     for (const word of words) {
       if (line && (line.length + word.length + 1) > capacity) { lines.push(line); line = ''; }
@@ -384,13 +391,15 @@ export function renderPosterSvg(result: CompetitionResult, theme: PublicThemeSet
       size -= 1;
       lines = wrapText(value, Math.max(1, Math.floor(w / (size * .62))));
     }
-    if (!value.trim()) return '';
     const anchor = element.align === 'left' ? 'start' : element.align === 'right' ? 'end' : 'middle';
     const tx = x + (element.align === 'center' ? w / 2 : element.align === 'right' ? w : 0);
     const ty = y + Math.max(size, (h - lines.length * size * 1.2) / 2 + size);
     const font = element.field === 'festivalName'
       ? festivalNameFontFamily(theme.festivalNameFont).replaceAll('"', '').replace('var(--font-montserrat), ', '')
       : posterFontCssFamily(element.fontFamily);
+    if (!value.trim()) {
+      return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${escapeXml(font)}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}"><tspan x="${tx}" y="${ty}"></tspan></text>`;
+    }
     return `<text fill="${isHex(element.color) ? element.color : '#FFFFFF'}" font-family="${escapeXml(font)}" font-size="${size}" font-weight="${element.fontWeight}" text-anchor="${anchor}">${lines.map((line, index) => `<tspan x="${tx}" y="${ty + index * size * 1.2}">${escapeXml(line)}</tspan>`).join('')}</text>`;
   };
 

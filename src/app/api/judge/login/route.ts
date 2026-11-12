@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     // 5. PIN / Secret check (Mandatory verification to prevent exposure of contestant data)
     const cleanSecret = (secret || '').trim();
-    if (assignment.secretHash || (assignment as any).pin) {
+    if (assignment.secretHash || ('pin' in assignment)) {
       if (!cleanSecret) {
         return NextResponse.json(
           { error: 'Juror PIN or Secret is required for authentication.' },
@@ -129,8 +129,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Fetch competition metadata and actual Green Room assignments
-    let competitionData: any = null;
-    let registrations: any[] = [];
+    let competitionData: Record<string, unknown> | null = null;
+    let registrations: Array<{
+      id: string;
+      codeLetter: string;
+      codeIndex: number;
+      status: string;
+    }> = [];
 
     const effectiveCompId = assignment.competitionId || competitionId;
     if (effectiveCompId) {
@@ -173,11 +178,11 @@ export async function POST(req: NextRequest) {
       judgeName: assignment.judgeName || 'Juror',
       judgePhone: assignment.judgePhone || '',
       competitionId: assignment.competitionId || effectiveCompId,
-      competitionCode: assignment.competitionCode || (competitionData ? competitionData.code : 'CMP-X'),
-      competitionName: assignment.competitionName || (competitionData ? competitionData.name : 'Stage Competition'),
-      categoryName: (assignment as any).categoryName || (competitionData ? competitionData.categoryName : 'General'),
-      type: (assignment as any).type || (competitionData ? competitionData.type : 'SOLO'),
-      stageName: assignment.stageName || (competitionData ? competitionData.stageName : 'Main Stage'),
+      competitionCode: assignment.competitionCode || (competitionData ? (competitionData.code as string) : 'CMP-X'),
+      competitionName: assignment.competitionName || (competitionData ? (competitionData.name as string) : 'Stage Competition'),
+      categoryName: (assignment as { categoryName?: string }).categoryName || (competitionData ? (competitionData.categoryName as string) : 'General'),
+      type: (assignment as { type?: string }).type || (competitionData ? (competitionData.type as string) : 'SOLO'),
+      stageName: assignment.stageName || (competitionData ? (competitionData.stageName as string) : 'Main Stage'),
       accessCode: assignment.accessCode,
       issuedAt: assignment.issuedAt || '',
       expiresAt: assignment.expiresAt || '',
@@ -192,10 +197,10 @@ export async function POST(req: NextRequest) {
       registrations
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[JudgeLogin] Error during authentication:', error);
     return NextResponse.json(
-      { error: error?.message || 'Internal Server Error during juror verification.' },
+      { error: error instanceof Error ? error.message : 'Internal Server Error during juror verification.' },
       { status: 500 }
     );
   }

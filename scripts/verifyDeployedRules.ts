@@ -55,8 +55,8 @@ async function verify() {
   try {
     const snap = await getDocs(collection(clientDb, 'categories'));
     console.log(`Public read on 'categories': PASS (Permitted as expected, read ${snap.docs.length} documents)`);
-  } catch (err: any) {
-    console.log(`Public read on 'categories': FAIL (${err.message})`);
+  } catch (err: unknown) {
+    console.log(`Public read on 'categories': FAIL (${err instanceof Error ? err.message : String(err)})`);
   }
 
   // Non-destructive write defense: unauthenticated client write to markEntries MUST be rejected
@@ -67,8 +67,9 @@ async function verify() {
       scores: { 'p1': 50 }
     });
     console.error('CRITICAL VULNERABILITY: Public write to markEntries succeeded!');
-  } catch (err: any) {
-    console.log(`Unauthorized client write to 'markEntries': PASS (Strictly Rejected: ${err.code || err.message})`);
+  } catch (err: unknown) {
+    const errCode = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : (err instanceof Error ? err.message : String(err));
+    console.log(`Unauthorized client write to 'markEntries': PASS (Strictly Rejected: ${errCode})`);
   }
 
   // Non-destructive write defense: unauthenticated client write to results MUST be rejected
@@ -78,8 +79,9 @@ async function verify() {
       status: 'PUBLISHED'
     });
     console.error('CRITICAL VULNERABILITY: Public write to results succeeded!');
-  } catch (err: any) {
-    console.log(`Unauthorized client write to 'results': PASS (Strictly Rejected: ${err.code || err.message})`);
+  } catch (err: unknown) {
+    const errCode = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : (err instanceof Error ? err.message : String(err));
+    console.log(`Unauthorized client write to 'results': PASS (Strictly Rejected: ${errCode})`);
   }
 
   // Non-destructive write defense: unauthenticated client write to pointsLedger MUST be rejected
@@ -89,8 +91,9 @@ async function verify() {
       status: 'COMMITTED'
     });
     console.error('CRITICAL VULNERABILITY: Public write to pointsLedger succeeded!');
-  } catch (err: any) {
-    console.log(`Unauthorized client write to 'pointsLedger': PASS (Strictly Rejected: ${err.code || err.message})`);
+  } catch (err: unknown) {
+    const errCode = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : (err instanceof Error ? err.message : String(err));
+    console.log(`Unauthorized client write to 'pointsLedger': PASS (Strictly Rejected: ${errCode})`);
   }
 
   // Non-destructive write defense: unauthenticated client write to settings/bootstrapLock MUST be rejected
@@ -100,8 +103,9 @@ async function verify() {
       owner: 'attacker'
     });
     console.error('CRITICAL VULNERABILITY: Public write to settings/bootstrapLock succeeded!');
-  } catch (err: any) {
-    console.log(`Unauthorized client write to 'settings/bootstrapLock': PASS (Strictly Rejected: ${err.code || err.message})`);
+  } catch (err: unknown) {
+    const errCode = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : (err instanceof Error ? err.message : String(err));
+    console.log(`Unauthorized client write to 'settings/bootstrapLock': PASS (Strictly Rejected: ${errCode})`);
   }
 
   console.log('\n--- Verification complete ---');

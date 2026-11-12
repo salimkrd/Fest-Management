@@ -8,7 +8,6 @@ import { PATCH as patchParticipantProfileRoute } from '@/app/api/participant/pro
 import { GET as qrRoute } from '@/app/api/participant/qr/route';
 import { createHash } from 'node:crypto';
 import { normalizeBib, PARTICIPANT_COOKIE_NAME } from '@/services/participantPortalAuth';
-import { QrSignerService } from '@/services/qrSignerService';
 import { verifyQrVerificationToken } from '@/domain/greenRoom';
 
 const TEST_SECRET = 'inspirath_production_safe_server_only_participant_portal_session_secret_2026';

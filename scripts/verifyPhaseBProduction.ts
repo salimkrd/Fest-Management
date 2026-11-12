@@ -1,5 +1,5 @@
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getSecurityRules } from 'firebase-admin/security-rules';
 import * as fs from 'fs';
@@ -32,7 +32,7 @@ async function verifyPhaseB() {
 
   // 1. Confirm exactly one Firebase Authentication user exists, with intended email & enabled status
   console.log('--- 1. Firebase Authentication User Verification ---');
-  const userRecords: any[] = [];
+  const userRecords: UserRecord[] = [];
   let pageToken: string | undefined = undefined;
   do {
     const listResult = await auth.listUsers(1000, pageToken);
@@ -149,11 +149,15 @@ async function verifyPhaseB() {
     headers: { Authorization: `Bearer ${token.access_token}` }
   });
   const indexData = await indexRes.json();
-  const indexes = indexData.indexes || [];
-  const allReady = indexes.length === 8 && indexes.every((idx: any) => idx.state === 'READY');
+  interface FirestoreIndexMeta {
+    name: string;
+    state: string;
+  }
+  const indexes: FirestoreIndexMeta[] = indexData.indexes || [];
+  const allReady = indexes.length === 8 && indexes.every((idx: FirestoreIndexMeta) => idx.state === 'READY');
   console.log(`  ✔ Firestore Composite Indexes Count: ${indexes.length} (Expected: 8)`);
   console.log(`  ✔ All 8 Composite Indexes in READY state: ${allReady}`);
-  indexes.forEach((idx: any, i: number) => {
+  indexes.forEach((idx: FirestoreIndexMeta, i: number) => {
     const colId = idx.name.split('/collectionGroups/')[1].split('/indexes/')[0];
     console.log(`     [${i + 1}] ${colId} -> ${idx.state}`);
   });

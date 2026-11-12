@@ -101,7 +101,7 @@ export const TabulationPrintSheet: React.FC<TabulationPrintSheetProps> = ({
 
         {/* Competitions Table */}
         <div className="mt-6 space-y-6">
-          {results.map((res, index) => (
+          {results.map((res) => (
             <div key={res.id} className="border border-[#E1E7EF] rounded-lg overflow-hidden">
               {/* Event Subheader */}
               <div className="flex flex-col gap-1 border-b border-[#E1E7EF] bg-[#F8FAFC] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">

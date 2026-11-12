@@ -81,9 +81,9 @@ export default function TeamExportPage() {
     showNotice('Your team results CSV has been downloaded.');
   };
 
-  const handleXLSX = () => {
+  const handleXLSX = async () => {
     if (disabled || !team) return;
-    TeamExportService.downloadXLSX(
+    await TeamExportService.downloadXLSX(
       filteredRows, team.name, team.code, theme.festivalName,
       (team.code || team.name) + '_Team_Results.xlsx'
     );

@@ -27,7 +27,6 @@ import {
   onSnapshot,
   doc,
   setDoc,
-  getDoc,
   deleteDoc,
   Firestore as ClientFirestore
 } from 'firebase/firestore';
@@ -518,7 +517,7 @@ describe('Admin Category API, Security Rules, & Realtime Synchronization', () =>
       const realtimeCatId = `cat-rt-${Date.now()}`;
       const code = `RT-${Date.now()}`;
 
-      let snapshotReceived: any = null;
+      let snapshotReceived: Record<string, unknown> | null = null;
       let snapshotCount = 0;
 
       // Subscribe to categories collection via client Firestore (simulating another tab/device)
@@ -555,8 +554,9 @@ describe('Admin Category API, Security Rules, & Realtime Synchronization', () =>
         await new Promise(resolve => setTimeout(resolve, 800));
 
         expect(snapshotReceived).toBeDefined();
-        expect(snapshotReceived?.name).toBe('Realtime Category');
-        expect(snapshotReceived?.code).toBe(code);
+        const receivedAfterCreate = snapshotReceived as Record<string, unknown> | null;
+        expect(receivedAfterCreate?.name).toBe('Realtime Category');
+        expect(receivedAfterCreate?.code).toBe(code);
 
         // 2. Admin updates category via Admin API route
         const reqUpdate = new NextRequest(`http://localhost/api/admin/categories/${realtimeCatId}`, {
@@ -577,8 +577,9 @@ describe('Admin Category API, Security Rules, & Realtime Synchronization', () =>
         // Wait for real-time propagation of update
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        expect(snapshotReceived?.name).toBe('Realtime Category Updated');
-        expect(snapshotReceived?.status).toBe('INACTIVE');
+        const receivedAfterUpdate = snapshotReceived as Record<string, unknown> | null;
+        expect(receivedAfterUpdate?.name).toBe('Realtime Category Updated');
+        expect(receivedAfterUpdate?.status).toBe('INACTIVE');
         expect(snapshotCount).toBeGreaterThanOrEqual(2);
       } finally {
         unsubscribe();

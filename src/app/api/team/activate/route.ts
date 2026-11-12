@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(result, { status: 200 });
-  } catch (err: any) {
-    const message = err.message || 'Internal Server Error';
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
     const isVal = message.toLowerCase().includes('validation error');
     const isSecurity = message.toLowerCase().includes('security violation');
     const status = isSecurity ? 403 : isVal ? 400 : 500;

@@ -10,13 +10,11 @@
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   PointsLedgerEntry,
-  commitResultToLedger,
-  reverseResultInLedger,
   recalculateTeamChampionship,
   CompetitionRankInput
 } from '@/domain/ledger';
 import { CompetitionType, getChampionshipPoints } from '@/domain/scoring';
-import { FirestoreTeam, FirestoreLeaderboardEntry } from '@/types/firestore';
+import { FirestoreLeaderboardEntry } from '@/types/firestore';
 import { AuthService } from './authService';
 
 export class PointsLedgerService {
@@ -134,14 +132,15 @@ export class PointsLedgerService {
       .where('resultId', '==', params.resultId)
       .get();
 
-    existingSnap.docs.forEach((doc: any) => {
-      batch.delete(doc.ref);
+    existingSnap.docs.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
     });
 
     // 2. Commit new ledger entries
     params.ranks.forEach(rank => {
       const entryId = `${params.resultId}_${rank.registrationId}`;
       const docRef = db.collection('pointsLedger').doc(entryId);
+      const officialPoints = (rank as { officialPoints?: number }).officialPoints;
 
       const entryData: PointsLedgerEntry = {
         id: entryId,
@@ -159,8 +158,8 @@ export class PointsLedgerService {
         score: rank.score,
         rank: rank.rank,
         grade: rank.grade,
-        points: (rank as any).officialPoints !== undefined
-          ? (rank as any).officialPoints
+        points: officialPoints !== undefined
+          ? officialPoints
           : getChampionshipPoints(params.competition.type, rank.grade, rank.rank),
         status: 'COMMITTED',
         publishedAt
@@ -210,8 +209,8 @@ export class PointsLedgerService {
 
     const batch = db.batch();
     const reversedAt = new Date().toISOString();
-    snapshot.docs.forEach((doc: any) => {
-      batch.update(doc.ref, {
+    snapshot.docs.forEach((docSnap) => {
+      batch.update(docSnap.ref, {
         status: 'REVERSED',
         reversalReason: reason,
         reversedBy: adminUser.uid,
@@ -248,19 +247,19 @@ export class PointsLedgerService {
       db.collection('pointsLedger').where('status', '==', 'COMMITTED').get()
     ]);
 
-    const baseTeams = teamsSnap.docs.map((doc: any) => ({
-      id: doc.id,
-      code: doc.data().code,
-      name: doc.data().name
+    const baseTeams = teamsSnap.docs.map((d) => ({
+      id: d.id,
+      code: d.data().code,
+      name: d.data().name
     }));
 
-    const activeLedger = ledgerSnap.docs.map((doc: any) => doc.data() as PointsLedgerEntry);
+    const activeLedger = ledgerSnap.docs.map((d) => d.data() as PointsLedgerEntry);
     const aggregated = recalculateTeamChampionship(baseTeams, activeLedger);
 
     for (let index = 0; index < aggregated.length; index += 250) {
       const batch = db.batch();
       aggregated.slice(index, index + 250).forEach(agg => {
-        const teamDoc = teamsSnap.docs.find((doc: any) => doc.id === agg.teamId);
+        const teamDoc = teamsSnap.docs.find((d) => d.id === agg.teamId);
         const color = teamDoc?.data()?.color || '#2563EB';
         const entry: FirestoreLeaderboardEntry = {
           teamId: agg.teamId,

@@ -152,8 +152,8 @@ export default function RegistrationManagementPage() {
         status: 'APPROVED'
       });
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save registration.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save registration.');
     } finally {
       setSaving(false);
     }
@@ -163,8 +163,8 @@ export default function RegistrationManagementPage() {
     if (confirm(`Are you sure you want to revoke registration for "${name}"?`)) {
       try {
         await deleteRegistration(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete registration.');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to delete registration.');
       }
     }
   };
@@ -340,7 +340,7 @@ export default function RegistrationManagementPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={() => { const form = document.querySelector<HTMLFormElement>('[data-registration-form]'); form?.requestSubmit(); }} disabled={saving}>
+              <Button variant="primary" size="sm" onClick={() => { const form = document.querySelector<HTMLFormElement>('[data-registration-form]'); form?.requestSubmit(); }} isLoading={saving} disabled={saving}>
                 Confirm Registration
               </Button>
             </div>

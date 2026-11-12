@@ -37,8 +37,8 @@ async function seedJryCode() {
     const emuDb = emuApp.firestore();
     await emuDb.collection('judgeAssignments').doc(assignment.id).set(assignment, { merge: true });
     console.log(`[Emulator] Seeded ${code} to judgeAssignments/${assignment.id}`);
-  } catch (e: any) {
-    console.log('[Emulator] Seed warning:', e.message);
+  } catch (e: unknown) {
+    console.log('[Emulator] Seed warning:', e instanceof Error ? e.message : String(e));
   }
 
   // 2. Seed production
@@ -53,8 +53,8 @@ async function seedJryCode() {
       await prodDb.collection('judgeAssignments').doc(assignment.id).set(assignment, { merge: true });
       console.log(`[Production] Seeded ${code} to judgeAssignments/${assignment.id}`);
     }
-  } catch (e: any) {
-    console.log('[Production] Seed warning:', e.message);
+  } catch (e: unknown) {
+    console.log('[Production] Seed warning:', e instanceof Error ? e.message : String(e));
   }
 }
 

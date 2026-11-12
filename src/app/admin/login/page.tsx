@@ -88,7 +88,7 @@ export default function AdminLoginPage() {
             setLoading(false);
             return;
           }
-        } catch (dbErr: any) {
+        } catch (dbErr: unknown) {
           console.warn('[Admin Login] Authoritative Firestore profile check warning:', dbErr);
           // If security rules or network blocked getDoc, fail closed
           await signOut(auth);
@@ -104,23 +104,26 @@ export default function AdminLoginPage() {
         router.push('/admin');
       }
       return;
-    } catch (authErr: any) {
+    } catch (authErr: unknown) {
       console.warn('[Admin Login] Authentication error:', authErr);
+      const code = authErr && typeof authErr === 'object' && 'code' in authErr
+        ? String((authErr as { code?: unknown }).code)
+        : '';
       if (
-        authErr.code === 'auth/invalid-credential' ||
-        authErr.code === 'auth/wrong-password' ||
-        authErr.code === 'auth/user-not-found' ||
-        authErr.code === 'auth/invalid-login-credentials'
+        code === 'auth/invalid-credential' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found' ||
+        code === 'auth/invalid-login-credentials'
       ) {
         setError('Invalid email or password. Please verify your administrator credentials.');
-      } else if (authErr.code === 'auth/user-disabled') {
+      } else if (code === 'auth/user-disabled') {
         setError('Access denied: This administrator account has been disabled.');
-      } else if (authErr.code === 'auth/too-many-requests') {
+      } else if (code === 'auth/too-many-requests') {
         setError('Access temporarily disabled due to multiple failed login attempts. Please try again later.');
-      } else if (authErr.code === 'auth/network-request-failed') {
+      } else if (code === 'auth/network-request-failed') {
         setError('Network error: Unable to reach the authentication service. Please check your connection.');
       } else {
-        setError(authErr.message || 'Authentication failed. Please verify your credentials.');
+        setError((authErr instanceof Error ? authErr.message : '') || 'Authentication failed. Please verify your credentials.');
       }
       setLoading(false);
       return;

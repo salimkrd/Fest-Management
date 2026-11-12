@@ -301,7 +301,7 @@ describe('Orphan Cleanup Accuracy and Safety Guardrails', () => {
 
 describe('Category Realtime State, Permanent Deletion and Cross-Device Sync', () => {
   it('7. Empty snapshot clears categories without reverting to default or General mock tier', () => {
-    const snapshotDocs: any[] = [];
+    const snapshotDocs: { data: () => Category }[] = [];
     let stateCategories: Category[] = [
       {
         id: 'cat-4',
@@ -363,8 +363,8 @@ describe('Category Realtime State, Permanent Deletion and Cross-Device Sync', ()
     let caughtError: string | null = null;
     try {
       await deleteCategory('cat-4');
-    } catch (err: any) {
-      caughtError = err.message;
+    } catch (err: unknown) {
+      caughtError = err instanceof Error ? err.message : String(err);
     }
 
     expect(caughtError).toBe('Missing or insufficient permissions');

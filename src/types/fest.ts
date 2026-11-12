@@ -1,5 +1,7 @@
 export type CategoryTier = 'SUB_JUNIOR' | 'JUNIOR' | 'SENIOR' | 'GENERAL';
 
+export type CategoryParticipantEligibility = 'CATEGORY_ONLY' | 'OPEN_TO_ALL';
+
 export interface Category {
   id: string;
   name: string;
@@ -10,6 +12,7 @@ export interface Category {
   enrolledCount: number;
   competitionsCount: number;
   status: 'ACTIVE' | 'INACTIVE';
+  participantEligibility?: CategoryParticipantEligibility;
 }
 
 export interface Team {
@@ -118,7 +121,7 @@ export interface Registration {
   competitionName: string;
   type: CompetitionType;
   chestNumber: string;
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
   groupMembers?: string[]; // Legacy full-roster groups remain readable
   groupLeaderId?: string; // Member representing a group, no individual credit
   groupSize?: number; // Declared member count at registration time

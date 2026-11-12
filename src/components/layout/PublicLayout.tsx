@@ -78,11 +78,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
     <div 
       className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors"
       style={{
-        ['--fest-primary' as any]: theme.primaryColor,
-        ['--fest-secondary' as any]: theme.secondaryColor || '#111111',
-        ['--fest-accent' as any]: theme.accentColor,
+        '--fest-primary': theme.primaryColor,
+        '--fest-secondary': theme.secondaryColor || '#111111',
+        '--fest-accent': theme.accentColor,
         fontFamily: theme.bodyFont ? `${theme.bodyFont}, Montserrat, sans-serif` : 'Montserrat, sans-serif'
-      }}
+      } as React.CSSProperties}
     >
 
       {/* Top Festival Announcement Bar */}

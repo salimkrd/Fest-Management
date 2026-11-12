@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GreenRoomService } from '@/services/greenRoomService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
-function extractToken(req: NextRequest, body?: any): string {
+function extractToken(req: NextRequest, body?: unknown): string {
   const authorization = req.headers.get('authorization') || '';
   if (authorization.startsWith('Bearer ')) {
     return authorization.slice(7).trim();
   }
-  if (body?.idToken && typeof body.idToken === 'string') {
-    return body.idToken.trim();
+  if (body && typeof body === 'object' && 'idToken' in body) {
+    const idToken = (body as { idToken?: unknown }).idToken;
+    if (typeof idToken === 'string') {
+      return idToken.trim();
+    }
   }
   return '';
 }
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, assignment: updated }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error);
   }
 }

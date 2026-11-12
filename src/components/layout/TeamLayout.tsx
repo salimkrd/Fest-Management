@@ -36,11 +36,9 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
       router.push('/team/login');
       return;
     }
-    if (currentTeamUser.portalAccess === false || (currentTeamUser as any).status === 'DISABLED') {
+    if (currentTeamUser.portalAccess === false || (currentTeamUser as { status?: string }).status === 'DISABLED') {
       router.push('/team/login?error=disabled');
-      return;
     }
-    setChecking(false);
   }, [currentTeamUser, router]);
 
   React.useEffect(() => {
@@ -145,7 +143,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                 </div>
               </div>
 
-              <span className="hidden max-w-40 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 sm:inline-flex">
+              <span className="hidden min-[375px]:inline-flex max-w-40 truncate rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 sm:px-3 sm:py-2">
                 {team.name} ({team.code})
               </span>
 
@@ -163,7 +161,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   router.push('/team/login');
                 }}
                 aria-label="Sign out of Team Workspace"
-                title="Sign out"
+                title="Sign out of Team Workspace"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <LogOut className="h-4 w-4" />

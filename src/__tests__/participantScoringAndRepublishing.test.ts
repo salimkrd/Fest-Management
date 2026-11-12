@@ -229,7 +229,7 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     });
     const data = await (await meRoute(meReq)).json();
-    const soloEvent = data.events.find((e: any) => e.registrationId === testSoloRegId);
+    const soloEvent = data.events.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
 
     expect(soloEvent).toBeDefined();
     expect(soloEvent.type).toBe('SOLO');
@@ -246,7 +246,7 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     });
     const data = await (await meRoute(meReq)).json();
-    const groupEvent = data.events.find((e: any) => e.registrationId === testGroupRegId);
+    const groupEvent = data.events.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testGroupRegId);
 
     expect(groupEvent).toBeDefined();
     expect(groupEvent.type).toBe('GROUP');
@@ -269,7 +269,7 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     });
     const data = await (await meRoute(meReq)).json();
-    const soloEvent = data.events.find((e: any) => e.registrationId === testSoloRegId);
+    const soloEvent = data.events.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
 
     expect(soloEvent.published).toBe(false);
     expect(soloEvent.score).toBeNull();
@@ -289,7 +289,7 @@ describe('Participant Portal Staging Scoring, Republishing & Digital ID Validati
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     });
     const data = await (await meRoute(meReq)).json();
-    const soloEvent = data.events.find((e: any) => e.registrationId === testSoloRegId);
+    const soloEvent = data.events.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
 
     expect(soloEvent.published).toBe(true);
     expect(soloEvent.score).toBe(95);

@@ -48,11 +48,12 @@ export async function POST(req: NextRequest) {
       return error('This scorecard has not been finalized as an official submission.', 409);
     }
 
-    const storedHash = String((assignment as any).verificationHash || markEntry.verificationHash || '');
+    const assignmentRecord = assignment as unknown as Record<string, unknown>;
+    const storedHash = String(assignmentRecord.verificationHash || markEntry.verificationHash || '');
     if (!storedHash || storedHash !== verificationHash || String(markEntry.verificationHash || '') !== verificationHash) {
       return error('The digital verification hash does not match the archived scorecard.', 403);
     }
-    const secretHash = assignment.secretHash || (assignment as any).hashedSecret || '';
+    const secretHash = assignment.secretHash || String(assignmentRecord.hashedSecret || '');
     if (!secretHash || !assignment.salt || !(await verifyHash(secret, secretHash, assignment.salt))) {
       return error('Judge session verification failed. Please use the original secure session.', 401);
     }
@@ -63,8 +64,9 @@ export async function POST(req: NextRequest) {
     let anonymousRoster: Array<{ codeLetter: string; codeIndex: number }> = [];
     if (Array.isArray(markEntry.anonymousRoster)) {
       anonymousRoster = markEntry.anonymousRoster
-        .filter((item: any) => item && /^[A-Z]{1,2}$/.test(String(item.codeLetter || '').toUpperCase()))
-        .map((item: any) => ({
+        .filter((item: unknown): item is { codeLetter?: unknown; codeIndex?: unknown } => Boolean(item && typeof item === 'object'))
+        .filter(item => /^[A-Z]{1,2}$/.test(String(item.codeLetter || '').toUpperCase()))
+        .map(item => ({
           codeLetter: String(item.codeLetter).toUpperCase(),
           codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : 0
         }));
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       verificationHash: storedHash,
-      submittedAt: String(markEntry.submittedAt || (assignment as any).submittedAt || ''),
+      submittedAt: String(markEntry.submittedAt || assignmentRecord.submittedAt || ''),
       marksRecorded: scoreRegistrationIds.length,
       competition: {
         id: competitionDoc.id,

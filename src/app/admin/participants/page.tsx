@@ -56,15 +56,13 @@ export default function ParticipantsPage() {
     if (confirm(`Are you sure you want to remove participant "${name}"?`)) {
       try {
         await deleteParticipant(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete participant.');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to delete participant.');
       }
     }
   };
 
   const getRegisteredEventCount = (participantId: string) => new Set(registrations.filter(reg => reg.status !== 'REJECTED' && (reg.participantId === participantId || reg.groupLeaderId === participantId)).map(reg => reg.competitionId)).size;
-
-  const activeFilterCount = Number(teamFilter !== 'ALL') + Number(categoryFilter !== 'ALL');
 
   return (
     <AdminLayout>

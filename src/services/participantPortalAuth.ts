@@ -129,9 +129,9 @@ async function reserveLoginAttempt(bib: string, request: NextRequest): Promise<b
 
   try {
     return await db.runTransaction(async txn => {
-      const snapshots = await Promise.all(refs.map(item => txn.get(item.ref as any)));
+      const snapshots = await Promise.all(refs.map(item => txn.get(item.ref)));
       const now = Date.now();
-      const previous = snapshots.map(snap => (snap as any).data?.() || (snap as any).data);
+      const previous = snapshots.map(snap => snap.data() as { windowStart?: number; count?: number } | undefined);
 
       const isLimited = previous.some((data, i) =>
         data &&
@@ -148,7 +148,7 @@ async function reserveLoginAttempt(bib: string, request: NextRequest): Promise<b
       refs.forEach((item, i) => {
         const data = previous[i];
         const sameWindow = data && typeof data.windowStart === 'number' && data.windowStart + WINDOW_MS > now;
-        txn.set(item.ref as any, {
+        txn.set(item.ref, {
           windowStart: sameWindow ? data.windowStart : now,
           count: sameWindow ? Number(data.count || 0) + 1 : 1,
           updatedAt: now
@@ -181,20 +181,20 @@ async function onLoginSuccess(bib: string, request: NextRequest): Promise<void> 
 
   try {
     await db.runTransaction(async txn => {
-      const [bibSnap, ipSnap] = await Promise.all([txn.get(bibRef as any), txn.get(ipRef as any)]);
+      const [bibSnap, ipSnap] = await Promise.all([txn.get(bibRef), txn.get(ipRef)]);
       const now = Date.now();
 
       // Clear Bib failed attempt counter
-      if ((bibSnap as any).exists) {
-        txn.set(bibRef as any, { count: 0, updatedAt: now }, { merge: true });
+      if (bibSnap.exists) {
+        txn.set(bibRef, { count: 0, updatedAt: now }, { merge: true });
       }
 
       // Decrement IP count to release the reservation
-      const ipData = (ipSnap as any).data?.() || (ipSnap as any).data;
-      if ((ipSnap as any).exists && ipData && typeof ipData.count === 'number') {
+      const ipData = ipSnap.data() as { windowStart?: number; count?: number } | undefined;
+      if (ipSnap.exists && ipData && typeof ipData.count === 'number') {
         const sameWindow = typeof ipData.windowStart === 'number' && ipData.windowStart + WINDOW_MS > now;
         if (sameWindow && ipData.count > 0) {
-          txn.set(ipRef as any, {
+          txn.set(ipRef, {
             count: Math.max(0, ipData.count - 1),
             updatedAt: now
           }, { merge: true });
