@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { TabulationPrintSheet } from '@/components/domain/TabulationPrintSheet';
 import {
   FileDown,
@@ -13,8 +12,6 @@ import {
   FileText,
   Search,
   CheckCircle2,
-  Calendar,
-  Layers,
   CheckSquare,
   Square,
   Trophy,
@@ -32,10 +29,10 @@ export default function ExportManagementPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER'>('WINNERS');
-  const [printWinnersOpen, setPrintWinnersOpen] = useState(false);
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   // CRITICAL RULE: Filter ONLY published results as official winners!
   const publishedResults = results.filter(r => r.resultStatus === 'PUBLISHED');
@@ -82,17 +79,28 @@ export default function ExportManagementPage() {
   };
 
   // Export 2: Official Published Winners OpenXML XLSX Format (.xlsx)
-  const handleExportWinnersExcel = () => {
+  const handleExportWinnersExcel = async () => {
+    if (isExportingExcel) return;
+
     if (selectedResults.length === 0) {
       alert('Please select at least one published competition to export.');
       return;
     }
-    const rows = ExportService.getOfficialPublishedWinners(selectedResults);
-    const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.xlsx`;
-    ExportService.downloadWinnersXLSX(rows, filename);
 
-    setExportNotice('Official Published Winners OpenXML Workbook (.xlsx) generated and downloaded successfully.');
-    setTimeout(() => setExportNotice(null), 4000);
+    try {
+      setIsExportingExcel(true);
+      const rows = ExportService.getOfficialPublishedWinners(selectedResults);
+      const filename = `${theme.festivalName.replace(/\s+/g, '_')}_Official_Published_Winners.xlsx`;
+      await ExportService.downloadWinnersXLSX(rows, filename);
+
+      setExportNotice('Official Published Winners OpenXML Workbook (.xlsx) generated and downloaded successfully.');
+      setTimeout(() => setExportNotice(null), 4000);
+    } catch (error) {
+      console.error('Failed to export winners XLSX:', error);
+      alert('An error occurred while generating the Excel export. Please try again.');
+    } finally {
+      setIsExportingExcel(false);
+    }
   };
 
   // Export 3: Official Published Winners Downloadable PDF (.pdf)
@@ -155,6 +163,8 @@ export default function ExportManagementPage() {
             <Button
               variant="outline"
               size="sm"
+              isLoading={isExportingExcel}
+              disabled={isExportingExcel}
               leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
               onClick={handleExportWinnersExcel}
             >

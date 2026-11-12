@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Calendar, Clock, MapPin, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Clock, MapPin } from 'lucide-react';
 
 export default function SchedulePage() {
   const { schedules, competitions, stages, addSchedule, updateSchedule, deleteSchedule } = useFest();
@@ -95,8 +95,8 @@ export default function SchedulePage() {
         await addSchedule(slotData);
       }
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save schedule slot.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save schedule slot.');
     } finally {
       setSaving(false);
     }
@@ -106,8 +106,8 @@ export default function SchedulePage() {
     if (confirm(`Are you sure you want to delete schedule slot for "${name}"?`)) {
       try {
         await deleteSchedule(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete schedule slot.');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to delete schedule slot.');
       }
     }
   };
@@ -279,7 +279,7 @@ export default function SchedulePage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="sm" onClick={handleSave} isLoading={saving} disabled={saving}>
                 {editingSlot ? 'Update Slot' : 'Save Slot'}
               </Button>
             </div>
@@ -332,7 +332,7 @@ export default function SchedulePage() {
             <Select
               label="Status"
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as ScheduleSlot['status'])}
               options={[
                 { value: 'SCHEDULED', label: 'Scheduled (Upcoming)' },
                 { value: 'LIVE', label: 'Live On Stage' },

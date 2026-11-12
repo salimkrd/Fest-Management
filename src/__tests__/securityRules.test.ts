@@ -21,8 +21,6 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  collection,
-  getDocs,
   Firestore
 } from 'firebase/firestore';
 import { getAdminDb, getAdminAuth } from '@/lib/firebase/admin';

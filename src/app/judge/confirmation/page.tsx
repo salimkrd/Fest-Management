@@ -8,7 +8,6 @@ import { useFest } from '@/context/FestContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CheckCircle2, Printer, ShieldCheck } from 'lucide-react';
-import { indexToCodeLetter } from '@/domain/greenRoom';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -22,7 +21,9 @@ function ConfirmationContent() {
       try {
         const raw = sessionStorage.getItem('judge_session');
         if (raw) return JSON.parse(raw);
-      } catch (e) {}
+      } catch {
+        // ignore parse error
+      }
     }
     return null;
   });
@@ -32,10 +33,10 @@ function ConfirmationContent() {
   const contestants = useMemo(() => {
     const rawList = sessionData?.contestants || sessionData?.registrations || [];
     if (Array.isArray(rawList) && rawList.length > 0) {
-      return rawList
-        .filter((item: any) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
-        .map((item: any, idx: number) => ({
-          codeLetter: item.codeLetter || item.id,
+      return (rawList as Array<{ id?: string; codeLetter?: string; codeIndex?: number }>)
+        .filter((item) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
+        .map((item, idx: number) => ({
+          codeLetter: item.codeLetter || item.id || '',
           codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx
         }));
     }

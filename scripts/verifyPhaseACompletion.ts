@@ -1,5 +1,5 @@
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 
@@ -19,7 +19,7 @@ async function verifyState() {
   const db = getFirestore(app);
 
   // 1. Verify Auth Users
-  const authUsers: any[] = [];
+  const authUsers: UserRecord[] = [];
   let pageToken: string | undefined = undefined;
   do {
     const listResult = await auth.listUsers(1000, pageToken);
@@ -38,8 +38,9 @@ async function verifyState() {
   try {
     await auth.getUser('LFSyKBUeojNO8ds9saw6NvHMMFz2');
     console.error('   FAIL: imposter UID still exists in Auth!');
-  } catch (err: any) {
-    if (err.code === 'auth/user-not-found') {
+  } catch (err: unknown) {
+    const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+    if (code === 'auth/user-not-found') {
       console.log('   PASS: Confirmed imposter UID is completely deleted from Auth.');
     } else {
       console.error('   Error checking imposter UID:', err);

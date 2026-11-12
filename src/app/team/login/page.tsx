@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
@@ -16,22 +16,14 @@ function TeamLoginForm() {
   const searchParams = useSearchParams();
   const { teams, setCurrentTeamUser, theme } = useFest();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => searchParams.get('email') || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
-  useEffect(() => {
-    const emailParam = searchParams.get('email');
-    const isOnboarding = searchParams.get('onboarding');
-    if (emailParam) {
-      setEmail(emailParam);
-    }
-    if (isOnboarding === 'true') {
-      setNotice('Welcome to Sahithyolsav! Please log in with your provisioned manager credentials to access your team workspace.');
-    }
-  }, [searchParams]);
+  const [notice] = useState(() => searchParams.get('onboarding') === 'true'
+    ? 'Welcome to Sahithyolsav! Please log in with your provisioned manager credentials to access your team workspace.'
+    : ''
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,7 +146,7 @@ function TeamLoginForm() {
         }
 
         // Verify portal access and team status
-        if (targetTeam.portalAccess === false || (targetTeam as any).status === 'DISABLED') {
+        if (targetTeam.portalAccess === false || targetTeam.status === 'DISABLED') {
           await signOut(auth);
           setError('Access denied: Team contingent is currently disabled by the Chief Administrator.');
           setLoading(false);
@@ -164,20 +156,23 @@ function TeamLoginForm() {
         setCurrentTeamUser(targetTeam);
         router.push('/team');
         return;
-      } catch (authErr: any) {
+      } catch (authErr: unknown) {
         console.warn('[Team Login] Authentication error:', authErr);
+        const code = authErr && typeof authErr === 'object' && 'code' in authErr
+          ? String((authErr as { code?: unknown }).code)
+          : '';
         if (
-          authErr.code === 'auth/invalid-credential' ||
-          authErr.code === 'auth/wrong-password' ||
-          authErr.code === 'auth/user-not-found'
+          code === 'auth/invalid-credential' ||
+          code === 'auth/wrong-password' ||
+          code === 'auth/user-not-found'
         ) {
           setError('Invalid email or password. Please verify your team manager credentials.');
-        } else if (authErr.code === 'auth/user-disabled') {
+        } else if (code === 'auth/user-disabled') {
           setError('This team manager account has been disabled by the Chief Administrator.');
-        } else if (authErr.code === 'auth/network-request-failed') {
+        } else if (code === 'auth/network-request-failed') {
           setError('Network error: Unable to reach the authentication service. Please check your connection.');
         } else {
-          setError(authErr.message || 'Authentication failed. Please verify your credentials.');
+          setError((authErr instanceof Error ? authErr.message : '') || 'Authentication failed. Please verify your credentials.');
         }
         setLoading(false);
         return;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Participant } from '@/types/fest';
@@ -11,10 +12,18 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
-import { Plus, Search, Edit2, Trash2, IdCard, Users2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, IdCard, AlertTriangle, ArrowRight } from 'lucide-react';
 
 export default function ParticipantsPage() {
-  const { participants, teams, categories, competitions, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const {
+    participants,
+    teams,
+    categories,
+    addParticipant,
+    updateParticipant,
+    deleteParticipant,
+    checkParticipantCategoryConflicts
+  } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -22,6 +31,18 @@ export default function ParticipantsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<Participant | null>(null);
   const [selectedIdCardPart, setSelectedIdCardPart] = useState<Participant | null>(null);
+
+  // Category change conflict state
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictingRegistrations, setConflictingRegistrations] = useState<Array<{
+    registrationId: string;
+    registrationCode: string;
+    competitionId: string;
+    competitionName: string;
+    competitionCode: string;
+    competitionCategoryName: string;
+  }>>([]);
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -91,6 +112,28 @@ export default function ParticipantsPage() {
     }
     const cat = categories.find(c => c.id === categoryId);
 
+    // F-01: Verify category change for conflicting competition registrations
+    if (editingPart && categoryId !== editingPart.categoryId) {
+      setIsCheckingConflicts(true);
+      try {
+        const conflicts = await checkParticipantCategoryConflicts(editingPart.id, categoryId);
+        if (conflicts.length > 0) {
+          setConflictingRegistrations(conflicts);
+          setConflictModalOpen(true);
+          setSaving(false);
+          setIsCheckingConflicts(false);
+          return;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to verify category eligibility.';
+        setError(msg);
+        setSaving(false);
+        setIsCheckingConflicts(false);
+        return;
+      }
+      setIsCheckingConflicts(false);
+    }
+
     const partData = {
       name,
       email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@student.institution.org`,
@@ -115,8 +158,9 @@ export default function ParticipantsPage() {
         await addParticipant(partData);
       }
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save participant.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save participant.';
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -126,8 +170,9 @@ export default function ParticipantsPage() {
     if (confirm(`Are you sure you want to remove participant "${name}"?`)) {
       try {
         await deleteParticipant(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete participant.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to delete participant.';
+        alert(msg);
       }
     }
   };
@@ -304,8 +349,17 @@ export default function ParticipantsPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
-                {editingPart ? 'Update Participant' : 'Save & Generate Bib'}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving || isCheckingConflicts}
+              >
+                {saving || isCheckingConflicts
+                  ? 'Saving...'
+                  : editingPart
+                  ? 'Update Participant'
+                  : 'Save & Generate Bib'}
               </Button>
             </div>
           }
@@ -383,6 +437,79 @@ export default function ParticipantsPage() {
               helperText="Paste direct image URL or leave default for avatar generation"
             />
           </form>
+        </Modal>
+
+        {/* Category Change Conflict Blocking Modal */}
+        <Modal
+          isOpen={conflictModalOpen}
+          onClose={() => setConflictModalOpen(false)}
+          title="Category Change Blocked"
+          description="Conflicting competition registrations detected"
+          maxWidth="lg"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <Link
+                href="/admin/registration"
+                className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1"
+              >
+                Go to Registrations Desk <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  if (editingPart) {
+                    setCategoryId(editingPart.categoryId);
+                  }
+                  setConflictModalOpen(false);
+                }}
+              >
+                Keep Current Category
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800 space-y-1">
+                <p className="font-bold">
+                  Cannot switch &quot;{editingPart?.name}&quot; to {categories.find(c => c.id === categoryId)?.name || 'the requested category'}.
+                </p>
+                <p>
+                  This student has {conflictingRegistrations.length} active registration(s) linked to competitions restricted to their current category ({editingPart?.categoryName}).
+                  Existing registrations cannot be silently altered or deleted. To protect festival tabulation integrity, please cancel or reassign these registrations before changing the student&apos;s category.
+                </p>
+              </div>
+            </div>
+
+            <div className="border border-[#E1E7EF] rounded-xl overflow-hidden">
+              <div className="bg-[#F8FAFC] px-4 py-2.5 border-b border-[#E1E7EF] flex items-center justify-between">
+                <span className="text-xs font-bold text-[#111111]">Conflicting Competitions ({conflictingRegistrations.length})</span>
+                <span className="text-[10px] font-semibold text-[#526070] uppercase">Resolution Required</span>
+              </div>
+              <div className="divide-y divide-[#E1E7EF] max-h-56 overflow-y-auto">
+                {conflictingRegistrations.map((conflict) => (
+                  <div key={conflict.registrationId} className="px-4 py-3 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-[#2563EB] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-[10px]">
+                          {conflict.competitionCode}
+                        </span>
+                        <span className="font-bold text-[#111111]">{conflict.competitionName}</span>
+                      </div>
+                      <span className="text-[11px] text-[#526070]">
+                        Restricted Category: <strong>{conflict.competitionCategoryName}</strong> · Reg Code: {conflict.registrationCode}
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      Conflicting
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </Modal>
 
         {/* Digital ID Card Preview Modal */}

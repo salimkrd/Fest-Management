@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const roster = await GreenRoomService.getCompetitionRoster(competitionId, idToken);
     return NextResponse.json({ success: true, roster }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error);
   }
 }

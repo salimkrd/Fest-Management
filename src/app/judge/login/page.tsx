@@ -12,7 +12,7 @@ import Link from 'next/link';
 function JudgeLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { competitions, markEntries, theme } = useFest();
+  const { competitions } = useFest();
 
   const urlCode = searchParams.get('code') || '';
   const urlSecret = searchParams.get('token') || '';

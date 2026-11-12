@@ -17,9 +17,9 @@
 import { randomUUID } from 'crypto';
 import * as crypto from 'crypto';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { FirestoreTeam, FirestoreTeamPrivate, CombinedTeam, FirestoreUser, InvitationStatus, ProvisioningStatus } from '@/types/firestore';
+import { FirestoreTeam, FirestoreTeamPrivate, CombinedTeam, FirestoreUser, InvitationStatus } from '@/types/firestore';
 import { AuthService } from './authService';
-import { InvitationService, GenerateInvitationResult } from './invitationService';
+import { InvitationService } from './invitationService';
 
 export interface CreateTeamParams {
   name: string;
@@ -212,7 +212,7 @@ export class TeamService {
       .where('managerEmail', '==', rawEmail)
       .limit(1)
       .get()
-      .catch(() => ({ empty: true, docs: [] as any[] }));
+      .catch(() => ({ empty: true, docs: [] as Array<FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>> }));
 
     if (!dupPrivateSnap.empty && dupPrivateSnap.docs[0].data().teamId !== teamId) {
       const existingPrivate = dupPrivateSnap.docs[0].data() as FirestoreTeamPrivate;
@@ -247,8 +247,9 @@ export class TeamService {
             );
           }
         }
-      } catch (checkErr: any) {
-        if (checkErr.code === 'auth/user-not-found') {
+      } catch (checkErr: unknown) {
+        const code = typeof checkErr === 'object' && checkErr !== null && 'code' in checkErr ? (checkErr as { code: unknown }).code : '';
+        if (code === 'auth/user-not-found') {
           // Cryptographically unguessable temporary password (NEVER exposed, stored, or logged)
           const randomSecret = crypto.randomBytes(24).toString('base64url');
           const newAuth = await auth.createUser({
@@ -609,8 +610,9 @@ export class TeamService {
         if (!querySnap.empty) {
           privateDoc = querySnap.docs[0];
         }
-      } catch (cgErr: any) {
-        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', cgErr.message);
+      } catch (cgErr: unknown) {
+        const message = cgErr instanceof Error ? cgErr.message : String(cgErr);
+        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', message);
       }
     }
 
@@ -742,8 +744,9 @@ export class TeamService {
           privateDocRef = querySnap.docs[0].ref;
           targetTeamId = (querySnap.docs[0].data() as FirestoreTeamPrivate).teamId;
         }
-      } catch (cgErr: any) {
-        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', cgErr.message);
+      } catch (cgErr: unknown) {
+        const message = cgErr instanceof Error ? cgErr.message : String(cgErr);
+        console.warn('[TeamService] collectionGroup query unindexed or failed, falling back to direct team scan:', message);
       }
     }
 
@@ -848,14 +851,15 @@ export class TeamService {
           teamId: data.teamId
         };
       });
-    } catch (phase1Err: any) {
-      if (phase1Err.message?.includes('does not match the registered team manager')) {
+    } catch (phase1Err: unknown) {
+      const message = phase1Err instanceof Error ? phase1Err.message : '';
+      if (message.includes('does not match the registered team manager')) {
         try {
           const freshSnap = await privateDocRef.get();
           if (freshSnap.exists) {
             const freshData = freshSnap.data() as FirestoreTeamPrivate;
             const attempts = (freshData.failedActivationAttempts || 0) + 1;
-            const updatePayload: any = {
+            const updatePayload: Record<string, unknown> = {
               failedActivationAttempts: attempts,
               updatedAt: new Date().toISOString()
             };
@@ -889,14 +893,15 @@ export class TeamService {
         password: params.newPassword,
         disabled: false
       });
-    } catch (authErr: any) {
+    } catch (authErr: unknown) {
+      const message = authErr instanceof Error ? authErr.message : '';
       // Safe recovery from partial failure: release concurrency lock so the manager can safely retry
       await privateDocRef.update({
         activationInProgress: false,
-        lastActivationError: authErr.message || 'Auth update failed',
+        lastActivationError: message || 'Auth update failed',
         updatedAt: new Date().toISOString()
       });
-      throw new Error(`Authentication Error: Failed to set password. ${authErr.message || 'Please choose a stronger password and retry.'}`);
+      throw new Error(`Authentication Error: Failed to set password. ${message || 'Please choose a stronger password and retry.'}`);
     }
 
     // Optional: Generate Firebase password reset link satisfying requirement
@@ -1041,8 +1046,9 @@ export class TeamService {
         if (existingAuth.customClaims?.role === 'ADMIN') {
           throw new Error(`Security Violation: User "${newEmail}" is an Administrator.`);
         }
-      } catch (authLookupErr: any) {
-        if (authLookupErr.code === 'auth/user-not-found') {
+      } catch (authLookupErr: unknown) {
+        const code = typeof authLookupErr === 'object' && authLookupErr !== null && 'code' in authLookupErr ? (authLookupErr as { code: unknown }).code : '';
+        if (code === 'auth/user-not-found') {
           const randomSecret = crypto.randomBytes(24).toString('base64url');
           const created = await auth.createUser({
             email: newEmail,

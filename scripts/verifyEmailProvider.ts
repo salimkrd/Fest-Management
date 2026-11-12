@@ -17,15 +17,16 @@ async function verifyEmailAuth() {
   console.log('Testing Email/Password sign-in provider status on inspirath-d6778...');
   try {
     await signInWithEmailAndPassword(auth, 'probe-check-provider@inspirath-d6778.test', 'WrongPass123!');
-  } catch (err: any) {
-    console.log(`Received Auth response code: ${err.code}`);
-    if (err.code === 'auth/operation-not-allowed') {
+  } catch (err: unknown) {
+    const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+    console.log(`Received Auth response code: ${code}`);
+    if (code === 'auth/operation-not-allowed') {
       console.error('CRITICAL: Email/Password Authentication is DISABLED in Firebase Console!');
       process.exit(1);
-    } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+    } else if (code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
       console.log('SUCCESS: Email/Password Authentication provider is ENABLED on inspirath-d6778.');
     } else {
-      console.log(`Auth response: ${err.code} - ${err.message}`);
+      console.log(`Auth response: ${code} - ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

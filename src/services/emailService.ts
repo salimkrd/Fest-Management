@@ -51,7 +51,8 @@ export class EmailService {
   /**
    * Deprecated stub
    */
-  static async sendManagerInvitation(params: SendManagerInvitationParams): Promise<EmailDeliveryResult> {
+  static async sendManagerInvitation(_params: SendManagerInvitationParams): Promise<EmailDeliveryResult> {
+    void _params;
     return {
       success: true,
       provider: 'none',

@@ -114,7 +114,7 @@ async function runStagingVerification() {
       false,
       'FAILED: validateWorkloadIdentityScope did not block production project!'
     );
-  } catch (err) {
+  } catch {
     record(
       'Fail-Closed Production Rejection',
       true,
@@ -131,7 +131,7 @@ async function runStagingVerification() {
       false,
       'FAILED: validateWorkloadIdentityScope did not reject unauthorized Vercel Project ID!'
     );
-  } catch (err) {
+  } catch {
     record(
       'Fail-Closed Vercel Project ID Scoping',
       true,
@@ -337,7 +337,6 @@ async function runStagingVerification() {
     }
 
     // 8. Test Login with unprefixed bib
-    let sessionToken: string | undefined;
     const loginReq = new NextRequest('http://localhost:3000/api/participant/login', {
       method: 'POST',
       headers: {
@@ -349,7 +348,7 @@ async function runStagingVerification() {
     const loginRes = await loginRoute(loginReq);
     const loginData = await loginRes.json();
     const cookie = loginRes.cookies.get(PARTICIPANT_COOKIE_NAME);
-    sessionToken = cookie?.value;
+    const sessionToken = cookie?.value;
 
     if (loginRes.status === 200 && loginData.success && sessionToken) {
       record(`Login with Unprefixed Bib ("${testBibInput}")`, true, 'Status 200 OK, session cookie received.');
@@ -473,8 +472,8 @@ async function runStagingVerification() {
     }
 
     // 13. Verify Points Scoring: SOLO published points contribute, GROUP points are team-only
-    const soloEvent = dashboardData.events?.find((e: any) => e.registrationId === testSoloRegId);
-    const groupEvent = dashboardData.events?.find((e: any) => e.registrationId === testGroupRegId);
+    const soloEvent = dashboardData.events?.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
+    const groupEvent = dashboardData.events?.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testGroupRegId);
 
     const soloPoints = soloEvent?.individualPoints;
     const groupTeamPoints = groupEvent?.groupTeamPoints;
@@ -511,7 +510,7 @@ async function runStagingVerification() {
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     }));
     const unpubData = await unpubMeRes.json();
-    const unpubSoloEvent = unpubData.events?.find((e: any) => e.registrationId === testSoloRegId);
+    const unpubSoloEvent = unpubData.events?.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
 
     const unpubPointsCorrect =
       unpubSoloEvent?.published === false &&
@@ -544,7 +543,7 @@ async function runStagingVerification() {
       headers: { cookie: `${PARTICIPANT_COOKIE_NAME}=${sessionToken}` }
     }));
     const repubData = await repubMeRes.json();
-    const repubSoloEvent = repubData.events?.find((e: any) => e.registrationId === testSoloRegId);
+    const repubSoloEvent = repubData.events?.find((e: { registrationId: string; [key: string]: unknown }) => e.registrationId === testSoloRegId);
 
     const repubPointsCorrect =
       repubSoloEvent?.published === true &&

@@ -5,7 +5,7 @@
  */
 
 import { CompetitionResult } from '@/types/fest';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 
 export interface PublishedWinnerRow {
@@ -105,65 +105,75 @@ export class ExportService {
   }
 
   /**
-   * Generates and triggers download of a genuine OpenXML XLSX spreadsheet (.xlsx).
+   * Builds an ExcelJS Workbook object containing official published winners.
+   * Configures 20 standard columns, headers, widths, and the 'Official Winners' worksheet.
    */
-  static downloadWinnersXLSX(rows: PublishedWinnerRow[], filename: string): void {
-    if (typeof window === 'undefined') return;
+  static generateWinnersWorkbook(rows: PublishedWinnerRow[]): ExcelJS.Workbook {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Official Winners');
 
-    const dataForSheet = rows.map(r => ({
-      'Competition Code': r.competitionCode,
-      'Competition Name': r.competitionName,
-      'Category': r.categoryName,
-      'Event Type': r.type,
-      '1st Place Winner': r.rank1Name,
-      '1st Bib': r.rank1Bib,
-      '1st Team': r.rank1Team,
-      '1st Grade': r.rank1Grade,
-      '1st Points': r.rank1Points,
-      '2nd Place Winner': r.rank2Name,
-      '2nd Bib': r.rank2Bib,
-      '2nd Team': r.rank2Team,
-      '2nd Grade': r.rank2Grade,
-      '2nd Points': r.rank2Points,
-      '3rd Place Winner': r.rank3Name,
-      '3rd Bib': r.rank3Bib,
-      '3rd Team': r.rank3Team,
-      '3rd Grade': r.rank3Grade,
-      '3rd Points': r.rank3Points,
-      'Event Total Points': r.eventTotalPoints
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 14 }, // Code
-      { wch: 28 }, // Name
-      { wch: 14 }, // Cat
-      { wch: 10 }, // Type
-      { wch: 24 }, // 1st Name
-      { wch: 10 }, // 1st Bib
-      { wch: 18 }, // 1st Team
-      { wch: 10 }, // 1st Grade
-      { wch: 10 }, // 1st Pts
-      { wch: 24 }, // 2nd Name
-      { wch: 10 }, // 2nd Bib
-      { wch: 18 }, // 2nd Team
-      { wch: 10 }, // 2nd Grade
-      { wch: 10 }, // 2nd Pts
-      { wch: 24 }, // 3rd Name
-      { wch: 10 }, // 3rd Bib
-      { wch: 18 }, // 3rd Team
-      { wch: 10 }, // 3rd Grade
-      { wch: 10 }, // 3rd Pts
-      { wch: 14 }  // Total Pts
+    worksheet.columns = [
+      { header: 'Competition Code', key: 'competitionCode', width: 14 },
+      { header: 'Competition Name', key: 'competitionName', width: 28 },
+      { header: 'Category', key: 'categoryName', width: 14 },
+      { header: 'Event Type', key: 'type', width: 10 },
+      { header: '1st Place Winner', key: 'rank1Name', width: 24 },
+      { header: '1st Bib', key: 'rank1Bib', width: 10 },
+      { header: '1st Team', key: 'rank1Team', width: 18 },
+      { header: '1st Grade', key: 'rank1Grade', width: 10 },
+      { header: '1st Points', key: 'rank1Points', width: 10 },
+      { header: '2nd Place Winner', key: 'rank2Name', width: 24 },
+      { header: '2nd Bib', key: 'rank2Bib', width: 10 },
+      { header: '2nd Team', key: 'rank2Team', width: 18 },
+      { header: '2nd Grade', key: 'rank2Grade', width: 10 },
+      { header: '2nd Points', key: 'rank2Points', width: 10 },
+      { header: '3rd Place Winner', key: 'rank3Name', width: 24 },
+      { header: '3rd Bib', key: 'rank3Bib', width: 10 },
+      { header: '3rd Team', key: 'rank3Team', width: 18 },
+      { header: '3rd Grade', key: 'rank3Grade', width: 10 },
+      { header: '3rd Points', key: 'rank3Points', width: 10 },
+      { header: 'Event Total Points', key: 'eventTotalPoints', width: 14 }
     ];
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Official Winners');
+    rows.forEach(r => {
+      worksheet.addRow({
+        competitionCode: r.competitionCode,
+        competitionName: r.competitionName,
+        categoryName: r.categoryName,
+        type: r.type,
+        rank1Name: r.rank1Name,
+        rank1Bib: r.rank1Bib,
+        rank1Team: r.rank1Team,
+        rank1Grade: r.rank1Grade,
+        rank1Points: r.rank1Points,
+        rank2Name: r.rank2Name,
+        rank2Bib: r.rank2Bib,
+        rank2Team: r.rank2Team,
+        rank2Grade: r.rank2Grade,
+        rank2Points: r.rank2Points,
+        rank3Name: r.rank3Name,
+        rank3Bib: r.rank3Bib,
+        rank3Team: r.rank3Team,
+        rank3Grade: r.rank3Grade,
+        rank3Points: r.rank3Points,
+        eventTotalPoints: r.eventTotalPoints
+      });
+    });
 
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return workbook;
+  }
+
+  /**
+   * Generates and triggers download of a genuine OpenXML XLSX spreadsheet (.xlsx) using ExcelJS.
+   */
+  static async downloadWinnersXLSX(rows: PublishedWinnerRow[], filename: string): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    const workbook = this.generateWinnersWorkbook(rows);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

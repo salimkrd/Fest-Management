@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Trash2, Calendar, MapPin, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Trash2 } from 'lucide-react';
 
 export default function TeamRegistrationPage() {
   const { currentTeamUser, teams, registrations, categories, competitions, participants, addRegistration, deleteRegistration } = useFest();

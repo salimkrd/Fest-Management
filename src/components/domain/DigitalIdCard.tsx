@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Printer, Download, QrCode } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
+import Image from 'next/image';
 import { auth } from '@/lib/firebase/client';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 
@@ -31,18 +32,14 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
   useEffect(() => {
     if (!participant || !isOpen) {
-      setQrDataUrl('');
-      setSignedToken('');
-      setSignedPayload('');
-      setFetchError(null);
       return;
     }
 
     let isMounted = true;
-    setLoading(true);
-    setFetchError(null);
 
     const fetchQrBadge = async () => {
+      setLoading(true);
+      setFetchError(null);
       try {
         const idToken = authMode === 'firebase' && auth?.currentUser
           ? await auth.currentUser.getIdToken() : '';
@@ -80,10 +77,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           setQrDataUrl(url);
           setLoading(false);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
           console.error('[DigitalIdCard] QR generation error:', err);
-          setFetchError(err.message || 'Error generating QR badge');
+          setFetchError(err instanceof Error ? err.message : 'Error generating QR badge');
           setLoading(false);
         }
       }
@@ -93,6 +90,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     return () => {
       isMounted = false;
+      setQrDataUrl('');
+      setSignedToken('');
+      setSignedPayload('');
+      setFetchError(null);
     };
   }, [participant, isOpen, authMode]);
 
@@ -203,9 +204,12 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             </div>
             <div className="w-14 h-14 bg-white border border-[#E1E7EF] rounded-lg p-0.5 flex items-center justify-center shadow-xs">
               {qrDataUrl ? (
-                <img
+                <Image
+                  unoptimized
                   src={qrDataUrl}
                   alt={`QR Verification for ${participant.bib}`}
+                  width={56}
+                  height={56}
                   className="w-full h-full object-contain"
                 />
               ) : (

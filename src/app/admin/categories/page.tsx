@@ -3,13 +3,14 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
-import { Category } from '@/types/fest';
+import { Category, CategoryParticipantEligibility } from '@/types/fest';
+import { resolveCategoryEligibilityPolicy } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Layers, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Layers, AlertCircle } from 'lucide-react';
 
 export default function CategoriesPage() {
   const { categories, addCategory, updateCategory, deleteCategory } = useFest();
@@ -27,6 +28,7 @@ export default function CategoriesPage() {
   const [classRange, setClassRange] = useState('');
   const [eligibility, setEligibility] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  const [participantEligibility, setParticipantEligibility] = useState<CategoryParticipantEligibility>('CATEGORY_ONLY');
   const [error, setError] = useState('');
 
   const filteredCategories = categories.filter(c =>
@@ -42,6 +44,7 @@ export default function CategoriesPage() {
     setClassRange('');
     setEligibility('');
     setStatus('ACTIVE');
+    setParticipantEligibility('CATEGORY_ONLY');
     setError('');
     setModalOpen(true);
   };
@@ -54,6 +57,7 @@ export default function CategoriesPage() {
     setClassRange(cat.classRange);
     setEligibility(cat.eligibility);
     setStatus(cat.status);
+    setParticipantEligibility(cat.participantEligibility || resolveCategoryEligibilityPolicy(cat));
     setError('');
     setModalOpen(true);
   };
@@ -78,7 +82,8 @@ export default function CategoriesPage() {
           ageRange,
           classRange,
           eligibility,
-          status
+          status,
+          participantEligibility
         });
       } else {
         await addCategory({
@@ -87,12 +92,13 @@ export default function CategoriesPage() {
           ageRange,
           classRange,
           eligibility,
-          status
+          status,
+          participantEligibility
         });
       }
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save category.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save category.');
     } finally {
       setSaving(false);
     }
@@ -104,8 +110,8 @@ export default function CategoriesPage() {
       setDeletingId(id);
       try {
         await deleteCategory(id);
-      } catch (err: any) {
-        setActionError(err?.message || 'Failed to delete category.');
+      } catch (err: unknown) {
+        setActionError(err instanceof Error ? err.message : 'Failed to delete category.');
       } finally {
         setDeletingId(null);
       }
@@ -178,6 +184,7 @@ export default function CategoriesPage() {
                 <tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[#526070] font-bold uppercase text-[11px]">
                   <th className="py-3 px-6">Category Name &amp; Code</th>
                   <th className="py-3 px-6">Age / Class Eligibility</th>
+                  <th className="py-3 px-6 text-center">Eligibility Policy</th>
                   <th className="py-3 px-6 text-center">Enrolled Participants</th>
                   <th className="py-3 px-6 text-center">Assigned Competitions</th>
                   <th className="py-3 px-6 text-center">System Status</th>
@@ -187,7 +194,7 @@ export default function CategoriesPage() {
               <tbody className="divide-y divide-[#E1E7EF]">
                 {filteredCategories.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-xs text-[#526070]">
+                    <td colSpan={7} className="py-12 text-center text-xs text-[#526070]">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <Layers className="w-8 h-8 text-[#94A3B8]" />
                         <p className="font-semibold text-sm text-[#111111]">
@@ -220,6 +227,18 @@ export default function CategoriesPage() {
                         <span className="text-[#526070] text-[11px]">{cat.ageRange}</span>
                       </td>
                       <td className="py-4 px-6 text-center">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          resolveCategoryEligibilityPolicy(cat) === 'OPEN_TO_ALL'
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                          {resolveCategoryEligibilityPolicy(cat) === 'OPEN_TO_ALL' ? 'Open to All' : 'Restricted'}
+                        </span>
+                        <span className="text-[10px] text-[#526070] block mt-0.5">
+                          {resolveCategoryEligibilityPolicy(cat) === 'OPEN_TO_ALL' ? 'All tiers allowed' : 'Match tier only'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
                         <span className="font-bold text-[#111111]">{cat.enrolledCount}</span>
                         <span className="text-[#526070] text-[11px] block">Students</span>
                       </td>
@@ -245,7 +264,8 @@ export default function CategoriesPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(cat.id, cat.name)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                            disabled={deletingId === cat.id}
+                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors disabled:opacity-50"
                             title="Delete Category"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -327,10 +347,57 @@ export default function CategoriesPage() {
               onChange={(e) => setEligibility(e.target.value)}
             />
 
+            <div>
+              <label className="block text-xs font-bold text-[#111111] mb-1">
+                Participant Eligibility
+              </label>
+              <p className="text-[11px] text-[#526070] mb-2">
+                Configure whether competitions under this category are restricted to matching participants or open across tiers.
+              </p>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-[#E1E7EF] hover:bg-[#F8FAFC] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="participantEligibility"
+                    value="CATEGORY_ONLY"
+                    checked={participantEligibility === 'CATEGORY_ONLY'}
+                    onChange={() => setParticipantEligibility('CATEGORY_ONLY')}
+                    className="mt-0.5 text-[#2563EB] focus:ring-[#2563EB]"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-[#111111] block">
+                      Restricted to This Category (Default)
+                    </span>
+                    <span className="text-[11px] text-[#526070] block">
+                      Only participants assigned to this specific category can register (e.g. Junior competitions allow only Junior participants).
+                    </span>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-[#E1E7EF] hover:bg-[#F8FAFC] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="participantEligibility"
+                    value="OPEN_TO_ALL"
+                    checked={participantEligibility === 'OPEN_TO_ALL'}
+                    onChange={() => setParticipantEligibility('OPEN_TO_ALL')}
+                    className="mt-0.5 text-[#2563EB] focus:ring-[#2563EB]"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-[#111111] block">
+                      Open to All Categories
+                    </span>
+                    <span className="text-[11px] text-[#526070] block">
+                      Participants from any academic category (Sub Junior, Junior, Senior, etc.) can register (e.g. General / campus-wide events).
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <Select
               label="System Status"
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
               options={[
                 { value: 'ACTIVE', label: 'Active (Available for registrations)' },
                 { value: 'INACTIVE', label: 'Inactive (Disabled)' }

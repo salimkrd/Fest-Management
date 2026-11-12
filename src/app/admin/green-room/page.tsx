@@ -20,14 +20,6 @@ import {
   AlertTriangle,
   Printer,
   Edit2,
-  Clock,
-  UserCheck,
-  UserX,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Users,
-  ShieldCheck,
   Plus
 } from 'lucide-react';
 
@@ -83,20 +75,17 @@ export default function GreenRoomPage() {
     return () => { active = false; unsubscribe(); };
   }, []);
 
-  // Keep the selected competition valid after live Firestore updates/deletions.
-  useEffect(() => {
-    if (!competitions.length) {
-      if (selectedCompId) setSelectedCompId('');
-      return;
+  const effectiveCompId = useMemo(() => {
+    if (!competitions.length) return '';
+    if (selectedCompId && competitions.some(comp => comp.id === selectedCompId)) {
+      return selectedCompId;
     }
-    if (!competitions.some(comp => comp.id === selectedCompId)) {
-      setSelectedCompId(competitions[0].id);
-    }
+    return competitions[0]?.id || '';
   }, [competitions, selectedCompId]);
 
   const selectedCompetition = useMemo(() => {
-    return competitions.find(c => c.id === selectedCompId) || competitions[0] || null;
-  }, [competitions, selectedCompId]);
+    return competitions.find(c => c.id === effectiveCompId) || null;
+  }, [competitions, effectiveCompId]);
 
   // Approved registrations for current competition
   const currentCompRegistrations = useMemo(() => {
@@ -106,13 +95,11 @@ export default function GreenRoomPage() {
 
   // Realtime subscription to greenRoomAssignments for selected competition
   useEffect(() => {
-    if (!selectedCompId || !db) return;
+    if (!effectiveCompId || !db) return;
 
-    setLoadingRoster(true);
-    setRoster([]);
     const q = query(
       collection(db, 'greenRoomAssignments'),
-      where('competitionId', '==', selectedCompId)
+      where('competitionId', '==', effectiveCompId)
     );
 
     const unsubscribe = onSnapshot(
@@ -132,7 +119,7 @@ export default function GreenRoomPage() {
     );
 
     return () => unsubscribe();
-  }, [selectedCompId]);
+  }, [effectiveCompId]);
 
   // Candidate matches for manual search
   const searchResults = useMemo(() => {
@@ -203,10 +190,10 @@ export default function GreenRoomPage() {
         setSelectedAssignmentForSlip(data.assignment);
         setSlipModalOpen(true);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFeedbackMessage({
         type: 'error',
-        text: err?.message || 'Check-in failed.'
+        text: err instanceof Error ? err.message : 'Check-in failed.'
       });
     } finally {
       setIsCheckingIn(false);
@@ -233,8 +220,8 @@ export default function GreenRoomPage() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Status update failed.');
-    } catch (err: any) {
-      alert(`Could not update contestant status: ${err?.message}`);
+    } catch (err: unknown) {
+      alert(`Could not update contestant status: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -270,8 +257,8 @@ export default function GreenRoomPage() {
         type: 'success',
         text: `Successfully reassigned to Code Letter ${data.assignment?.codeLetter}`
       });
-    } catch (err: any) {
-      alert(`Reassignment failed: ${err?.message}`);
+    } catch (err: unknown) {
+      alert(`Reassignment failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsReassigning(false);
     }
@@ -304,8 +291,8 @@ export default function GreenRoomPage() {
       setStaffEmail('');
       setStaffDisplayName('');
       setStaffPassword('');
-    } catch (err: any) {
-      alert(`Error provisioning staff: ${err?.message}`);
+    } catch (err: unknown) {
+      alert(`Error provisioning staff: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsProvisioningStaff(false);
     }
@@ -352,7 +339,7 @@ export default function GreenRoomPage() {
               </label>
               <select
                 id="comp-selector"
-                value={selectedCompId}
+                value={effectiveCompId}
                 onChange={(e) => setSelectedCompId(e.target.value)}
                 className="px-3 py-2 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl text-xs font-bold text-[#111111] focus:outline-hidden focus:ring-2 focus:ring-[#2563EB]"
               >

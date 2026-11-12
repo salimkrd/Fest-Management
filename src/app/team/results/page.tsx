@@ -3,9 +3,8 @@
 import React, { useState } from 'react';
 import { TeamLayout } from '@/components/layout/TeamLayout';
 import { useFest } from '@/context/FestContext';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Trophy, Award, Medal, Search, ExternalLink } from 'lucide-react';
+import { Trophy, Search } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TeamResultsPage() {

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Trophy, MapPin, Calendar, Clock, Users, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle } from 'lucide-react';
 
 export default function CompetitionsPage() {
   const { competitions, categories, stages, registrations, results, addCompetition, updateCompetition, deleteCompetition } = useFest();
@@ -146,8 +146,8 @@ export default function CompetitionsPage() {
         await addCompetition(compData);
       }
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save competition.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save competition.');
     } finally {
       setSaving(false);
     }
@@ -159,8 +159,8 @@ export default function CompetitionsPage() {
       setDeletingId(id);
       try {
         await deleteCompetition(id);
-      } catch (err: any) {
-        setActionError(err?.message || 'Failed to delete competition.');
+      } catch (err: unknown) {
+        setActionError(err instanceof Error ? err.message : 'Failed to delete competition.');
       } finally {
         setDeletingId(null);
       }
@@ -356,7 +356,8 @@ export default function CompetitionsPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(comp.id, comp.name)}
-                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                            disabled={deletingId === comp.id}
+                            className="p-1.5 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors disabled:opacity-50"
                             title="Delete Competition"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -383,7 +384,7 @@ export default function CompetitionsPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="sm" onClick={handleSave} isLoading={saving} disabled={saving}>
                 {editingComp ? 'Update Competition' : 'Save Competition'}
               </Button>
             </div>

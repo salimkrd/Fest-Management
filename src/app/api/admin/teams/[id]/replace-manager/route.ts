@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TeamService } from '@/services/teamService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
-function extractToken(req: NextRequest, body?: any): string {
+function extractToken(req: NextRequest, body?: unknown): string {
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7).trim();
   }
-  if (body?.adminIdToken && typeof body.adminIdToken === 'string') {
-    return body.adminIdToken.trim();
+  if (body && typeof body === 'object' && 'adminIdToken' in body) {
+    const adminIdToken = (body as { adminIdToken?: unknown }).adminIdToken;
+    if (typeof adminIdToken === 'string') {
+      return adminIdToken.trim();
+    }
   }
   return '';
 }
@@ -51,7 +54,7 @@ export async function POST(
       newManagerUid: result.newManagerUid,
       invitation: result.invitation
     }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return handleApiError(err);
   }
 }

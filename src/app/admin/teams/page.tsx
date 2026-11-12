@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Team } from '@/types/fest';
@@ -20,14 +20,13 @@ import {
   RefreshCw,
   UserPlus,
   ShieldAlert,
-  Send,
   MessageSquare,
   ExternalLink,
   Ban,
   CheckCheck
 } from 'lucide-react';
 import { auth } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 /**
  * Parses and sanitizes HTTP API response errors with specific status-code awareness.
@@ -91,7 +90,6 @@ export default function TeamsPage() {
   // WhatsApp Invitation Modal State
   const [invitationTeamId, setInvitationTeamId] = useState('');
   const [invitationTeamName, setInvitationTeamName] = useState('');
-  const [invitationManagerEmail, setInvitationManagerEmail] = useState('');
   const [invitationManagerPhone, setInvitationManagerPhone] = useState('');
   const [invitationCode, setInvitationCode] = useState('');
   const [invitationMessage, setInvitationMessage] = useState('');
@@ -109,15 +107,35 @@ export default function TeamsPage() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [loadingTeams, setLoadingTeams] = useState<boolean>(true);
 
-  // Dynamic server-synced teams list (strictly initialized empty in production)
-  const [dynamicTeams, setDynamicTeams] = useState<Team[]>([]);
+  // Dynamic server-synced teams list
+  const [serverTeams, setServerTeams] = useState<Team[]>([]);
+
+  // Synchronize dynamicTeams with realtime Firestore teams from FestContext and server-side metadata
+  const dynamicTeams = useMemo(() => {
+    return teams.map((t, idx) => {
+      const existing = serverTeams.find(p => p.id === t.id);
+      return {
+        ...t,
+        managerName: existing?.managerName || t.managerName || '',
+        managerEmail: existing?.managerEmail || t.managerEmail || '',
+        managerPhone: existing?.managerPhone || t.managerPhone || '',
+        rank: existing?.rank || t.rank || idx + 1,
+        portalAccess: existing?.portalAccess !== false && t.portalAccess !== false,
+        status: existing?.status || t.status || 'ACTIVE',
+        provisioningStatus: existing?.provisioningStatus || t.provisioningStatus,
+        invitationStatus: existing?.invitationStatus || t.invitationStatus,
+        invitationSentAt: existing?.invitationSentAt || t.invitationSentAt || '',
+        invitationExpiresAt: existing?.invitationExpiresAt || t.invitationExpiresAt || ''
+      };
+    });
+  }, [teams, serverTeams]);
 
   // Helper to ensure Firebase Auth initialization completes
-  const waitForAuthReady = async (): Promise<any> => {
+  const waitForAuthReady = async (): Promise<User | null> => {
     if (!auth) return null;
     if (auth.currentUser) return auth.currentUser;
-    if (typeof (auth as any).authStateReady === 'function') {
-      await (auth as any).authStateReady();
+    if ('authStateReady' in auth && typeof (auth as { authStateReady?: () => Promise<void> }).authStateReady === 'function') {
+      await (auth as { authStateReady: () => Promise<void> }).authStateReady();
       return auth.currentUser;
     }
     return new Promise((resolve) => {
@@ -128,7 +146,7 @@ export default function TeamsPage() {
     });
   };
 
-  const getAdminToken = async (): Promise<string> => {
+  const getAdminToken = useCallback(async (): Promise<string> => {
     if (!auth) {
       throw new Error('Authentication service unavailable. Please check your network connection.');
     }
@@ -144,25 +162,27 @@ export default function TeamsPage() {
         throw new Error('Unauthorized: Invalid or empty ID token received.');
       }
       return token;
-    } catch (tokenErr: any) {
-      if (tokenErr.code === 'auth/user-token-expired' || tokenErr.code === 'auth/user-disabled') {
+    } catch (tokenErr: unknown) {
+      const code = tokenErr && typeof tokenErr === 'object' && 'code' in tokenErr
+        ? String((tokenErr as { code?: unknown }).code) : '';
+      if (code === 'auth/user-token-expired' || code === 'auth/user-disabled') {
         throw new Error('Unauthorized: Your session has expired. Please log in again.');
       }
       throw new Error('Unauthorized: Authentication token retrieval failed.');
     }
-  };
+  }, []);
 
   // Sync teams from backend authoritative Firestore
-  const refreshTeams = async () => {
+  const refreshTeams = useCallback(async () => {
     setLoadingTeams(true);
     setConnectionError(null);
     try {
       let token = '';
       try {
         token = await getAdminToken();
-      } catch (tokenErr: any) {
-        setConnectionError(tokenErr.message || 'Authentication required to load live teams.');
-        setDynamicTeams([]);
+      } catch (tokenErr: unknown) {
+        setConnectionError(tokenErr instanceof Error ? tokenErr.message : 'Authentication required to load live teams.');
+        setServerTeams([]);
         setLoadingTeams(false);
         return;
       }
@@ -173,81 +193,67 @@ export default function TeamsPage() {
       if (!res.ok) {
         const errDetail = await parseResponseError(res, 'Failed to fetch teams from server.');
         setConnectionError(errDetail);
-        setDynamicTeams([]);
+        setServerTeams([]);
         setLoadingTeams(false);
         return;
       }
 
       const data = await res.json();
       if (Array.isArray(data.teams)) {
-        const merged: Team[] = data.teams.map((dt: any, idx: number) => {
+        const merged: Team[] = data.teams.map((dt: Record<string, unknown>, idx: number) => {
           const existing = teams.find(t => t.id === dt.id);
           return {
-            id: dt.id,
-            name: dt.name,
-            code: dt.code,
-            color: dt.color || '#2563EB',
-            managerName: dt.managerName || '',
-            managerEmail: dt.managerEmail || '',
-            managerPhone: dt.managerPhone || '',
-            zone: dt.zone || '',
-            contestantsCount: existing?.contestantsCount || dt.contestantsCount || 0,
-            eventsCount: existing?.eventsCount || dt.eventsCount || 0,
-            totalPoints: existing?.totalPoints || dt.totalPoints || 0,
-            soloPoints: existing?.soloPoints || dt.soloPoints || 0,
-            groupPoints: existing?.groupPoints || dt.groupPoints || 0,
-            rank: existing?.rank || dt.rank || idx + 1,
-            firstCount: existing?.firstCount || dt.firstCount || 0,
-            secondCount: existing?.secondCount || dt.secondCount || 0,
-            thirdCount: existing?.thirdCount || dt.thirdCount || 0,
+            id: String(dt.id || ''),
+            name: String(dt.name || ''),
+            code: String(dt.code || ''),
+            color: (dt.color as string) || '#2563EB',
+            managerName: (dt.managerName as string) || '',
+            managerEmail: (dt.managerEmail as string) || '',
+            managerPhone: (dt.managerPhone as string) || '',
+            zone: (dt.zone as string) || '',
+            contestantsCount: existing?.contestantsCount || Number(dt.contestantsCount) || 0,
+            eventsCount: existing?.eventsCount || Number(dt.eventsCount) || 0,
+            totalPoints: existing?.totalPoints || Number(dt.totalPoints) || 0,
+            soloPoints: existing?.soloPoints || Number(dt.soloPoints) || 0,
+            groupPoints: existing?.groupPoints || Number(dt.groupPoints) || 0,
+            rank: existing?.rank || Number(dt.rank) || idx + 1,
+            firstCount: existing?.firstCount || Number(dt.firstCount) || 0,
+            secondCount: existing?.secondCount || Number(dt.secondCount) || 0,
+            thirdCount: existing?.thirdCount || Number(dt.thirdCount) || 0,
             portalAccess: dt.portalAccess !== false,
-            status: dt.status || 'ACTIVE',
-            provisioningStatus: dt.provisioningStatus || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
-            invitationStatus: dt.invitationStatus || 'PENDING',
-            invitationSentAt: dt.invitationSentAt || '',
-            invitationExpiresAt: dt.invitationExpiresAt || ''
+            status: (dt.status as Team['status']) || 'ACTIVE',
+            provisioningStatus: (dt.provisioningStatus as Team['provisioningStatus']) || (dt.managerEmail ? 'PROVISIONED' : 'AWAITING_MANAGER'),
+            invitationStatus: (dt.invitationStatus as Team['invitationStatus']) || 'PENDING',
+            invitationSentAt: (dt.invitationSentAt as string) || '',
+            invitationExpiresAt: (dt.invitationExpiresAt as string) || ''
           };
         });
-        setDynamicTeams(merged);
+        setServerTeams(merged);
         setConnectionError(null);
       } else {
         setConnectionError('Invalid data format received from server.');
-        setDynamicTeams([]);
+        setServerTeams([]);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.warn('[TeamsPage] Fetch error:', e);
-      setConnectionError(e.message || 'Network error: Failed to connect to server.');
-      setDynamicTeams([]);
+      setConnectionError(e instanceof Error ? e.message : 'Network error: Failed to connect to server.');
+      setServerTeams([]);
     } finally {
       setLoadingTeams(false);
     }
-  };
+  }, [teams, getAdminToken]);
 
   useEffect(() => {
-    refreshTeams();
-  }, []);
-
-  // Synchronize dynamicTeams with realtime Firestore teams from FestContext
-  useEffect(() => {
-    if (teams) {
-      setDynamicTeams(prev => {
-        return teams.map(t => {
-          const existing = prev.find(p => p.id === t.id);
-          return {
-            ...t,
-            managerName: existing?.managerName || t.managerName || '',
-            managerEmail: existing?.managerEmail || t.managerEmail || '',
-            managerPhone: existing?.managerPhone || t.managerPhone || '',
-            provisioningStatus: existing?.provisioningStatus || t.provisioningStatus,
-            invitationStatus: existing?.invitationStatus || t.invitationStatus
-          };
-        });
-      });
-      if (teams.length > 0) {
-        setLoadingTeams(false);
+    let active = true;
+    void (async () => {
+      if (active) {
+        await refreshTeams();
       }
-    }
-  }, [teams]);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [refreshTeams]);
 
   const filteredTeams = dynamicTeams.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -377,7 +383,6 @@ export default function TeamsPage() {
         if (data.invitation) {
           setInvitationTeamId(data.team.id);
           setInvitationTeamName(data.team.name);
-          setInvitationManagerEmail(data.team.managerEmail);
           setInvitationManagerPhone(data.team.managerPhone);
           setInvitationCode(data.invitation.code);
           setInvitationMessage(data.invitation.message);
@@ -390,8 +395,8 @@ export default function TeamsPage() {
           setSuccessBanner(`Team "${data.team.name}" created successfully.`);
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Operation failed.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Operation failed.');
     } finally {
       setLoading(false);
     }
@@ -436,7 +441,6 @@ export default function TeamsPage() {
       if (data.invitation) {
         setInvitationTeamId(data.team.id);
         setInvitationTeamName(data.team.name);
-        setInvitationManagerEmail(data.team.managerEmail);
         setInvitationManagerPhone(data.team.managerPhone);
         setInvitationCode(data.invitation.code);
         setInvitationMessage(data.invitation.message);
@@ -446,8 +450,8 @@ export default function TeamsPage() {
         setCopiedMessage(false);
         setInvitationModalOpen(true);
       }
-    } catch (err: any) {
-      setError(err.message || 'Replacement failed.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Replacement failed.');
     } finally {
       setLoading(false);
     }
@@ -481,7 +485,6 @@ export default function TeamsPage() {
 
       setInvitationTeamId(team.id);
       setInvitationTeamName(team.name);
-      setInvitationManagerEmail(data.managerEmail || team.managerEmail);
       setInvitationManagerPhone(data.managerPhone || team.managerPhone);
       setInvitationCode(data.invitationCode);
       setInvitationMessage(data.message);
@@ -491,8 +494,8 @@ export default function TeamsPage() {
       setCopiedMessage(false);
       setInvitationModalOpen(true);
       await refreshTeams();
-    } catch (err: any) {
-      const msg = err.message || 'Error generating invitation.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error generating invitation.';
       setError(msg);
       alert(msg);
     } finally {
@@ -521,8 +524,8 @@ export default function TeamsPage() {
       setInvitationStatus('MANUALLY_SENT');
       setSuccessBanner('Invitation marked as manually sent via WhatsApp.');
       await refreshTeams();
-    } catch (err: any) {
-      const msg = err.message || 'Failed to mark as sent.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to mark as sent.';
       setError(msg);
       alert(msg);
     } finally {
@@ -554,8 +557,8 @@ export default function TeamsPage() {
 
       setSuccessBanner(`Invitation for ${team.name} has been revoked.`);
       await refreshTeams();
-    } catch (err: any) {
-      const msg = err.message || 'Failed to revoke invitation.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to revoke invitation.';
       setError(msg);
       alert(msg);
     } finally {
@@ -586,7 +589,7 @@ export default function TeamsPage() {
   };
 
   const handleToggleAccess = async (team: Team) => {
-    const isCurrentlyActive = team.portalAccess && (team as any).status !== 'DISABLED';
+    const isCurrentlyActive = team.portalAccess && team.status !== 'DISABLED';
     const newTarget = !isCurrentlyActive;
 
     setActionLoadingId(team.id);
@@ -614,8 +617,8 @@ export default function TeamsPage() {
       updateTeam(team.id, { portalAccess: newTarget });
       setSuccessBanner(`Team "${team.name}" status updated to ${newTarget ? 'ACTIVE' : 'DISABLED'}.`);
       await refreshTeams();
-    } catch (err: any) {
-      const msg = err.message || 'Error toggling team status.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error toggling team status.';
       setError(msg);
       alert(msg);
     } finally {
@@ -893,14 +896,14 @@ export default function TeamsPage() {
                               disabled={actionLoadingId === t.id}
                               onClick={() => handleToggleAccess(t)}
                               className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-colors ${
-                                t.portalAccess && (t as any).status !== 'DISABLED'
+                                t.portalAccess && t.status !== 'DISABLED'
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                                   : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                               }`}
                             >
                               {actionLoadingId === t.id
                                 ? 'UPDATING...'
-                                : t.portalAccess && (t as any).status !== 'DISABLED'
+                                : t.portalAccess && t.status !== 'DISABLED'
                                 ? 'ACTIVE'
                                 : 'DISABLED'}
                             </button>
@@ -1262,8 +1265,8 @@ export default function TeamsPage() {
                 <span>Security Guidance for Administrators</span>
               </div>
               <p className="leading-relaxed">
-                Click <strong>"Copy Invitation Message"</strong> and paste it directly into WhatsApp with the manager.
-                The <strong>"Open WhatsApp"</strong> button strictly opens the recipient&apos;s phone number without transmitting any secret token in URL query parameters.
+                Click <strong>&quot;Copy Invitation Message&quot;</strong> and paste it directly into WhatsApp with the manager.
+                The <strong>&quot;Open WhatsApp&quot;</strong> button strictly opens the recipient&apos;s phone number without transmitting any secret token in URL query parameters.
               </p>
             </div>
           </div>

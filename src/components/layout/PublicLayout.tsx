@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
-import { Trophy, Search, Sparkles, Award, FileText, Menu, X } from 'lucide-react';
+import { Trophy, Search, Sparkles, FileText, Menu, X } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -77,11 +77,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
     <div 
       className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors"
       style={{
-        ['--fest-primary' as any]: theme.primaryColor,
-        ['--fest-secondary' as any]: theme.secondaryColor || '#111111',
-        ['--fest-accent' as any]: theme.accentColor,
+        '--fest-primary': theme.primaryColor,
+        '--fest-secondary': theme.secondaryColor || '#111111',
+        '--fest-accent': theme.accentColor,
         fontFamily: theme.bodyFont ? `${theme.bodyFont}, Montserrat, sans-serif` : 'Montserrat, sans-serif'
-      }}
+      } as React.CSSProperties}
     >
 
       {/* Top Festival Announcement Bar */}

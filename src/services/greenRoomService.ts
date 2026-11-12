@@ -14,14 +14,13 @@ import { randomUUID } from 'crypto';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { AuthService } from './authService';
 import {
-  indexToCodeLetter,
   codeLetterToIndex,
   isValidCodeLetter,
   getNextAvailableCodeLetter,
   parseParticipantQrPayload
 } from '@/domain/greenRoom';
 import { QrSignerService } from './qrSignerService';
-import { GreenRoomAssignment, GreenRoomContestantStatus } from '@/types/fest';
+import { GreenRoomContestantStatus } from '@/types/fest';
 import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firestore';
 
 export interface CheckInContestantParams {
@@ -133,7 +132,7 @@ export class GreenRoomService {
       throw new Error(`Validation Error: No registrations found for competition "${compData.name}".`);
     }
 
-    let matchingRegDoc = regsSnap.docs.find(doc => {
+    const matchingRegDoc = regsSnap.docs.find(doc => {
       const data = doc.data();
       const cleanChest = (data.chestNumber || '').toString().trim().toUpperCase();
       const cleanBib = (data.bib || '').toString().trim().toUpperCase();

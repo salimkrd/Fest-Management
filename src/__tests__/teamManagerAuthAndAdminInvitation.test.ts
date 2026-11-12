@@ -27,12 +27,11 @@ import {
   signOut,
   Auth as ClientAuth
 } from 'firebase/auth';
-import { getFirestore as getClientFirestore, connectFirestoreEmulator, doc, getDoc, Firestore as ClientFirestore } from 'firebase/firestore';
+import { getFirestore as getClientFirestore, connectFirestoreEmulator, Firestore as ClientFirestore } from 'firebase/firestore';
 import { TeamService } from '@/services/teamService';
 import { AuthService } from '@/services/authService';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb } from '@/lib/firebase/admin';
 import { POST as revokeInvitationRoute } from '@/app/api/admin/teams/[id]/revoke-invitation/route';
-import { POST as generateInvitationRoute } from '@/app/api/admin/teams/[id]/generate-invitation/route';
 import { GET as getTeamRoute } from '@/app/api/team/[id]/route';
 import { NextRequest } from 'next/server';
 

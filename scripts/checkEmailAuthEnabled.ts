@@ -14,15 +14,17 @@ async function checkAuthConfig() {
   const auth = getAuth(app);
 
   try {
-    const projectConfig = await (auth as any).projectConfigManager().getProjectConfig();
+    const authManager = auth as unknown as { projectConfigManager: () => { getProjectConfig: () => Promise<unknown> } };
+    const projectConfig = await authManager.projectConfigManager().getProjectConfig();
     console.log('Project Config raw:', JSON.stringify(projectConfig, null, 2));
-  } catch (err: any) {
-    console.log('projectConfigManager() error:', err.message);
+  } catch (err: unknown) {
+    console.log('projectConfigManager() error:', err instanceof Error ? err.message : String(err));
   }
 
   // Also query Identity Toolkit config endpoint directly with OAuth2 token
   try {
-    const token = await (app.options.credential as any).getAccessToken();
+    const cred = app.options.credential as unknown as { getAccessToken: () => Promise<{ access_token: string }> };
+    const token = await cred.getAccessToken();
     const res = await fetch('https://identitytoolkit.googleapis.com/v1/projects/inspirath-d6778/config', {
       headers: {
         'Authorization': `Bearer ${token.access_token}`
@@ -30,8 +32,8 @@ async function checkAuthConfig() {
     });
     const data = await res.json();
     console.log('Identity Toolkit Config Endpoint:', JSON.stringify(data, null, 2));
-  } catch (err: any) {
-    console.log('Fetch error:', err.message);
+  } catch (err: unknown) {
+    console.log('Fetch error:', err instanceof Error ? err.message : String(err));
   }
 }
 

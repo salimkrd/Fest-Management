@@ -21,7 +21,8 @@ import {
   Menu,
   X,
   Bell,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import { useFest } from '@/context/FestContext';
 import { auth, db } from '@/lib/firebase/client';
@@ -39,11 +40,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authorizedUser, setAuthorizedUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'ADMIN' | 'GREEN_ROOM_STAFF' | null>(null);
-  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [authChecking, setAuthChecking] = useState<boolean>(() => Boolean(auth));
 
   useEffect(() => {
     if (!auth) {
-      setAuthChecking(false);
       router.replace('/admin/login');
       return;
     }
@@ -139,6 +139,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   }, [router, pathname]);
 
   const handleSignOut = async () => {
+    setMobileMenuOpen(false);
     if (auth) {
       try {
         await signOut(auth);
@@ -341,6 +342,32 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   );
                 })}
               </nav>
+
+              {/* Mobile Drawer Footer: User Profile & Visible Sign Out Button */}
+              <div className="pt-4 border-t border-[#E1E7EF] bg-white mt-auto">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center justify-center shrink-0">
+                    {userInitials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-bold text-[#111111] truncate block">
+                      {userRole === 'GREEN_ROOM_STAFF' ? 'Green Room Staff' : 'Chief Administrator'}
+                    </span>
+                    <span className="text-[10px] text-[#526070] truncate block">
+                      {authorizedUser.email || 'admin@fest.institution.org'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold text-[#DC2626] bg-red-50 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
+                  title="Sign out of Fest Administrator"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Exit / Sign Out</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

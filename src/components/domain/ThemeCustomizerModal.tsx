@@ -6,7 +6,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Palette, CheckCircle2, Eye, ShieldCheck, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Palette, CheckCircle2, Eye, ShieldCheck, Image as ImageIcon } from 'lucide-react';
+import Image from 'next/image';
+import { PublicThemeSettings } from '@/types/fest';
 import Link from 'next/link';
 
 interface ThemeCustomizerModalProps {
@@ -60,8 +62,8 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
         setSaved(false);
         onClose();
       }, 1200);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update theme.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update theme.');
     } finally {
       setSaving(false);
     }
@@ -100,6 +102,8 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
               variant="primary"
               size="sm"
               onClick={handleSave}
+              isLoading={saving}
+              disabled={saving}
               leftIcon={<Palette className="w-4 h-4" />}
             >
               Save &amp; Publish Theme
@@ -268,7 +272,7 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
           <Select
             label="Background Style"
             value={backgroundStyle}
-            onChange={(e) => setBackgroundStyle(e.target.value as any)}
+            onChange={(e) => setBackgroundStyle(e.target.value as PublicThemeSettings['backgroundStyle'])}
             options={[
               { value: 'clean-white', label: 'Clean White Minimalist' },
               { value: 'subtle-pattern', label: 'Subtle Geometric Grid' },
@@ -280,7 +284,7 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
           <Select
             label="Result Card Styling"
             value={cardStyle}
-            onChange={(e) => setCardStyle(e.target.value as any)}
+            onChange={(e) => setCardStyle(e.target.value as PublicThemeSettings['cardStyle'])}
             options={[
               { value: 'elevated', label: 'Elevated (Soft Shadow)' },
               { value: 'bordered', label: 'Bordered (Clean Lines)' },
@@ -305,7 +309,7 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
           >
             <div className="flex items-center gap-3">
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-white/10 p-1" />
+                <Image unoptimized src={logoUrl} alt="Logo" width={40} height={40} className="w-10 h-10 object-contain rounded-lg bg-white/10 p-1" />
               ) : (
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-lg">
                   {festivalName.charAt(0)}

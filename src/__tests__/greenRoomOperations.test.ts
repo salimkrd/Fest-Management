@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { initializeApp, getApps, deleteApp } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp as initClientApp, deleteApp as deleteClientApp, FirebaseApp } from 'firebase/app';
@@ -30,13 +30,9 @@ import { GreenRoomService } from '@/services/greenRoomService';
 import { AuthService } from '@/services/authService';
 import { JudgeService } from '@/services/judgeService';
 import {
-  indexToCodeLetter,
-  codeLetterToIndex,
-  getNextAvailableCodeLetter,
   encodeParticipantQrPayload,
   parseParticipantQrPayload,
-  generateQrVerificationToken,
-  verifyQrVerificationToken
+  generateQrVerificationToken
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
 import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
@@ -665,9 +661,9 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
   });
 
   describe('6. Anonymous Judge Login & Marking Security Resolution', () => {
-    let judgeAccessCode = 'JRY-GR-TEST';
-    let judgeSecret = 'jury1234';
-    let assignmentId = 'asgn-gr-test';
+    const judgeAccessCode = 'JRY-GR-TEST';
+    const judgeSecret = 'jury1234';
+    const assignmentId = 'asgn-gr-test';
 
     beforeAll(async () => {
       const salt = 'random_salt_gr_test';
@@ -714,7 +710,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(data.contestants.length).toBeGreaterThanOrEqual(2);
 
       // Verify zero personal identity leakage in contestants array
-      data.contestants.forEach((c: any) => {
+      data.contestants.forEach((c: Record<string, unknown>) => {
         expect(c.codeLetter).toBeDefined();
         expect(c.participantName).toBeUndefined();
         expect(c.name).toBeUndefined();
@@ -1502,8 +1498,9 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         // Spy on validateScoresPayload to simulate a concurrent race condition:
         // validateScoresPayload validates that 'A' maps to 'reg-stale-1'.
         // Right after validation returns and before transaction runs, reg-stale-1's codeLetter is modified backstage to 'X'!
-        const origValidate = (JudgeService as any).validateScoresPayload;
-        const spy = vi.spyOn(JudgeService as any, 'validateScoresPayload').mockImplementation(async function(this: any, ...args: any[]) {
+        const judgeServiceTarget = JudgeService as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+        const origValidate = judgeServiceTarget.validateScoresPayload;
+        const spy = vi.spyOn(judgeServiceTarget, 'validateScoresPayload').mockImplementation(async function(this: unknown, ...args: unknown[]) {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
             codeLetter: 'X',
@@ -1536,8 +1533,9 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
 
       it('rejects submitMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
         // Simulate a backstage race condition for submitMarks:
-        const origValidate = (JudgeService as any).validateScoresPayload;
-        const spy = vi.spyOn(JudgeService as any, 'validateScoresPayload').mockImplementation(async function(this: any, ...args: any[]) {
+        const judgeServiceTarget = JudgeService as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+        const origValidate = judgeServiceTarget.validateScoresPayload;
+        const spy = vi.spyOn(judgeServiceTarget, 'validateScoresPayload').mockImplementation(async function(this: unknown, ...args: unknown[]) {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
             codeLetter: 'Z',

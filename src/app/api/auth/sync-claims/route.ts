@@ -73,8 +73,8 @@ export async function POST(req: NextRequest) {
       role: targetRole,
       teamId: targetTeamId
     }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[API sync-claims] Error reconciling claims:', err);
-    return NextResponse.json({ error: err.message || 'Claims reconciliation failed.' }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Claims reconciliation failed.' }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
-import { CompetitionResult, ResultStatus, ResultRank } from '@/types/fest';
+import { CompetitionResult, ResultStatus } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -16,11 +16,8 @@ import {
   Globe,
   RotateCcw,
   Sparkles,
-  Trophy,
   ShieldAlert,
-  FileCheck,
-  AlertTriangle,
-  Send
+  FileCheck
 } from 'lucide-react';
 import Link from 'next/link';
 

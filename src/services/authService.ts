@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { FirestoreUser, UserRole } from '@/types/firestore';
+import { FirestoreUser, UserRole, FirestoreJudgeAssignment } from '@/types/firestore';
 import { verifyJudgeAssignment } from '@/domain/judgeAuth';
 
 export interface VerifiedUserContext {
@@ -50,8 +50,10 @@ export class AuthService {
     let decoded;
     try {
       decoded = await auth.verifyIdToken(idToken, true);
-    } catch (tokenErr: any) {
-      throw new Error(`Unauthorized: Invalid or malformed authentication token (${tokenErr.code || tokenErr.message}).`);
+    } catch (tokenErr: unknown) {
+      const code = typeof tokenErr === 'object' && tokenErr !== null && 'code' in tokenErr ? String((tokenErr as { code: unknown }).code) : '';
+      const message = tokenErr instanceof Error ? tokenErr.message : String(tokenErr);
+      throw new Error(`Unauthorized: Invalid or malformed authentication token (${code || message}).`);
     }
 
     const tokenRole = (decoded.role as UserRole) || 'PUBLIC';
@@ -218,7 +220,10 @@ export class AuthService {
       throw new Error('Unauthorized: Judge assignment not found.');
     }
 
-    const assignment = docSnap.data() as any;
+    const assignment: FirestoreJudgeAssignment = {
+      ...(docSnap.data() as FirestoreJudgeAssignment),
+      id: docSnap.id
+    };
 
     // Check revocation and expiration
     if (assignment.revoked || assignment.status === 'REVOKED') {
@@ -372,8 +377,9 @@ export class AuthService {
         });
         uid = userRecord.uid;
         authUserCreated = true;
-      } catch (err: any) {
-        if (err.code === 'auth/email-already-exists') {
+      } catch (err: unknown) {
+        const errCode = typeof err === 'object' && err !== null && 'code' in err ? (err as { code: unknown }).code : '';
+        if (errCode === 'auth/email-already-exists') {
           const existing = await auth.getUserByEmail(params.email);
           uid = existing.uid;
         } else {
@@ -413,7 +419,7 @@ export class AuthService {
 
       console.log(`[AuthService] Successfully bootstrapped initial Chief Admin: ${params.email} (${uid})`);
       return { uid, email: params.email };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Failure Recovery with Ownership Verification:
       if (lockAcquired) {
         // Rollback partial Auth user if created in this failed run
@@ -485,8 +491,9 @@ export class AuthService {
         displayName: params.displayName
       });
       uid = userRecord.uid;
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-exists') {
+    } catch (err: unknown) {
+      const errCode = typeof err === 'object' && err !== null && 'code' in err ? (err as { code: unknown }).code : '';
+      if (errCode === 'auth/email-already-exists') {
         const existing = await auth.getUserByEmail(params.email);
         uid = existing.uid;
       } else {

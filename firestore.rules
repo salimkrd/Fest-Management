@@ -69,6 +69,24 @@ service cloud.firestore {
         request.time.toMillis() < get(/databases/$(database)/documents/judgeAssignments/$(assignmentId)).data.expiresAtMs;
     }
 
+    function validParticipantUpdate() {
+      // Explicit allowlist: Team Manager can ONLY update legitimate profile fields.
+      // All server-managed and protected fields (categoryId, categoryName, registeredEventIds, bib,
+      // idStatus, teamId, teamCode, teamName, id, createdAt, role, scores, totalPoints, etc.)
+      // and any arbitrary unknown fields are strictly blocked.
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name',
+        'email',
+        'phone',
+        'classGrade',
+        'division',
+        'dob',
+        'photoUrl',
+        'remarks',
+        'updatedAt'
+      ]);
+    }
+
 
 
     // ==========================================
@@ -114,10 +132,23 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isSignedIn() && isTeamManager(request.resource.data.teamId)
       );
-      allow update: if isAdmin() || (
-        isSignedIn() && 
-        isTeamManager(resource.data.teamId) && 
-        request.resource.data.teamId == resource.data.teamId
+      allow update: if (
+        // 1. ALL client SDK updates (including Admin) MUST preserve existing categoryId.
+        // Category switching MUST go through authorized Server API (PATCH /api/participants/[id])
+        // which performs atomic registration conflict validation.
+        (
+          (!('categoryId' in request.resource.data) && !('categoryId' in resource.data)) ||
+          (('categoryId' in request.resource.data) && ('categoryId' in resource.data) && request.resource.data.categoryId == resource.data.categoryId)
+        ) &&
+        // 2. Authorization: Admin OR Team Manager for their own team with field-level protection
+        (
+          isAdmin() || (
+            isSignedIn() && 
+            isTeamManager(resource.data.teamId) && 
+            request.resource.data.teamId == resource.data.teamId &&
+            validParticipantUpdate()
+          )
+        )
       );
       allow delete: if isAdmin() || (
         isSignedIn() && isTeamManager(resource.data.teamId)

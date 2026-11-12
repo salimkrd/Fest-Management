@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { BaseExternalAccountClient } from 'google-auth-library';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -188,8 +189,9 @@ describe('Workload Identity Federation for Firebase Admin', () => {
 
       const client = buildWorkloadIdentityClient(STAGING_PROJECT_ID);
       expect(client).toBeDefined();
-      expect((client as any).audience).toBe('//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider');
-      expect((client as any).serviceAccountImpersonationUrl).toBe('https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com:generateAccessToken');
+      const clientWithProps = client as unknown as { audience?: string; serviceAccountImpersonationUrl?: string };
+      expect(clientWithProps.audience).toBe('//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider');
+      expect(clientWithProps.serviceAccountImpersonationUrl).toBe('https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com:generateAccessToken');
     });
 
     it('preserves existing audience prefix if already supplied with //', () => {
@@ -197,7 +199,8 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       process.env.GCP_SERVICE_ACCOUNT_EMAIL = 'vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com';
 
       const client = buildWorkloadIdentityClient(STAGING_PROJECT_ID);
-      expect((client as any).audience).toBe('//iam.googleapis.com/projects/999/locations/global/workloadIdentityPools/p/providers/pr');
+      const clientWithProps = client as unknown as { audience?: string };
+      expect(clientWithProps.audience).toBe('//iam.googleapis.com/projects/999/locations/global/workloadIdentityPools/p/providers/pr');
     });
 
     it('supports full GCP credential config JSON in GCP_WORKLOAD_IDENTITY_CONFIG', () => {
@@ -211,7 +214,8 @@ describe('Workload Identity Federation for Firebase Admin', () => {
 
       const client = buildWorkloadIdentityClient(STAGING_PROJECT_ID);
       expect(client).toBeDefined();
-      expect((client as any).audience).toBe('//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/p/providers/pr');
+      const clientWithProps = client as unknown as { audience?: string };
+      expect(clientWithProps.audience).toBe('//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/p/providers/pr');
     });
 
     it('creates WorkloadIdentityCredential wrapping the client', () => {
@@ -225,13 +229,13 @@ describe('Workload Identity Federation for Firebase Admin', () => {
 
   describe('WorkloadIdentityCredential token retrieval', () => {
     it('returns access token and computes expires_in from expiry_date', async () => {
-      const mockClient: any = {
+      const mockClient = {
         getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-shortlived-token' }),
         cachedAccessToken: {
           access_token: 'mock-shortlived-token',
           expiry_date: Date.now() + 1800 * 1000 // 30 minutes from now
         }
-      };
+      } as unknown as BaseExternalAccountClient;
 
       const credential = new WorkloadIdentityCredential(mockClient);
       const token = await credential.getAccessToken();
@@ -242,10 +246,10 @@ describe('Workload Identity Federation for Firebase Admin', () => {
     });
 
     it('defaults expires_in to 3600 seconds when cached expiry_date is absent', async () => {
-      const mockClient: any = {
+      const mockClient = {
         getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-token-no-cache' }),
         cachedAccessToken: null
-      };
+      } as unknown as BaseExternalAccountClient;
 
       const credential = new WorkloadIdentityCredential(mockClient);
       const token = await credential.getAccessToken();
@@ -255,9 +259,9 @@ describe('Workload Identity Federation for Firebase Admin', () => {
     });
 
     it('throws error when client returns an empty token', async () => {
-      const mockClient: any = {
+      const mockClient = {
         getAccessToken: vi.fn().mockResolvedValue({ token: null })
-      };
+      } as unknown as BaseExternalAccountClient;
 
       const credential = new WorkloadIdentityCredential(mockClient);
       await expect(credential.getAccessToken()).rejects.toThrow(/Failed to acquire access token/);
@@ -299,7 +303,7 @@ describe('Workload Identity Federation for Firebase Admin', () => {
   describe('Firestore SDK Credential Initialization Regression Test', () => {
     it('catches original error: rejects custom Credential class when initializing Firestore client', async () => {
       // Re-create the original bug: initializing Firebase Admin app with a custom Credential instance
-      const customCred = new WorkloadIdentityCredential({} as any);
+      const customCred = new WorkloadIdentityCredential({} as unknown as BaseExternalAccountClient);
       const reproAppName = `repro-custom-cred-${Date.now()}`;
       const reproApp = initializeApp(
         {

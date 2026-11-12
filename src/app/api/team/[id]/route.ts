@@ -42,9 +42,9 @@ export async function GET(
         managerEmail: team.managerEmail || ''
       }
     }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: err.message || 'Internal Server Error' },
+      { error: err instanceof Error ? err.message : 'Internal Server Error' },
       { status: 500 }
     );
   }

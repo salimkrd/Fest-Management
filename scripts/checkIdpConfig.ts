@@ -10,7 +10,8 @@ async function checkIdentityToolkitEndpoints() {
     projectId: 'inspirath-d6778'
   }, 'id-toolkit-check');
 
-  const tokenObj = await (app.options.credential as any).getAccessToken();
+  const cred = app.options.credential as unknown as { getAccessToken: () => Promise<{ access_token: string }> };
+  const tokenObj = await cred.getAccessToken();
   const token = tokenObj.access_token;
 
   const endpoints = [
@@ -38,8 +39,8 @@ async function checkIdentityToolkitEndpoints() {
       } catch {
         console.log('Response text (first 200 chars):', text.slice(0, 200));
       }
-    } catch (e: any) {
-      console.log('Error:', e.message);
+    } catch (e: unknown) {
+      console.log('Error:', e instanceof Error ? e.message : String(e));
     }
   }
 }

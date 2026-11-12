@@ -31,7 +31,7 @@ describe('Phase 3 Step 5: Recurrence Prevention & Fail-Closed Safeguards', () =>
   });
 
   it('1. Fails closed with error if test attempts to initialize Admin SDK targeting inspirath-d6778', () => {
-    (process.env as any).NODE_ENV = 'test';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
     process.env.FIREBASE_ADMIN_PROJECT_ID = 'inspirath-d6778';
     delete process.env.ALLOW_PROD_TEST_READONLY;
 
@@ -41,7 +41,7 @@ describe('Phase 3 Step 5: Recurrence Prevention & Fail-Closed Safeguards', () =>
   });
 
   it('2. Fails closed if test execution tries to fall back to live credentials when emulator is missing', () => {
-    (process.env as any).NODE_ENV = 'test';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
     process.env.FIREBASE_ADMIN_PROJECT_ID = 'demo-sahithyolsav-2025';
     delete process.env.FIRESTORE_EMULATOR_HOST;
     delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
@@ -57,7 +57,7 @@ describe('Phase 3 Step 5: Recurrence Prevention & Fail-Closed Safeguards', () =>
   });
 
   it('3. Ensures emulator is prioritized first and never uses live credentials when emulator is enabled', () => {
-    (process.env as any).NODE_ENV = 'test';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
     process.env.FIREBASE_ADMIN_PROJECT_ID = 'demo-sahithyolsav-2025';
     process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
     process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';

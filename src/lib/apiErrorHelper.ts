@@ -10,8 +10,13 @@ import { NextResponse } from 'next/server';
  * - 500 Internal Server Error for unhandled exceptions.
  * Never leaks raw stack traces or internal implementation details.
  */
-export function handleApiError(err: any): NextResponse {
-  const rawMessage: string = err?.message || 'Internal Server Error';
+export function handleApiError(err: unknown): NextResponse {
+  const rawMessage: string =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err !== null && 'message' in err
+      ? String((err as { message: unknown }).message)
+      : 'Internal Server Error';
   const lower = rawMessage.toLowerCase();
 
   // 1. Authentication failures (Missing, Expired, Malformed, or Argument Error)

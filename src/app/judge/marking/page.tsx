@@ -6,7 +6,6 @@ import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { useFest } from '@/context/FestContext';
 import { calculateGrade } from '@/domain/scoring';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import {
   Gavel,
@@ -17,10 +16,8 @@ import {
   Send,
   AlertTriangle,
   Clock,
-  ShieldCheck,
-  Award
+  ShieldCheck
 } from 'lucide-react';
-import { indexToCodeLetter } from '@/domain/greenRoom';
 
 interface LocalScore {
   [criterionId: string]: number;
@@ -38,14 +35,15 @@ function JudgeMarkingContent() {
   const { competitions } = useFest();
 
   const compId = searchParams.get('competitionId') || 'cmp-1';
-  const token = searchParams.get('token') || 'JRY-9921-EN';
 
   const [sessionData] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
         const raw = sessionStorage.getItem('judge_session');
         if (raw) return JSON.parse(raw);
-      } catch (e) {}
+      } catch {
+        // ignore parse error
+      }
     }
     return null;
   });
@@ -56,10 +54,10 @@ function JudgeMarkingContent() {
   const contestants: AnonymousContestant[] = useMemo(() => {
     const rawList = sessionData?.contestants || sessionData?.registrations || [];
     if (Array.isArray(rawList) && rawList.length > 0) {
-      return rawList
-        .filter((item: any) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
-        .map((item: any, idx: number) => ({
-          codeLetter: item.codeLetter || item.id,
+      return (rawList as Array<{ id?: string; codeLetter?: string; codeIndex?: number; status?: string }>)
+        .filter((item) => item.codeLetter || (item.id && /^[A-Z]{1,2}$/.test(item.id)))
+        .map((item, idx: number) => ({
+          codeLetter: item.codeLetter || item.id || '',
           codeIndex: typeof item.codeIndex === 'number' ? item.codeIndex : idx,
           status: item.status || 'CHECKED_IN'
         }))
@@ -92,7 +90,6 @@ function JudgeMarkingContent() {
     return initial;
   });
 
-  const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [draftSavedNotice, setDraftSavedNotice] = useState(false);

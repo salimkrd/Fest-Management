@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
-import { Plus, Search, Edit2, Trash2, IdCard, Users } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
 
 export default function TeamParticipantsPage() {
   const { currentTeamUser, teams, participants, categories, addParticipant, updateParticipant, deleteParticipant } = useFest();

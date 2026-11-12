@@ -11,10 +11,8 @@
 
 import {
   Grade,
-  PrizePosition,
   CompetitionType,
-  getChampionshipPoints,
-  normalizePosition
+  getChampionshipPoints
 } from './scoring';
 
 export type ResultStatus =
@@ -220,7 +218,6 @@ export function recalculateTeamChampionship(
   });
 
   // Assign rankings (handling true ties by sharing rank)
-  let currentRank = 1;
   for (let i = 0; i < teamList.length; i++) {
     if (i > 0) {
       const prev = teamList[i - 1];

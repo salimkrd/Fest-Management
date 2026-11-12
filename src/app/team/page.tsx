@@ -14,14 +14,11 @@ import {
   Award,
   PlusCircle,
   Calendar,
-  IdCard,
-  ChevronRight,
-  ArrowRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 
 export default function TeamManagerDashboardPage() {
-  const { currentTeamUser, teams, participants, registrations, schedules, results } = useFest();
+  const { currentTeamUser, teams, participants, registrations, schedules } = useFest();
   const team = currentTeamUser || teams[0];
 
   // Scoped team data

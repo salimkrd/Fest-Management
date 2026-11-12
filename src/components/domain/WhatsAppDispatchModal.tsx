@@ -5,7 +5,7 @@ import { MarkEntry } from '@/types/fest';
 import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Copy, Check, MessageSquare, ExternalLink, ShieldCheck, Key } from 'lucide-react';
+import { Copy, Check, MessageSquare, ShieldCheck, Key } from 'lucide-react';
 import { buildWhatsAppDispatchUrl } from '@/domain/judgeAuth';
 
 interface WhatsAppDispatchModalProps {

@@ -1,5 +1,5 @@
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 
@@ -23,7 +23,7 @@ async function investigate() {
 
   // 1. INVESTIGATE FIREBASE AUTH USERS
   console.log('1. Checking ALL Firebase Auth Users...');
-  const userRecords: any[] = [];
+  const userRecords: UserRecord[] = [];
   let pageToken: string | undefined = undefined;
   do {
     const listResult = await auth.listUsers(1000, pageToken);

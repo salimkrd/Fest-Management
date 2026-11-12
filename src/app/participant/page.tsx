@@ -45,7 +45,17 @@ export default function ParticipantDashboard() {
     }
   }, [router]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      if (active) {
+        await refresh();
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [refresh]);
 
   const logout = async () => {
     try {

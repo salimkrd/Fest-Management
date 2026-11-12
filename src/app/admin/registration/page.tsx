@@ -4,13 +4,12 @@ import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
-import { Registration, CompetitionType } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Check, X, Trash2, ClipboardList, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Check, Trash2 } from 'lucide-react';
 
 export default function RegistrationManagementPage() {
   const { registrations, teams, categories, competitions, participants, addRegistration, updateRegistrationStatus, deleteRegistration } = useFest();
@@ -151,8 +150,8 @@ export default function RegistrationManagementPage() {
         status: 'APPROVED'
       });
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save registration.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save registration.');
     } finally {
       setSaving(false);
     }
@@ -162,8 +161,8 @@ export default function RegistrationManagementPage() {
     if (confirm(`Are you sure you want to revoke registration for "${name}"?`)) {
       try {
         await deleteRegistration(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete registration.');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to delete registration.');
       }
     }
   };
@@ -322,7 +321,7 @@ export default function RegistrationManagementPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="sm" onClick={handleSave} isLoading={saving} disabled={saving}>
                 Confirm Registration
               </Button>
             </div>

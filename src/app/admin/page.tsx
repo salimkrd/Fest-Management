@@ -12,7 +12,6 @@ import {
   Trophy,
   CheckCircle2,
   Clock,
-  ArrowRight,
   ExternalLink,
   PlusCircle,
   FileSpreadsheet,

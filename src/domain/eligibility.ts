@@ -1,12 +1,43 @@
-import { Category, Participant } from '@/types/fest';
+import { Category, CategoryParticipantEligibility, Participant } from '@/types/fest';
+
+/**
+ * Resolves the category eligibility policy, falling back to legacy General/Open heuristics
+ * for existing category documents in Firestore that pre-date the explicit participantEligibility property.
+ */
+export function resolveCategoryEligibilityPolicy(category?: Category): CategoryParticipantEligibility {
+  if (!category) return 'CATEGORY_ONLY';
+
+  if (category.participantEligibility === 'OPEN_TO_ALL') {
+    return 'OPEN_TO_ALL';
+  }
+  if (category.participantEligibility === 'CATEGORY_ONLY') {
+    return 'CATEGORY_ONLY';
+  }
+
+  // Backward-compatibility fallback for existing/legacy categories without explicit participantEligibility
+  const code = (category.code || '').trim().toUpperCase();
+  const id = (category.id || '').trim().toLowerCase();
+  const name = (category.name || '').trim().toLowerCase();
+
+  const isLegacyGeneral =
+    code === 'CAT-GEN' ||
+    code === 'GEN' ||
+    id === 'cat-4' ||
+    id === 'cat-gen' ||
+    name === 'general' ||
+    name === 'general category' ||
+    name === 'campus wide' ||
+    name === 'campus-wide';
+
+  return isLegacyGeneral ? 'OPEN_TO_ALL' : 'CATEGORY_ONLY';
+}
 
 /**
  * Determines whether a participant is eligible to register for a given category/competition.
  * 
  * Rules:
- * 1. "General" tier is an Open / Campus-Wide tier ("All Eligible Students") where ANY enrolled
- *    participant from any academic category (Sub Junior, Junior, Senior) is eligible.
- * 2. For specific categories (Sub Junior, Junior, Senior), participants must match the category
+ * 1. OPEN_TO_ALL: Open to ANY enrolled participant from any academic category (Sub Junior, Junior, Senior, etc.).
+ * 2. CATEGORY_ONLY: Restricted to participants whose assigned category matches the target category
  *    either by direct categoryId, normalized categoryName ("Senior" === "Senior"), or standard aliases.
  */
 export function isParticipantEligibleForCategory(
@@ -16,35 +47,26 @@ export function isParticipantEligibleForCategory(
 ): boolean {
   if (!targetCategory) return true;
 
-  // 1. General tier is open to ALL students across the institution / campus
-  const isGeneralTier =
-    targetCategory.code?.toUpperCase() === 'CAT-GEN' ||
-    targetCategory.code?.toUpperCase() === 'GEN' ||
-    targetCategory.name?.trim().toLowerCase() === 'general' ||
-    targetCategory.name?.trim().toLowerCase().includes('general') ||
-    targetCategory.id?.toLowerCase() === 'cat-4' ||
-    targetCategory.id?.toLowerCase() === 'cat-gen' ||
-    targetCategory.id?.toLowerCase().includes('gen') ||
-    targetCategory.eligibility?.toLowerCase().includes('all') ||
-    targetCategory.classRange?.toLowerCase().includes('campus');
-
-  if (isGeneralTier) {
+  // 1. If category policy is OPEN_TO_ALL, all participants are eligible regardless of category
+  const policy = resolveCategoryEligibilityPolicy(targetCategory);
+  if (policy === 'OPEN_TO_ALL') {
     return true;
   }
 
-  // 2. Direct ID match
+  // 2. Policy is CATEGORY_ONLY: verify matching category
+  // Direct ID match
   if (participant.categoryId && participant.categoryId === targetCategory.id) {
     return true;
   }
 
-  // 3. Name normalization match (e.g. "Senior" === "Senior")
+  // Name normalization match (e.g. "Senior" === "Senior")
   const partName = participant.categoryName?.trim().toLowerCase();
   const targetName = targetCategory.name?.trim().toLowerCase();
   if (partName && targetName && partName === targetName) {
     return true;
   }
 
-  // 4. Resolve participant's category from allCategories if participant has categoryId
+  // Resolve participant's category from allCategories if participant has categoryId
   if (allCategories && participant.categoryId) {
     const partCat = allCategories.find(c => c.id === participant.categoryId);
     if (partCat) {
@@ -53,7 +75,7 @@ export function isParticipantEligibleForCategory(
     }
   }
 
-  // 5. Standard tier code and name aliases
+  // Standard tier code and name aliases
   const targetCode = targetCategory.code?.toUpperCase();
   const isTargetSJ = targetCode === 'CAT-SJ' || targetName?.includes('sub') || targetCategory.id === 'cat-1' || targetCategory.id === 'cat-sj';
   const isTargetJR = !isTargetSJ && (targetCode === 'CAT-JR' || targetName === 'junior' || targetCategory.id === 'cat-2' || targetCategory.id === 'cat-jr');

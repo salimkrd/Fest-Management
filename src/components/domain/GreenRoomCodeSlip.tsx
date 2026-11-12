@@ -3,7 +3,7 @@
 import React from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Printer, ShieldAlert, Award, Sparkles } from 'lucide-react';
+import { Printer, ShieldAlert } from 'lucide-react';
 import { FirestoreGreenRoomAssignment } from '@/types/firestore';
 
 interface GreenRoomCodeSlipProps {

@@ -8,7 +8,6 @@ import {
   Users,
   ClipboardCheck,
   Award,
-  Shield,
   LogOut,
   Trophy
 } from 'lucide-react';
@@ -24,7 +23,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { currentTeamUser, setCurrentTeamUser } = useFest();
-  const [checking, setChecking] = React.useState(!currentTeamUser);
+  const checking = !currentTeamUser;
 
   const team = currentTeamUser;
 
@@ -33,11 +32,9 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
       router.push('/team/login');
       return;
     }
-    if (currentTeamUser.portalAccess === false || (currentTeamUser as any).status === 'DISABLED') {
+    if (currentTeamUser.portalAccess === false || (currentTeamUser as { status?: string }).status === 'DISABLED') {
       router.push('/team/login?error=disabled');
-      return;
     }
-    setChecking(false);
   }, [currentTeamUser, router]);
 
   React.useEffect(() => {
@@ -97,30 +94,30 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
       <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-2 sm:mr-0">
               <div 
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shadow-xs"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shadow-xs shrink-0"
                 style={{ backgroundColor: team?.color || '#2563EB' }}
               >
                 {team?.code}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-bold text-[#111111] leading-none">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <h1 className="text-xs sm:text-sm font-bold text-[#111111] leading-none truncate">
                     {team?.name}
                   </h1>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#2563EB] border border-blue-200 shrink-0">
                     CONTINGENT
                   </span>
                 </div>
-                <span className="text-[11px] text-[#526070] font-medium">
+                <span className="text-[10px] sm:text-[11px] text-[#526070] font-medium truncate block">
                   Manager: {team?.managerName} · {team?.zone}
                 </span>
               </div>
             </div>
 
             {/* Right Team Stats & Controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               <div className="hidden sm:flex items-center gap-3 bg-[#F8FAFC] px-3.5 py-1.5 rounded-lg border border-[#E1E7EF] text-xs">
                 <div className="flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5 text-amber-500" />
@@ -135,9 +132,10 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
               </div>
 
               {/* Authenticated Team Contingent Display */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#E1E7EF] bg-white text-xs font-bold text-[#111111]">
+              <div className="hidden min-[375px]:flex items-center gap-1.5 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-[#E1E7EF] bg-white text-xs font-bold text-[#111111] shrink-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>{team?.name} ({team?.code})</span>
+                <span className="hidden sm:inline">{team?.name} </span>
+                <span>({team?.code})</span>
               </div>
 
               <button
@@ -153,8 +151,9 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                   setCurrentTeamUser(null);
                   router.push('/team/login');
                 }}
-                className="p-2 rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 transition-colors"
+                className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-[#526070] hover:text-[#DC2626] hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors shrink-0 cursor-pointer"
                 title="Sign out of Team Workspace"
+                aria-label="Sign out of Team Workspace"
               >
                 <LogOut className="w-4 h-4" />
               </button>

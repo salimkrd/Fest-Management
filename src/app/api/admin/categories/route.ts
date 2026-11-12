@@ -3,13 +3,16 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { AuthService } from '@/services/authService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
-function extractToken(req: NextRequest, body?: any): string {
+function extractToken(req: NextRequest, body?: unknown): string {
   const authorization = req.headers.get('authorization') || '';
   if (authorization.startsWith('Bearer ')) {
     return authorization.slice(7).trim();
   }
-  if (body?.adminIdToken && typeof body.adminIdToken === 'string') {
-    return body.adminIdToken.trim();
+  if (body && typeof body === 'object' && 'adminIdToken' in body) {
+    const adminIdToken = (body as { adminIdToken?: unknown }).adminIdToken;
+    if (typeof adminIdToken === 'string') {
+      return adminIdToken.trim();
+    }
   }
   return '';
 }
@@ -44,7 +47,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    let body: any = {};
+    let body: Record<string, unknown> = {};
     try {
       body = await req.json();
     } catch {
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest) {
       status: body.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
       enrolledCount: typeof body.enrolledCount === 'number' ? body.enrolledCount : 0,
       competitionsCount: typeof body.competitionsCount === 'number' ? body.competitionsCount : 0,
+      participantEligibility: body.participantEligibility === 'OPEN_TO_ALL' ? 'OPEN_TO_ALL' : 'CATEGORY_ONLY',
       createdAt: now,
       updatedAt: now
     };

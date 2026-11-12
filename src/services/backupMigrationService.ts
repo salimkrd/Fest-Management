@@ -17,7 +17,7 @@ import {
   Participant,
   Registration
 } from '@/types/fest';
-import { Firestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { Firestore, collection, getDocs, doc, setDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 
 export interface LocalFestBackupData {
@@ -27,7 +27,7 @@ export interface LocalFestBackupData {
   project: string;
   counts: Record<string, number>;
   data: {
-    theme?: any;
+    theme?: unknown;
     categories?: Category[];
     teams?: Team[];
     competitions?: Competition[];
@@ -35,9 +35,9 @@ export interface LocalFestBackupData {
     schedules?: ScheduleSlot[];
     participants?: Participant[];
     registrations?: Registration[];
-    markEntries?: any[];
-    results?: any[];
-    pointsLedger?: any[];
+    markEntries?: unknown[];
+    results?: unknown[];
+    pointsLedger?: unknown[];
   };
 }
 
@@ -46,7 +46,7 @@ export interface CollectionDryRun<T> {
   totalLocal: number;
   validToMigrate: T[];
   duplicates: Array<{ id: string; nameOrCode: string; reason: string }>;
-  invalid: Array<{ item: any; errors: string[] }>;
+  invalid: Array<{ item: unknown; errors: string[] }>;
 }
 
 export interface DryRunMigrationReport {
@@ -86,11 +86,11 @@ export class BackupMigrationService {
     const schedules = this.parseLocalArray<ScheduleSlot>('fest_schedules_v2');
     const participants = this.parseLocalArray<Participant>('fest_participants_v2');
     const registrations = this.parseLocalArray<Registration>('fest_registrations_v2');
-    const markEntries = this.parseLocalArray<any>('fest_mark_entries_v2');
-    const results = this.parseLocalArray<any>('fest_results_v2');
-    const pointsLedger = this.parseLocalArray<any>('fest_points_ledger_v2');
+    const markEntries = this.parseLocalArray<unknown>('fest_mark_entries_v2');
+    const results = this.parseLocalArray<unknown>('fest_results_v2');
+    const pointsLedger = this.parseLocalArray<unknown>('fest_points_ledger_v2');
 
-    let theme: any = null;
+    let theme: unknown = null;
     if (typeof window !== 'undefined') {
       try {
         const rawTheme = localStorage.getItem('fest_theme_settings_v2');
@@ -178,6 +178,7 @@ export class BackupMigrationService {
     const backup = this.exportLocalBackup();
 
     // Fetch existing live Firestore IDs and codes to detect duplicates
+    const emptySnap = { docs: [] as QueryDocumentSnapshot<DocumentData>[] };
     const [
       catSnap,
       teamSnap,
@@ -187,31 +188,31 @@ export class BackupMigrationService {
       partSnap,
       regSnap
     ] = await Promise.all([
-      getDocs(collection(db, 'categories')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'teams')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'competitions')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'stages')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'schedules')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'participants')).catch(() => ({ docs: [] } as any)),
-      getDocs(collection(db, 'registrations')).catch(() => ({ docs: [] } as any))
+      getDocs(collection(db, 'categories')).catch(() => emptySnap),
+      getDocs(collection(db, 'teams')).catch(() => emptySnap),
+      getDocs(collection(db, 'competitions')).catch(() => emptySnap),
+      getDocs(collection(db, 'stages')).catch(() => emptySnap),
+      getDocs(collection(db, 'schedules')).catch(() => emptySnap),
+      getDocs(collection(db, 'participants')).catch(() => emptySnap),
+      getDocs(collection(db, 'registrations')).catch(() => emptySnap)
     ]);
 
-    const existingCatIds = new Set(catSnap.docs.map((d: any) => d.id));
-    const existingCatCodes = new Set(catSnap.docs.map((d: any) => d.data().code?.toUpperCase()));
+    const existingCatIds = new Set(catSnap.docs.map(d => d.id));
+    const existingCatCodes = new Set(catSnap.docs.map(d => (d.data() as { code?: string }).code?.toUpperCase()));
 
-    const existingTeamIds = new Set(teamSnap.docs.map((d: any) => d.id));
-    const existingTeamCodes = new Set(teamSnap.docs.map((d: any) => d.data().code?.toUpperCase()));
+    const existingTeamIds = new Set(teamSnap.docs.map(d => d.id));
+    const existingTeamCodes = new Set(teamSnap.docs.map(d => (d.data() as { code?: string }).code?.toUpperCase()));
 
-    const existingCompIds = new Set(compSnap.docs.map((d: any) => d.id));
-    const existingCompCodes = new Set(compSnap.docs.map((d: any) => d.data().code?.toUpperCase()));
+    const existingCompIds = new Set(compSnap.docs.map(d => d.id));
+    const existingCompCodes = new Set(compSnap.docs.map(d => (d.data() as { code?: string }).code?.toUpperCase()));
 
-    const existingStageIds = new Set(stageSnap.docs.map((d: any) => d.id));
-    const existingStageCodes = new Set(stageSnap.docs.map((d: any) => d.data().code?.toUpperCase()));
+    const existingStageIds = new Set(stageSnap.docs.map(d => d.id));
+    const existingStageCodes = new Set(stageSnap.docs.map(d => (d.data() as { code?: string }).code?.toUpperCase()));
 
-    const existingSchedIds = new Set(schedSnap.docs.map((d: any) => d.id));
-    const existingPartIds = new Set(partSnap.docs.map((d: any) => d.id));
-    const existingPartBibs = new Set(partSnap.docs.map((d: any) => d.data().bib));
-    const existingRegIds = new Set(regSnap.docs.map((d: any) => d.id));
+    const existingSchedIds = new Set(schedSnap.docs.map(d => d.id));
+    const existingPartIds = new Set(partSnap.docs.map(d => d.id));
+    const existingPartBibs = new Set(partSnap.docs.map(d => (d.data() as { bib?: string }).bib));
+    const existingRegIds = new Set(regSnap.docs.map(d => d.id));
 
     // Demo IDs to skip from migrating
     const DEMO_IDS = new Set([

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Edit2, Trash2, MapPin, Users, Radio, Phone, Music, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin } from 'lucide-react';
 
 export default function StagesPage() {
   const { stages, addStage, updateStage, deleteStage } = useFest();
@@ -88,8 +88,8 @@ export default function StagesPage() {
         await addStage(stageData);
       }
       setModalOpen(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save stage.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save stage.');
     } finally {
       setSaving(false);
     }
@@ -99,8 +99,8 @@ export default function StagesPage() {
     if (confirm(`Are you sure you want to remove stage venue "${name}"?`)) {
       try {
         await deleteStage(id);
-      } catch (err: any) {
-        alert(err?.message || 'Failed to delete stage.');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to delete stage.');
       }
     }
   };
@@ -238,7 +238,7 @@ export default function StagesPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={handleSave}>
+              <Button variant="primary" size="sm" onClick={handleSave} isLoading={saving} disabled={saving}>
                 {editingStage ? 'Update Venue' : 'Save Venue'}
               </Button>
             </div>
@@ -286,7 +286,7 @@ export default function StagesPage() {
               <Select
                 label="Audio / Visual Status"
                 value={audioVisualStatus}
-                onChange={(e) => setAudioVisualStatus(e.target.value as any)}
+                onChange={(e) => setAudioVisualStatus(e.target.value as Stage['audioVisualStatus'])}
                 options={[
                   { value: 'OPERATIONAL', label: 'Operational (Ready)' },
                   { value: 'STANDBY', label: 'Standby (Pre-check)' },

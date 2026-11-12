@@ -11,14 +11,11 @@ import {
   Sparkles,
   ArrowRight,
   Trophy,
-  CheckCircle2,
-  Calendar,
-  Layers,
-  MapPin
+  CheckCircle2
 } from 'lucide-react';
 
 export default function HomePage() {
-  const { theme, teams, competitions, participants, results } = useFest();
+  const { theme, competitions, participants, results } = useFest();
 
   const publishedCount = results.filter(r => r.resultStatus === 'PUBLISHED').length;
 

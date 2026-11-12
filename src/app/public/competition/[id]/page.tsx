@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
@@ -150,9 +151,12 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <div className="w-20 h-20 rounded-full border-4 border-amber-300 mx-auto shadow-md overflow-hidden bg-amber-100 mb-3">
-                  <img
+                  <Image
+                    unoptimized
                     src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
                     alt={rank1.candidateName}
+                    width={80}
+                    height={80}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -186,9 +190,12 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <div className="w-16 h-16 rounded-full border-4 border-slate-200 mx-auto shadow-xs overflow-hidden bg-slate-100 mb-3">
-                  <img
+                  <Image
+                    unoptimized
                     src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80"
                     alt={rank2.candidateName}
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -222,9 +229,12 @@ function CompetitionDetailContent() {
 
               <div className="pt-2">
                 <div className="w-16 h-16 rounded-full border-4 border-amber-100 mx-auto shadow-xs overflow-hidden bg-amber-50 mb-3">
-                  <img
+                  <Image
+                    unoptimized
                     src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80"
                     alt={rank3.candidateName}
+                    width={64}
+                    height={64}
                     className="w-full h-full object-cover"
                   />
                 </div>

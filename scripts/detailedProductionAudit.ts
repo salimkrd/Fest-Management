@@ -1,5 +1,5 @@
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 
@@ -22,7 +22,7 @@ async function fullAudit() {
   console.log('=== FULL PRODUCTION AUDIT: inspirath-d6778 ===\n');
 
   // 1. Auth Users
-  const userRecords: any[] = [];
+  const userRecords: UserRecord[] = [];
   let pageToken: string | undefined = undefined;
   do {
     const listResult = await auth.listUsers(1000, pageToken);
@@ -39,7 +39,7 @@ async function fullAudit() {
   const collections = await db.listCollections();
   console.log(`\n[FIRESTORE] Collections: ${collections.map(c => c.id).join(', ')}`);
 
-  const auditData: Record<string, any[]> = {};
+  const auditData: Record<string, { id: string; data: FirebaseFirestore.DocumentData }[]> = {};
 
   for (const col of collections) {
     const snap = await col.get();
