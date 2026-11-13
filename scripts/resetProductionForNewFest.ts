@@ -615,7 +615,7 @@ async function main(): Promise<void> {
     }
 
     const canonicalAdmin = await assertCanonicalAdmin(db, auth);
-    const { inventory, authUsers, storageFiles } = await buildInventory(db, auth, bucket);
+    const { inventory } = await buildInventory(db, auth, bucket);
 
     console.log('\n=== INSPIRATH PRODUCTION FRESH-FEST RESET ===');
     console.log(`Target project: ${TARGET_PROJECT}`);
