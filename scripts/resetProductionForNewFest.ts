@@ -30,12 +30,14 @@ import { createGzip, type Gzip } from 'node:zlib';
 import { finished } from 'node:stream/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { assertInventoriesEqual, sha256File, verifyBackupArtifacts } from './resetProductionBackupVerification';
 import { stdin, stdout } from 'node:process';
 
 const TARGET_PROJECT = 'inspirath-d6778';
 const TARGET_BUCKET = 'inspirath-d6778.firebasestorage.app';
 const DEFAULT_SERVICE_ACCOUNT_PATH = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
 const PRESERVED_LOCK_PATH = 'settings/bootstrapLock';
+const PRESERVED_MAINTENANCE_PATH = 'settings/resetMaintenance';
 const RESET_CONFIRMATION = 'RESET_INSPIRATH_PRODUCTION';
 
 type StorageFileList = StorageFile[];
@@ -43,9 +45,12 @@ type StorageFileList = StorageFile[];
 type Inventory = {
   firestoreCollections: Record<string, number>;
   firestoreDocuments: number;
+  firestoreDocumentVersions: string[];
   authUsers: number;
+  authUserFingerprints: string[];
   storageObjects: number;
   storageBytes: number;
+  storageObjectVersions: string[];
 };
 
 function assertNoEmulatorEnvironment(): void {
@@ -110,7 +115,8 @@ async function listAllAuthUsers(auth: ReturnType<typeof getAuth>): Promise<UserR
 
 async function countCollectionTree(
   collectionRef: CollectionReference,
-  counts: Record<string, number>
+  counts: Record<string, number>,
+  documentVersions: string[] = []
 ): Promise<number> {
   // listDocuments() also returns references for missing parent documents whose
   // subcollections still contain records. Those orphaned paths must be counted.
@@ -122,10 +128,13 @@ async function countCollectionTree(
     if (document.exists) {
       directDocumentCount++;
       total++;
+      documentVersions.push(
+        `${documentRef.path}:${document.updateTime?.toMillis() ?? 'unknown'}`
+      );
     }
     const childCollections = await documentRef.listCollections();
     for (const child of childCollections) {
-      total += await countCollectionTree(child, counts);
+      total += await countCollectionTree(child, counts, documentVersions);
     }
   }
   counts[collectionRef.path] = (counts[collectionRef.path] || 0) + directDocumentCount;
@@ -138,28 +147,50 @@ async function buildInventory(
   bucket: StorageBucket
 ): Promise<{ inventory: Inventory; authUsers: UserRecord[]; storageFiles: StorageFileList }> {
   const collectionCounts: Record<string, number> = {};
+  const firestoreDocumentVersions: string[] = [];
   let firestoreDocuments = 0;
   const rootCollections = await db.listCollections();
   for (const collectionRef of rootCollections) {
-    firestoreDocuments += await countCollectionTree(collectionRef, collectionCounts);
+    firestoreDocuments += await countCollectionTree(
+      collectionRef,
+      collectionCounts,
+      firestoreDocumentVersions
+    );
   }
 
   const authUsers = await listAllAuthUsers(auth);
+  const authUserFingerprints = authUsers.map(user =>
+    `${user.uid}:${createHash('sha256').update(JSON.stringify(user.toJSON())).digest('hex')}`
+  ).sort();
   const [storageFiles] = await bucket.getFiles({ autoPaginate: true });
   let storageBytes = 0;
+  const storageObjectVersions: string[] = [];
   for (let offset = 0; offset < storageFiles.length; offset += 20) {
     const batch = storageFiles.slice(offset, offset + 20);
     const metadata = await Promise.all(batch.map(file => file.getMetadata()));
-    storageBytes += metadata.reduce((sum, [item]) => sum + Number(item.size || 0), 0);
+    for (let index = 0; index < batch.length; index++) {
+      const item = metadata[index][0];
+      const size = Number(item.size);
+      if (!Number.isFinite(size) || size < 0) {
+        throw new Error(`Safety stop: Storage metadata for "${batch[index].name}" has an invalid size.`);
+      }
+      storageBytes += size;
+      storageObjectVersions.push(
+        `${batch[index].name}:${item.generation ?? 'unknown'}:${size}`
+      );
+    }
   }
 
   return {
     inventory: {
       firestoreCollections: collectionCounts,
       firestoreDocuments,
+      firestoreDocumentVersions: firestoreDocumentVersions.sort(),
       authUsers: authUsers.length,
+      authUserFingerprints,
       storageObjects: storageFiles.length,
-      storageBytes
+      storageBytes,
+      storageObjectVersions: storageObjectVersions.sort()
     },
     authUsers,
     storageFiles
@@ -291,6 +322,8 @@ async function backupStorage(
       const item = {
         name: file.name,
         backupPath: relativeBackupPath,
+        size: localStat.size,
+        sha256: await sha256File(absoluteBackupPath),
         metadata
       };
       if (!manifest.write(JSON.stringify(item) + '\n')) {
@@ -314,7 +347,8 @@ async function writeBackup(
   bucket: StorageBucket,
   inventory: Inventory,
   authUsers: UserRecord[],
-  storageFiles: StorageFileList
+  storageFiles: StorageFileList,
+  canonicalAdminUid: string
 ): Promise<string> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDirectory = path.resolve(process.cwd(), 'backups', `production_fest_reset_${timestamp}`);
@@ -355,7 +389,8 @@ async function writeBackup(
       firestoreDocumentCount: firestoreBackup.documentCount,
       firestoreCollectionCounts: firestoreBackup.collectionCounts,
       authUserCount: authUsers.length,
-      storageObjectCount: storageBackupCount
+      storageObjectCount: storageBackupCount,
+      storageBytes: inventory.storageBytes
     },
     files: [
       'firestore_documents.jsonl.gz',
@@ -373,7 +408,18 @@ async function writeBackup(
     }
   }
 
-  console.log(`\n[BACKUP VERIFIED] ${backupDirectory}`);
+  await verifyBackupArtifacts({
+    directory: backupDirectory,
+    expectedProject: TARGET_PROJECT,
+    expectedBucket: TARGET_BUCKET,
+    expectedFirestoreDocuments: inventory.firestoreDocuments,
+    expectedAuthUsers: inventory.authUsers,
+    expectedStorageObjects: inventory.storageObjects,
+    expectedStorageBytes: inventory.storageBytes,
+    canonicalAdminUid
+  });
+
+  console.log(`\n[BACKUP VERIFIED: gzip, JSONL, Auth count, Storage sizes and SHA-256 checksums] ${backupDirectory}`);
   return backupDirectory;
 }
 
@@ -389,8 +435,9 @@ async function deleteAllFirestoreExceptCanonicalAdmin(
     for (const documentRef of documentRefs) {
       const preserveAdmin = documentRef.path === `users/${adminUid}`;
       const preserveBootstrapLock = documentRef.path === PRESERVED_LOCK_PATH;
+      const preserveMaintenanceLock = documentRef.path === PRESERVED_MAINTENANCE_PATH;
 
-      if (preserveAdmin || preserveBootstrapLock) {
+      if (preserveAdmin || preserveBootstrapLock || preserveMaintenanceLock) {
         const subcollections = await documentRef.listCollections();
         for (const subcollection of subcollections) {
           const count = await countCollectionTree(subcollection, {});
@@ -455,7 +502,8 @@ async function verifyFreshState(
   db: ReturnType<typeof getFirestore>,
   auth: ReturnType<typeof getAuth>,
   bucket: StorageBucket,
-  adminUid: string
+  adminUid: string,
+  maintenanceLockExpected: boolean
 ): Promise<void> {
   const remainingCounts: Record<string, number> = {};
   let remainingDocuments = 0;
@@ -469,7 +517,11 @@ async function verifyFreshState(
     bucket.getFiles({ autoPaginate: true })
   ]);
 
-  const expectedPaths = ['settings/bootstrapLock', `users/${adminUid}`].sort();
+  const expectedPaths = [
+    'settings/bootstrapLock',
+    ...(maintenanceLockExpected ? [PRESERVED_MAINTENANCE_PATH] : []),
+    `users/${adminUid}`
+  ].sort();
   const remainingPaths: string[] = [];
   for (const root of await db.listCollections()) {
     const snapshot = await root.get();
@@ -481,7 +533,7 @@ async function verifyFreshState(
     }
   }
 
-  if (remainingDocuments !== 2 || remainingPaths.sort().join('|') !== expectedPaths.join('|')) {
+  if (remainingDocuments !== expectedPaths.length || remainingPaths.sort().join('|') !== expectedPaths.join('|')) {
     throw new Error(
       `Fresh-state verification failed: expected only ${expectedPaths.join(', ')}; found ${remainingDocuments} Firestore documents.`
     );
@@ -491,6 +543,38 @@ async function verifyFreshState(
   }
   if (remainingStorage[0].length !== 0) {
     throw new Error(`Fresh-state verification failed: ${remainingStorage[0].length} Storage objects remain.`);
+  }
+}
+
+async function assertProductionMaintenanceProxy(): Promise<void> {
+  const configuredUrl = process.env.FEST_RESET_APP_URL?.trim();
+  if (!configuredUrl) {
+    throw new Error(
+      'Safety stop: set FEST_RESET_APP_URL to the verified production HTTPS origin after enabling FEST_RESET_MAINTENANCE=1 in Vercel and redeploying.'
+    );
+  }
+
+  const appUrl = new URL(configuredUrl);
+  if (appUrl.protocol !== 'https:' || appUrl.pathname !== '/' || appUrl.search || appUrl.hash) {
+    throw new Error('Safety stop: FEST_RESET_APP_URL must be a plain HTTPS origin with no path, query or fragment.');
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${appUrl.origin}/api/__reset-maintenance-check`, {
+      method: 'GET',
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000)
+    });
+  } catch {
+    throw new Error('Safety stop: could not reach production to verify maintenance mode. No data was changed.');
+  }
+
+  if (response.status !== 503 || response.headers.get('x-fest-maintenance') !== 'enabled') {
+    throw new Error(
+      'Safety stop: production API did not confirm the active Vercel maintenance proxy (HTTP 503 + x-fest-maintenance: enabled). No data was changed.'
+    );
   }
 }
 
@@ -572,27 +656,115 @@ async function main(): Promise<void> {
       return;
     }
 
-    const backupDirectory = await writeBackup(db, auth, bucket, inventory, authUsers, storageFiles);
+    // All Next.js API traffic must already be gated at the production deployment.
+    // This Firestore lock separately blocks direct browser SDK writes and Storage rules.
+    await assertProductionMaintenanceProxy();
 
-    console.log('\n[RESET] Removing all old Firestore data except the canonical Admin and bootstrap lock…');
-    const firestoreDeleted = await deleteAllFirestoreExceptCanonicalAdmin(db, canonicalAdmin.uid);
+    const maintenanceRef = db.doc(PRESERVED_MAINTENANCE_PATH);
+    const existingMaintenance = await maintenanceRef.get();
+    if (existingMaintenance.exists) {
+      throw new Error(
+        'Safety stop: a reset-maintenance lock already exists. Treat this as an interrupted reset and inspect it manually; do not overwrite it.'
+      );
+    }
 
-    console.log('[RESET] Removing all production Storage objects…');
-    const storageDeleted = await deleteAllStorageObjects(storageFiles);
+    let maintenanceLockApplied = false;
+    let deletionStarted = false;
+    try {
+      await maintenanceRef.create({
+        enabled: true,
+        purpose: 'fresh-fest-production-reset',
+        projectId: TARGET_PROJECT,
+        initiatedBy: canonicalAdmin.uid,
+        startedAt: new Date()
+      });
+      maintenanceLockApplied = true;
 
-    console.log('[RESET] Removing all Firebase Auth accounts except the canonical Chief Admin…');
-    const authDeleted = await deleteAllAuthUsersExceptAdmin(auth, authUsers, canonicalAdmin.uid);
+      const lockedAdmin = await assertCanonicalAdmin(db, auth);
+      if (lockedAdmin.uid !== canonicalAdmin.uid) {
+        throw new Error('Safety stop: canonical Chief Admin changed after maintenance mode was enabled.');
+      }
 
-    console.log('\n[VERIFY] Checking the clean production state…');
-    await verifyFreshState(db, auth, bucket, canonicalAdmin.uid);
+      // Take the baseline only after all client writes have been denied.
+      const lockedState = await buildInventory(db, auth, bucket);
+      const backupDirectory = await writeBackup(
+        db,
+        auth,
+        bucket,
+        lockedState.inventory,
+        lockedState.authUsers,
+        lockedState.storageFiles,
+        canonicalAdmin.uid
+      );
 
-    console.log('\n=== FRESH-FEST RESET COMPLETE ===');
-    console.log(`Firestore documents removed: ${firestoreDeleted}`);
-    console.log(`Storage objects removed: ${storageDeleted}`);
-    console.log(`Firebase Auth accounts removed: ${authDeleted}`);
-    console.log('Preserved: Chief Admin login, users/{ChiefAdminUid}, settings/bootstrapLock.');
-    console.log('Cleared: festival identity/theme, categories, teams, competitions, participants, registrations, stages, schedules, judges, marks, results, ledger, posters, logos, exports and all other stored objects.');
-    console.log(`Backup: ${backupDirectory}`);
+      // Check all inventories once more immediately before deletion. This catches
+      // out-of-band Admin SDK, Console, or other external writes after the backup.
+      const recheckedState = await buildInventory(db, auth, bucket);
+      assertInventoriesEqual(lockedState.inventory, recheckedState.inventory);
+      const recheckedAdmin = await assertCanonicalAdmin(db, auth);
+      if (recheckedAdmin.uid !== canonicalAdmin.uid) {
+        throw new Error('Safety stop: canonical Chief Admin changed after backup verification.');
+      }
+
+      deletionStarted = true;
+      console.log('\n[RESET] Removing all old Firestore data except Chief Admin, bootstrap lock and temporary maintenance lock…');
+      const firestoreDeleted = await deleteAllFirestoreExceptCanonicalAdmin(db, canonicalAdmin.uid);
+
+      console.log('[RESET] Removing all production Storage objects from the verified backup inventory…');
+      const storageDeleted = await deleteAllStorageObjects(recheckedState.storageFiles);
+
+      console.log('[RESET] Removing all Firebase Auth accounts except the canonical Chief Admin…');
+      const authDeleted = await deleteAllAuthUsersExceptAdmin(auth, recheckedState.authUsers, canonicalAdmin.uid);
+
+      console.log('\n[VERIFY] Checking clean production state while maintenance lock is active…');
+      await verifyFreshState(db, auth, bucket, canonicalAdmin.uid, true);
+
+      // Only release the Firestore write lock after all destructive operations
+      // and the locked-state verification have succeeded.
+      await maintenanceRef.delete();
+      maintenanceLockApplied = false;
+      try {
+        await verifyFreshState(db, auth, bucket, canonicalAdmin.uid, false);
+      } catch (verificationError) {
+        await maintenanceRef.set({
+          enabled: true,
+          purpose: 'fresh-fest-production-reset-recovery',
+          projectId: TARGET_PROJECT,
+          initiatedBy: canonicalAdmin.uid,
+          startedAt: new Date(),
+          recoveryRequired: true
+        }).catch(() => undefined);
+        maintenanceLockApplied = true;
+        throw verificationError;
+      }
+
+      console.log('\n=== FRESH-FEST RESET COMPLETE ===');
+      console.log(`Firestore documents removed: ${firestoreDeleted}`);
+      console.log(`Storage objects removed: ${storageDeleted}`);
+      console.log(`Firebase Auth accounts removed: ${authDeleted}`);
+      console.log('Preserved: Chief Admin login, users/{ChiefAdminUid}, settings/bootstrapLock.');
+      console.log('Cleared: festival identity/theme, categories, teams, competitions, participants, registrations, stages, schedules, judges, marks, results, ledger, posters, logos, exports and all other stored objects.');
+      console.log(`Verified backup: ${backupDirectory}`);
+      console.log('The app remains in Vercel maintenance mode until FEST_RESET_MAINTENANCE is removed and production is redeployed.');
+    } catch (error) {
+      if (maintenanceLockApplied && !deletionStarted) {
+        await maintenanceRef.delete().catch(() => undefined);
+        console.error('[RESET SAFETY] Backup/preflight failed before deletion. The Firestore maintenance lock was released; Vercel maintenance mode remains active.');
+      } else if (deletionStarted) {
+        if (!maintenanceLockApplied) {
+          await maintenanceRef.set({
+            enabled: true,
+            purpose: 'fresh-fest-production-reset-recovery',
+            projectId: TARGET_PROJECT,
+            initiatedBy: canonicalAdmin.uid,
+            startedAt: new Date(),
+            recoveryRequired: true
+          }).catch(() => undefined);
+        }
+        console.error('[RESET SAFETY] Reset stopped after destructive work began. Maintenance lock intentionally remains active. Do not disable Vercel maintenance mode; inspect backup and remaining inventories before recovery.');
+      }
+      throw error;
+    }
   } finally {
     await deleteApp(app);
   }
