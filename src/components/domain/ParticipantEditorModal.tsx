@@ -219,7 +219,7 @@ export function ParticipantEditorModal({
                   return;
                 }
                 if (file.size > 5 * 1024 * 1024) {
-                  setError('Photo must be smaller than 5 MB.');
+                  setError('Photo must be smaller than 4 MB.');
                   event.target.value = '';
                   return;
                 }
@@ -229,7 +229,7 @@ export function ParticipantEditorModal({
               }}
               className="block w-full rounded-xl border border-[#E1E7EF] bg-white px-3 py-2 text-sm text-[#526070] file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
             />
-            <span className="mt-1 block text-[11px] text-[#526070]">JPG, PNG, or WebP · Maximum 5 MB. Uploaded photos are stored in the fest's Firebase Storage.</span>
+            <span className="mt-1 block text-[11px] text-[#526070]">JPG, PNG, or WebP · Maximum 4 MB. Uploaded photos are stored in the fest's Firebase Storage.</span>
             {photoFile && <span className="mt-1 block text-xs font-semibold text-emerald-700">Selected: {photoFile.name} (will replace the URL above)</span>}
           </label>
         </div>
