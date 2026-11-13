@@ -413,6 +413,7 @@ async function writeBackup(
     expectedProject: TARGET_PROJECT,
     expectedBucket: TARGET_BUCKET,
     expectedFirestoreDocuments: inventory.firestoreDocuments,
+    expectedFirestoreCollections: inventory.firestoreCollections,
     expectedAuthUsers: inventory.authUsers,
     expectedStorageObjects: inventory.storageObjects,
     expectedStorageBytes: inventory.storageBytes,
