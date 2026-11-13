@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/services/authService';
 import { QrSignerService } from '@/services/qrSignerService';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
 /**
@@ -17,6 +17,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncWorkloadIdentityToken();
     const authHeader = req.headers.get('authorization') || '';
     const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 

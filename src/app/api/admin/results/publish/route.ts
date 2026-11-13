@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/services/authService';
 import { PointsLedgerService } from '@/services/pointsLedgerService';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import type { CompetitionRankInput } from '@/domain/ledger';
 import type { CompetitionType } from '@/domain/scoring';
 
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const authorization = req.headers.get('authorization') || '';
     const adminIdToken = authorization.startsWith('Bearer ')
       ? authorization.slice(7).trim()

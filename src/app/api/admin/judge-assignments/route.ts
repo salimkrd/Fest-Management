@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { JudgeService } from '@/services/judgeService';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { getTrustedAppUrl } from '@/lib/trustedUrl';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const authorization = req.headers.get('authorization') || '';
     const adminIdToken = authorization.startsWith('Bearer ')
       ? authorization.slice(7).trim()

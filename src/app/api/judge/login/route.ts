@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
 
 /**
@@ -11,6 +11,7 @@ import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth
  */
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const body = await req.json();
     const { accessCode, competitionId, secret } = body;
 

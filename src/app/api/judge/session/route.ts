@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,7 @@ function error(message: string, status: number) {
  */
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const body = await req.json().catch(() => null);
     const assignmentId = typeof body?.assignmentId === 'string' ? body.assignmentId.trim() : '';
     const competitionId = typeof body?.competitionId === 'string' ? body.competitionId.trim() : '';

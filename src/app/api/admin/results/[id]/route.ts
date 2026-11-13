@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/services/authService';
 import { PointsLedgerService } from '@/services/pointsLedgerService';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { calculateGrade, getChampionshipPoints, Grade } from '@/domain/scoring';
 
 export async function POST(
@@ -9,6 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncWorkloadIdentityToken();
     const authorization = req.headers.get('authorization') || '';
     const adminIdToken = authorization.startsWith('Bearer ')
       ? authorization.slice(7).trim()

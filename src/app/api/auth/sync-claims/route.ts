@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getAdminAuth, getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 
 /**
  * Reconciles Firebase Auth Custom Claims with the authoritative Firestore /users/{uid} document.
@@ -8,6 +8,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
  */
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const authHeader = req.headers.get('authorization') || '';
     const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 

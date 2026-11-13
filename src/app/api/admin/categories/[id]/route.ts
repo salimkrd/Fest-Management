@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { AuthService } from '@/services/authService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 import { resolveCategoryEligibilityPolicy, isParticipantEligibleForCategory } from '@/domain/eligibility';
@@ -33,6 +33,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncWorkloadIdentityToken();
     const adminIdToken = extractToken(req);
     if (!adminIdToken) {
       return NextResponse.json(
@@ -82,6 +83,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncWorkloadIdentityToken();
     let body: Record<string, unknown> = {};
     try {
       body = await req.json();
@@ -282,6 +284,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncWorkloadIdentityToken();
     const adminIdToken = extractToken(req);
 
     if (!adminIdToken) {
