@@ -5,6 +5,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Category, CategoryParticipantEligibility } from '@/types/fest';
 import { resolveCategoryEligibilityPolicy } from '@/domain/eligibility';
+import { buildCategoryUsageCounts } from '@/domain/categoryUsageCounts';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -24,45 +25,11 @@ export default function CategoriesPage() {
     deleteCategory
   } = useFest();
 
-  // Counts are derived from the live source collections, not cached category
-  // counters. This keeps them correct after participant/category/competition
-  // changes and avoids showing stale zeroes from older category documents.
-  const categoryUsageCounts = useMemo(() => {
-    const counts = new Map<string, { participants: number; competitions: number }>();
-
-    for (const category of categories) {
-      const normalizedName = category.name.trim().toLocaleLowerCase();
-      const normalizedCode = category.code.trim().toLocaleLowerCase();
-
-      const enrolledParticipants = participants.filter(participant => {
-        const assignedCategoryId = participant.categoryId?.trim();
-        if (assignedCategoryId) return assignedCategoryId === category.id;
-
-        const assignedCategoryName = participant.categoryName?.trim().toLocaleLowerCase();
-        if (assignedCategoryName) return assignedCategoryName === normalizedName;
-
-        // Compatibility for older participant records that stored the tier in
-        // classGrade but did not persist categoryId/categoryName.
-        const legacyTier = participant.classGrade?.trim().toLocaleLowerCase();
-        return Boolean(legacyTier && (legacyTier === normalizedName || legacyTier === normalizedCode));
-      }).length;
-
-      const assignedCompetitions = competitions.filter(competition => {
-        const assignedCategoryId = competition.categoryId?.trim();
-        if (assignedCategoryId) return assignedCategoryId === category.id;
-
-        // Older competition records may contain the category name only.
-        return competition.categoryName.trim().toLocaleLowerCase() === normalizedName;
-      }).length;
-
-      counts.set(category.id, {
-        participants: enrolledParticipants,
-        competitions: assignedCompetitions
-      });
-    }
-
-    return counts;
-  }, [categories, participants, competitions]);
+  // Derive counters from live records; do not trust stale persisted category counters.
+  const categoryUsageCounts = useMemo(
+    () => buildCategoryUsageCounts(categories, participants, competitions),
+    [categories, participants, competitions]
+  );
 
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
