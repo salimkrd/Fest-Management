@@ -23,6 +23,7 @@ import { getFirestore, type CollectionReference, type DocumentReference } from '
 import { getStorage } from 'firebase-admin/storage';
 import type { Bucket as StorageBucket, File as StorageFile } from '@google-cloud/storage';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { once } from 'node:events';
@@ -547,6 +548,16 @@ async function verifyFreshState(
   }
 }
 
+function deployProductionSecurityRules(): void {
+  const firebaseCommand = process.platform === 'win32' ? 'firebase.cmd' : 'firebase';
+  console.log(`\n[SAFETY] Deploying Firestore and Storage Rules to exactly ${TARGET_PROJECT}…`);
+  execSync(
+    `${firebaseCommand} deploy --project ${TARGET_PROJECT} --only firestore:rules,storage`,
+    { cwd: process.cwd(), stdio: 'inherit' }
+  );
+  console.log('[SAFETY] Firestore and Storage Rules deployment command completed successfully.');
+}
+
 async function assertProductionMaintenanceProxy(): Promise<void> {
   const configuredUrl = process.env.FEST_RESET_APP_URL?.trim();
   if (!configuredUrl) {
@@ -656,6 +667,10 @@ async function main(): Promise<void> {
       console.log('Confirmation did not match. No data was deleted.');
       return;
     }
+
+    // Deploy the exact repository rules to production before activating the
+    // lock. If deployment fails, abort before any festival data is changed.
+    deployProductionSecurityRules();
 
     // One atomic flag in the preserved bootstrapLock gates API traffic and all
     // direct Firestore/Storage client writes. No temporary third document is created.
