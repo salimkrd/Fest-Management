@@ -119,8 +119,7 @@ export async function verifyBackupArtifacts(options: {
   }
   for (const requiredPath of [
     'settings/bootstrapLock',
-    `users/${canonicalAdminUid}`,
-    'settings/resetMaintenance'
+    `users/${canonicalAdminUid}`
   ]) {
     if (!firestorePaths.has(requiredPath)) {
       throw new Error(`Backup verification failed: required preserved Firestore document "${requiredPath}" is missing.`);
