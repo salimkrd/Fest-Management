@@ -9,7 +9,7 @@ export async function uploadParticipantPhoto(
   const form = new FormData();
   form.append('photo', file);
 
-  const headers: HeadersInit = {};
+  const headers: Record<string, string> = {};
   if (authMode === 'firebase') {
     const user = auth?.currentUser;
     if (!user) throw new Error('Please sign in again before uploading a photo.');
