@@ -244,7 +244,7 @@ export function isWorkloadIdentityConfigured(): boolean {
  * STRICT FAIL-CLOSED VALIDATION FOR WORKLOAD IDENTITY FEDERATION:
  * 1. Prohibits WIF from ever connecting to the production project (inspirath-d6778).
  * 2. Prohibits WIF from being activated in Vercel production deployment.
- * 3. In Vercel preview environments, restricts access strictly to the Participant Portal branch.
+ * 3. Only permits the dedicated staging Firebase project and the integration remediation Preview branch.
  * 4. Validates that the Vercel project ID matches prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y.
  */
 export function validateWorkloadIdentityScope(targetProjectId: string): void {
@@ -256,6 +256,14 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
     );
   }
 
+  // 1b. Fail-closed: WIF may target this staging Firebase project only.
+  if (targetProjectId !== STAGING_PROJECT_ID) {
+    throw new Error(
+      `[FAIL-CLOSED SAFETY] Workload Identity Federation may only target staging project "${STAGING_PROJECT_ID}", ` +
+      `but target project is "${targetProjectId}".`
+    );
+  }
+
   // 2. Fail-closed: Never run in Vercel production deployment
   const vercelEnv = process.env.VERCEL_ENV;
   if (vercelEnv === 'production') {
@@ -264,7 +272,7 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
     );
   }
 
-  // 3. Fail-closed: Restrict federated access to the Participant Portal preview branch in Vercel Preview
+  // 4. Fail-closed: Restrict federated access to the integration remediation branch in Vercel Preview
   const allowedBranch = process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH?.trim() || ALLOWED_WIF_BRANCH;
   const currentBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
 
@@ -275,7 +283,7 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
     );
   }
 
-  // 4. Fail-closed: Restrict federated access to the authorized Vercel Project ID
+  // 5. Fail-closed: Restrict federated access to the authorized Vercel Project ID
   const expectedProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim() || VERCEL_PROJECT_ID;
   const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
 

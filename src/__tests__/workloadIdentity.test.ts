@@ -132,6 +132,11 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       }).toThrow(/FAIL-CLOSED SAFETY.*cannot target production project/);
     });
 
+    it('rejects every non-production project other than the authorized staging project', () => {
+      expect(() => validateWorkloadIdentityScope('inspirath-qa-project'))
+        .toThrow(/FAIL-CLOSED SAFETY.*may only target staging project "inspirath-staging"/);
+    });
+
     it('throws fail-closed error if running inside Vercel production deployment', () => {
       process.env.VERCEL_ENV = 'production';
       expect(() => {
