@@ -18,7 +18,8 @@
     "env:live": "node -e \"require('fs').copyFileSync('.env.local.live', '.env.local'); console.log('Switched to Live Firebase profile');\"",
     "seed": "npx tsx scripts/seedDemoData.ts",
     "emulators": "firebase emulators:start --project demo-sahithyolsav-2025",
-    "reset:production": "tsx scripts/resetProductionForNewFest.ts"
+    "reset:production": "tsx scripts/resetProductionForNewFest.ts",
+    "test:reset-safety": "vitest run scripts/resetProductionBackupVerification.test.ts"
   },
   "dependencies": {
     "@vercel/oidc": "^4.0.3",
