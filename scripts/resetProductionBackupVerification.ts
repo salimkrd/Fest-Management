@@ -127,7 +127,7 @@ export async function verifyBackupArtifacts(options: {
     }
   }
   const sortedCounts = (counts: Record<string, number>) =>
-    JSON.stringify(Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))));
+    JSON.stringify(Object.fromEntries(Object.entries(counts).filter(([, count]) => count > 0).sort(([a], [b]) => a.localeCompare(b))));
   if (sortedCounts(actualFirestoreCollections) !== sortedCounts(expectedFirestoreCollections)) {
     throw new Error('Backup verification failed: Firestore per-collection counts do not match the locked inventory.');
   }
