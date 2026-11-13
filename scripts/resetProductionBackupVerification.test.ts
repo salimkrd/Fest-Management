@@ -90,7 +90,7 @@ describe('fresh-fest reset backup safeguards', () => {
   });
 
   it('rejects Storage object corruption even when the file still exists', async () => {
-    await writeFile(path.join(directory, 'storage_objects', 'file-1'), Buffer.from('tampered bytes'));
+    await writeFile(path.join(directory, 'storage_objects', 'file-1'), Buffer.from('VERIFIED participant image bytes'));
     await expect(verifyBackupArtifacts(options())).rejects.toThrow(/SHA-256 mismatch/);
   });
 
