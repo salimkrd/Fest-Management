@@ -78,7 +78,8 @@ export async function POST(
       return NextResponse.json({ error: 'Firebase Storage bucket is not configured.' }, { status: 503 });
     }
 
-    const filePath = `participants/${id}/${randomUUID()}.${definition.extension}`;
+    const filePath = `participants/${id}/profile.${definition.extension}`;
+    const previousStoragePath = typeof participant.photoStoragePath === 'string' ? participant.photoStoragePath : '';
     const downloadToken = randomUUID();
     const object = bucket.file(filePath);
     await object.save(bytes, {
@@ -97,11 +98,24 @@ export async function POST(
       photoStoragePath: filePath
     });
 
+    // Remove only a previous upload owned by this participant, after the new
+    // photo URL has been committed successfully.
+    if (previousStoragePath.startsWith(`participants/${id}/`) && previousStoragePath !== filePath) {
+      await bucket.file(previousStoragePath).delete({ ignoreNotFound: true }).catch(error => {
+        console.warn('[ParticipantPhotoUpload] Old photo cleanup skipped:', error instanceof Error ? error.message : 'unknown');
+      });
+    }
+
     return NextResponse.json({ success: true, photoUrl }, {
       headers: { 'Cache-Control': 'no-store' }
     });
   } catch (error) {
-    console.error('[ParticipantPhotoUpload] Upload failed:', error instanceof Error ? error.message : 'unknown');
+    const message = error instanceof Error ? error.message : 'unknown';
+    const lower = message.toLowerCase();
+    if (lower.includes('unauthorized') || lower.includes('security violation') || lower.includes('cross-team access denied')) {
+      return NextResponse.json({ error: 'You are not authorized to update this participant photo.' }, { status: 403 });
+    }
+    console.error('[ParticipantPhotoUpload] Upload failed:', message);
     return NextResponse.json({ error: 'Could not upload the participant photo. Please retry.' }, { status: 500 });
   }
 }
