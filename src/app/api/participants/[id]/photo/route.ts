@@ -6,7 +6,7 @@ import { getAdminDb, getAdminStorage, syncWorkloadIdentityToken } from '@/lib/fi
 
 export const runtime = 'nodejs';
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 const PHOTO_TYPES = {
   'image/jpeg': { extension: 'jpg', signature: (b: Buffer) => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   'image/png': { extension: 'png', signature: (b: Buffer) => b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
@@ -59,7 +59,7 @@ export async function POST(
       return NextResponse.json({ error: 'Choose a photo to upload.' }, { status: 400 });
     }
     if (upload.size < 1 || upload.size > MAX_PHOTO_BYTES) {
-      return NextResponse.json({ error: 'Photo must be smaller than 5 MB.' }, { status: 400 });
+      return NextResponse.json({ error: 'Photo must be smaller than 4 MB.' }, { status: 400 });
     }
 
     const mime = upload.type.toLowerCase();
