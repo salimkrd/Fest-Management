@@ -22,7 +22,7 @@ function PublicNavLinks() {
   ];
 
   return (
-    <nav className="hidden md:flex items-center gap-1">
+    <nav className="hidden lg:flex items-center gap-1">
       {navLinks.map((link) => {
         const isActive = pathname === link.href;
         const Icon = link.icon;
@@ -124,14 +124,14 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
             </Suspense>
 
             {/* Search Input Bar */}
-            <div className="hidden sm:flex items-center">
+            <div className="hidden lg:flex items-center">
               <Suspense fallback={<div className="h-8 w-48 bg-neutral-100 rounded animate-pulse" />}>
                 <PublicSearchBar />
               </Suspense>
             </div>
 
             {/* Mobile menu trigger */}
-            <div className="flex md:hidden items-center gap-2">
+            <div className="flex lg:hidden items-center gap-2">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-lg text-[#526070] hover:bg-[#F8FAFC]"
@@ -145,7 +145,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#E1E7EF] bg-white px-4 pt-3 pb-6 space-y-3">
+          <div className="lg:hidden border-t border-[#E1E7EF] bg-white px-4 pt-3 pb-6 space-y-3">
             <Suspense fallback={null}>
               <PublicSearchBar />
             </Suspense>
