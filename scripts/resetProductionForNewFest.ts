@@ -574,7 +574,7 @@ async function assertProductionMaintenanceProxy(): Promise<void> {
 
   if (response.status !== 503 || response.headers.get('x-fest-maintenance') !== 'enabled') {
     throw new Error(
-      'Safety stop: production API did not confirm the active Vercel maintenance proxy (HTTP 503 + x-fest-maintenance: enabled). No data was changed.'
+      'Safety stop: production API did not confirm the active bootstrap-lock maintenance proxy (HTTP 503 + x-fest-maintenance: enabled). No data was changed.'
     );
   }
 }
