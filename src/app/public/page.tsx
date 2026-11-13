@@ -73,7 +73,7 @@ export default function PublicResultHomePage() {
         </div>
 
         {/* Category Pills Filter Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain pb-2">
           <button
             type="button"
             onClick={() => setSelectedCategory('ALL')}

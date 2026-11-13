@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-export const ALLOWED_WIF_BRANCH = 'feature/participant-id-dob-portal';
+export const ALLOWED_WIF_BRANCH = 'integration/main-participant-remediation';
 export const STAGING_PROJECT_ID = 'inspirath-staging';
 export const PRODUCTION_PROJECT_ID = 'inspirath-d6778';
 export const VERCEL_PROJECT_ID = 'prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y';

@@ -180,7 +180,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+      <main className="min-w-0 flex-1 max-w-7xl mx-auto w-full overflow-x-clip px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
 

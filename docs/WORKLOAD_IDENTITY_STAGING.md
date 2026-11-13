@@ -9,7 +9,7 @@ This document describes how **Vercel Preview** securely authenticates to Firebas
 ```
 ┌──────────────────────────────────────┐
 │            Vercel Preview            │
-│ (feature/participant-id-dob-portal)  │
+│ (integration/main-participant-remediation)  │
 │  Project: prj_MmRcs7gArslBmtJxmHG... │
 └──────────────────┬───────────────────┘
                    │ 1. OIDC Token via @vercel/oidc (request context / rotating file)
@@ -60,8 +60,8 @@ Standard Vercel OIDC tokens contain the following verified claims:
 ### 3. Git Branch Isolation & Defense-in-Depth
 Because Vercel OIDC does not issue a Git branch claim in the JWT, Google Cloud cannot cryptographically verify the Git branch at the STS token boundary.
 Branch isolation is enforced through two layers:
-1. **Vercel Branch-Scoped Configuration**: In the Vercel Dashboard, all Workload Identity environment variables (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, etc.) are scoped exclusively to the **Preview** environment and filtered specifically to branch **`feature/participant-id-dob-portal`**.
-2. **Application Fail-Closed Boundary**: `validateWorkloadIdentityScope()` enforces that when `VERCEL_ENV === 'preview'`, `process.env.VERCEL_GIT_COMMIT_REF` must match `feature/participant-id-dob-portal`, immediately aborting with a `[FAIL-CLOSED SAFETY]` exception on unauthorized branches.
+1. **Vercel Branch-Scoped Configuration**: In the Vercel Dashboard, all Workload Identity environment variables (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, etc.) are scoped exclusively to the **Preview** environment and filtered specifically to branch **`integration/main-participant-remediation`**.
+2. **Application Fail-Closed Boundary**: `validateWorkloadIdentityScope()` enforces that when `VERCEL_ENV === 'preview'`, `process.env.VERCEL_GIT_COMMIT_REF` must match `integration/main-participant-remediation`, immediately aborting with a `[FAIL-CLOSED SAFETY]` exception on unauthorized branches.
 
 ### 4. Vercel OIDC Issuer Modes (Team vs Global)
 Vercel supports two issuer configurations under **Project Settings** > **Security** > **Secure backend access with OIDC federation**:
@@ -224,7 +224,7 @@ In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
 1. Navigate to **Settings** > **Environment Variables**.
 2. Add the following variables:
    - **Environment**: Select **Preview** ONLY (uncheck Production and Development).
-   - **Branch Filter**: Set specifically to **`feature/participant-id-dob-portal`**.
+   - **Branch Filter**: Set specifically to **`integration/main-participant-remediation`**.
 
 | Variable Name | Example Value | Description |
 |---|---|---|
@@ -233,7 +233,7 @@ In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider` | Full provider resource path |
 | `GCP_SERVICE_ACCOUNT_EMAIL` | `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com` | Staging service account email |
 | `GCP_WORKLOAD_IDENTITY_AUDIENCE` | `https://vercel.com/[TEAM_SLUG]` (or `//iam.googleapis.com/...`) | OIDC audience configured in GCP |
-| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `feature/participant-id-dob-portal` | Application-level branch restriction |
+| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `integration/main-participant-remediation` | Application-level branch restriction |
 | `GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID`| `prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y` | Application-level project ID verification |
 | `PARTICIPANT_SESSION_SECRET` | *(Random 32+ character string)* | Session token signing secret |
 | `QR_SIGNING_SECRET` | *(Random 32+ character string)* | Digital ID QR cryptographic signing secret |

@@ -147,6 +147,14 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       }).toThrow(/FAIL-CLOSED SAFETY.*restricted to branch "feature\/participant-id-dob-portal"/);
     });
 
+    it('rejects the previous feature branch after WIF scope is moved to integration', () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_GIT_COMMIT_REF = 'feature/participant-id-dob-portal';
+      process.env.VERCEL_PROJECT_ID = VERCEL_PROJECT_ID;
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*restricted to branch "integration\\/main-participant-remediation"/);
+    });
+
     it('throws fail-closed error in Vercel preview if VERCEL_PROJECT_ID does not match prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y', () => {
       process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
