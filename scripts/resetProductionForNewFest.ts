@@ -21,6 +21,7 @@ import { initializeApp, cert, deleteApp } from 'firebase-admin/app';
 import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore, type CollectionReference, type DocumentReference } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import type { Bucket as StorageBucket, File as StorageFile } from '@google-cloud/storage';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -37,8 +38,6 @@ const DEFAULT_SERVICE_ACCOUNT_PATH = 'C:/Users/Admin/.credentials/inspirath-d677
 const PRESERVED_LOCK_PATH = 'settings/bootstrapLock';
 const RESET_CONFIRMATION = 'RESET_INSPIRATH_PRODUCTION';
 
-type StorageBucket = ReturnType<ReturnType<typeof getStorage>['bucket']>;
-type StorageFile = Awaited<ReturnType<StorageBucket['getFiles']>>[0][number];
 type StorageFileList = StorageFile[];
 
 type Inventory = {
@@ -243,8 +242,7 @@ async function backupFirestore(
 }
 
 async function backupStorage(
-  files: Awaited<ReturnType<Bucket['getFiles']>>[0],
-  bucket: Bucket,
+  files: StorageFileList,
   destination: string
 ): Promise<number> {
   const storageDir = path.join(destination, 'storage_objects');
@@ -292,10 +290,10 @@ async function backupStorage(
 async function writeBackup(
   db: ReturnType<typeof getFirestore>,
   auth: ReturnType<typeof getAuth>,
-  bucket: Bucket,
+  bucket: StorageBucket,
   inventory: Inventory,
   authUsers: UserRecord[],
-  storageFiles: Awaited<ReturnType<Bucket['getFiles']>>[0]
+  storageFiles: StorageFileList
 ): Promise<string> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDirectory = path.resolve(process.cwd(), 'backups', `production_fest_reset_${timestamp}`);
@@ -400,7 +398,7 @@ async function countCollectionTreeForDocument(documentRef: DocumentReference): P
   return total;
 }
 
-async function deleteAllStorageObjects(files: Awaited<ReturnType<Bucket['getFiles']>>[0]): Promise<number> {
+async function deleteAllStorageObjects(files: StorageFileList): Promise<number> {
   let deleted = 0;
   for (const file of files) {
     await file.delete({ ignoreNotFound: true });
@@ -435,7 +433,7 @@ async function deleteAllAuthUsersExceptAdmin(
 async function verifyFreshState(
   db: ReturnType<typeof getFirestore>,
   auth: ReturnType<typeof getAuth>,
-  bucket: Bucket,
+  bucket: StorageBucket,
   adminUid: string
 ): Promise<void> {
   const remainingCounts: Record<string, number> = {};
