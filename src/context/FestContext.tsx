@@ -60,7 +60,7 @@ interface FestContextType {
 
   participants: Participant[];
   participantsSyncState: 'loading' | 'ready' | 'error' | 'idle';
-  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
+  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<Participant>;
   updateParticipant: (id: string, part: Partial<Participant>) => Promise<void>;
   deleteParticipant: (id: string) => Promise<void>;
   checkParticipantCategoryConflicts: (participantId: string, newCategoryId: string) => Promise<Array<{
@@ -2166,6 +2166,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
     setParticipants(prev => [...prev.filter(p => p.id !== newParticipant.id), newParticipant]);
     setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
+    return newParticipant;
   };
 
   const checkParticipantCategoryConflicts = useCallback(async (
