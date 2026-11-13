@@ -60,6 +60,9 @@ function assertNoEmulatorEnvironment(): void {
     'FIREBASE_STORAGE_EMULATOR_HOST'
   ];
   const active = emulatorVars.filter(key => Boolean(process.env[key]?.trim()));
+  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR?.trim().toLowerCase() === 'true') {
+    active.push('NEXT_PUBLIC_USE_FIREBASE_EMULATOR');
+  }
   if (active.length) {
     throw new Error(
       `Refusing to target production while emulator variables are set: ${active.join(', ')}. Remove them from this terminal and retry.`
