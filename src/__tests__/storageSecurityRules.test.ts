@@ -17,9 +17,6 @@ import {
 import {
   getFirestore,
   connectFirestoreEmulator,
-  doc,
-  setDoc,
-  deleteDoc,
   Firestore
 } from 'firebase/firestore';
 import {

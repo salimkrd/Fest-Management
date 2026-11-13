@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-export const ALLOWED_WIF_BRANCH = 'feature/participant-id-dob-portal';
+export const ALLOWED_WIF_BRANCH = 'integration/main-participant-remediation';
 export const STAGING_PROJECT_ID = 'inspirath-staging';
 export const PRODUCTION_PROJECT_ID = 'inspirath-d6778';
 export const VERCEL_PROJECT_ID = 'prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y';
@@ -58,7 +58,7 @@ export function getWorkloadIdentityAudience(): string {
  * Generates the Google Cloud External Account credential configuration JSON
  * adhering to Google Application Default Credentials (ADC) format for Workload Identity Federation.
  */
-export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<string, any> {
+export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<string, unknown> {
   if (process.env.GCP_WORKLOAD_IDENTITY_CONFIG?.trim()) {
     let rawConfig = process.env.GCP_WORKLOAD_IDENTITY_CONFIG.trim();
     if ((rawConfig.startsWith('"') && rawConfig.endsWith('"')) || (rawConfig.startsWith("'") && rawConfig.endsWith("'"))) {
@@ -71,7 +71,6 @@ export function generateWorkloadIdentityConfig(tokenFilePath: string): Record<st
     return parsed;
   }
 
-  const provider = process.env.GCP_WORKLOAD_IDENTITY_PROVIDER!.trim();
   const saEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL!.trim();
   const impersonationUrl = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${saEmail}:generateAccessToken`;
   const tokenUrl = process.env.GCP_WORKLOAD_IDENTITY_STS_URL?.trim() || 'https://sts.googleapis.com/v1/token';
@@ -143,7 +142,7 @@ export class WorkloadIdentityCredential implements Credential {
       );
     }
     // Calculate token expiry in seconds from cachedAccessToken or default to 1 hour
-    const expiryDate = (this.client as any).cachedAccessToken?.expiry_date;
+    const expiryDate = (this.client as unknown as { cachedAccessToken?: { expiry_date?: number } }).cachedAccessToken?.expiry_date;
     const expiresIn = expiryDate
       ? Math.max(60, Math.floor((expiryDate - Date.now()) / 1000))
       : 3600;
@@ -245,7 +244,7 @@ export function isWorkloadIdentityConfigured(): boolean {
  * STRICT FAIL-CLOSED VALIDATION FOR WORKLOAD IDENTITY FEDERATION:
  * 1. Prohibits WIF from ever connecting to the production project (inspirath-d6778).
  * 2. Prohibits WIF from being activated in Vercel production deployment.
- * 3. In Vercel preview environments, restricts access strictly to the Participant Portal branch.
+ * 3. Only permits the dedicated staging Firebase project and the integration remediation Preview branch.
  * 4. Validates that the Vercel project ID matches prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y.
  */
 export function validateWorkloadIdentityScope(targetProjectId: string): void {
@@ -257,34 +256,72 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
     );
   }
 
-  // 2. Fail-closed: Never run in Vercel production deployment
-  const vercelEnv = process.env.VERCEL_ENV;
+  // 1b. Fail-closed: WIF may target this staging Firebase project only.
+  if (targetProjectId !== STAGING_PROJECT_ID) {
+    throw new Error(
+      `[FAIL-CLOSED SAFETY] Workload Identity Federation may only target staging project "${STAGING_PROJECT_ID}", ` +
+      `but target project is "${targetProjectId}".`
+    );
+  }
+
+  // 2. Fail-closed: Within Vercel, WIF is authorized only in Preview.
+  // Local staging verification remains available when Vercel identity variables are absent.
+  const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === 'production') {
     throw new Error(
       `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to staging/preview environments and cannot run in production deployments.`
     );
   }
 
-  // 3. Fail-closed: Restrict federated access to the Participant Portal preview branch in Vercel Preview
-  const allowedBranch = process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH?.trim() || ALLOWED_WIF_BRANCH;
-  const currentBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
-
-  if (vercelEnv === 'preview' && currentBranch && currentBranch !== allowedBranch) {
+  const isVercelRuntime = process.env.VERCEL === '1' || Boolean(vercelEnv);
+  if (isVercelRuntime && vercelEnv !== 'preview') {
     throw new Error(
-      `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to branch "${allowedBranch}" in Vercel Preview, ` +
-      `but current branch is "${currentBranch}". Access to staging credentials denied.`
+      `[FAIL-CLOSED SAFETY] Workload Identity Federation may only run in Vercel Preview, ` +
+      `but the current Vercel environment is "${vercelEnv || 'missing'}".`
     );
   }
 
-  // 4. Fail-closed: Restrict federated access to the authorized Vercel Project ID
-  const expectedProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim() || VERCEL_PROJECT_ID;
-  const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
+  if (vercelEnv === 'preview') {
+    // The configured values are assertions, not overrides: they cannot widen the hard-coded scope.
+    const configuredAllowedBranch = process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH?.trim();
+    if (configuredAllowedBranch && configuredAllowedBranch !== ALLOWED_WIF_BRANCH) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH must equal the authorized branch "${ALLOWED_WIF_BRANCH}".`
+      );
+    }
 
-  if (currentVercelProjectId && currentVercelProjectId !== expectedProjectId) {
-    throw new Error(
-      `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to Vercel Project ID "${expectedProjectId}", ` +
-      `but current environment VERCEL_PROJECT_ID is "${currentVercelProjectId}". Access denied.`
-    );
+    const currentBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
+    if (!currentBranch) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Vercel Preview commit branch identity is missing; staging credentials denied.`
+      );
+    }
+    if (currentBranch !== ALLOWED_WIF_BRANCH) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to branch "${ALLOWED_WIF_BRANCH}" in Vercel Preview, ` +
+        `but current branch is "${currentBranch}". Access to staging credentials denied.`
+      );
+    }
+
+    const configuredProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim();
+    if (configuredProjectId && configuredProjectId !== VERCEL_PROJECT_ID) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID must equal the authorized Vercel Project ID "${VERCEL_PROJECT_ID}".`
+      );
+    }
+
+    const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
+    if (!currentVercelProjectId) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Vercel Project ID is missing from Preview; staging credentials denied.`
+      );
+    }
+    if (currentVercelProjectId !== VERCEL_PROJECT_ID) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to Vercel Project ID "${VERCEL_PROJECT_ID}", ` +
+        `but current environment VERCEL_PROJECT_ID is "${currentVercelProjectId}". Access denied.`
+      );
+    }
   }
 }
 
@@ -394,7 +431,7 @@ export function getAdminApp(): App | null {
         projectId: (projectId && projectId !== 'inspirath-d6778') ? projectId : 'demo-sahithyolsav-2025'
       });
       return adminApp;
-    } catch (err) {
+    } catch {
       return null;
     }
   }

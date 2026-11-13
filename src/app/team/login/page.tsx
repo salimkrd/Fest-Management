@@ -155,7 +155,7 @@ function TeamLoginForm() {
         }
 
         // Verify portal access and team status
-        if (targetTeam.portalAccess === false || (targetTeam as any).status === 'DISABLED') {
+        if (targetTeam.portalAccess === false || (targetTeam as unknown as Record<string, unknown>).status === 'DISABLED') {
           await signOut(auth);
           setError('Access denied: Team contingent is currently disabled by the Chief Administrator.');
           setLoading(false);
@@ -165,20 +165,21 @@ function TeamLoginForm() {
         setCurrentTeamUser(targetTeam);
         router.push('/team');
         return;
-      } catch (authErr: any) {
+      } catch (authErr: unknown) {
         console.warn('[Team Login] Authentication error:', authErr);
+        const err = authErr as { code?: string; message?: string } | null;
         if (
-          authErr.code === 'auth/invalid-credential' ||
-          authErr.code === 'auth/wrong-password' ||
-          authErr.code === 'auth/user-not-found'
+          err?.code === 'auth/invalid-credential' ||
+          err?.code === 'auth/wrong-password' ||
+          err?.code === 'auth/user-not-found'
         ) {
           setError('Invalid email or password. Please verify your team manager credentials.');
-        } else if (authErr.code === 'auth/user-disabled') {
+        } else if (err?.code === 'auth/user-disabled') {
           setError('This team manager account has been disabled by the Chief Administrator.');
-        } else if (authErr.code === 'auth/network-request-failed') {
+        } else if (err?.code === 'auth/network-request-failed') {
           setError('Network error: Unable to reach the authentication service. Please check your connection.');
         } else {
-          setError(authErr.message || 'Authentication failed. Please verify your credentials.');
+          setError(err?.message || 'Authentication failed. Please verify your credentials.');
         }
         setLoading(false);
         return;

@@ -2,7 +2,8 @@
   "projects": {
     "production": "inspirath-d6778",
     "emulator": "demo-sahithyolsav-2025",
-    "default": "inspirath-d6778"
+    "default": "inspirath-d6778",
+    "staging": "inspirath-staging"
   },
   "targets": {},
   "etags": {}

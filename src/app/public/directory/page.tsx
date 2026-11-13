@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { useFest } from '@/context/FestContext';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Search, Trophy, ArrowRight, Sparkles, Filter, ChevronRight, Calendar, MapPin } from 'lucide-react';
+import { Search, ArrowRight, Sparkles } from 'lucide-react';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
@@ -17,12 +15,15 @@ function DirectoryContent() {
   const { results, categories, theme } = useFest();
 
   const [search, setSearch] = useState(initialQuery);
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
+
+  if (prevInitialQuery !== initialQuery) {
+    setPrevInitialQuery(initialQuery);
+    setSearch(initialQuery);
+  }
+
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedType, setSelectedType] = useState('ALL');
-
-  useEffect(() => {
-    if (initialQuery) setSearch(initialQuery);
-  }, [initialQuery]);
 
   const publishedResults = results.filter(r => r.resultStatus === 'PUBLISHED');
 
@@ -113,7 +114,6 @@ function DirectoryContent() {
           filtered.map(res => {
             const rank1 = res.ranks.find(r => r.rank === 1);
             const rank2 = res.ranks.find(r => r.rank === 2);
-            const rank3 = res.ranks.find(r => r.rank === 3);
 
             return (
               <div

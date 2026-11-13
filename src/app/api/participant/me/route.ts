@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
         grade: rank?.grade || null,
         position: rank?.rank ?? null,
         // Only individual SOLO results contribute to the participant's points.
-        individualPoints: soloResult ? Number(rank.officialPoints ?? rank.totalEarnedPoints ?? (rank as any).points ?? 0) : 0,
-        groupTeamPoints: reg.type === 'GROUP' && rank ? Number(rank.officialPoints ?? rank.totalEarnedPoints ?? (rank as any).points ?? 0) : 0
+        individualPoints: soloResult ? Number(rank.officialPoints ?? rank.totalEarnedPoints ?? (rank as { points?: unknown }).points ?? 0) : 0,
+        groupTeamPoints: reg.type === 'GROUP' && rank ? Number(rank.officialPoints ?? rank.totalEarnedPoints ?? (rank as { points?: unknown }).points ?? 0) : 0
       };
     });
     events.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
@@ -71,6 +71,7 @@ export async function GET(req: NextRequest) {
       categoryName: data.categoryName || '',
       categoryId: data.categoryId || '',
       classGrade: data.classGrade || '',
+      division: data.division || '',
       photoUrl: data.photoUrl || '',
       idStatus: data.idStatus || 'GENERATED',
       email: data.email || '',

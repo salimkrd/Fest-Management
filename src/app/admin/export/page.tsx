@@ -24,6 +24,7 @@ export default function ExportManagementPage() {
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<ExportNotice | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectionInitialized = useRef(false);
   const knownPublishedIds = useRef<Set<string>>(new Set());
@@ -117,14 +118,17 @@ export default function ExportManagementPage() {
       notifyExport('CSV export failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
   };
-  const handleExportWinnersExcel = () => {
-    if (!ensureExportReady()) return;
+  const handleExportWinnersExcel = async () => {
+    if (!ensureExportReady() || isExportingExcel) return;
     try {
+      setIsExportingExcel(true);
       const rows = ExportService.getOfficialPublishedWinners(selectedResults);
-      ExportService.downloadWinnersXLSX(rows, safeFestivalName + '_Official_Published_Winners.xlsx');
-      notifyExport('Excel workbook downloaded with a Winners Summary sheet and a Full Details sheet.');
+      await ExportService.downloadWinnersXLSX(rows, safeFestivalName + '_Official_Published_Winners.xlsx');
+      notifyExport('Excel workbook downloaded with an Official Winners worksheet.');
     } catch (error) {
       notifyExport('Excel export failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
+    } finally {
+      setIsExportingExcel(false);
     }
   };
   const handleDownloadWinnersPDF = () => {
@@ -182,7 +186,14 @@ export default function ExportManagementPage() {
             <Button variant="outline" size="sm" leftIcon={<FileText className="h-4 w-4 text-red-600" />} onClick={handleDownloadWinnersPDF} disabled={!canExport}>
               Download PDF
             </Button>
-            <Button variant="outline" size="sm" leftIcon={<FileSpreadsheet className="h-4 w-4 text-emerald-600" />} onClick={handleExportWinnersExcel} disabled={!canExport}>
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={isExportingExcel}
+              disabled={!canExport || isExportingExcel}
+              leftIcon={<FileSpreadsheet className="h-4 w-4 text-emerald-600" />}
+              onClick={handleExportWinnersExcel}
+            >
               Export XLSX
             </Button>
             <Button variant="primary" size="sm" leftIcon={<FileDown className="h-4 w-4" />} onClick={handleExportWinnersCSV} disabled={!canExport}>

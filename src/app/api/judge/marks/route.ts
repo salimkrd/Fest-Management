@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
       { error: 'Bad Request: action must be DRAFT or SUBMIT.' },
       { status: 400 }
     );
-  } catch (error: any) {
-    const message = error?.message || 'Internal Server Error';
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
     const isAuthError = message.toLowerCase().includes('unauthorized');
     const isConflictError = message.toLowerCase().includes('lock conflict') || message.toLowerCase().includes('stale mapping');
     const isValidationError = message.toLowerCase().includes('validation error');

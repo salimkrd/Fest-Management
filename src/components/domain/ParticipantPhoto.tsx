@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User } from 'lucide-react';
 
 /**
@@ -44,14 +44,10 @@ export const ParticipantPhoto: React.FC<ParticipantPhotoProps> = ({
   fallback = 'auto',
   alt
 }) => {
-  const [imgError, setImgError] = useState(false);
-
-  useEffect(() => {
-    setImgError(false);
-  }, [photoUrl]);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   const cleanUrl = photoUrl?.trim();
-  const hasValidPhoto = Boolean(cleanUrl && !isStockPhotoPlaceholder(cleanUrl) && !imgError);
+  const hasValidPhoto = Boolean(cleanUrl && !isStockPhotoPlaceholder(cleanUrl) && failedUrl !== cleanUrl);
   const initials = getParticipantInitials(name);
 
   const shapeClass = shape === 'circle' ? 'rounded-full' : 'rounded-2xl';
@@ -80,11 +76,12 @@ export const ParticipantPhoto: React.FC<ParticipantPhotoProps> = ({
 
   if (hasValidPhoto) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={cleanUrl}
         alt={alt || name || 'Participant photo'}
         className={`${sizeClass} ${shapeClass} object-cover ${className}`}
-        onError={() => setImgError(true)}
+        onError={() => cleanUrl && setFailedUrl(cleanUrl)}
       />
     );
   }

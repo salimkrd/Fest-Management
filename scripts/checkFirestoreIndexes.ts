@@ -28,9 +28,9 @@ async function checkIndexes() {
   console.log('--- FIRESTORE COMPOSITE INDEXES ---');
   if (data.indexes) {
     console.log(`Total Indexes: ${data.indexes.length}`);
-    data.indexes.forEach((idx: any, i: number) => {
+    data.indexes.forEach((idx: { name: string; state: string; fields: { fieldPath: string; order?: string; arrayConfig?: string }[] }, i: number) => {
       const colId = idx.name.split('/collectionGroups/')[1].split('/indexes/')[0];
-      const fields = idx.fields.map((f: any) => `${f.fieldPath} (${f.order || f.arrayConfig})`).join(', ');
+      const fields = idx.fields.map(f => `${f.fieldPath} (${f.order || f.arrayConfig})`).join(', ');
       console.log(`[Index ${i + 1}] Collection: ${colId} | State: ${idx.state} | Fields: ${fields}`);
     });
   } else {

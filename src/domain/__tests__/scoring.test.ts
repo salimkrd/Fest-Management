@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  SAHITHYOLSAV_POINTS_MATRIX,
   calculateGradeFromPercentage,
   calculateGrade,
   getChampionshipPoints,
   evaluateCompetitionEntries,
   Grade,
   PrizePosition,
-  CompetitionType,
   ScoredEntry
 } from '../scoring';
 

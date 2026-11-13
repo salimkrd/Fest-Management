@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 
 export interface TeamResultExportRow {
@@ -55,56 +55,67 @@ export class TeamExportService {
       filename.endsWith('.csv') ? filename : filename + '.csv');
   }
 
-  static downloadXLSX(
+  static async downloadXLSX(
     rows: TeamResultExportRow[],
     teamName: string,
     teamCode: string,
     festivalName: string,
     filename: string
-  ): void {
-    const detailData = rows.map((row, index) => ({
-      '#': index + 1,
-      'Competition Code': row.competitionCode,
-      'Competition': row.competitionName,
-      'Category': row.categoryName,
-      'Type': row.type,
-      'Stage / Venue': row.stageName,
-      'Contestant / Group': row.candidateName,
-      'Bib': row.bib,
-      'Grade': row.grade,
-      'Prize Rank': rankLabel(row.rank),
-      'Published Date': row.publishedDate
-    }));
-    const detailSheet = XLSX.utils.json_to_sheet(detailData);
-    detailSheet['!cols'] = [
-      { wch: 5 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 10 },
-      { wch: 24 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 18 }
-    ];
-    detailSheet['!rows'] = [{ hpt: 24 }, ...rows.map(() => ({ hpt: 22 }))];
-    if (detailData.length > 0) {
-      detailSheet['!autofilter'] = { ref: 'A1:K' + (detailData.length + 1) };
-    }
+  ): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
 
     const firsts = rows.filter(row => row.rank === 1).length;
     const seconds = rows.filter(row => row.rank === 2).length;
     const thirds = rows.filter(row => row.rank === 3).length;
-    const summaryData = [
-      { Metric: 'Festival', Value: festivalName },
-      { Metric: 'Team', Value: teamName + ' (' + teamCode + ')' },
-      { Metric: 'Published Placings / Entries', Value: rows.length },
-      { Metric: '1st Place', Value: firsts },
-      { Metric: '2nd Place', Value: seconds },
-      { Metric: '3rd Place', Value: thirds },
-      { Metric: 'Generated On', Value: new Date().toLocaleDateString('en-GB') }
-    ];
-    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-    summarySheet['!cols'] = [{ wch: 28 }, { wch: 44 }];
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Team Summary');
-    XLSX.utils.book_append_sheet(workbook, detailSheet, 'My Team Results');
-    const output = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    downloadBlob(new Blob([output], {
+    const summarySheet = workbook.addWorksheet('Team Summary');
+    summarySheet.columns = [
+      { header: 'Metric', key: 'metric', width: 28 },
+      { header: 'Value', key: 'value', width: 44 }
+    ];
+    summarySheet.addRows([
+      { metric: 'Festival', value: festivalName },
+      { metric: 'Team', value: teamName + ' (' + teamCode + ')' },
+      { metric: 'Published Placings / Entries', value: rows.length },
+      { metric: '1st Place', value: firsts },
+      { metric: '2nd Place', value: seconds },
+      { metric: '3rd Place', value: thirds },
+      { metric: 'Generated On', value: new Date().toLocaleDateString('en-GB') }
+    ]);
+
+    const detailSheet = workbook.addWorksheet('My Team Results');
+    detailSheet.columns = [
+      { header: '#', key: 'index', width: 6 },
+      { header: 'Competition Code', key: 'competitionCode', width: 16 },
+      { header: 'Competition', key: 'competitionName', width: 32 },
+      { header: 'Category', key: 'categoryName', width: 18 },
+      { header: 'Type', key: 'type', width: 10 },
+      { header: 'Stage / Venue', key: 'stageName', width: 24 },
+      { header: 'Contestant / Group', key: 'candidateName', width: 30 },
+      { header: 'Bib', key: 'bib', width: 12 },
+      { header: 'Grade', key: 'grade', width: 14 },
+      { header: 'Prize Rank', key: 'prizeRank', width: 24 },
+      { header: 'Published Date', key: 'publishedDate', width: 18 }
+    ];
+
+    rows.forEach((row, index) => {
+      detailSheet.addRow({
+        index: index + 1,
+        competitionCode: row.competitionCode,
+        competitionName: row.competitionName,
+        categoryName: row.categoryName,
+        type: row.type,
+        stageName: row.stageName,
+        candidateName: row.candidateName,
+        bib: row.bib,
+        grade: row.grade,
+        prizeRank: rankLabel(row.rank),
+        publishedDate: row.publishedDate
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }), filename.endsWith('.xlsx') ? filename : filename + '.xlsx');
   }

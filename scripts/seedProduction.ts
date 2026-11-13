@@ -1,4 +1,5 @@
-import * as admin from 'firebase-admin';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 
 async function seedCategories() {
@@ -10,12 +11,12 @@ async function seedCategories() {
   const serviceAccountPath = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
   const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
-  const app = admin.apps.find(a => a?.name === 'prod-seed') || admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  const app = getApps().find(a => a.name === 'prod-seed') || initializeApp({
+    credential: cert(serviceAccount),
     projectId: 'inspirath-d6778'
   }, 'prod-seed');
 
-  const db = app.firestore();
+  const db = getFirestore(app);
   console.log('Seeding initial categories to inspirath-d6778...');
 
   const initialCategories = [

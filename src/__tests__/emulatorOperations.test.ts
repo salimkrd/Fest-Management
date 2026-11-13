@@ -3,17 +3,11 @@
  * Verifies Auth, Firestore Collections, Transactions, Idempotent Ledger, and Security Constraints.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { calculateGradeFromPercentage, getChampionshipPoints } from '../domain/scoring';
-import { hashSecret, verifyJudgeAssignment } from '../domain/judgeAuth';
-import {
-  commitResultToLedger,
-  reverseResultInLedger,
-  recalculateTeamChampionship
-} from '../domain/ledger';
+import { hashSecret } from '../domain/judgeAuth';
 
 // Ensure emulator ports are targeted
 process.env.GCLOUD_PROJECT = 'demo-sahithyolsav-2025';
@@ -110,15 +104,15 @@ describe('Firebase Local Emulator Integration & Workflow Verification', () => {
     const resData = resSnap.data()!;
     expect(resData.resultStatus).toBe('PUBLISHED');
 
-    const rank1 = resData.ranks.find((r: any) => r.rank === 1);
+    const rank1 = resData.ranks.find((r: { rank?: number }) => r.rank === 1);
     expect(rank1.grade).toBe('A+');
     expect(rank1.points).toBe(11); // Solo 1st A+ = 11 pts
 
-    const rank2 = resData.ranks.find((r: any) => r.rank === 2);
+    const rank2 = resData.ranks.find((r: { rank?: number }) => r.rank === 2);
     expect(rank2.grade).toBe('A');
     expect(rank2.points).toBe(8); // Solo 2nd A = 8 pts
 
-    const rank3 = resData.ranks.find((r: any) => r.rank === 3);
+    const rank3 = resData.ranks.find((r: { rank?: number }) => r.rank === 3);
     expect(rank3.grade).toBe('A');
     expect(rank3.points).toBe(6); // Solo 3rd A = 6 pts
   });

@@ -3,7 +3,6 @@ import {
   createJudgeAssignment,
   verifyJudgeAssignment,
   buildWhatsAppDispatchUrl,
-  hashSecret,
   MAX_ALLOWED_ATTEMPTS
 } from '../judgeAuth';
 
@@ -25,8 +24,8 @@ describe('Secure Judge Access & Authentication', () => {
     expect(creds.assignment.secretHash).not.toBe(creds.oneTimeSecret);
     expect(creds.assignment.salt).toBeDefined();
     // Verify assignment object does NOT have oneTimeSecret or password property
-    expect((creds.assignment as any).oneTimeSecret).toBeUndefined();
-    expect((creds.assignment as any).password).toBeUndefined();
+    expect((creds.assignment as unknown as Record<string, unknown>).oneTimeSecret).toBeUndefined();
+    expect((creds.assignment as unknown as Record<string, unknown>).password).toBeUndefined();
   });
 
   it('Requirement: Verifies correct credentials successfully and bounds to assignment', async () => {

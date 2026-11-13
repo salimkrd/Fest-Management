@@ -16,13 +16,25 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Eye,
   FileSpreadsheet,
-  Send,
   UserPlus,
   ShieldCheck,
   ExternalLink
 } from 'lucide-react';
+
+interface OrphanCleanupResult {
+  success: boolean;
+  dryRun?: boolean;
+  requiresConfirmation?: boolean;
+  totalOrphaned?: number;
+  removedJudgeAssignments?: number;
+  removedMarkEntries?: number;
+  orphanedJudgeAssignmentsCount?: number;
+  orphanedMarkEntriesCount?: number;
+  message?: string;
+  orphanedJudgeDetails?: Array<{ id: string; competitionId: string; judgeName: string }>;
+  orphanedMarkDetails?: Array<{ id: string; competitionId: string }>;
+}
 import Link from 'next/link';
 
 export default function MarkEntryPage() {
@@ -39,7 +51,7 @@ export default function MarkEntryPage() {
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [purging, setPurging] = useState(false);
-  const [inspectResult, setInspectResult] = useState<any>(null);
+  const [inspectResult, setInspectResult] = useState<OrphanCleanupResult | null>(null);
   const [inspectError, setInspectError] = useState<string | null>(null);
 
   const handleInspectDryRun = async () => {
@@ -50,8 +62,8 @@ export default function MarkEntryPage() {
     try {
       const res = await cleanupOrphanedJudgeAssignments({ dryRun: true });
       setInspectResult(res);
-    } catch (err: any) {
-      setInspectError(err?.message || 'Failed to inspect orphaned records.');
+    } catch (err: unknown) {
+      setInspectError(err instanceof Error ? err.message : 'Failed to inspect orphaned records.');
     } finally {
       setInspecting(false);
     }
@@ -63,8 +75,8 @@ export default function MarkEntryPage() {
     try {
       const res = await cleanupOrphanedJudgeAssignments({ confirm: true });
       setInspectResult(res);
-    } catch (err: any) {
-      setInspectError(err?.message || 'Failed to clean up orphaned records.');
+    } catch (err: unknown) {
+      setInspectError(err instanceof Error ? err.message : 'Failed to clean up orphaned records.');
     } finally {
       setPurging(false);
     }
@@ -481,7 +493,7 @@ export default function MarkEntryPage() {
                       {inspectResult.orphanedJudgeDetails && inspectResult.orphanedJudgeDetails.length > 0 && (
                         <div className="border border-[#E1E7EF] rounded-xl p-3 bg-neutral-50 max-h-48 overflow-y-auto space-y-2">
                           <p className="text-xs font-bold text-[#111111]">Detected Orphaned Assignments:</p>
-                          {inspectResult.orphanedJudgeDetails.slice(0, 10).map((item: any) => (
+                          {inspectResult.orphanedJudgeDetails.slice(0, 10).map((item) => (
                             <div key={item.id} className="text-xs text-[#526070] flex justify-between border-b border-[#E1E7EF] pb-1 last:border-0">
                               <span className="font-medium text-[#111111]">{item.judgeName}</span>
                               <span className="font-mono text-[10px] text-neutral-500">Comp ID: {item.competitionId}</span>

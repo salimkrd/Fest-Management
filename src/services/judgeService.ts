@@ -122,7 +122,7 @@ export class JudgeService {
 
     // Invariant 2 & 3: Filter for ELIGIBLE registrations only (strictly status === 'APPROVED')
     // Fail-closed: missing, null, empty, PENDING, CANCELLED, WITHDRAWN, or REJECTED registrations are strictly ineligible.
-    const isExplicitlyApproved = (rawStatus: any): boolean => {
+    const isExplicitlyApproved = (rawStatus: unknown): boolean => {
       return typeof rawStatus === 'string' && rawStatus.trim().toUpperCase() === 'APPROVED';
     };
 

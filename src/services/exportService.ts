@@ -1,11 +1,11 @@
 /**
  * Official Export Service
  * Strictly filters for PUBLISHED competition results when exporting official winners.
- * Generates genuine downloadable CSV, XLSX (OpenXML), and PDF files.
+ * Generates genuine downloadable CSV, XLSX (OpenXML via ExcelJS), and PDF files.
  */
 
 import { CompetitionResult } from '@/types/fest';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 
 export interface PublishedWinnerRow {
@@ -77,36 +77,47 @@ export class ExportService {
    * Generates standard RFC 4180 CSV string of official published winners.
    */
   static generateWinnersCSV(rows: PublishedWinnerRow[]): string {
-    const header = 'Competition Code,Competition Name,Category,Type,1st Winner,1st Bib,1st Team,1st Grade,1st Points,2nd Winner,2nd Bib,2nd Team,2nd Grade,2nd Points,3rd Winner,3rd Bib,3rd Team,3rd Grade,3rd Points,Event Total Points';
-    const quote = (value: string | number): string =>
-      '"' + String(value ?? '').replace(/"/g, '""') + '"';
+    const escapeField = (val: unknown): string => {
+      if (val === null || val === undefined) return '""';
+      if (typeof val === 'number') return String(val);
+      const str = String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
 
-    const lines = rows.map(row => [
-      quote(row.competitionCode),
-      quote(row.competitionName),
-      quote(row.categoryName),
-      quote(row.type),
-      quote(row.rank1Name),
-      quote(row.rank1Bib),
-      quote(row.rank1Team),
-      quote(row.rank1Grade),
-      String(row.rank1Points),
-      quote(row.rank2Name),
-      quote(row.rank2Bib),
-      quote(row.rank2Team),
-      quote(row.rank2Grade),
-      String(row.rank2Points),
-      quote(row.rank3Name),
-      quote(row.rank3Bib),
-      quote(row.rank3Team),
-      quote(row.rank3Grade),
-      String(row.rank3Points),
-      String(row.eventTotalPoints)
+    const header = [
+      'Competition Code', 'Competition Name', 'Category', 'Type',
+      '1st Winner', '1st Bib', '1st Team', '1st Grade', '1st Points',
+      '2nd Winner', '2nd Bib', '2nd Team', '2nd Grade', '2nd Points',
+      '3rd Winner', '3rd Bib', '3rd Team', '3rd Grade', '3rd Points',
+      'Event Total Points'
+    ].join(',');
+
+    const lines = rows.map(r => [
+      escapeField(r.competitionCode),
+      escapeField(r.competitionName),
+      escapeField(r.categoryName),
+      escapeField(r.type),
+      escapeField(r.rank1Name),
+      escapeField(r.rank1Bib),
+      escapeField(r.rank1Team),
+      escapeField(r.rank1Grade),
+      r.rank1Points,
+      escapeField(r.rank2Name),
+      escapeField(r.rank2Bib),
+      escapeField(r.rank2Team),
+      escapeField(r.rank2Grade),
+      r.rank2Points,
+      escapeField(r.rank3Name),
+      escapeField(r.rank3Bib),
+      escapeField(r.rank3Team),
+      escapeField(r.rank3Grade),
+      r.rank3Points,
+      r.eventTotalPoints
     ].join(','));
 
-    // UTF-8 BOM helps spreadsheet applications identify the file's encoding.
-    return '\uFEFF' + header + '\r\n' + lines.join('\r\n');
+    return '\uFEFF' + [header, ...lines].join('\r\n') + '\r\n';
   }
+
   /**
    * Generates and triggers download of a genuine RFC 4180 CSV file.
    */
@@ -122,91 +133,91 @@ export class ExportService {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    URL.revokeObjectURL(url);
   }
 
   /**
-   * Generates and triggers download of a genuine OpenXML XLSX spreadsheet (.xlsx).
+   * Builds an ExcelJS Workbook object containing official published winners.
+   * Configures 20 standard columns, headers, widths, and the 'Official Winners' worksheet.
    */
-  static downloadWinnersXLSX(rows: PublishedWinnerRow[], filename: string): void {
+  static generateWinnersWorkbook(rows: PublishedWinnerRow[]): ExcelJS.Workbook {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Official Winners');
+
+    worksheet.columns = [
+      { header: 'Competition Code', key: 'competitionCode', width: 14 },
+      { header: 'Competition Name', key: 'competitionName', width: 28 },
+      { header: 'Category', key: 'categoryName', width: 14 },
+      { header: 'Event Type', key: 'type', width: 10 },
+      { header: '1st Place Winner', key: 'rank1Name', width: 24 },
+      { header: '1st Bib', key: 'rank1Bib', width: 10 },
+      { header: '1st Team', key: 'rank1Team', width: 18 },
+      { header: '1st Grade', key: 'rank1Grade', width: 10 },
+      { header: '1st Points', key: 'rank1Points', width: 10 },
+      { header: '2nd Place Winner', key: 'rank2Name', width: 24 },
+      { header: '2nd Bib', key: 'rank2Bib', width: 10 },
+      { header: '2nd Team', key: 'rank2Team', width: 18 },
+      { header: '2nd Grade', key: 'rank2Grade', width: 10 },
+      { header: '2nd Points', key: 'rank2Points', width: 10 },
+      { header: '3rd Place Winner', key: 'rank3Name', width: 24 },
+      { header: '3rd Bib', key: 'rank3Bib', width: 10 },
+      { header: '3rd Team', key: 'rank3Team', width: 18 },
+      { header: '3rd Grade', key: 'rank3Grade', width: 10 },
+      { header: '3rd Points', key: 'rank3Points', width: 10 },
+      { header: 'Event Total Points', key: 'eventTotalPoints', width: 14 }
+    ];
+
+    rows.forEach(r => {
+      worksheet.addRow({
+        competitionCode: r.competitionCode,
+        competitionName: r.competitionName,
+        categoryName: r.categoryName,
+        type: r.type,
+        rank1Name: r.rank1Name,
+        rank1Bib: r.rank1Bib,
+        rank1Team: r.rank1Team,
+        rank1Grade: r.rank1Grade,
+        rank1Points: r.rank1Points,
+        rank2Name: r.rank2Name,
+        rank2Bib: r.rank2Bib,
+        rank2Team: r.rank2Team,
+        rank2Grade: r.rank2Grade,
+        rank2Points: r.rank2Points,
+        rank3Name: r.rank3Name,
+        rank3Bib: r.rank3Bib,
+        rank3Team: r.rank3Team,
+        rank3Grade: r.rank3Grade,
+        rank3Points: r.rank3Points,
+        eventTotalPoints: r.eventTotalPoints
+      });
+    });
+
+    return workbook;
+  }
+
+  /**
+   * Generates and triggers download of a genuine OpenXML XLSX spreadsheet (.xlsx) using ExcelJS.
+   */
+  static async downloadWinnersXLSX(rows: PublishedWinnerRow[], filename: string): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    const winnerCell = (name: string, team: string, bib: string, grade: string, points: number) => {
-      if (!name || name === '-') return '-';
-      return name + '\n' + team + '\nBib: ' + bib + ' | Grade: ' + grade + ' | +' + points + ' pts';
-    };
-
-    // A concise first sheet is easier to read, share, and print.
-    const summaryData = rows.map(row => ({
-      'Competition Code': row.competitionCode,
-      'Competition': row.competitionName,
-      'Category': row.categoryName,
-      'Type': row.type,
-      '1st Prize Winner': winnerCell(row.rank1Name, row.rank1Team, row.rank1Bib, row.rank1Grade, row.rank1Points),
-      '2nd Prize Winner': winnerCell(row.rank2Name, row.rank2Team, row.rank2Bib, row.rank2Grade, row.rank2Points),
-      '3rd Prize Winner': winnerCell(row.rank3Name, row.rank3Team, row.rank3Bib, row.rank3Grade, row.rank3Points),
-      'Total Points': row.eventTotalPoints
-    }));
-    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-    summarySheet['!cols'] = [
-      { wch: 16 }, { wch: 34 }, { wch: 18 }, { wch: 10 },
-      { wch: 38 }, { wch: 38 }, { wch: 38 }, { wch: 14 }
-    ];
-    summarySheet['!rows'] = [{ hpt: 24 }, ...rows.map(() => ({ hpt: 48 }))];
-    if (summaryData.length > 0) summarySheet['!autofilter'] = { ref: 'A1:H' + (summaryData.length + 1) };
-
-    // Preserve the fully separated fields in a second sheet for analysis.
-    const detailData = rows.map(row => ({
-      'Competition Code': row.competitionCode,
-      'Competition Name': row.competitionName,
-      'Category': row.categoryName,
-      'Event Type': row.type,
-      '1st Place Winner': row.rank1Name,
-      '1st Bib': row.rank1Bib,
-      '1st Team': row.rank1Team,
-      '1st Grade': row.rank1Grade,
-      '1st Points': row.rank1Points,
-      '2nd Place Winner': row.rank2Name,
-      '2nd Bib': row.rank2Bib,
-      '2nd Team': row.rank2Team,
-      '2nd Grade': row.rank2Grade,
-      '2nd Points': row.rank2Points,
-      '3rd Place Winner': row.rank3Name,
-      '3rd Bib': row.rank3Bib,
-      '3rd Team': row.rank3Team,
-      '3rd Grade': row.rank3Grade,
-      '3rd Points': row.rank3Points,
-      'Event Total Points': row.eventTotalPoints
-    }));
-    const detailSheet = XLSX.utils.json_to_sheet(detailData);
-    detailSheet['!cols'] = [
-      { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 10 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
-      { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 16 }
-    ];
-    if (detailData.length > 0) detailSheet['!autofilter'] = { ref: 'A1:T' + (detailData.length + 1) };
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Winners Summary');
-    XLSX.utils.book_append_sheet(workbook, detailSheet, 'Full Details');
-
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const workbook = this.generateWinnersWorkbook(rows);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = filename.endsWith('.xlsx') ? filename : filename + '.xlsx';
+    link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
 
-
   /**
-   * Creates an A4 landscape winners report with a clear hierarchy, repeating
-   * table headers, dynamic row heights, and page numbering.
+   * Generates and triggers download of a genuine downloadable PDF document (.pdf).
    */
   static downloadWinnersPDF(
     rows: PublishedWinnerRow[],
@@ -405,5 +416,4 @@ export class ExportService {
     const safeName = (festivalName || 'Festival').trim().replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'Festival';
     doc.save(filename.endsWith('.pdf') ? filename : safeName + '_Official_Published_Winners_A4.pdf');
   }
-
 }

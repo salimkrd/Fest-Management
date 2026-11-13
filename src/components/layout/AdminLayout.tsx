@@ -207,7 +207,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     setSigningOut(true);
 
     try {
-      if (auth) if (auth) await signOut(auth);
+      if (auth) await signOut(auth);
       setAuthorizedUser(null);
       setMobileMenuOpen(false);
       router.replace('/admin/login');

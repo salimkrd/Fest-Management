@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo } from '@/components/domain/FestivalBrand';
 import { Button } from '@/components/ui/Button';
-import { Printer, ShieldAlert, Award, Sparkles } from 'lucide-react';
+import { Printer, ShieldAlert } from 'lucide-react';
 import { FirestoreGreenRoomAssignment } from '@/types/firestore';
 
 interface GreenRoomCodeSlipProps {

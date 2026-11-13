@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, Lock, Mail, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useFest } from '@/context/FestContext';
@@ -14,9 +14,9 @@ function TeamActivateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [code, setCode] = useState('');
-  const [email, setEmail] = useState('');
-  const [teamId, setTeamId] = useState('');
+  const [code, setCode] = useState(() => searchParams.get('code')?.trim().toUpperCase() || '');
+  const [email, setEmail] = useState(() => searchParams.get('email')?.trim().toLowerCase() || '');
+  const teamId = searchParams.get('teamId')?.trim() || '';
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,16 +24,6 @@ function TeamActivateForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activatedTeam, setActivatedTeam] = useState<{ teamName?: string; email?: string } | null>(null);
-
-  useEffect(() => {
-    const codeParam = searchParams.get('code');
-    const emailParam = searchParams.get('email');
-    const teamIdParam = searchParams.get('teamId');
-
-    if (codeParam) setCode(codeParam.trim().toUpperCase());
-    if (emailParam) setEmail(emailParam.trim().toLowerCase());
-    if (teamIdParam) setTeamId(teamIdParam.trim());
-  }, [searchParams]);
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,8 +70,8 @@ function TeamActivateForm() {
       setActivatedTeam({
         email: data.managerEmail || trimmedEmail
       });
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during activation.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during activation.');
     } finally {
       setLoading(false);
     }

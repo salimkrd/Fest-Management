@@ -23,7 +23,7 @@ if (fs.existsSync(envLocalPath)) {
 
 // Strict Safety Guard: Test suites must ALWAYS execute against the local emulator,
 // never against the production cloud project.
-(process.env as any).NODE_ENV = 'test';
+(process.env as Record<string, string | undefined>).NODE_ENV = 'test';
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';

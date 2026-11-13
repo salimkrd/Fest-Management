@@ -11,7 +11,8 @@
     --border-neutral: #E1E7EF;
     --surface-base: #FFFFFF;
     --surface-pale: #F8FAFC;
-    
+    --font-montserrat: 'Montserrat';
+
     /* Dynamic Theme Variables for Public Results */
     --fest-primary: #2563EB;
     --fest-accent: #D97706;

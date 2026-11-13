@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,7 @@ function error(message: string, status: number) {
  */
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const body = await req.json().catch(() => null);
     const assignmentId = typeof body?.assignmentId === 'string' ? body.assignmentId.trim() : '';
     const competitionId = typeof body?.competitionId === 'string' ? body.competitionId.trim() : '';
@@ -57,21 +58,32 @@ export async function POST(req: NextRequest) {
     if (!competitionDoc.exists) return error('The assigned competition is no longer available.', 404);
     const rawCompetition = competitionDoc.data() || {};
     const criteria = Array.isArray(rawCompetition.criteria)
-      ? rawCompetition.criteria.map((item: any) => ({
-          id: String(item.id || ''),
-          name: String(item.name || ''),
-          maxMarks: Number(item.maxMarks || 0)
-        })).filter((item: any) => item.id && item.name && Number.isFinite(item.maxMarks) && item.maxMarks > 0)
+      ? (rawCompetition.criteria as Array<Record<string, unknown>>)
+          .map(item => ({
+            id: String(item.id || ''),
+            name: String(item.name || ''),
+            maxMarks: Number(item.maxMarks || 0)
+          }))
+          .filter(item => Boolean(item.id && item.name && Number.isFinite(item.maxMarks) && item.maxMarks > 0))
       : [];
 
     const roster = greenRoomSnapshot.docs
-      .map(doc => ({ ...doc.data(), documentId: doc.id }))
-      .filter((item: any) => typeof item.codeLetter === 'string' && /^[A-Z]{1,2}$/.test(item.codeLetter.trim().toUpperCase()) && typeof item.registrationId === 'string')
-      .map((item: any, index: number) => ({
-        registrationId: item.registrationId as string,
-        codeLetter: item.codeLetter.trim().toUpperCase(),
-        codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : index,
-        status: String(item.status || 'CHECKED_IN')
+      .map(doc => {
+        const data = doc.data() as Record<string, unknown>;
+        return {
+          documentId: doc.id,
+          registrationId: typeof data.registrationId === 'string' ? data.registrationId : '',
+          codeLetter: typeof data.codeLetter === 'string' ? data.codeLetter.trim().toUpperCase() : '',
+          codeIndex: Number.isFinite(Number(data.codeIndex)) ? Number(data.codeIndex) : null,
+          status: String(data.status || 'CHECKED_IN')
+        };
+      })
+      .filter(item => Boolean(item.registrationId && /^[A-Z]{1,2}$/.test(item.codeLetter)))
+      .map((item, index: number) => ({
+        registrationId: item.registrationId,
+        codeLetter: item.codeLetter,
+        codeIndex: item.codeIndex !== null ? item.codeIndex : index,
+        status: item.status
       }))
       .sort((a, b) => a.codeIndex - b.codeIndex);
 
@@ -92,11 +104,12 @@ export async function POST(req: NextRequest) {
       draftScores[codeLetter] = value as Record<string, number> | number;
     }
 
+    const assignmentRecord = assignment as unknown as Record<string, unknown>;
     return NextResponse.json({
       success: true,
       isSubmitted,
-      verificationHash: isSubmitted ? (assignment as any).verificationHash || rawMarkEntry.verificationHash || '' : '',
-      submittedAt: isSubmitted ? (assignment as any).submittedAt || rawMarkEntry.submittedAt || '' : '',
+      verificationHash: isSubmitted ? assignmentRecord.verificationHash || rawMarkEntry.verificationHash || '' : '',
+      submittedAt: isSubmitted ? assignmentRecord.submittedAt || rawMarkEntry.submittedAt || '' : '',
       assignment: {
         id: assignmentDoc.id,
         competitionId,

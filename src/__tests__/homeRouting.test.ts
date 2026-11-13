@@ -14,14 +14,14 @@ describe('Public homepage and management hub routing', () => {
 
   it('renders the existing public results homepage at / and management at /management', () => {
     expect(source('src/app/page.tsx')).toContain("export { default } from './public/page'");
-    expect(source('src/app/management/page.tsx')).toContain('Fest Management System');
-    expect(source('src/app/management/page.tsx')).toContain('href="/admin"');
+    expect(source('src/app/management/page.tsx')).toContain('Management System');
+    expect(source('src/app/management/page.tsx')).toMatch(/href[:=]\s*["']\/admin["']/);
   });
 
   it('keeps dedicated public result routes and correct homepage navigation', () => {
     const layout = source('src/components/layout/PublicLayout.tsx');
     expect(layout).toContain("{ name: 'Latest Results', href: '/'");
-    expect(layout).toContain('href="/management"');
+    expect(layout).not.toContain('href="/management"');
     expect(layout).toContain('href="/public/directory"');
     expect(layout).toContain('href="/public/championship"');
   });

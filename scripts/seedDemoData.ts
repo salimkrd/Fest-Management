@@ -3,11 +3,10 @@
  * Seeds all 18 Firestore collections and demo Auth accounts against Local Firebase Emulators.
  */
 
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { hashSecret } from '../src/domain/judgeAuth';
-import { calculateGradeFromPercentage, getChampionshipPoints } from '../src/domain/scoring';
 
 // Ensure emulator environment variables
 process.env.GCLOUD_PROJECT = 'demo-sahithyolsav-2025';
@@ -43,11 +42,12 @@ async function seed() {
       });
       await auth.setCustomUserClaims(u.uid, { role: u.role, teamId: u.teamId });
       console.log(`  ✔ Created Auth user: ${u.email} (${u.role})`);
-    } catch (err: any) {
-      if (err.code === 'auth/uid-already-exists' || err.code === 'auth/email-already-exists') {
+    } catch (err: unknown) {
+      const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+      if (code === 'auth/uid-already-exists' || code === 'auth/email-already-exists') {
         console.log(`  ℹ Auth user exists: ${u.email}`);
       } else {
-        console.warn(`  ⚠ Warning creating auth user ${u.email}:`, err.message);
+        console.warn(`  ⚠ Warning creating auth user ${u.email}:`, err instanceof Error ? err.message : String(err));
       }
     }
 

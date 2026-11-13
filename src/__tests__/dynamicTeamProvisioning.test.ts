@@ -34,7 +34,7 @@ import { getFirestore as getClientFirestore, connectFirestoreEmulator, doc, getD
 import { TeamService } from '@/services/teamService';
 import { InvitationService } from '@/services/invitationService';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { FirestoreTeam, FirestoreTeamPrivate, FirestoreUser } from '@/types/firestore';
+import { FirestoreTeamPrivate, FirestoreUser } from '@/types/firestore';
 import { getChampionshipPoints, CompetitionType, Grade, SAHITHYOLSAV_POINTS_MATRIX } from '@/domain/scoring';
 
 describe('Phase 3 Checkpoint 3: Secure Manual WhatsApp Team Manager Onboarding', () => {
@@ -119,7 +119,7 @@ describe('Phase 3 Checkpoint 3: Secure Manual WhatsApp Team Manager Onboarding',
 
     // Verify public Firestore document: teams/{id} has ONLY safe public metadata
     const teamSnap = await adminDb!.collection('teams').doc(result.team.id).get();
-    const publicTeam = teamSnap.data() as any;
+    const publicTeam = teamSnap.data() as Record<string, unknown>;
     expect(publicTeam.name).toBe(teamName);
     expect(publicTeam.code).toBe('AHH');
     expect(publicTeam.status).toBe('ACTIVE');
@@ -137,7 +137,7 @@ describe('Phase 3 Checkpoint 3: Secure Manual WhatsApp Team Manager Onboarding',
     expect(privData.portalAccess).toBe(false); // No access until activated
     expect(privData.invitationStatus).toBe('READY_TO_SEND');
     expect(privData.invitationTokenHash).toBeDefined();
-    expect((privData as any).invitationCode).toBeUndefined(); // Raw code NEVER saved
+    expect('invitationCode' in privData).toBe(false); // Raw code NEVER saved
   });
 
   // TEST 3 & 4: One-time invitation generation & message formatting
@@ -739,7 +739,7 @@ describe('Phase 3 Checkpoint 3: Secure Manual WhatsApp Team Manager Onboarding',
 
     try {
       // Switch to production mode
-      (process.env as any).NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
       delete process.env.NEXT_PUBLIC_APP_URL;
       delete process.env.APP_URL;
 
@@ -772,7 +772,7 @@ describe('Phase 3 Checkpoint 3: Secure Manual WhatsApp Team Manager Onboarding',
       expect(pkg.message).toContain('https://fest.sahithyolsav.com/team/activate');
     } finally {
       // Restore environment
-      (process.env as any).NODE_ENV = originalEnv;
+      (process.env as Record<string, string | undefined>).NODE_ENV = originalEnv;
       if (originalAppUrl) {
         process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
       } else {

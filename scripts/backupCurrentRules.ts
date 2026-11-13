@@ -30,8 +30,8 @@ async function backup() {
     fs.writeFileSync(path.join(backupDir, 'firestore.rules.bak'), firestoreSource, 'utf8');
     console.log('Successfully backed up live Firestore rules to backups/production_pre_checkpoint_1/firestore.rules.bak');
     console.log(`Live Firestore Ruleset Name: ${firestoreRuleset.name}, Created: ${firestoreRuleset.createTime}`);
-  } catch (err: any) {
-    console.warn('Could not fetch Firestore ruleset via Admin API:', err?.message);
+  } catch (err: unknown) {
+    console.warn('Could not fetch Firestore ruleset via Admin API:', err instanceof Error ? err.message : String(err));
     fs.writeFileSync(path.join(backupDir, 'firestore.rules.bak'), '// No previous custom ruleset found or error fetching\n', 'utf8');
   }
 
@@ -42,8 +42,8 @@ async function backup() {
     fs.writeFileSync(path.join(backupDir, 'storage.rules.bak'), storageSource, 'utf8');
     console.log('Successfully backed up live Storage rules to backups/production_pre_checkpoint_1/storage.rules.bak');
     console.log(`Live Storage Ruleset Name: ${storageRuleset.name}, Created: ${storageRuleset.createTime}`);
-  } catch (err: any) {
-    console.warn('Could not fetch Storage ruleset via Admin API:', err?.message);
+  } catch (err: unknown) {
+    console.warn('Could not fetch Storage ruleset via Admin API:', err instanceof Error ? err.message : String(err));
     fs.writeFileSync(path.join(backupDir, 'storage.rules.bak'), '// No previous custom ruleset found or error fetching\n', 'utf8');
   }
 

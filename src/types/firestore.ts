@@ -30,7 +30,9 @@ export interface FirestoreCategory {
   ageRange: string;
   classRange: string;
   status: 'ACTIVE' | 'INACTIVE';
+  participantEligibility?: 'CATEGORY_ONLY' | 'OPEN_TO_ALL';
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type ProvisioningStatus = 'PENDING' | 'PROVISIONED' | 'FAILED' | 'AWAITING_MANAGER';
@@ -163,7 +165,7 @@ export interface FirestoreRegistration {
   competitionName: string;
   type: CompetitionType;
   chestNumber: string;
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
   groupMembers?: string[];
   groupLeaderId?: string;
   groupSize?: number;
@@ -247,7 +249,7 @@ export interface FirestoreResult {
   publishedBy?: string; // Admin UID
   ranks: FirestoreResultRank[];
   posterReleased: boolean;
-  posterConfig?: any;
+  posterConfig?: Record<string, unknown>;
 }
 
 export interface FirestorePointsLedgerEntry {
@@ -358,7 +360,7 @@ export interface FirestoreAuditLog {
   actorRole: UserRole;
   targetCollection: string;
   targetDocId: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   timestamp: string;
 }
 

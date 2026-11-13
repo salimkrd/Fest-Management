@@ -68,7 +68,7 @@ async function main() {
 
   console.log(`================================================================`);
   console.log(`PHASE A TARGETED PRODUCTION RECOVERY`);
-  console.log(`Mode: ${isExecute ? 'EXECUTE (DESTRUCTIVE TARGETED DELETION)' : 'DRY RUN (READ ONLY)'}`);
+  console.log(`Mode: ${isDryRun ? 'DRY RUN (READ ONLY)' : 'EXECUTE (DESTRUCTIVE TARGETED DELETION)'}`);
   console.log(`Target Project: ${TARGET_PROJECT}`);
   console.log(`================================================================\n`);
 
@@ -137,8 +137,8 @@ async function main() {
       } else {
         console.log(`  [DRY RUN] Would delete Auth user UID: ${targetAuth.uid} (${targetAuth.email})`);
       }
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: unknown }).code === 'auth/user-not-found') {
         console.log(`  [Notice] Auth user UID ${targetAuth.uid} already absent.`);
       } else {
         throw err;

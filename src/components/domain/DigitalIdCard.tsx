@@ -9,7 +9,7 @@ import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
 import { ParticipantPhoto, isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
-import { useFest } from '@/context/FestContext';
+import { useSafeFest, defaultTheme } from '@/context/FestContext';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -24,7 +24,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   onClose,
   authMode = 'firebase'
 }) => {
-  const { theme } = useFest();
+  const fest = useSafeFest();
+  const theme = fest?.theme || defaultTheme;
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [signedToken, setSignedToken] = useState<string>('');
   const [signedPayload, setSignedPayload] = useState<string>('');
@@ -86,10 +87,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           setQrDataUrl(url);
           setLoading(false);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
           console.error('[DigitalIdCard] QR generation error:', err);
-          setFetchError(err.message || 'Error generating QR badge');
+          setFetchError(err instanceof Error ? err.message : 'Error generating QR badge');
           setLoading(false);
         }
       }
@@ -99,6 +100,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     return () => {
       isMounted = false;
+      setQrDataUrl('');
+      setSignedToken('');
+      setSignedPayload('');
+      setFetchError(null);
     };
   }, [participantId, isOpen, authMode]);
 
@@ -201,22 +206,26 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="bg-gradient-to-br from-[#0758D8] via-[#1675F7] to-[#38A5FF] text-white px-5 pt-5 pb-6 text-center relative overflow-hidden">
             <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full border-[18px] border-white/10" />
             <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[20px] border-white/10" />
-            <span className="relative text-[10px] sm:text-xs font-bold uppercase tracking-[0.22em] text-blue-100 block mb-3">Official Festival Pass</span>
+            <div className="absolute top-3 right-3 px-2 py-0.5 rounded bg-white text-[#2563EB] text-[10px] font-bold uppercase">{participant.categoryName.toUpperCase()}</div>
+            <span className="relative text-[10px] sm:text-xs font-bold uppercase tracking-[0.22em] text-blue-100 block mb-3">OFFICIAL FESTIVAL PASS</span>
             <h4 className="relative text-xl sm:text-2xl font-extrabold tracking-tight leading-tight break-words">
-              <span className="festival-name">{theme.festivalName}</span>
+              <span className="festival-name">{(theme.festivalName || 'SAHITHYOLSAV 2025').toUpperCase()}</span>
             </h4>
             <p className="relative text-xs sm:text-sm text-blue-100 mt-1">{theme.institutionName}</p>
             <div className="relative flex justify-center mt-5">
               <div className="w-[108px] h-[108px] rounded-full p-1.5 bg-white ring-4 ring-blue-200 shadow-lg">
                 <ParticipantPhoto photoUrl={participant.photoUrl} name={participant.name} shape="circle" size="lg" className="!w-full !h-full border-2 border-[#2563EB]" />
               </div>
-              <span className="absolute -bottom-3 bg-black text-white text-sm font-extrabold px-6 py-1 rounded-full border-2 border-white shadow-md">{participant.bib}</span>
+              <span className="absolute -bottom-3 bg-black text-white text-sm font-extrabold px-6 py-1 rounded-full border-2 border-white shadow-md">{participant.bib.startsWith('#') ? participant.bib : `#${participant.bib}`}</span>
             </div>
           </div>
 
           <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
             <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
-            <p className="text-sm font-semibold text-[#64748B] mt-1">{participant.categoryName}</p>
+            {participant.classGrade && (
+              <p className="text-xs text-[#526070] mt-0.5">{participant.classGrade}{participant.division ? ` - Div ${participant.division}` : ''}</p>
+            )}
+            <p className="text-sm font-semibold text-[#64748B] mt-1 uppercase">{participant.categoryName}</p>
             <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
               <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
               <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
@@ -233,12 +242,12 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               <span className="mt-1 font-extrabold text-sm text-[#111827] block break-words">{participant.categoryName}</span>
             </div>
             <div className="min-w-0 border-t border-blue-100 pt-3">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Registered Contests</span>
-              <span className="mt-1 font-extrabold text-sm text-[#111827] block">{participant.registeredEventIds.length} Competitions</span>
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Events Registered</span>
+              <span className="mt-1 font-extrabold text-sm text-[#111827] block">{participant.registeredEventIds.length} Contests</span>
             </div>
             <div className="min-w-0 border-t border-blue-100 pt-3 border-l pl-3">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Security Status</span>
-              <span className="mt-1 font-extrabold text-sm text-emerald-700 block">✓ Verified Auth</span>
+              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Security Auth</span>
+              <span className="mt-1 font-extrabold text-sm text-emerald-700 block">VERIFIED</span>
             </div>
           </div>
 
@@ -246,6 +255,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#0758D8]">Scan at Venue Entrance &amp; Stage Gate</div>
             <div className="mt-3 w-[204px] h-[204px] p-2 bg-white rounded-2xl shadow-sm border border-blue-50 flex items-center justify-center">
               {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={qrDataUrl} alt={`QR Verification for ${participant.bib}`} className="w-full h-full object-contain" />
               ) : (
                 <QrCode className="w-14 h-14 text-neutral-400 animate-pulse" />

@@ -263,7 +263,7 @@ export async function verifyJudgeAssignment(
     return { valid: false, reason: 'EXPIRED' };
   }
 
-  const storedHash = assignment.secretHash || (assignment as any).hashedSecret || '';
+  const storedHash = assignment.secretHash || (assignment as unknown as { hashedSecret?: string }).hashedSecret || '';
   const isMatch = await verifyHash(inputSecret, storedHash, assignment.salt);
   if (!isMatch) {
     const remaining = recordFailedAttempt(assignment.id);

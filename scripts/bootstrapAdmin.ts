@@ -29,7 +29,7 @@ function promptSecret(promptText: string): Promise<string> {
     const isTTY = stdin.isTTY;
 
     if (isTTY) {
-      (stdin as any).setRawMode(true);
+      stdin.setRawMode?.(true);
       stdin.resume();
       let input = '';
 
@@ -37,7 +37,7 @@ function promptSecret(promptText: string): Promise<string> {
         const c = char.toString('utf8');
         if (c === '\n' || c === '\r' || c === '\u0004') {
           stdin.removeListener('data', onData);
-          (stdin as any).setRawMode(false);
+          stdin.setRawMode?.(false);
           stdin.pause();
           process.stdout.write('\n');
           rl.close();
@@ -136,8 +136,8 @@ Usage:
         bootstrapSecret: secret
       });
       console.log('✔ Chief Administrator successfully provisioned:', res);
-    } catch (err: any) {
-      console.error('✖ Bootstrap failed:', err.message);
+    } catch (err: unknown) {
+      console.error('✖ Bootstrap failed:', err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
     return;
@@ -190,8 +190,8 @@ Usage:
         teamId
       });
       console.log('✔ Team Manager successfully provisioned:', res);
-    } catch (err: any) {
-      console.error('✖ Provisioning failed:', err.message);
+    } catch (err: unknown) {
+      console.error('✖ Provisioning failed:', err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
     return;

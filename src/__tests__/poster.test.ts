@@ -41,8 +41,8 @@ function withElements(...elements: PosterElement[]): PosterConfig {
   return { ...createPosterPreset(), decoration: 'minimal', elements, winnerContainer: undefined };
 }
 
-function textLayer(field: PosterField = 'text', text = ''): PosterElement {
-  return { ...createTextElement('content', field, text), x: 0, y: 0, width: 100, height: 40 };
+function textLayer(field: PosterField = 'text', text = '', id = 'content'): PosterElement {
+  return { ...createTextElement(id, field, text), x: 0, y: 0, width: 100, height: 40 };
 }
 
 // Read only the generated text nodes, so assertions verify content rather than layout serialization.
@@ -256,9 +256,9 @@ describe('Poster result bindings and shared rendering', () => {
       winner({ rank: 2, registrationId: 'registration-2', candidateName: 'Second Winner', teamName: 'Team Two' }),
     ]);
     const text = renderedText(renderPosterSvg(twoWinners, theme, createPosterPreset()));
-    expect(text).toContain('01  /  FIRST PLACE');
-    expect(text).toContain('02  /  SECOND PLACE');
-    expect(text).not.toContain('03  /  THIRD PLACE');
+    expect(text).toContain('01 / FIRST PLACE');
+    expect(text).toContain('02 / SECOND PLACE');
+    expect(text).not.toContain('03 / THIRD PLACE');
     expect(text).not.toContain('03');
   });
 
@@ -270,7 +270,7 @@ describe('Poster result bindings and shared rendering', () => {
       winner({ rank: 3, registrationId: 'registration-4', candidateName: 'Third Winner B', teamName: 'Team Three B' }),
     ]);
     const text = renderedText(renderPosterSvg(tiedThird, theme, createPosterPreset()));
-    expect(text).toContain('03  /  THIRD PLACE');
+    expect(text).toContain('03 / THIRD PLACE');
     expect(text).toContain('First Winner');
     expect(text).toContain('Second Winner');
     expect(text).toContain('Third Winner A');
@@ -280,7 +280,7 @@ describe('Poster result bindings and shared rendering', () => {
   });
 
   it('keeps legacy grade/score layers loadable but renders them blank', () => {
-    const legacy = validatePosterConfig(withElements(textLayer('rank1.grade'), textLayer('rank1.score')));
+    const legacy = validatePosterConfig(withElements(textLayer('rank1.grade', '', 'legacy-grade'), textLayer('rank1.score', '', 'legacy-score')));
     const svg = renderPosterSvg(result([winner()]), theme, legacy);
     expect(renderedText(svg)).toEqual(['', '']);
     expect(svg).not.toContain('Grade A+');

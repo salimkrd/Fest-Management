@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyHash, JudgeAssignmentRecord } from '@/domain/judgeAuth';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ function error(message: string, status: number) {
 /** Returns a server-verified, anonymous-only receipt for an already-submitted scorecard. */
 export async function POST(req: NextRequest) {
   try {
+    await syncWorkloadIdentityToken();
     const body = await req.json().catch(() => null);
     const assignmentId = typeof body?.assignmentId === 'string' ? body.assignmentId.trim() : '';
     const competitionId = typeof body?.competitionId === 'string' ? body.competitionId.trim() : '';
@@ -48,11 +49,12 @@ export async function POST(req: NextRequest) {
       return error('This scorecard has not been finalized as an official submission.', 409);
     }
 
-    const storedHash = String((assignment as any).verificationHash || markEntry.verificationHash || '');
+    const assignmentRecord = assignment as unknown as Record<string, unknown>;
+    const storedHash = String(assignmentRecord.verificationHash || markEntry.verificationHash || '');
     if (!storedHash || storedHash !== verificationHash || String(markEntry.verificationHash || '') !== verificationHash) {
       return error('The digital verification hash does not match the archived scorecard.', 403);
     }
-    const secretHash = assignment.secretHash || (assignment as any).hashedSecret || '';
+    const secretHash = assignment.secretHash || String(assignmentRecord.hashedSecret || '');
     if (!secretHash || !assignment.salt || !(await verifyHash(secret, secretHash, assignment.salt))) {
       return error('Judge session verification failed. Please use the original secure session.', 401);
     }
@@ -63,8 +65,9 @@ export async function POST(req: NextRequest) {
     let anonymousRoster: Array<{ codeLetter: string; codeIndex: number }> = [];
     if (Array.isArray(markEntry.anonymousRoster)) {
       anonymousRoster = markEntry.anonymousRoster
-        .filter((item: any) => item && /^[A-Z]{1,2}$/.test(String(item.codeLetter || '').toUpperCase()))
-        .map((item: any) => ({
+        .filter((item: unknown): item is { codeLetter?: unknown; codeIndex?: unknown } => Boolean(item && typeof item === 'object'))
+        .filter(item => /^[A-Z]{1,2}$/.test(String(item.codeLetter || '').toUpperCase()))
+        .map(item => ({
           codeLetter: String(item.codeLetter).toUpperCase(),
           codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : 0
         }));
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       verificationHash: storedHash,
-      submittedAt: String(markEntry.submittedAt || (assignment as any).submittedAt || ''),
+      submittedAt: String(markEntry.submittedAt || assignmentRecord.submittedAt || ''),
       marksRecorded: scoreRegistrationIds.length,
       competition: {
         id: competitionDoc.id,

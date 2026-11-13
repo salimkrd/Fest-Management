@@ -9,7 +9,7 @@ This document describes how **Vercel Preview** securely authenticates to Firebas
 ```
 ┌──────────────────────────────────────┐
 │            Vercel Preview            │
-│ (feature/participant-id-dob-portal)  │
+│ (integration/main-participant-remediation)  │
 │  Project: prj_MmRcs7gArslBmtJxmHG... │
 └──────────────────┬───────────────────┘
                    │ 1. OIDC Token via @vercel/oidc (request context / rotating file)
@@ -60,8 +60,8 @@ Standard Vercel OIDC tokens contain the following verified claims:
 ### 3. Git Branch Isolation & Defense-in-Depth
 Because Vercel OIDC does not issue a Git branch claim in the JWT, Google Cloud cannot cryptographically verify the Git branch at the STS token boundary.
 Branch isolation is enforced through two layers:
-1. **Vercel Branch-Scoped Configuration**: In the Vercel Dashboard, all Workload Identity environment variables (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, etc.) are scoped exclusively to the **Preview** environment and filtered specifically to branch **`feature/participant-id-dob-portal`**.
-2. **Application Fail-Closed Boundary**: `validateWorkloadIdentityScope()` enforces that when `VERCEL_ENV === 'preview'`, `process.env.VERCEL_GIT_COMMIT_REF` must match `feature/participant-id-dob-portal`, immediately aborting with a `[FAIL-CLOSED SAFETY]` exception on unauthorized branches.
+1. **Vercel Branch-Scoped Configuration**: In the Vercel Dashboard, all Workload Identity environment variables (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, etc.) are scoped exclusively to the **Preview** environment and filtered specifically to branch **`integration/main-participant-remediation`**.
+2. **Application Fail-Closed Boundary**: `validateWorkloadIdentityScope()` enforces that when `VERCEL_ENV === 'preview'`, `process.env.VERCEL_GIT_COMMIT_REF` must match `integration/main-participant-remediation`, immediately aborting with a `[FAIL-CLOSED SAFETY]` exception on unauthorized branches.
 
 ### 4. Vercel OIDC Issuer Modes (Team vs Global)
 Vercel supports two issuer configurations under **Project Settings** > **Security** > **Secure backend access with OIDC federation**:
@@ -78,6 +78,7 @@ Vercel supports two issuer configurations under **Project Settings** > **Securit
 ### 5. Least-Privilege IAM Roles
 For the Participant Portal staging preview:
 - **Cloud Datastore User (`roles/datastore.user`)**: **REQUIRED**. Grants read/write access to Cloud Firestore documents (`participants`, `competitions`, `registrations`, `results`, and `participantLoginAttempts` rate limits).
+- **Cloud Storage object roles (`roles/storage.objectAdmin` / `roles/storage.objectCreator`)**: **NOT NEEDED / OMITTED**. Festival logo uploads use the signed-in Chief Admin Firebase Client SDK and the `branding/` Firebase Storage Rules, which enforce the active ADMIN claim and authoritative `/users/{uid}` role. The staging WIF service account receives no direct bucket-write access. `/api/festival/logo` only reads public theme data and serves the configured public image for exports.
 - **Firebase Authentication Admin (`roles/firebaseauth.admin`)**: **NOT NEEDED / OMITTED**. The Participant Portal authenticates using short Bib + DOB and issues server-signed HMAC session cookies (`inspirath_participant_session`). It does not create or manage Firebase Auth accounts.
 - **Service Account Token Creator (`roles/iam.serviceAccountTokenCreator`)**: **NOT NEEDED / OMITTED**. The federated identity receives `roles/iam.workloadIdentityUser` on the service account, which already includes `iam.serviceAccounts.getAccessToken`. Granting Token Creator on top of Workload Identity User is redundant.
 
@@ -224,7 +225,7 @@ In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
 1. Navigate to **Settings** > **Environment Variables**.
 2. Add the following variables:
    - **Environment**: Select **Preview** ONLY (uncheck Production and Development).
-   - **Branch Filter**: Set specifically to **`feature/participant-id-dob-portal`**.
+   - **Branch Filter**: Set specifically to **`integration/main-participant-remediation`**.
 
 | Variable Name | Example Value | Description |
 |---|---|---|
@@ -233,14 +234,43 @@ In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-provider` | Full provider resource path |
 | `GCP_SERVICE_ACCOUNT_EMAIL` | `vercel-staging-sa@inspirath-staging.iam.gserviceaccount.com` | Staging service account email |
 | `GCP_WORKLOAD_IDENTITY_AUDIENCE` | `https://vercel.com/[TEAM_SLUG]` (or `//iam.googleapis.com/...`) | OIDC audience configured in GCP |
-| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `feature/participant-id-dob-portal` | Application-level branch restriction |
+| `GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH` | `integration/main-participant-remediation` | Application-level branch restriction |
 | `GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID`| `prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y` | Application-level project ID verification |
 | `PARTICIPANT_SESSION_SECRET` | *(Random 32+ character string)* | Session token signing secret |
 | `QR_SIGNING_SECRET` | *(Random 32+ character string)* | Digital ID QR cryptographic signing secret |
 
 ---
 
-## 5. Local Verification vs Live Vercel-to-GCP Verification
+## 5. Deploy Firestore and Storage Rules to Staging Only
+
+The repository default Firebase project deliberately remains **production** (`inspirath-d6778`) for backward compatibility. A named `staging` alias now points to `inspirath-staging`. Always specify `--project staging` explicitly when deploying rules.
+
+The current staging Preview browser has confirmed that public Firestore reads (including `settings/publicTheme`, categories, teams, competitions, stages and schedules) are denied. The repository rules permit those reads, so the staging rules need to be deployed to the staging project before client-side portal verification can pass.
+
+Run these commands from an authenticated developer workstation:
+
+```bash
+# Authenticate using your own Firebase/Google account.
+npx firebase login
+
+# Confirm the named staging alias resolves to the staging project.
+npx firebase projects:list
+npx firebase use staging
+
+# Deploy only Firestore and Storage rules to inspirath-staging.
+npx firebase deploy --only firestore:rules,storage --project staging
+```
+
+**Safety checks:**
+- `--project staging` explicitly resolves to `inspirath-staging`.
+- Do not use `--project default`, `--project production`, or deploy while relying on the default project.
+- This deploy must not target `inspirath-d6778`.
+- The commands deploy only the repository's `firestore.rules` and `storage.rules`; they do not migrate or copy application data.
+
+After deployment, re-test the public reads in the Preview browser and then run the authenticated Admin, Team Manager, Judge and Participant workflows against staging.
+
+---
+## 6. Local Verification vs Live Vercel-to-GCP Verification
 
 | Scope | What is Proven Locally | What Requires Live Vercel-to-GCP Verification |
 |---|---|---|

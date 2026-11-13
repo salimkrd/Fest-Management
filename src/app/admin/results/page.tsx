@@ -16,8 +16,8 @@ import {
   Globe,
   RotateCcw,
   Sparkles,
-  Trophy,
   ShieldAlert,
+  Trophy,
   FileCheck,
   Send
 } from 'lucide-react';

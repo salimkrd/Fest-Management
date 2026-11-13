@@ -4,9 +4,7 @@ import React, { useState } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { ChampionshipPodium } from '@/components/domain/ChampionshipPodium';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Trophy, Award, Medal, Sparkles, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function PublicChampionshipPage() {
   const { teams, theme } = useFest();

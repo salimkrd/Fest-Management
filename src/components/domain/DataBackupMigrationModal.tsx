@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import {
   BackupMigrationService,
   DryRunMigrationReport
@@ -15,7 +14,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ArrowRight,
   ShieldCheck,
   FileJson
 } from 'lucide-react';
@@ -42,8 +40,8 @@ export const DataBackupMigrationModal: React.FC<DataBackupMigrationModalProps> =
       const result = BackupMigrationService.downloadLocalBackup();
       setDownloadNotice(`Downloaded ${result.filename} (${(result.sizeBytes / 1024).toFixed(1)} KB) successfully.`);
       setTimeout(() => setDownloadNotice(null), 5000);
-    } catch (e: any) {
-      setError('Could not export local backup: ' + (e.message || String(e)));
+    } catch (e: unknown) {
+      setError('Could not export local backup: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 
@@ -58,8 +56,8 @@ export const DataBackupMigrationModal: React.FC<DataBackupMigrationModalProps> =
     try {
       const plan = await BackupMigrationService.planDryRunMigration(db);
       setReport(plan);
-    } catch (e: any) {
-      setError('Dry-run analysis failed: ' + (e.message || String(e)));
+    } catch (e: unknown) {
+      setError('Dry-run analysis failed: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setAnalyzing(false);
     }
@@ -79,8 +77,8 @@ export const DataBackupMigrationModal: React.FC<DataBackupMigrationModalProps> =
       setMigrationSuccess(`Successfully migrated ${totalMigrated} items to live Firestore. Pre-migration snapshot saved as ${outcome.snapshotKey}.`);
       setReport(null);
       setConfirmText('');
-    } catch (e: any) {
-      setError('Migration execution failed: ' + (e.message || String(e)));
+    } catch (e: unknown) {
+      setError('Migration execution failed: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setMigrating(false);
     }

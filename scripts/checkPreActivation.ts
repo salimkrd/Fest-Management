@@ -3,7 +3,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getSecurityRules } from 'firebase-admin/security-rules';
 import * as fs from 'fs';
-import * as path from 'path';
 
 async function check() {
   console.log('=== PRE-ACTIVATION VERIFICATION FOR CHECKPOINT 2 ===\n');
@@ -48,8 +47,8 @@ async function check() {
     } else {
       console.log('  Zero users exist in production Auth (Ready for initial administrator bootstrap).');
     }
-  } catch (err: any) {
-    console.error('FAIL: Error connecting to Firebase Auth:', err.message);
+  } catch (err: unknown) {
+    console.error('FAIL: Error connecting to Firebase Auth:', err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 

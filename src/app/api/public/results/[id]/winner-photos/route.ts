@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,6 +24,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    await syncWorkloadIdentityToken();
     const { id } = await context.params;
     if (!id || id.length > 180) {
       return NextResponse.json({ error: 'Invalid result ID.' }, { status: 400 });

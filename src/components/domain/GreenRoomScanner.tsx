@@ -9,6 +9,18 @@ interface GreenRoomScannerProps {
   isProcessing?: boolean;
 }
 
+interface Html5QrcodeInstance {
+  isScanning: boolean;
+  start: (
+    cameraConfig: { facingMode: string },
+    configuration: { fps: number; qrbox: { width: number; height: number }; aspectRatio: number },
+    onSuccess: (decodedText: string) => void,
+    onError: () => void
+  ) => Promise<unknown>;
+  stop: () => Promise<void>;
+  scanFile: (file: File, showImage?: boolean) => Promise<string>;
+}
+
 export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
   onScanSuccess,
   isProcessing = false
@@ -17,9 +29,8 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successNotice, setSuccessNotice] = useState<string>('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5QrcodeInstance | null>(null);
   const readerElementId = 'green-room-qr-reader';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastScannedTimeRef = useRef<number>(0);
@@ -62,12 +73,10 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
       );
 
       setCameraActive(true);
-      setHasCameraPermission(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('[GreenRoomScanner] Camera start error:', err);
       setCameraActive(false);
-      setHasCameraPermission(false);
-      const msg = err?.message || err?.toString() || '';
+      const msg = err instanceof Error ? err.message : String(err || '');
       if (msg.includes('NotAllowedError') || msg.includes('Permission denied')) {
         setErrorMessage('Camera access denied. Please enable camera permissions in your browser settings.');
       } else if (msg.includes('NotFoundError') || msg.includes('DevicesNotFoundError')) {
@@ -119,7 +128,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
         setTimeout(() => setSuccessNotice(''), 2000);
         onScanSuccess(decodedText);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('[GreenRoomScanner] File scan error:', err);
       setErrorMessage('Could not find a valid QR code in this image. Please ensure the QR is clear and well-lit.');
     } finally {

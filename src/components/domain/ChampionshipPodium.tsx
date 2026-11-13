@@ -20,15 +20,15 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
   if (!first) return null;
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h3 className="text-base font-bold text-[#111111]">Championship Laureates Podium</h3>
+    <div className="w-full min-w-0 max-w-full overflow-hidden bg-white rounded-2xl border border-[#E1E7EF] p-4 sm:p-6 shadow-xs">
+      <div className="flex min-w-0 flex-col gap-3 mb-6 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm sm:text-base font-bold text-[#111111]">Championship Laureates Podium</h3>
           <p className="text-xs text-[#526070]">Top three performing contingent houses in active standings</p>
         </div>
-        <div className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
+        <div className="max-w-full self-start flex flex-wrap items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] sm:text-xs font-semibold text-amber-800 sm:self-auto">
           <Trophy className="w-4 h-4 text-amber-600" />
-          <span><span className="festival-name">{theme.festivalName}</span> Trophy Race</span>
+          <span className="min-w-0 break-words"><span className="festival-name">{theme.festivalName}</span> Trophy Race</span>
           <FestivalStatusBadge />
         </div>
       </div>

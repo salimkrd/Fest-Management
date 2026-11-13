@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useFest } from '@/context/FestContext';
-import { auth } from '@/lib/firebase/client';
+import { auth, storage } from '@/lib/firebase/client';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { normalizeFestivalSettings } from '@/domain/festivalSettings';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -55,15 +56,28 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       setSaving(true); setError(''); setSaved(false);
       if (logoFile) {
         if (!auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
-        const token = await auth.currentUser.getIdToken(true);
-        const response = await fetch('/api/admin/festival-logo', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': logoFile.type },
-          body: logoFile
+        if (!storage) throw new Error('Firebase Storage is not configured for this environment.');
+        const extensionByType: Record<string, string> = {
+          'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
+        };
+        const extension = extensionByType[logoFile.type];
+        if (!extension || logoFile.size === 0 || logoFile.size >= 5 * 1024 * 1024) {
+          throw new Error('Upload a nonempty PNG, JPG or WebP image smaller than 5 MB.');
+        }
+        const signature = new Uint8Array(await logoFile.slice(0, 12).arrayBuffer());
+        const isPng = signature.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => signature[i] === v);
+        const isJpeg = signature.length >= 3 && signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff;
+        const isWebp = signature.length >= 12 && String.fromCharCode(...signature.slice(0, 4)) === 'RIFF' && String.fromCharCode(...signature.slice(8, 12)) === 'WEBP';
+        if (!(logoFile.type === 'image/png' && isPng || logoFile.type === 'image/jpeg' && isJpeg || logoFile.type === 'image/webp' && isWebp)) {
+          throw new Error('Selected file content does not match its image type.');
+        }
+        // Storage Rules enforce the signed-in ADMIN role; WIF remains Firestore-only.
+        const logoRef = ref(storage, 'branding/festival-logo-' + crypto.randomUUID() + '.' + extension);
+        const uploaded = await uploadBytes(logoRef, logoFile, {
+          contentType: logoFile.type,
+          customMetadata: { uploadedBy: auth.currentUser.uid },
         });
-        const data = await response.json();
-        if (!response.ok || !data.url) throw new Error(data.error || 'Could not upload festival logo.');
-        changes.logoUrl = data.url;
+        changes.logoUrl = await getDownloadURL(uploaded.ref);
       }
       // A share-page URL is not an image. Validate the actual browser-renderable
       // image before publishing so every portal won't fall back to an initial.

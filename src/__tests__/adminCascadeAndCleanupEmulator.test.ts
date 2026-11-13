@@ -640,7 +640,7 @@ describe('Admin Cascade Deletion & Orphan Cleanup Emulator Integration', () => {
             }
             return b.commit();
           }
-        } as any;
+        } as unknown as ReturnType<typeof db.batch>;
       });
 
       // Attempt 1: Should fail during batch commit
