@@ -1,4 +1,5 @@
-import * as admin from 'firebase-admin';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import { hashSecret } from '../src/domain/judgeAuth';
 
@@ -33,8 +34,8 @@ async function seedJryCode() {
   try {
     process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
     process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
-    const emuApp = admin.initializeApp({ projectId: 'demo-sahithyolsav-2025' }, 'emu-seed-jry');
-    const emuDb = emuApp.firestore();
+    const emuApp = initializeApp({ projectId: 'demo-sahithyolsav-2025' }, 'emu-seed-jry');
+    const emuDb = getFirestore(emuApp);
     await emuDb.collection('judgeAssignments').doc(assignment.id).set(assignment, { merge: true });
     console.log(`[Emulator] Seeded ${code} to judgeAssignments/${assignment.id}`);
   } catch (e: unknown) {
@@ -48,8 +49,8 @@ async function seedJryCode() {
     const credPath = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
     if (fs.existsSync(credPath)) {
       const serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf8'));
-      const prodApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), projectId: 'inspirath-d6778' }, 'prod-seed-jry');
-      const prodDb = prodApp.firestore();
+      const prodApp = initializeApp({ credential: cert(serviceAccount), projectId: 'inspirath-d6778' }, 'prod-seed-jry');
+      const prodDb = getFirestore(prodApp);
       await prodDb.collection('judgeAssignments').doc(assignment.id).set(assignment, { merge: true });
       console.log(`[Production] Seeded ${code} to judgeAssignments/${assignment.id}`);
     }

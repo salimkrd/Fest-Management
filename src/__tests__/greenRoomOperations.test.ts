@@ -1416,6 +1416,20 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     const staleJudgeAssignId = 'ja-stale-judge-01';
 
     beforeAll(async () => {
+      // This suite uses fixed emulator document IDs. Remove artifacts from prior
+      // runs first so the code-letter allocator always begins with a clean A/B pool.
+      await Promise.all([
+        db.collection('greenRoomAssignments').doc(staleCompId + '_reg-stale-1').delete(),
+        db.collection('greenRoomAssignments').doc(staleCompId + '_reg-stale-2').delete(),
+        db.collection('greenRoomCounters').doc(staleCompId).delete(),
+        db.collection('competitionMarkingLocks').doc(staleCompId).delete(),
+        db.collection('markEntries').doc('me-' + staleJudgeAssignId).delete(),
+        db.collection('registrations').doc('reg-stale-1').delete(),
+        db.collection('registrations').doc('reg-stale-2').delete(),
+        db.collection('judgeAssignments').doc(staleJudgeAssignId).delete(),
+        db.collection('competitions').doc(staleCompId).delete(),
+      ]);
+
       // Seed competition for stale mapping test
       await db.collection('competitions').doc(staleCompId).set({
         id: staleCompId,
@@ -1617,7 +1631,20 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     });
 
     describe('C. Concurrency & Stale Code Letter-to-Registration Race Condition Elimination', () => {
+      const getAssignedCodeLetters = async () => {
+        const [firstSnapshot, secondSnapshot] = await Promise.all([
+          db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get(),
+          db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).get(),
+        ]);
+        const firstCodeLetter = String(firstSnapshot.data()?.codeLetter || '').trim().toUpperCase();
+        const secondCodeLetter = String(secondSnapshot.data()?.codeLetter || '').trim().toUpperCase();
+        if (!firstCodeLetter || !secondCodeLetter || firstCodeLetter === secondCodeLetter) {
+          throw new Error('Stale mapping fixture must have two distinct assigned code letters.');
+        }
+        return { firstCodeLetter, secondCodeLetter };
+      };
       it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Spy on validateScoresPayload to simulate a concurrent race condition:
         // validateScoresPayload validates that 'A' maps to 'reg-stale-1'.
         // Right after validation returns and before transaction runs, reg-stale-1's codeLetter is modified backstage to 'X'!
@@ -1639,8 +1666,8 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
               scores: {
-                'A': { 'c1': 45, 'c2': 40 },
-                'B': { 'c1': 35, 'c2': 38 }
+                [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
+                [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
               }
             })
           ).rejects.toThrow(/Stale Mapping Error/);
@@ -1648,13 +1675,14 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           spy.mockRestore();
           // Reset reg-stale-1 back to 'A'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
-            codeLetter: 'A',
+            codeLetter: firstCodeLetter,
             updatedAt: new Date().toISOString()
           });
         }
       });
 
       it('rejects submitMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Simulate a backstage race condition for submitMarks:
         const judgeServiceTarget = JudgeService as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
         const origValidate = judgeServiceTarget.validateScoresPayload;
@@ -1674,8 +1702,8 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
               scores: {
-                'A': { 'c1': 45, 'c2': 40 },
-                'B': { 'c1': 35, 'c2': 38 }
+                [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
+                [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
               }
             })
           ).rejects.toThrow(/Stale Mapping Error/);
@@ -1683,21 +1711,22 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           spy.mockRestore();
           // Reset reg-stale-2 back to 'B'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
-            codeLetter: 'B',
+            codeLetter: secondCodeLetter,
             updatedAt: new Date().toISOString()
           });
         }
       });
 
       it('successfully saves draft and submits marks when Code Letter mappings match the atomic transaction state', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Save draft marks
         const draftRes = await JudgeService.saveDraftMarks({
           assignmentId: staleJudgeAssignId,
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
           scores: {
-            'A': { 'c1': 48, 'c2': 45 },
-            'B': { 'c1': 40, 'c2': 42 }
+            [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
+            [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
           }
         });
         expect(draftRes.success).toBe(true);
@@ -1708,8 +1737,8 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
           scores: {
-            'A': { 'c1': 48, 'c2': 45 },
-            'B': { 'c1': 40, 'c2': 42 }
+            [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
+            [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
           }
         });
         expect(submitRes.success).toBe(true);

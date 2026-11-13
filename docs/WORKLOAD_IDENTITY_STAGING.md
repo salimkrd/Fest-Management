@@ -78,6 +78,7 @@ Vercel supports two issuer configurations under **Project Settings** > **Securit
 ### 5. Least-Privilege IAM Roles
 For the Participant Portal staging preview:
 - **Cloud Datastore User (`roles/datastore.user`)**: **REQUIRED**. Grants read/write access to Cloud Firestore documents (`participants`, `competitions`, `registrations`, `results`, and `participantLoginAttempts` rate limits).
+- **Cloud Storage object roles (`roles/storage.objectAdmin` / `roles/storage.objectCreator`)**: **NOT NEEDED / OMITTED**. Festival logo uploads use the signed-in Chief Admin Firebase Client SDK and the `branding/` Firebase Storage Rules, which enforce the active ADMIN claim and authoritative `/users/{uid}` role. The staging WIF service account receives no direct bucket-write access. `/api/festival/logo` only reads public theme data and serves the configured public image for exports.
 - **Firebase Authentication Admin (`roles/firebaseauth.admin`)**: **NOT NEEDED / OMITTED**. The Participant Portal authenticates using short Bib + DOB and issues server-signed HMAC session cookies (`inspirath_participant_session`). It does not create or manage Firebase Auth accounts.
 - **Service Account Token Creator (`roles/iam.serviceAccountTokenCreator`)**: **NOT NEEDED / OMITTED**. The federated identity receives `roles/iam.workloadIdentityUser` on the service account, which already includes `iam.serviceAccounts.getAccessToken`. Granting Token Creator on top of Workload Identity User is redundant.
 

@@ -157,7 +157,7 @@ Before deploying to production (e.g., Vercel + Live Firebase):
 ### 1. Vercel Git-Based Automatic Deployment Behavior
 - **Default Vercel Behavior**: Connecting this repository to Vercel enables automatic production deployments on every push to the `main` branch.
 - **Release Control**: If you wish to stage or gate production releases, configure **Ignored Build Step** or enable deployment protection/preview branch promotions in the Vercel Project Settings.
-- **Runtime Environment**: Uses Node.js `22.x` as declared in `package.json` (`engines`) and `.nvmrc`.
+- **Runtime Environment**: Uses Node.js `24.x` as declared in `package.json` (`engines`), `.nvmrc`, and the linked Vercel project.
 
 ### 2. Trusted HTTPS Canonical URL
 - Set `NEXT_PUBLIC_APP_URL` in Vercel Production Environment Variables to your confirmed HTTPS domain (e.g., `https://fest.example.com` or your production Vercel URL).
