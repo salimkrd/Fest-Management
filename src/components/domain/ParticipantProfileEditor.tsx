@@ -226,7 +226,7 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
                       return;
                     }
                     if (file.size > 5 * 1024 * 1024) {
-                      setError('Photo must be smaller than 5 MB.');
+                      setError('Photo must be smaller than 4 MB.');
                       event.target.value = '';
                       return;
                     }
@@ -235,7 +235,7 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
                   }}
                   className={inputClass}
                 />
-                <span className="mt-1.5 block text-[11px] leading-4 text-slate-500">JPG, PNG, or WebP · Maximum 5 MB. Uploaded directly to INSPIRATH storage.</span>
+                <span className="mt-1.5 block text-[11px] leading-4 text-slate-500">JPG, PNG, or WebP · Maximum 4 MB. Uploaded directly to INSPIRATH storage.</span>
                 {photoFile && <span className="mt-1 block text-xs font-semibold text-emerald-700">Selected: {photoFile.name} (will replace the URL above)</span>}
               </label>
 
