@@ -17,10 +17,10 @@
  *   npm run reset:production -- --execute
  */
 
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, deleteApp } from 'firebase-admin/app';
 import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { getFirestore, type CollectionReference, type DocumentReference } from 'firebase-admin/firestore';
-import { getStorage, type Bucket } from 'firebase-admin/storage';
+import { getStorage } from 'firebase-admin/storage';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -36,6 +36,10 @@ const TARGET_BUCKET = 'inspirath-d6778.firebasestorage.app';
 const DEFAULT_SERVICE_ACCOUNT_PATH = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
 const PRESERVED_LOCK_PATH = 'settings/bootstrapLock';
 const RESET_CONFIRMATION = 'RESET_INSPIRATH_PRODUCTION';
+
+type StorageBucket = ReturnType<ReturnType<typeof getStorage>['bucket']>;
+type StorageFile = Awaited<ReturnType<StorageBucket['getFiles']>>[0][number];
+type StorageFileList = StorageFile[];
 
 type Inventory = {
   firestoreCollections: Record<string, number>;
@@ -124,8 +128,8 @@ async function countCollectionTree(
 async function buildInventory(
   db: ReturnType<typeof getFirestore>,
   auth: ReturnType<typeof getAuth>,
-  bucket: Bucket
-): Promise<{ inventory: Inventory; authUsers: UserRecord[]; storageFiles: Awaited<ReturnType<Bucket['getFiles']>>[0] }> {
+  bucket: StorageBucket
+): Promise<{ inventory: Inventory; authUsers: UserRecord[]; storageFiles: StorageFileList }> {
   const collectionCounts: Record<string, number> = {};
   let firestoreDocuments = 0;
   const rootCollections = await db.listCollections();
@@ -310,7 +314,7 @@ async function writeBackup(
     'utf8'
   );
 
-  const storageBackupCount = await backupStorage(storageFiles, bucket, backupDirectory);
+  const storageBackupCount = await backupStorage(storageFiles, backupDirectory);
   if (storageBackupCount !== inventory.storageObjects) {
     throw new Error(
       `Storage changed while backing up: inventory had ${inventory.storageObjects} objects but backup contains ${storageBackupCount}. No deletion was performed.`
@@ -487,12 +491,12 @@ async function main(): Promise<void> {
     client_email?: string;
     private_key?: string;
   };
-  if (serviceAccount.project_id !== TARGET_PROJECT || !serviceAccount.client_email || !serviceAccount.private_key) {
+  if (serviceAccount.project_id !== TARGET_PROJECT || typeof serviceAccount.client_email !== 'string' || typeof serviceAccount.private_key !== 'string') {
     throw new Error(`Safety stop: service account must be a valid credential for exactly ${TARGET_PROJECT}.`);
   }
 
   const app = initializeApp({
-    credential: cert(serviceAccount),
+    credential: cert({ projectId: TARGET_PROJECT, clientEmail: serviceAccount.client_email, privateKey: serviceAccount.private_key }),
     projectId: TARGET_PROJECT,
     storageBucket: TARGET_BUCKET
   }, `fresh-fest-reset-${Date.now()}`);
@@ -571,7 +575,7 @@ async function main(): Promise<void> {
     console.log('Cleared: festival identity/theme, categories, teams, competitions, participants, registrations, stages, schedules, judges, marks, results, ledger, posters, logos, exports and all other stored objects.');
     console.log(`Backup: ${backupDirectory}`);
   } finally {
-    await app.delete();
+    await deleteApp(app);
   }
 }
 
