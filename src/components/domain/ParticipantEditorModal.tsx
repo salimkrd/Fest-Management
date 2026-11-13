@@ -42,14 +42,10 @@ export function ParticipantEditorModal({
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
 
   useEffect(() => {
-    if (!photoFile) {
-      setPhotoPreviewUrl('');
-      return;
-    }
-    const preview = URL.createObjectURL(photoFile);
-    setPhotoPreviewUrl(preview);
-    return () => URL.revokeObjectURL(preview);
-  }, [photoFile]);
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
 
   const update = (key: keyof ParticipantEditorFields, value: string) => {
     setFields(previous => ({ ...previous, [key]: value }));
@@ -214,6 +210,7 @@ export function ParticipantEditorModal({
                 const file = event.target.files?.[0] || null;
                 if (!file) {
                   setPhotoFile(null);
+                  setPhotoPreviewUrl('');
                   return;
                 }
                 if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -227,6 +224,7 @@ export function ParticipantEditorModal({
                   return;
                 }
                 setPhotoFile(file);
+                setPhotoPreviewUrl(URL.createObjectURL(file));
                 setError('');
               }}
               className="block w-full rounded-xl border border-[#E1E7EF] bg-white px-3 py-2 text-sm text-[#526070] file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
