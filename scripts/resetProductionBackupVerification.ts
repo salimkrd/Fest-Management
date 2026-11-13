@@ -50,6 +50,7 @@ export async function verifyBackupArtifacts(options: {
   expectedProject: string;
   expectedBucket: string;
   expectedFirestoreDocuments: number;
+  expectedFirestoreCollections: Record<string, number>;
   expectedAuthUsers: number;
   expectedStorageObjects: number;
   expectedStorageBytes: number;
@@ -60,6 +61,7 @@ export async function verifyBackupArtifacts(options: {
     expectedProject,
     expectedBucket,
     expectedFirestoreDocuments,
+    expectedFirestoreCollections,
     expectedAuthUsers,
     expectedStorageObjects,
     expectedStorageBytes,
@@ -81,6 +83,7 @@ export async function verifyBackupArtifacts(options: {
     crlfDelay: Infinity
   });
   const firestorePaths = new Set<string>();
+  const actualFirestoreCollections: Record<string, number> = {};
   let firestoreCount = 0;
   try {
     for await (const line of firestoreReader) {
@@ -97,6 +100,12 @@ export async function verifyBackupArtifacts(options: {
       if (firestorePaths.has(record.path)) {
         throw new Error(`Duplicate Firestore document path ${record.path}.`);
       }
+      const pathSegments = record.path.split('/');
+      if (pathSegments.length < 2 || pathSegments.length % 2 !== 0) {
+        throw new Error(`Invalid Firestore document path "${record.path}".`);
+      }
+      const collectionPath = pathSegments.slice(0, -1).join('/');
+      actualFirestoreCollections[collectionPath] = (actualFirestoreCollections[collectionPath] || 0) + 1;
       firestorePaths.add(record.path);
       firestoreCount++;
     }
@@ -107,6 +116,20 @@ export async function verifyBackupArtifacts(options: {
   }
   if (firestoreCount !== expectedFirestoreDocuments) {
     throw new Error(`Backup verification failed: Firestore record count ${firestoreCount} does not match inventory ${expectedFirestoreDocuments}.`);
+  }
+  for (const requiredPath of [
+    'settings/bootstrapLock',
+    `users/${canonicalAdminUid}`,
+    'settings/resetMaintenance'
+  ]) {
+    if (!firestorePaths.has(requiredPath)) {
+      throw new Error(`Backup verification failed: required preserved Firestore document "${requiredPath}" is missing.`);
+    }
+  }
+  const sortedCounts = (counts: Record<string, number>) =>
+    JSON.stringify(Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))));
+  if (sortedCounts(actualFirestoreCollections) !== sortedCounts(expectedFirestoreCollections)) {
+    throw new Error('Backup verification failed: Firestore per-collection counts do not match the locked inventory.');
   }
 
   let authUsers: Array<{ uid?: unknown }>;
@@ -207,12 +230,14 @@ export async function verifyBackupArtifacts(options: {
     targetBucket?: string;
     inventoryBeforeReset?: {
       firestoreDocuments?: number;
+      firestoreCollections?: Record<string, number>;
       authUsers?: number;
       storageObjects?: number;
       storageBytes?: number;
     };
     verifiedBackup?: {
       firestoreDocumentCount?: number;
+      firestoreCollectionCounts?: Record<string, number>;
       authUserCount?: number;
       storageObjectCount?: number;
       storageBytes?: number;
@@ -228,10 +253,12 @@ export async function verifyBackupArtifacts(options: {
   }
   if (
     manifest.inventoryBeforeReset?.firestoreDocuments !== expectedFirestoreDocuments ||
+    sortedCounts(manifest.inventoryBeforeReset?.firestoreCollections || {}) !== sortedCounts(expectedFirestoreCollections) ||
     manifest.inventoryBeforeReset?.authUsers !== expectedAuthUsers ||
     manifest.inventoryBeforeReset?.storageObjects !== expectedStorageObjects ||
     manifest.inventoryBeforeReset?.storageBytes !== expectedStorageBytes ||
     manifest.verifiedBackup?.firestoreDocumentCount !== expectedFirestoreDocuments ||
+    sortedCounts(manifest.verifiedBackup?.firestoreCollectionCounts || {}) !== sortedCounts(actualFirestoreCollections) ||
     manifest.verifiedBackup?.authUserCount !== expectedAuthUsers ||
     manifest.verifiedBackup?.storageObjectCount !== expectedStorageObjects ||
     manifest.verifiedBackup?.storageBytes !== expectedStorageBytes
