@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
+import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
 
 export default function ParticipantsPage() {
@@ -41,15 +42,29 @@ export default function ParticipantsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = async (data: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
+  const handleSave = async (
+    data: Omit<Participant, 'id' | 'bib' | 'idStatus'>,
+    photoFile?: File | null
+  ): Promise<string> => {
+    let participantId: string;
     if (editingPart) {
       // Do not replace competition registrations when editing profile fields.
       const profileUpdates: Partial<Participant> = { ...data };
       delete profileUpdates.registeredEventIds;
       await updateParticipant(editingPart.id, profileUpdates);
+      participantId = editingPart.id;
     } else {
-      await addParticipant(data);
+      const created = await addParticipant(data);
+      participantId = created.id;
+      // If upload fails, the open editor becomes an edit session, avoiding duplicate creation on retry.
+      setEditingPart(created);
     }
+
+    if (photoFile) {
+      const photoUrl = await uploadParticipantPhoto(participantId, photoFile);
+      await updateParticipant(participantId, { photoUrl });
+    }
+    return participantId;
   };
 
   const handleDelete = async (id: string, name: string) => {
