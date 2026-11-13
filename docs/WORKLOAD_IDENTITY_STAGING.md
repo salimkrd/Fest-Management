@@ -240,7 +240,36 @@ In the Vercel Dashboard for project **`salimkrd/Fest-Management`**:
 
 ---
 
-## 5. Local Verification vs Live Vercel-to-GCP Verification
+## 5. Deploy Firestore and Storage Rules to Staging Only
+
+The repository default Firebase project deliberately remains **production** (`inspirath-d6778`) for backward compatibility. A named `staging` alias now points to `inspirath-staging`. Always specify `--project staging` explicitly when deploying rules.
+
+The current staging Preview browser has confirmed that public Firestore reads (including `settings/publicTheme`, categories, teams, competitions, stages and schedules) are denied. The repository rules permit those reads, so the staging rules need to be deployed to the staging project before client-side portal verification can pass.
+
+Run these commands from an authenticated developer workstation:
+
+```bash
+# Authenticate using your own Firebase/Google account.
+npx firebase login
+
+# Confirm the named staging alias resolves to the staging project.
+npx firebase projects:list
+npx firebase use staging
+
+# Deploy only Firestore and Storage rules to inspirath-staging.
+npx firebase deploy --only firestore:rules,storage --project staging
+```
+
+**Safety checks:**
+- `--project staging` explicitly resolves to `inspirath-staging`.
+- Do not use `--project default`, `--project production`, or deploy while relying on the default project.
+- This deploy must not target `inspirath-d6778`.
+- The commands deploy only the repository's `firestore.rules` and `storage.rules`; they do not migrate or copy application data.
+
+After deployment, re-test the public reads in the Preview browser and then run the authenticated Admin, Team Manager, Judge and Participant workflows against staging.
+
+---
+## 6. Local Verification vs Live Vercel-to-GCP Verification
 
 | Scope | What is Proven Locally | What Requires Live Vercel-to-GCP Verification |
 |---|---|---|
