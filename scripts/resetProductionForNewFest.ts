@@ -37,7 +37,6 @@ const TARGET_PROJECT = 'inspirath-d6778';
 const TARGET_BUCKET = 'inspirath-d6778.firebasestorage.app';
 const DEFAULT_SERVICE_ACCOUNT_PATH = 'C:/Users/Admin/.credentials/inspirath-d6778-firebase-adminsdk.json';
 const PRESERVED_LOCK_PATH = 'settings/bootstrapLock';
-const PRESERVED_MAINTENANCE_PATH = 'settings/resetMaintenance';
 const RESET_CONFIRMATION = 'RESET_INSPIRATH_PRODUCTION';
 
 type StorageFileList = StorageFile[];
@@ -436,9 +435,8 @@ async function deleteAllFirestoreExceptCanonicalAdmin(
     for (const documentRef of documentRefs) {
       const preserveAdmin = documentRef.path === `users/${adminUid}`;
       const preserveBootstrapLock = documentRef.path === PRESERVED_LOCK_PATH;
-      const preserveMaintenanceLock = documentRef.path === PRESERVED_MAINTENANCE_PATH;
 
-      if (preserveAdmin || preserveBootstrapLock || preserveMaintenanceLock) {
+      if (preserveAdmin || preserveBootstrapLock) {
         const subcollections = await documentRef.listCollections();
         for (const subcollection of subcollections) {
           const count = await countCollectionTree(subcollection, {});
@@ -518,11 +516,7 @@ async function verifyFreshState(
     bucket.getFiles({ autoPaginate: true })
   ]);
 
-  const expectedPaths = [
-    'settings/bootstrapLock',
-    ...(maintenanceLockExpected ? [PRESERVED_MAINTENANCE_PATH] : []),
-    `users/${adminUid}`
-  ].sort();
+  const expectedPaths = ['settings/bootstrapLock', `users/${adminUid}`].sort();
   const remainingPaths: string[] = [];
   for (const root of await db.listCollections()) {
     const snapshot = await root.get();
@@ -539,6 +533,12 @@ async function verifyFreshState(
       `Fresh-state verification failed: expected only ${expectedPaths.join(', ')}; found ${remainingDocuments} Firestore documents.`
     );
   }
+  const bootstrapLock = await db.doc(PRESERVED_LOCK_PATH).get();
+  if (!bootstrapLock.exists || bootstrapLock.get('maintenanceMode') !== maintenanceLockExpected) {
+    throw new Error(
+      `Fresh-state verification failed: bootstrap maintenanceMode should be ${maintenanceLockExpected}.`
+    );
+  }
   if (remainingAuthUsers.length !== 1 || remainingAuthUsers[0].uid !== adminUid) {
     throw new Error(`Fresh-state verification failed: expected only the canonical Chief Admin Auth account; found ${remainingAuthUsers.length}.`);
   }
@@ -551,7 +551,7 @@ async function assertProductionMaintenanceProxy(): Promise<void> {
   const configuredUrl = process.env.FEST_RESET_APP_URL?.trim();
   if (!configuredUrl) {
     throw new Error(
-      'Safety stop: set FEST_RESET_APP_URL to the verified production HTTPS origin after enabling FEST_RESET_MAINTENANCE=1 in Vercel and redeploying.'
+      'Safety stop: set FEST_RESET_APP_URL to the verified production HTTPS origin. Deploy the new proxy and both updated Firebase Rules before running the reset.'
     );
   }
 
@@ -657,29 +657,32 @@ async function main(): Promise<void> {
       return;
     }
 
-    // All Next.js API traffic must already be gated at the production deployment.
-    // This Firestore lock separately blocks direct browser SDK writes and Storage rules.
-    await assertProductionMaintenanceProxy();
-
-    const maintenanceRef = db.doc(PRESERVED_MAINTENANCE_PATH);
+    // One atomic flag in the preserved bootstrapLock gates API traffic and all
+    // direct Firestore/Storage client writes. No temporary third document is created.
+    const maintenanceRef = db.doc(PRESERVED_LOCK_PATH);
     const existingMaintenance = await maintenanceRef.get();
-    if (existingMaintenance.exists) {
+    if (!existingMaintenance.exists) {
+      throw new Error('Safety stop: preserved settings/bootstrapLock disappeared. No data was changed.');
+    }
+    if (existingMaintenance.get('maintenanceMode') === true) {
       throw new Error(
-        'Safety stop: a reset-maintenance lock already exists. Treat this as an interrupted reset and inspect it manually; do not overwrite it.'
+        'Safety stop: bootstrapLock already has maintenanceMode=true. Treat this as an interrupted reset and inspect it manually; do not overwrite it.'
       );
     }
 
     let maintenanceLockApplied = false;
     let deletionStarted = false;
     try {
-      await maintenanceRef.create({
-        enabled: true,
-        purpose: 'fresh-fest-production-reset',
-        projectId: TARGET_PROJECT,
-        initiatedBy: canonicalAdmin.uid,
-        startedAt: new Date()
+      await maintenanceRef.update({
+        maintenanceMode: true,
+        maintenanceStartedAt: new Date(),
+        maintenancePurpose: 'fresh-fest-production-reset'
       });
       maintenanceLockApplied = true;
+
+      // Verify the deployed production proxy observes this exact lock before any
+      // backup or deletion. If the proxy is not deployed, abort and unlock safely.
+      await assertProductionMaintenanceProxy();
 
       const lockedAdmin = await assertCanonicalAdmin(db, auth);
       if (lockedAdmin.uid !== canonicalAdmin.uid) {
@@ -708,7 +711,7 @@ async function main(): Promise<void> {
       }
 
       deletionStarted = true;
-      console.log('\n[RESET] Removing all old Firestore data except Chief Admin, bootstrap lock and temporary maintenance lock…');
+      console.log('\n[RESET] Removing all old Firestore data except Chief Admin and bootstrap lock…');
       const firestoreDeleted = await deleteAllFirestoreExceptCanonicalAdmin(db, canonicalAdmin.uid);
 
       console.log('[RESET] Removing all production Storage objects from the verified backup inventory…');
@@ -717,23 +720,24 @@ async function main(): Promise<void> {
       console.log('[RESET] Removing all Firebase Auth accounts except the canonical Chief Admin…');
       const authDeleted = await deleteAllAuthUsersExceptAdmin(auth, recheckedState.authUsers, canonicalAdmin.uid);
 
-      console.log('\n[VERIFY] Checking clean production state while maintenance lock is active…');
+      console.log('\n[VERIFY] Checking clean production state while bootstrapLock.maintenanceMode is true…');
       await verifyFreshState(db, auth, bucket, canonicalAdmin.uid, true);
 
-      // Only release the Firestore write lock after all destructive operations
-      // and the locked-state verification have succeeded.
-      await maintenanceRef.delete();
+      // All three gates read the same field on bootstrapLock. One atomic
+      // update releases API, Firestore and Storage writes together.
+      await maintenanceRef.update({
+        maintenanceMode: false,
+        maintenanceCompletedAt: new Date(),
+        maintenancePurpose: 'fresh-fest-production-reset-complete'
+      });
       maintenanceLockApplied = false;
       try {
         await verifyFreshState(db, auth, bucket, canonicalAdmin.uid, false);
       } catch (verificationError) {
-        await maintenanceRef.set({
-          enabled: true,
-          purpose: 'fresh-fest-production-reset-recovery',
-          projectId: TARGET_PROJECT,
-          initiatedBy: canonicalAdmin.uid,
-          startedAt: new Date(),
-          recoveryRequired: true
+        await maintenanceRef.update({
+          maintenanceMode: true,
+          maintenanceRecoveryRequired: true,
+          maintenancePurpose: 'fresh-fest-production-reset-recovery'
         }).catch(() => undefined);
         maintenanceLockApplied = true;
         throw verificationError;
@@ -743,26 +747,27 @@ async function main(): Promise<void> {
       console.log(`Firestore documents removed: ${firestoreDeleted}`);
       console.log(`Storage objects removed: ${storageDeleted}`);
       console.log(`Firebase Auth accounts removed: ${authDeleted}`);
-      console.log('Preserved: Chief Admin login, users/{ChiefAdminUid}, settings/bootstrapLock.');
+      console.log('Preserved: Chief Admin login, users/{ChiefAdminUid}, settings/bootstrapLock (maintenanceMode=false).');
       console.log('Cleared: festival identity/theme, categories, teams, competitions, participants, registrations, stages, schedules, judges, marks, results, ledger, posters, logos, exports and all other stored objects.');
       console.log(`Verified backup: ${backupDirectory}`);
-      console.log('The app remains in Vercel maintenance mode until FEST_RESET_MAINTENANCE is removed and production is redeployed.');
+      console.log('All maintenance gates are released together by setting bootstrapLock.maintenanceMode=false after final verification.');
     } catch (error) {
       if (maintenanceLockApplied && !deletionStarted) {
-        await maintenanceRef.delete().catch(() => undefined);
-        console.error('[RESET SAFETY] Backup/preflight failed before deletion. The Firestore maintenance lock was released; Vercel maintenance mode remains active.');
+        await maintenanceRef.update({
+          maintenanceMode: false,
+          maintenanceAbortedAt: new Date(),
+          maintenancePurpose: 'fresh-fest-production-reset-aborted'
+        }).catch(() => undefined);
+        console.error('[RESET SAFETY] Backup/preflight failed before deletion. The bootstrapLock write gate was safely released; no festival data was deleted.');
       } else if (deletionStarted) {
         if (!maintenanceLockApplied) {
-          await maintenanceRef.set({
-            enabled: true,
-            purpose: 'fresh-fest-production-reset-recovery',
-            projectId: TARGET_PROJECT,
-            initiatedBy: canonicalAdmin.uid,
-            startedAt: new Date(),
-            recoveryRequired: true
+          await maintenanceRef.update({
+            maintenanceMode: true,
+            maintenanceRecoveryRequired: true,
+            maintenancePurpose: 'fresh-fest-production-reset-recovery'
           }).catch(() => undefined);
         }
-        console.error('[RESET SAFETY] Reset stopped after destructive work began. Maintenance lock intentionally remains active. Do not disable Vercel maintenance mode; inspect backup and remaining inventories before recovery.');
+        console.error('[RESET SAFETY] Reset stopped after destructive work began. bootstrapLock.maintenanceMode intentionally remains true. API, Firestore and Storage writes stay blocked; inspect backup and remaining inventories before recovery.');
       }
       throw error;
     }
