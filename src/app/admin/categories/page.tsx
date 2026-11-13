@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Category, CategoryParticipantEligibility } from '@/types/fest';
 import { resolveCategoryEligibilityPolicy } from '@/domain/eligibility';
+import { buildCategoryUsageCounts } from '@/domain/categoryUsageCounts';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -13,7 +14,22 @@ import { Modal } from '@/components/ui/Modal';
 import { Plus, Search, Edit2, Trash2, Layers, AlertCircle } from 'lucide-react';
 
 export default function CategoriesPage() {
-  const { categories, addCategory, updateCategory, deleteCategory } = useFest();
+  const {
+    categories,
+    participants,
+    participantsSyncState,
+    competitions,
+    competitionsSyncState,
+    addCategory,
+    updateCategory,
+    deleteCategory
+  } = useFest();
+
+  // Derive counters from live records; do not trust stale persisted category counters.
+  const categoryUsageCounts = useMemo(
+    () => buildCategoryUsageCounts(categories, participants, competitions),
+    [categories, participants, competitions]
+  );
 
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -239,12 +255,32 @@ export default function CategoriesPage() {
                         </span>
                       </td>
                       <td className="px-5 py-5 text-center">
-                        <span className="font-semibold tabular-nums text-slate-900">{cat.enrolledCount ?? 0}</span>
-                        <span className="mt-1 block text-xs text-slate-500">Participants</span>
+                        <span className="font-semibold tabular-nums text-slate-900">
+                          {participantsSyncState === 'ready'
+                            ? categoryUsageCounts.get(cat.id)?.participants ?? 0
+                            : '—'}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {participantsSyncState === 'ready'
+                            ? 'Participants'
+                            : participantsSyncState === 'loading'
+                              ? 'Syncing…'
+                              : 'Unavailable'}
+                        </span>
                       </td>
                       <td className="px-5 py-5 text-center">
-                        <span className="font-semibold tabular-nums text-slate-900">{cat.competitionsCount ?? 0}</span>
-                        <span className="mt-1 block text-xs text-slate-500">Competitions</span>
+                        <span className="font-semibold tabular-nums text-slate-900">
+                          {competitionsSyncState === 'ready'
+                            ? categoryUsageCounts.get(cat.id)?.competitions ?? 0
+                            : '—'}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {competitionsSyncState === 'ready'
+                            ? 'Competitions'
+                            : competitionsSyncState === 'loading'
+                              ? 'Syncing…'
+                              : 'Unavailable'}
+                        </span>
                       </td>
                       <td className="px-5 py-5 text-center">
                         <Badge variant={cat.status === 'ACTIVE' ? 'success' : 'default'} size="sm" dot>
