@@ -17,9 +17,8 @@ describe('fresh-fest reset backup safeguards', () => {
     directory = await mkdtemp(path.join(tmpdir(), 'inspirath-reset-'));
     await mkdir(path.join(directory, 'storage_objects'));
     const firestoreRecords = [
-      { path: 'settings/bootstrapLock', data: { adminUid } },
-      { path: 'users/chief-admin-uid', data: { role: 'ADMIN', status: 'ACTIVE' } },
-      { path: 'settings/resetMaintenance', data: { enabled: true } }
+      { path: 'settings/bootstrapLock', data: { adminUid, maintenanceMode: true } },
+      { path: 'users/chief-admin-uid', data: { role: 'ADMIN', status: 'ACTIVE' } }
     ];
     await writeFile(
       path.join(directory, 'firestore_documents.jsonl.gz'),
@@ -44,15 +43,15 @@ describe('fresh-fest reset backup safeguards', () => {
       targetProject: 'inspirath-d6778',
       targetBucket: 'inspirath-d6778.firebasestorage.app',
       inventoryBeforeReset: {
-        firestoreCollections: { settings: 2, users: 1 },
-        firestoreDocuments: 3,
+        firestoreCollections: { settings: 1, users: 1 },
+        firestoreDocuments: 2,
         authUsers: 1,
         storageObjects: 1,
         storageBytes: objectBytes.length
       },
       verifiedBackup: {
-        firestoreCollectionCounts: { settings: 2, users: 1 },
-        firestoreDocumentCount: 3,
+        firestoreCollectionCounts: { settings: 1, users: 1 },
+        firestoreDocumentCount: 2,
         authUserCount: 1,
         storageObjectCount: 1,
         storageBytes: objectBytes.length
@@ -70,8 +69,8 @@ describe('fresh-fest reset backup safeguards', () => {
     directory,
     expectedProject: 'inspirath-d6778',
     expectedBucket: 'inspirath-d6778.firebasestorage.app',
-    expectedFirestoreDocuments: 3,
-    expectedFirestoreCollections: { settings: 2, users: 1 },
+    expectedFirestoreDocuments: 2,
+    expectedFirestoreCollections: { settings: 1, users: 1 },
     expectedAuthUsers: 1,
     expectedStorageObjects: 1,
     expectedStorageBytes: objectBytes.length,
@@ -89,9 +88,8 @@ describe('fresh-fest reset backup safeguards', () => {
 
   it('rejects a backup missing the preserved Chief Admin Firestore profile', async () => {
     const records = [
-      { path: 'settings/bootstrapLock', data: { adminUid } },
-      { path: 'users/other-admin', data: { role: 'ADMIN', status: 'ACTIVE' } },
-      { path: 'settings/resetMaintenance', data: { enabled: true } }
+      { path: 'settings/bootstrapLock', data: { adminUid, maintenanceMode: true } },
+      { path: 'users/other-admin', data: { role: 'ADMIN', status: 'ACTIVE' } }
     ];
     await writeFile(
       path.join(directory, 'firestore_documents.jsonl.gz'),
