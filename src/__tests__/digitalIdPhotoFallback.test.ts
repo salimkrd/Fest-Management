@@ -211,7 +211,8 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
       expect(html).toContain('#1042');
       expect(html).toContain('Grade 12 - Div A');
       expect(html).toContain('Al-Farooq House (ALF)');
-      expect(html).toContain('SENIOR');
+      expect(html).toContain('Senior');
+      expect(html).not.toContain('absolute top-3 right-3');
       expect(html).toContain('2 Contests');
       expect(html).toContain('VERIFIED');
 
