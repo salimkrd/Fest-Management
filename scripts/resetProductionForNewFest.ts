@@ -115,16 +115,20 @@ async function countCollectionTree(
   // listDocuments() also returns references for missing parent documents whose
   // subcollections still contain records. Those orphaned paths must be counted.
   const documentRefs = await collectionRef.listDocuments();
+  let directDocumentCount = 0;
   let total = 0;
   for (const documentRef of documentRefs) {
     const document = await documentRef.get();
-    if (document.exists) total++;
+    if (document.exists) {
+      directDocumentCount++;
+      total++;
+    }
     const childCollections = await documentRef.listCollections();
     for (const child of childCollections) {
       total += await countCollectionTree(child, counts);
     }
   }
-  counts[collectionRef.path] = (counts[collectionRef.path] || 0) + total;
+  counts[collectionRef.path] = (counts[collectionRef.path] || 0) + directDocumentCount;
   return total;
 }
 
