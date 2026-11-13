@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getAdminDb } from './src/lib/firebase/admin';
+import { getAdminDb } from './lib/firebase/admin';
 
 const PRODUCTION_PROJECT_ID = 'inspirath-d6778';
 
