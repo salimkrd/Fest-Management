@@ -95,9 +95,9 @@ describe('fresh-fest reset backup safeguards', () => {
     ];
     await writeFile(
       path.join(directory, 'firestore_documents.jsonl.gz'),
-      gzipSync(records.map(record => JSON.stringify(record)).join('\\n') + '\\n')
+      gzipSync(records.map(record => JSON.stringify(record)).join('\n') + '\n')
     );
-    await expect(verifyBackupArtifacts(options())).rejects.toThrow(/Chief Admin Firestore document/);
+    await expect(verifyBackupArtifacts(options())).rejects.toThrow(/required preserved Firestore document/);
   });
 
   it('rejects an Auth export that omits the canonical Chief Admin', async () => {
