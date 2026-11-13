@@ -218,7 +218,7 @@ export function ParticipantEditorModal({
                   event.target.value = '';
                   return;
                 }
-                if (file.size > 5 * 1024 * 1024) {
+                if (file.size > 4 * 1024 * 1024) {
                   setError('Photo must be smaller than 4 MB.');
                   event.target.value = '';
                   return;
