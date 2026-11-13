@@ -1,6 +1,12 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Firestore-backed lock also blocks direct Firebase Storage SDK writes.
+    function isResetMaintenanceInactive() {
+      return !firestore.exists(/databases/(default)/documents/settings/bootstrapLock) ||
+        firestore.get(/databases/(default)/documents/settings/bootstrapLock).data.maintenanceMode != true;
+    }
+
 
     function isSignedIn() {
       return request.auth != null;
@@ -57,8 +63,8 @@ service firebase.storage {
     // Protected from public read; strictly restricted to Admin & authoritative Team Manager
     match /participants/{participantId}/{fileName} {
       allow read: if isAdmin() || isParticipantOwner(participantId);
-      allow create, update: if (isAdmin() || (isParticipantOwner(participantId) && isMetadataConsistent())) && isImageFile();
-      allow delete: if isAdmin() || isParticipantOwner(participantId);
+      allow create, update: if isResetMaintenanceInactive() && ((isAdmin() || (isParticipantOwner(participantId) && isMetadataConsistent())) && isImageFile());
+      allow delete: if isResetMaintenanceInactive() && (isAdmin() || isParticipantOwner(participantId));
     }
 
     // Participant Profile Photos (Nested Team Path)
@@ -69,7 +75,7 @@ service firebase.storage {
         request.auth.token.teamId == teamId &&
         isParticipantOwner(participantId)
       );
-      allow create, update: if (
+      allow create, update: if isResetMaintenanceInactive() && ((
         isAdmin() || (
           isSignedIn() &&
           request.auth.token.role == 'TEAM_MANAGER' &&
@@ -77,33 +83,33 @@ service firebase.storage {
           isParticipantOwner(participantId) &&
           isMetadataConsistent()
         )
-      ) && isImageFile();
-      allow delete: if isAdmin() || (
+      ) && isImageFile());
+      allow delete: if isResetMaintenanceInactive() && (isAdmin() || (
         isSignedIn() &&
         request.auth.token.role == 'TEAM_MANAGER' &&
         request.auth.token.teamId == teamId &&
         isParticipantOwner(participantId)
-      );
+      ));
     }
 
     // Festival Branding & Logos
     match /branding/{fileName} {
       allow read: if true;
-      allow create, update: if isAdmin() && isImageFile();
-      allow delete: if isAdmin();
+      allow create, update: if isResetMaintenanceInactive() && (isAdmin() && isImageFile());
+      allow delete: if isResetMaintenanceInactive() && (isAdmin());
     }
 
     // Generated Result Posters & Certificates
     match /posters/{fileName} {
       allow read: if true;
-      allow create, update: if isAdmin() && isImageFile();
-      allow delete: if isAdmin();
+      allow create, update: if isResetMaintenanceInactive() && (isAdmin() && isImageFile());
+      allow delete: if isResetMaintenanceInactive() && (isAdmin());
     }
 
     // Tabulation Register PDFs
     match /exports/{fileName} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow write: if isResetMaintenanceInactive() && (isAdmin());
     }
   }
 }

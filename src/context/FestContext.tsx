@@ -1035,6 +1035,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (!isIsolatedDemoOrTest && typeof window !== 'undefined') {
       try {
         localStorage.removeItem('fest_teams_v2');
+        localStorage.removeItem('fest_current_team_user_v2');
+        localStorage.removeItem('fest_theme_settings_v2');
         localStorage.removeItem('fest_categories_v2');
         localStorage.removeItem('fest_competitions_v2');
         localStorage.removeItem('fest_participants_v2');
