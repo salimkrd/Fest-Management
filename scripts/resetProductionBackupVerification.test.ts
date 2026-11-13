@@ -44,12 +44,14 @@ describe('fresh-fest reset backup safeguards', () => {
       targetProject: 'inspirath-d6778',
       targetBucket: 'inspirath-d6778.firebasestorage.app',
       inventoryBeforeReset: {
+        firestoreCollections: { settings: 2, users: 1 },
         firestoreDocuments: 3,
         authUsers: 1,
         storageObjects: 1,
         storageBytes: objectBytes.length
       },
       verifiedBackup: {
+        firestoreCollectionCounts: { settings: 2, users: 1 },
         firestoreDocumentCount: 3,
         authUserCount: 1,
         storageObjectCount: 1,
@@ -69,6 +71,7 @@ describe('fresh-fest reset backup safeguards', () => {
     expectedProject: 'inspirath-d6778',
     expectedBucket: 'inspirath-d6778.firebasestorage.app',
     expectedFirestoreDocuments: 3,
+    expectedFirestoreCollections: { settings: 2, users: 1 },
     expectedAuthUsers: 1,
     expectedStorageObjects: 1,
     expectedStorageBytes: objectBytes.length,
@@ -82,6 +85,19 @@ describe('fresh-fest reset backup safeguards', () => {
   it('rejects corrupt Firestore gzip before any deletion', async () => {
     await writeFile(path.join(directory, 'firestore_documents.jsonl.gz'), Buffer.from('not a gzip file'));
     await expect(verifyBackupArtifacts(options())).rejects.toThrow(/Firestore gzip/);
+  });
+
+  it('rejects a backup missing the preserved Chief Admin Firestore profile', async () => {
+    const records = [
+      { path: 'settings/bootstrapLock', data: { adminUid } },
+      { path: 'users/other-admin', data: { role: 'ADMIN', status: 'ACTIVE' } },
+      { path: 'settings/resetMaintenance', data: { enabled: true } }
+    ];
+    await writeFile(
+      path.join(directory, 'firestore_documents.jsonl.gz'),
+      gzipSync(records.map(record => JSON.stringify(record)).join('\\n') + '\\n')
+    );
+    await expect(verifyBackupArtifacts(options())).rejects.toThrow(/Chief Admin Firestore document/);
   });
 
   it('rejects an Auth export that omits the canonical Chief Admin', async () => {
