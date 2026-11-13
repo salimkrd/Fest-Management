@@ -3,8 +3,8 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Firestore-backed lock also blocks direct Firebase Storage SDK writes.
     function isResetMaintenanceInactive() {
-      return !firestore.exists(/databases/(default)/documents/settings/resetMaintenance) ||
-        firestore.get(/databases/(default)/documents/settings/resetMaintenance).data.enabled != true;
+      return !firestore.exists(/databases/(default)/documents/settings/bootstrapLock) ||
+        firestore.get(/databases/(default)/documents/settings/bootstrapLock).data.maintenanceMode != true;
     }
 
 
