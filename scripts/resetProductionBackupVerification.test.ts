@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -92,6 +92,27 @@ describe('fresh-fest reset backup safeguards', () => {
   it('rejects Storage object corruption even when the file still exists', async () => {
     await writeFile(path.join(directory, 'storage_objects', 'file-1'), Buffer.from('VERIFIED participant image bytes'));
     await expect(verifyBackupArtifacts(options())).rejects.toThrow(/SHA-256 mismatch/);
+  });
+
+  it('gates every Firestore and Storage client write grant during maintenance', async () => {
+    const [firestoreRules, storageRules] = await Promise.all([
+      readFile(path.resolve(process.cwd(), 'firestore.rules'), 'utf8'),
+      readFile(path.resolve(process.cwd(), 'storage.rules'), 'utf8')
+    ]);
+    const writeGrants = (rules: string) =>
+      [...rules.matchAll(/allow\\s+([^:]+):\\s*if\\s+([\\s\\S]*?);/g)]
+        .filter(([, operations]) => /\\b(write|create|update|delete)\\b/.test(operations));
+
+    const firestoreWrites = writeGrants(firestoreRules);
+    const storageWrites = writeGrants(storageRules);
+    expect(firestoreWrites.length).toBeGreaterThan(0);
+    expect(storageWrites.length).toBeGreaterThan(0);
+    for (const [, , expression] of firestoreWrites) {
+      expect(expression).toContain('!isResetMaintenanceActive()');
+    }
+    for (const [, , expression] of storageWrites) {
+      expect(expression).toContain('isResetMaintenanceInactive()');
+    }
   });
 
   it('rejects changes to the Firestore/Auth inventory after backup', () => {
