@@ -12,6 +12,7 @@ vi.mock('@/services/authService', () => ({
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
+  syncWorkloadIdentityToken: vi.fn().mockResolvedValue(null),
   getAdminDb: vi.fn().mockReturnValue({
     collection: vi.fn().mockReturnValue({
       doc: vi.fn().mockReturnValue({
