@@ -31,7 +31,7 @@ indexes, Vercel project, domains or environment variables.
 ## Mandatory deployment preparation
 
 1. Merge the reset-safeguard PR and deploy the latest application code to the
-   production Vercel deployment. It must include root-level `proxy.ts`, which
+   production Vercel deployment. It must include `src/proxy.ts` (next to `src/app`), which
    reads the existing bootstrap lock using the Firebase Admin SDK and blocks
    every `/api/*` request with HTTP 503 while `maintenanceMode=true`.
 2. Confirm the production app origin/domain in Vercel. The reset script checks
