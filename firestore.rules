@@ -4,8 +4,8 @@ service cloud.firestore {
     // Temporary production reset lock. This document is written with the Admin SDK;
     // client SDK writes are denied while enabled=true.
     function isResetMaintenanceActive() {
-      return exists(/databases/$(database)/documents/settings/resetMaintenance) &&
-        get(/databases/$(database)/documents/settings/resetMaintenance).data.enabled == true;
+      return exists(/databases/$(database)/documents/settings/bootstrapLock) &&
+        get(/databases/$(database)/documents/settings/bootstrapLock).data.maintenanceMode == true;
     }
 
 
