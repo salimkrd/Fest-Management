@@ -112,15 +112,19 @@ async function countCollectionTree(
   collectionRef: CollectionReference,
   counts: Record<string, number>
 ): Promise<number> {
-  const snapshot = await collectionRef.get();
-  counts[collectionRef.path] = (counts[collectionRef.path] || 0) + snapshot.size;
-  let total = snapshot.size;
-  for (const document of snapshot.docs) {
-    const childCollections = await document.ref.listCollections();
+  // listDocuments() also returns references for missing parent documents whose
+  // subcollections still contain records. Those orphaned paths must be counted.
+  const documentRefs = await collectionRef.listDocuments();
+  let total = 0;
+  for (const documentRef of documentRefs) {
+    const document = await documentRef.get();
+    if (document.exists) total++;
+    const childCollections = await documentRef.listCollections();
     for (const child of childCollections) {
       total += await countCollectionTree(child, counts);
     }
   }
+  counts[collectionRef.path] = (counts[collectionRef.path] || 0) + total;
   return total;
 }
 
@@ -212,22 +216,30 @@ async function backupFirestore(
   let documentCount = 0;
 
   const exportCollection = async (collectionRef: CollectionReference): Promise<void> => {
-    const snapshot = await collectionRef.get();
-    collectionCounts[collectionRef.path] = (collectionCounts[collectionRef.path] || 0) + snapshot.size;
+    // Traverse document references rather than only existing documents so records
+    // below deleted/missing parent documents are backed up too.
+    const documentRefs = await collectionRef.listDocuments();
+    let existingDocuments = 0;
 
-    for (const document of snapshot.docs) {
-      const record = {
-        path: document.ref.path,
-        data: serializeFirestoreValue(document.data())
-      };
-      await writeGzipLine(gzip, record);
-      documentCount++;
+    for (const documentRef of documentRefs) {
+      const document = await documentRef.get();
+      if (document.exists) {
+        const record = {
+          path: document.ref.path,
+          data: serializeFirestoreValue(document.data())
+        };
+        await writeGzipLine(gzip, record);
+        documentCount++;
+        existingDocuments++;
+      }
 
-      const childCollections = await document.ref.listCollections();
+      const childCollections = await documentRef.listCollections();
       for (const child of childCollections) {
         await exportCollection(child);
       }
     }
+
+    collectionCounts[collectionRef.path] = (collectionCounts[collectionRef.path] || 0) + existingDocuments;
   };
 
   try {
