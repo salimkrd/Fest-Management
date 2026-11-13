@@ -100,18 +100,21 @@ describe('fresh-fest reset backup safeguards', () => {
       readFile(path.resolve(process.cwd(), 'storage.rules'), 'utf8')
     ]);
     const writeGrants = (rules: string) =>
-      [...rules.matchAll(/allow\\s+([^:]+):\\s*if\\s+([\\s\\S]*?);/g)]
-        .filter(([, operations]) => /\\b(write|create|update|delete)\\b/.test(operations));
+      rules.split('allow ').slice(1)
+        .map(rule => rule.slice(0, rule.indexOf(';') < 0 ? rule.length : rule.indexOf(';')))
+        .filter(rule => rule.split(':', 1)[0].split(',').some(
+          action => ['write', 'create', 'update', 'delete'].includes(action.trim())
+        ));
 
     const firestoreWrites = writeGrants(firestoreRules);
     const storageWrites = writeGrants(storageRules);
     expect(firestoreWrites.length).toBeGreaterThan(0);
     expect(storageWrites.length).toBeGreaterThan(0);
-    for (const [, , expression] of firestoreWrites) {
-      expect(expression).toContain('!isResetMaintenanceActive()');
+    for (const grant of firestoreWrites) {
+      expect(grant).toContain('!isResetMaintenanceActive()');
     }
-    for (const [, , expression] of storageWrites) {
-      expect(expression).toContain('isResetMaintenanceInactive()');
+    for (const grant of storageWrites) {
+      expect(grant).toContain('isResetMaintenanceInactive()');
     }
   });
 
