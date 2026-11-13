@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function proxy(_request: NextRequest) {
+  void _request;
   if (process.env.FEST_RESET_MAINTENANCE !== '1') {
     return NextResponse.next();
   }
