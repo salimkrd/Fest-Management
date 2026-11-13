@@ -47,6 +47,7 @@ describe('Workload Identity Federation for Firebase Admin', () => {
     delete process.env.VERCEL_OIDC_TOKEN;
     delete process.env.VERCEL_OIDC_TOKEN_FILE;
     delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL;
     delete process.env.VERCEL_GIT_COMMIT_REF;
     delete process.env.VERCEL_PROJECT_ID;
     delete process.env.ALLOW_STAGING_WIF_TEST;
@@ -169,6 +170,36 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       }).toThrow(/FAIL-CLOSED SAFETY.*restricted to Vercel Project ID "prj_MmRcs7gArslBmtJxmHG4Nxn7iI4y"/);
     });
 
+    it('rejects Vercel Preview when the commit branch identity is missing', () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_PROJECT_ID = VERCEL_PROJECT_ID;
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*branch identity is missing/);
+    });
+
+    it('rejects Vercel Preview when the project identity is missing', () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*Vercel Project ID is missing/);
+    });
+
+    it('rejects Vercel development and CLI runtimes instead of treating them as Preview', () => {
+      process.env.VERCEL = '1';
+      process.env.VERCEL_ENV = 'development';
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*may only run in Vercel Preview/);
+    });
+
+    it('does not allow an environment variable to widen the hard-coded Vercel project scope', () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
+      process.env.VERCEL_PROJECT_ID = VERCEL_PROJECT_ID;
+      process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID = 'prj_unauthorized_other_project';
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*must equal the authorized Vercel Project ID/);
+    });
+
     it('permits Vercel preview when branch and project ID match', () => {
       process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_GIT_COMMIT_REF = ALLOWED_WIF_BRANCH;
@@ -178,13 +209,13 @@ describe('Workload Identity Federation for Firebase Admin', () => {
       }).not.toThrow();
     });
 
-    it('permits custom allowed branch override via GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH', () => {
+    it('does not allow environment variables to widen the authorized branch scope', () => {
       process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_GIT_COMMIT_REF = 'custom-preview-branch';
+      process.env.VERCEL_PROJECT_ID = VERCEL_PROJECT_ID;
       process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH = 'custom-preview-branch';
-      expect(() => {
-        validateWorkloadIdentityScope(STAGING_PROJECT_ID);
-      }).not.toThrow();
+      expect(() => validateWorkloadIdentityScope(STAGING_PROJECT_ID))
+        .toThrow(/FAIL-CLOSED SAFETY.*must equal the authorized branch/);
     });
 
     it('permits staging project when outside Vercel (e.g. local staging verification script)', () => {

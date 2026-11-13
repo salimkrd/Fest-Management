@@ -264,34 +264,64 @@ export function validateWorkloadIdentityScope(targetProjectId: string): void {
     );
   }
 
-  // 2. Fail-closed: Never run in Vercel production deployment
-  const vercelEnv = process.env.VERCEL_ENV;
+  // 2. Fail-closed: Within Vercel, WIF is authorized only in Preview.
+  // Local staging verification remains available when Vercel identity variables are absent.
+  const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === 'production') {
     throw new Error(
       `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to staging/preview environments and cannot run in production deployments.`
     );
   }
 
-  // 4. Fail-closed: Restrict federated access to the integration remediation branch in Vercel Preview
-  const allowedBranch = process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH?.trim() || ALLOWED_WIF_BRANCH;
-  const currentBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
-
-  if (vercelEnv === 'preview' && currentBranch && currentBranch !== allowedBranch) {
+  const isVercelRuntime = process.env.VERCEL === '1' || Boolean(vercelEnv);
+  if (isVercelRuntime && vercelEnv !== 'preview') {
     throw new Error(
-      `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to branch "${allowedBranch}" in Vercel Preview, ` +
-      `but current branch is "${currentBranch}". Access to staging credentials denied.`
+      `[FAIL-CLOSED SAFETY] Workload Identity Federation may only run in Vercel Preview, ` +
+      `but the current Vercel environment is "${vercelEnv || 'missing'}".`
     );
   }
 
-  // 5. Fail-closed: Restrict federated access to the authorized Vercel Project ID
-  const expectedProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim() || VERCEL_PROJECT_ID;
-  const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
+  if (vercelEnv === 'preview') {
+    // The configured values are assertions, not overrides: they cannot widen the hard-coded scope.
+    const configuredAllowedBranch = process.env.GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH?.trim();
+    if (configuredAllowedBranch && configuredAllowedBranch !== ALLOWED_WIF_BRANCH) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] GCP_WORKLOAD_IDENTITY_ALLOWED_BRANCH must equal the authorized branch "${ALLOWED_WIF_BRANCH}".`
+      );
+    }
 
-  if (currentVercelProjectId && currentVercelProjectId !== expectedProjectId) {
-    throw new Error(
-      `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to Vercel Project ID "${expectedProjectId}", ` +
-      `but current environment VERCEL_PROJECT_ID is "${currentVercelProjectId}". Access denied.`
-    );
+    const currentBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
+    if (!currentBranch) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Vercel Preview commit branch identity is missing; staging credentials denied.`
+      );
+    }
+    if (currentBranch !== ALLOWED_WIF_BRANCH) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to branch "${ALLOWED_WIF_BRANCH}" in Vercel Preview, ` +
+        `but current branch is "${currentBranch}". Access to staging credentials denied.`
+      );
+    }
+
+    const configuredProjectId = process.env.GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID?.trim();
+    if (configuredProjectId && configuredProjectId !== VERCEL_PROJECT_ID) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] GCP_WORKLOAD_IDENTITY_VERCEL_PROJECT_ID must equal the authorized Vercel Project ID "${VERCEL_PROJECT_ID}".`
+      );
+    }
+
+    const currentVercelProjectId = process.env.VERCEL_PROJECT_ID?.trim();
+    if (!currentVercelProjectId) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Vercel Project ID is missing from Preview; staging credentials denied.`
+      );
+    }
+    if (currentVercelProjectId !== VERCEL_PROJECT_ID) {
+      throw new Error(
+        `[FAIL-CLOSED SAFETY] Workload Identity Federation is restricted to Vercel Project ID "${VERCEL_PROJECT_ID}", ` +
+        `but current environment VERCEL_PROJECT_ID is "${currentVercelProjectId}". Access denied.`
+      );
+    }
   }
 }
 
