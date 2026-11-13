@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import type { Category, Participant, Team } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,7 +19,7 @@ interface ParticipantEditorModalProps {
   categories: Category[];
   /** Present for Team Managers only; the team is non-editable and cannot fall back to another team. */
   lockedTeam?: Team | null;
-  onSave: (participant: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
+  onSave: (participant: Omit<Participant, 'id' | 'bib' | 'idStatus'>, photoFile?: File | null) => Promise<string | void>;
   onClose: () => void;
 }
 
@@ -38,6 +38,14 @@ export function ParticipantEditorModal({
   );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
 
   const update = (key: keyof ParticipantEditorFields, value: string) => {
     setFields(previous => ({ ...previous, [key]: value }));
@@ -67,7 +75,7 @@ export function ParticipantEditorModal({
         isTeamManager ? lockedTeam?.id : undefined
       );
       setSaving(true);
-      await onSave(payload);
+      await onSave(payload, photoFile);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save participant.');
@@ -105,7 +113,7 @@ export function ParticipantEditorModal({
 
         <div className="flex items-center gap-3 pb-2 border-b border-[#E1E7EF]">
           <ParticipantPhoto
-            photoUrl={fields.photoUrl}
+            photoUrl={photoPreviewUrl || fields.photoUrl}
             name={fields.name}
             size="md"
             shape="rounded"
@@ -184,14 +192,47 @@ export function ParticipantEditorModal({
           />
         </div>
 
-        <Input
-          label="Participant Photo URL (Optional)"
-          type="url"
-          placeholder="https://..."
-          helperText="Leave blank to show the official neutral silhouette/initials placeholder"
-          value={fields.photoUrl}
-          onChange={e => update('photoUrl', e.target.value)}
-        />
+        <div className="space-y-2">
+          <Input
+            label="Participant Photo URL (Optional)"
+            type="url"
+            placeholder="Paste a direct public image URL (https://...)"
+            helperText="Use a direct image link. Google Photos and Google Drive share links may require sign-in and may not display for other users."
+            value={fields.photoUrl}
+            onChange={e => update('photoUrl', e.target.value)}
+          />
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-[#111111]">Or upload a photo</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={event => {
+                const file = event.target.files?.[0] || null;
+                if (!file) {
+                  setPhotoFile(null);
+                  setPhotoPreviewUrl('');
+                  return;
+                }
+                if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                  setError('Choose a JPG, PNG, or WebP image.');
+                  event.target.value = '';
+                  return;
+                }
+                if (file.size > 4 * 1024 * 1024) {
+                  setError('Photo must be smaller than 4 MB.');
+                  event.target.value = '';
+                  return;
+                }
+                setPhotoFile(file);
+                setPhotoPreviewUrl(URL.createObjectURL(file));
+                setError('');
+              }}
+              className="block w-full rounded-xl border border-[#E1E7EF] bg-white px-3 py-2 text-sm text-[#526070] file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+            />
+            <span className="mt-1 block text-[11px] text-[#526070]">JPG, PNG, or WebP · Maximum 4 MB. Uploaded photos are stored in the festival Firebase Storage bucket.</span>
+            {photoFile && <span className="mt-1 block text-xs font-semibold text-emerald-700">Selected: {photoFile.name} (will replace the URL above)</span>}
+          </label>
+        </div>
 
         <Input
           label="Stage / Accommodation Remarks (Optional)"
