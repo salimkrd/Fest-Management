@@ -138,7 +138,12 @@ async function buildInventory(
 
   const authUsers = await listAllAuthUsers(auth);
   const [storageFiles] = await bucket.getFiles({ autoPaginate: true });
-  const storageBytes = storageFiles.reduce((sum, file) => sum + Number(file.metadata?.size || 0), 0);
+  let storageBytes = 0;
+  for (let offset = 0; offset < storageFiles.length; offset += 20) {
+    const batch = storageFiles.slice(offset, offset + 20);
+    const metadata = await Promise.all(batch.map(file => file.getMetadata()));
+    storageBytes += metadata.reduce((sum, [item]) => sum + Number(item.size || 0), 0);
+  }
 
   return {
     inventory: {
