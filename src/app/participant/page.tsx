@@ -181,7 +181,7 @@ export default function ParticipantDashboard() {
               <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Class: {profile.classGrade || '—'}</span>
             </div>
           </div>
-          <div className="grid w-full grid-cols-1 gap-2 sm:ml-auto sm:w-auto sm:min-w-[190px]"><ParticipantProfileEditor profile={profile} onSaved={refresh} /><button type="button" onClick={() => setIdOpen(true)}
+          <div className="grid w-full grid-cols-1 gap-2 sm:ml-auto sm:w-auto sm:min-w-[190px]"><ParticipantProfileEditor participantId={profile.id} profile={profile} onSaved={refresh} /><button type="button" onClick={() => setIdOpen(true)}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
             <IdCard className="h-5 w-5" /> My Digital ID Card
           </button></div>
