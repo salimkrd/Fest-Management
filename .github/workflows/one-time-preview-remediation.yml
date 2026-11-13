@@ -109,6 +109,47 @@ jobs:
           ].join(String.fromCharCode(10));
           replaceOnce('src/__tests__/greenRoomOperations.test.ts', staleBefore, staleAfter, 'stale Green Room fixture cleanup');
 
+          // The production allocator is intentionally random. The race tests must
+          // score the letters actually assigned, not assume registration 1 is A.
+          const testPath = 'src/__tests__/greenRoomOperations.test.ts';
+          let testSource = fs.readFileSync(testPath, 'utf8');
+          const staleSectionStart = testSource.indexOf("    describe('C. Concurrency & Stale Code Letter-to-Registration Race Condition Elimination', () => {");
+          if (staleSectionStart < 0) throw new Error('Stale mapping test section not found');
+          const staleSection = testSource.slice(staleSectionStart);
+          const dynamicHelper = [
+            "    describe('C. Concurrency & Stale Code Letter-to-Registration Race Condition Elimination', () => {",
+            '      const getAssignedCodeLetters = async () => {',
+            '        const [firstSnapshot, secondSnapshot] = await Promise.all([',
+            "          db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get(),",
+            "          db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).get(),",
+            '        ]);',
+            "        const firstCodeLetter = String(firstSnapshot.data()?.codeLetter || '').trim().toUpperCase();",
+            "        const secondCodeLetter = String(secondSnapshot.data()?.codeLetter || '').trim().toUpperCase();",
+            '        if (!firstCodeLetter || !secondCodeLetter || firstCodeLetter === secondCodeLetter) {',
+            "          throw new Error('Stale mapping fixture must have two distinct assigned code letters.');",
+            '        }',
+            '        return { firstCodeLetter, secondCodeLetter };',
+            '      };'
+          ].join(String.fromCharCode(10));
+          const sectionHeader = "    describe('C. Concurrency & Stale Code Letter-to-Registration Race Condition Elimination', () => {";
+          let patchedSection = staleSection.replace(sectionHeader, dynamicHelper);
+          const testStarts = [
+            "      it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {",
+            "      it('rejects submitMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {",
+            "      it('successfully saves draft and submits marks when Code Letter mappings match the atomic transaction state', async () => {"
+          ];
+          for (const start of testStarts) {
+            if (!patchedSection.includes(start)) throw new Error('Expected stale mapping test not found: ' + start);
+            patchedSection = patchedSection.replace(start, start + String.fromCharCode(10) +
+              '        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();');
+          }
+          patchedSection = patchedSection.replaceAll("'A': { 'c1':", "[firstCodeLetter]: { 'c1':");
+          patchedSection = patchedSection.replaceAll("'B': { 'c1':", "[secondCodeLetter]: { 'c1':");
+          patchedSection = patchedSection.replace("codeLetter: 'A',", "codeLetter: firstCodeLetter,");
+          patchedSection = patchedSection.replace("codeLetter: 'B',", "codeLetter: secondCodeLetter,");
+          if (patchedSection === staleSection) throw new Error('Random letter fixture patch made no changes.');
+          fs.writeFileSync(testPath, testSource.slice(0, staleSectionStart) + patchedSection);
+
           replaceOnce(
             'src/components/domain/FestivalSettingsModal.tsx',
             "import { auth } from '@/lib/firebase/client';",
