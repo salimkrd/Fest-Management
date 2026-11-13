@@ -673,12 +673,14 @@ async function main(): Promise<void> {
     let maintenanceLockApplied = false;
     let deletionStarted = false;
     try {
+      // Mark the lock as pending before sending the update so an ambiguous
+      // network failure still triggers a best-effort rollback before deletion.
+      maintenanceLockApplied = true;
       await maintenanceRef.update({
         maintenanceMode: true,
         maintenanceStartedAt: new Date(),
         maintenancePurpose: 'fresh-fest-production-reset'
       });
-      maintenanceLockApplied = true;
 
       // Verify the deployed production proxy observes this exact lock before any
       // backup or deletion. If the proxy is not deployed, abort and unlock safely.
@@ -725,15 +727,17 @@ async function main(): Promise<void> {
 
       // All three gates read the same field on bootstrapLock. One atomic
       // update releases API, Firestore and Storage writes together.
-      await maintenanceRef.update({
-        maintenanceMode: false,
-        maintenanceCompletedAt: new Date(),
-        maintenancePurpose: 'fresh-fest-production-reset-complete'
-      });
       maintenanceLockApplied = false;
       try {
+        await maintenanceRef.update({
+          maintenanceMode: false,
+          maintenanceCompletedAt: new Date(),
+          maintenancePurpose: 'fresh-fest-production-reset-complete'
+        });
         await verifyFreshState(db, auth, bucket, canonicalAdmin.uid, false);
       } catch (verificationError) {
+        // If the unlock write was ambiguous or final verification failed, restore
+        // the same lock so both API and direct client writes remain disabled.
         await maintenanceRef.update({
           maintenanceMode: true,
           maintenanceRecoveryRequired: true,
