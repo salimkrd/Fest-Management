@@ -34,28 +34,20 @@ indexes, Vercel project, domains or environment variables.
    production Vercel deployment. It must include root-level `proxy.ts`, which
    reads the existing bootstrap lock using the Firebase Admin SDK and blocks
    every `/api/*` request with HTTP 503 while `maintenanceMode=true`.
-2. Deploy both updated Firebase Rules to production. The Firestore rules deny
-   every client write and Storage rules deny every client upload/update/delete
-   while the same bootstrap-lock field is true:
-
-   ```powershell
-   firebase.cmd deploy --project inspirath-d6778 --only firestore:rules,storage
-   ```
-
-   Deploying these rules while `maintenanceMode` is absent/false does not
-   interrupt normal service. Do not run the reset until both rule deployments
-   report success.
-3. Confirm the production app origin/domain in Vercel. The reset script checks
+2. Confirm the production app origin/domain in Vercel. The reset script checks
    that the live production API returns HTTP 503 with
    `X-Fest-Maintenance: enabled` after it activates the lock.
-4. Run the reset from the administrator workstation, not from CI. Use a Firebase
-   Admin service-account JSON for exactly `inspirath-d6778`, and ensure the
-   terminal is not using Firebase Emulator variables.
+3. On the administrator workstation, install dependencies and ensure Firebase
+   CLI is installed and authenticated for `inspirath-d6778`. The reset script
+   automatically deploys both Firestore and Storage Rules to that exact project
+   immediately after the typed confirmation and before activating maintenance.
+   If that deployment fails, the script stops before festival data is changed.
+4. Use a Firebase Admin service-account JSON for exactly `inspirath-d6778`,
+   and ensure the terminal is not using Firebase Emulator variables.
 
 ## Windows PowerShell
 
-From the repository root, after the production app and both Firebase Rules are
-deployed:
+From the repository root, after the new production app deployment is **Ready**:
 
 ```powershell
 npm ci
@@ -74,14 +66,21 @@ Only after confirming the project, bucket and inventory:
 npm run reset:production -- --execute
 ```
 
-The script requires an interactive terminal confirmation. It then atomically
-sets `settings/bootstrapLock.maintenanceMode=true`. This one value activates:
+The script requires an interactive terminal confirmation. After confirmation,
+it automatically runs:
+
+```powershell
+firebase.cmd deploy --project inspirath-d6778 --only firestore:rules,storage
+```
+
+It then atomically sets `settings/bootstrapLock.maintenanceMode=true`. This
+one value activates:
 
 - The Next.js Proxy maintenance gate for every application API request.
 - The Firestore Rules write gate for every client SDK create/update/delete.
 - The Storage Rules write gate for every client upload/update/delete.
 
-The script verifies the production proxy is live before it starts the backup.
+The script verifies the production proxy is live before starting the backup.
 It then re-inventories exact Firestore document update versions, Auth user
 fingerprints and Storage object generations. It writes a local backup and verifies:
 
@@ -104,8 +103,9 @@ together, and verifies that only the two preserved Firestore documents remain.
 
 ## Recovery and interruption
 
-- If the proxy preflight or backup verification fails before deletion, the
-  script sets `maintenanceMode=false` again; no festival data was deleted.
+- If the Rules deployment, proxy preflight or backup verification fails before
+  deletion, the script sets `maintenanceMode=false` again; no festival data
+  was deleted.
 - If an error occurs after deletion begins, the script intentionally leaves (or
   restores) `maintenanceMode=true`. Do **not** change this field manually.
   All app API, Firestore and Storage writes remain blocked. Inspect the backup
