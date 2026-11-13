@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { AlertCircle, CheckCircle2, LoaderCircle, Pencil, Save, X } from 'lucide-react';
 
 type EditableProfile = {
@@ -13,15 +14,17 @@ type EditableProfile = {
 };
 
 type Props = {
+  participantId: string;
   profile: Partial<EditableProfile>;
   onSaved: () => Promise<void>;
 };
 
-export function ParticipantProfileEditor({ profile, onSaved }: Props) {
+export function ParticipantProfileEditor({ participantId, profile, onSaved }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState<EditableProfile>({
     name: profile.name || '',
     classGrade: profile.classGrade || '',
@@ -42,6 +45,7 @@ export function ParticipantProfileEditor({ profile, onSaved }: Props) {
     });
     setError('');
     setSavedMessage('');
+    setPhotoFile(null);
     setOpen(true);
   };
 
@@ -70,6 +74,9 @@ export function ParticipantProfileEditor({ profile, onSaved }: Props) {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not save your profile.');
 
+      if (photoFile) {
+        await uploadParticipantPhoto(participantId, photoFile, 'participant');
+      }
       await onSaved();
       setOpen(false);
       setSavedMessage('Your profile has been updated successfully.');
@@ -199,8 +206,37 @@ export function ParticipantProfileEditor({ profile, onSaved }: Props) {
                   placeholder="https://…"
                 />
                 <span className="mt-1.5 block text-[11px] leading-4 text-slate-500">
-                  Use a direct HTTP or HTTPS image link. The Digital ID will use this photo.
+                  Use a direct public image URL, or upload a photo below. Google Photos / Drive sharing links may require sign-in.
                 </span>
+              </label>
+              <label className="block">
+                <span className={labelClass}>Or upload a photo</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={event => {
+                    const file = event.target.files?.[0] || null;
+                    if (!file) {
+                      setPhotoFile(null);
+                      return;
+                    }
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                      setError('Choose a JPG, PNG, or WebP image.');
+                      event.target.value = '';
+                      return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                      setError('Photo must be smaller than 5 MB.');
+                      event.target.value = '';
+                      return;
+                    }
+                    setPhotoFile(file);
+                    setError('');
+                  }}
+                  className={inputClass}
+                />
+                <span className="mt-1.5 block text-[11px] leading-4 text-slate-500">JPG, PNG, or WebP · Maximum 5 MB. Uploaded directly to INSPIRATH storage.</span>
+                {photoFile && <span className="mt-1 block text-xs font-semibold text-emerald-700">Selected: {photoFile.name} (will replace the URL above)</span>}
               </label>
 
               <label className="block">
