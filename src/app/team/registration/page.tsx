@@ -89,8 +89,7 @@ export default function TeamRegistrationPage() {
     setCategoryId(nextCategoryId);
     const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
     setCompetitionId(matchingCompetitions[0]?.id || '');
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
     setError('');
   };
 
@@ -98,8 +97,7 @@ export default function TeamRegistrationPage() {
     const competition = competitions.find(comp => comp.id === nextCompetitionId);
     setCompetitionId(nextCompetitionId);
     if (competition?.categoryId) setCategoryId(competition.categoryId);
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
     setError('');
   };
 
@@ -384,7 +382,7 @@ export default function TeamRegistrationPage() {
                 className="w-full sm:w-auto"
                 type="submit"
                 form="team-registration-form"
-                disabled={saving || !selectedCompetition || !participantId}
+                disabled={saving || !selectedCompetition || participantIds.length === 0}
                 isLoading={saving}
               >
                 Confirm Entry
