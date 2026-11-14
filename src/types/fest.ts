@@ -58,6 +58,7 @@ export interface Team {
 export type CompetitionType = 'SOLO' | 'GROUP';
 export type CompetitionPerformanceMode = 'STAGE' | 'OFF_STAGE';
 export type CompetitionStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'MARKS_ENTERED' | 'PUBLISHED';
+export type CompetitionScheduleStatus = 'SCHEDULED' | 'LIVE' | 'COMPLETED';
 
 export interface JudgingCriterion {
   id: string;
@@ -79,6 +80,8 @@ export interface Competition {
   stageName: string;
   assignedJudges: string[];
   status: CompetitionStatus;
+  /** Operational timetable state, separate from the judging/result workflow. */
+  scheduleStatus?: CompetitionScheduleStatus;
   date: string;
   timeSlot: string;
   durationMinutes: number;
