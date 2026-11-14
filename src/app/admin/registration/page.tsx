@@ -6,7 +6,6 @@ import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -25,7 +24,6 @@ export default function RegistrationManagementPage() {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
-  const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
 
   // Derived available competitions
@@ -57,15 +55,13 @@ export default function RegistrationManagementPage() {
     const initialComps = competitions.filter(c => c.categoryId === initCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setSelectedParticipantIds([]);
-    setChestNumber('');
     setError('');
     setModalOpen(true);
   };
 
   const handleTeamChange = (newTeamId: string) => {
     setTeamId(newTeamId);
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
   const handleCategoryChange = (newCatId: string) => {
@@ -76,8 +72,7 @@ export default function RegistrationManagementPage() {
     } else {
       setCompetitionId('');
     }
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
   const handleCompetitionChange = (newCompId: string) => {
@@ -86,8 +81,7 @@ export default function RegistrationManagementPage() {
     if (comp && comp.categoryId && comp.categoryId !== categoryId) {
       setCategoryId(comp.categoryId);
     }
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
  client';
@@ -98,7 +92,6 @@ import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -117,7 +110,6 @@ export default function RegistrationManagementPage() {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
-  const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
 
   // Derived available competitions
@@ -149,15 +141,13 @@ export default function RegistrationManagementPage() {
     const initialComps = competitions.filter(c => c.categoryId === initCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setSelectedParticipantIds([]);
-    setChestNumber('');
     setError('');
     setModalOpen(true);
   };
 
   const handleTeamChange = (newTeamId: string) => {
     setTeamId(newTeamId);
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
   const handleCategoryChange = (newCatId: string) => {
@@ -168,8 +158,7 @@ export default function RegistrationManagementPage() {
     } else {
       setCompetitionId('');
     }
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
   const handleCompetitionChange = (newCompId: string) => {
@@ -178,8 +167,7 @@ export default function RegistrationManagementPage() {
     if (comp && comp.categoryId && comp.categoryId !== categoryId) {
       setCategoryId(comp.categoryId);
     }
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
   };
 
   const handleParticipantChange = (newPartId: string) => {
