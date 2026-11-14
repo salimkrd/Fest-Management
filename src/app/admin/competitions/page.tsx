@@ -425,17 +425,15 @@ export default function CompetitionsPage() {
     }
   };
 
-  const getStatusBadge = (st: CompetitionStatus) => {
-    switch (st) {
-      case 'PUBLISHED':
-        return <Badge variant="success" size="sm">PUBLISHED</Badge>;
-      case 'MARKS_ENTERED':
-        return <Badge variant="info" size="sm">MARKS ENTERED</Badge>;
-      case 'IN_PROGRESS':
-        return <Badge variant="warning" size="sm">IN PROGRESS</Badge>;
+  const getScheduleStatusBadge = (status: Competition['scheduleStatus']) => {
+    switch (status || 'SCHEDULED') {
+      case 'LIVE':
+        return <Badge variant="error" size="sm" dot>LIVE</Badge>;
+      case 'COMPLETED':
+        return <Badge variant="success" size="sm" dot>COMPLETED</Badge>;
       case 'SCHEDULED':
       default:
-        return <Badge variant="default" size="sm">SCHEDULED</Badge>;
+        return <Badge variant="default" size="sm" dot>SCHEDULED</Badge>;
     }
   };
 
@@ -600,7 +598,7 @@ export default function CompetitionsPage() {
                         {getAssignedJudgeNames(comp.id).length > 0 ? getAssignedJudgeNames(comp.id).join(', ') : 'Pending Assignment'}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        {getStatusBadge(comp.status)}
+                        {getScheduleStatusBadge(comp.scheduleStatus)}
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
