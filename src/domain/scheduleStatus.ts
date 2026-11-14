@@ -51,6 +51,17 @@ export function getScheduleStartTimestamp(date: string, startTime: string): numb
   return localMidnightAsUtc + minutesAfterMidnight * 60_000 - 330 * 60_000;
 }
 
+export function getKolkataDateInput(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export function shouldScheduleBecomeLive(slot: ScheduleTimeFields, nowMs: number): boolean {
   if (slot.status !== 'SCHEDULED') return false;
   const startAt = getScheduleStartTimestamp(slot.date, slot.startTime);
