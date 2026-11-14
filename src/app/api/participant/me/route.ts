@@ -24,12 +24,20 @@ export async function GET(req: NextRequest) {
 
     const competitionIds = [...new Set(registrations.map(doc => doc.data().competitionId).filter((val): val is string => typeof val === 'string' && !!val))];
     const details = await Promise.all(competitionIds.map(async compId => {
-      const [competition, results] = await Promise.all([
+      const [competition, results, schedules] = await Promise.all([
         db.collection('competitions').doc(compId).get(),
-        db.collection('results').where('competitionId', '==', compId).get()
+        db.collection('results').where('competitionId', '==', compId).get(),
+        db.collection('schedules').where('competitionId', '==', compId).get()
       ]);
       const published = results.docs.find(doc => doc.data().resultStatus === 'PUBLISHED');
-      return [compId, { competition: competition.data() || {}, result: published?.data() }] as const;
+      const scheduleSlots = schedules.docs
+        .map(doc => doc.data())
+        .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.startTime || '').localeCompare(String(b.startTime || '')));
+      return [compId, {
+        competition: competition.data() || {},
+        result: published?.data(),
+        schedules: scheduleSlots
+      }] as const;
     }));
     const detailsMap = new Map(details);
     const events = registrations.map(doc => {
@@ -45,9 +53,10 @@ export async function GET(req: NextRequest) {
         code: contest.code || '',
         type: reg.type === 'GROUP' ? 'GROUP' : 'SOLO',
         mode: contest.performanceMode || null,
-        date: contest.date || '',
-        timeSlot: contest.timeSlot || '',
-        stageName: contest.stageName || '',
+        // Timetable data is sourced exclusively from Schedule slots, never legacy Competition fields.
+        date: [...new Set((values?.schedules || []).map(slot => String(slot.date || '')).filter(Boolean))].join(', '),
+        timeSlot: (values?.schedules || []).map(slot => [slot.startTime, slot.endTime].filter(Boolean).join(' – ')).filter(Boolean).join('; '),
+        stageName: [...new Set((values?.schedules || []).map(slot => String(slot.stageName || '')).filter(Boolean))].join(', '),
         scheduleStatus: contest.scheduleStatus === 'LIVE' || contest.scheduleStatus === 'COMPLETED' ? contest.scheduleStatus : 'SCHEDULED',
         registrationStatus: reg.status,
         groupName: reg.type === 'GROUP' ? reg.participantName : undefined,
