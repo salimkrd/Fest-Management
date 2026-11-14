@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Competition, CompetitionType, CompetitionStatus, CompetitionPerformanceMode } from '@/types/fest';
@@ -9,10 +9,10 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle, FileDown } from 'lucide-react';
 
 export default function CompetitionsPage() {
-  const { competitions, categories, stages, registrations, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
+  const { competitions, categories, stages, registrations, participants, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -22,6 +22,23 @@ export default function CompetitionsPage() {
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [printCompetition, setPrintCompetition] = useState<Competition | null>(null);
+
+  useEffect(() => {
+    if (!printCompetition) return;
+    const handleAfterPrint = () => setPrintCompetition(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    const printTimer = window.setTimeout(() => window.print(), 150);
+    return () => {
+      window.clearTimeout(printTimer);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, [printCompetition]);
+
+  const getCompetitionRegistrations = (competitionId: string) =>
+    registrations
+      .filter(reg => reg.competitionId === competitionId && reg.status !== 'REJECTED' && reg.status !== 'CANCELLED')
+      .sort((a, b) => a.teamName.localeCompare(b.teamName) || a.participantName.localeCompare(b.participantName));
 
   // Form State
   const [name, setName] = useState('');
@@ -198,6 +215,7 @@ export default function CompetitionsPage() {
 
   return (
     <AdminLayout>
+      <>
       <div className="w-full max-w-[1600px] space-y-6 lg:space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -362,6 +380,15 @@ export default function CompetitionsPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            onClick={() => setPrintCompetition(comp)}
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                            title="Download Participants List (A4)"
+                            aria-label={`Download participant list for ${comp.name}`}
+                          >
+                            <FileDown className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleOpenEdit(comp)}
                             className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             title="Edit Competition"
@@ -506,6 +533,92 @@ export default function CompetitionsPage() {
           </form>
         </Modal>
       </div>
+      {printCompetition && (() => {
+        const entries = getCompetitionRegistrations(printCompetition.id);
+        return (
+          <section id="competition-participant-print" aria-label="Competition participant list">
+            <header className="print-header">
+              <h1>INSPIRATH</h1>
+              <p className="print-subtitle">OFFICIAL COMPETITION PARTICIPANT LIST</p>
+              <h2>{printCompetition.name}</h2>
+              <div className="print-meta">
+                <span><strong>Code:</strong> {printCompetition.code}</span>
+                <span><strong>Category:</strong> {printCompetition.categoryName}</span>
+                <span><strong>Type:</strong> {printCompetition.type === 'GROUP' ? 'Group' : 'Individual'}</span>
+                <span><strong>Date:</strong> {printCompetition.date || '—'}</span>
+              </div>
+            </header>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '7%' }}>No.</th>
+                  <th style={{ width: '15%' }}>Bib / Chest No.</th>
+                  <th>Participant / Group Leader</th>
+                  <th style={{ width: '23%' }}>Team</th>
+                  <th style={{ width: '16%' }}>Registration ID</th>
+                  <th style={{ width: '12%' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.length === 0 ? (
+                  <tr><td colSpan={6} className="print-empty">No participants registered for this competition.</td></tr>
+                ) : entries.map((entry, index) => {
+                  const participant = participants.find(item =>
+                    item.id === entry.participantId || item.id === entry.groupLeaderId
+                  );
+                  return (
+                    <tr key={entry.id}>
+                      <td>{index + 1}</td>
+                      <td>{entry.chestNumber || participant?.bib || '—'}</td>
+                      <td>
+                        <strong>{entry.participantName || participant?.name || '—'}</strong>
+                        {entry.type === 'GROUP' && <small className="print-subline">Group entry – leader</small>}
+                      </td>
+                      <td>{entry.teamName} ({entry.teamCode})</td>
+                      <td>{entry.code || '—'}</td>
+                      <td>{entry.status}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <footer className="print-footer">
+              <span>Total registered entries: <strong>{entries.length}</strong></span>
+              <span>Generated from INSPIRATH Fest Management</span>
+            </footer>
+          </section>
+        );
+      })()}
+      <style jsx global>{`
+        @page { size: A4 portrait; margin: 12mm; }
+        @media print {
+          body * { visibility: hidden !important; }
+          #competition-participant-print,
+          #competition-participant-print * { visibility: visible !important; }
+          #competition-participant-print {
+            display: block !important;
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            color: #111827 !important;
+            background: #fff !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+          }
+          #competition-participant-print .print-header { border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 16px; }
+          #competition-participant-print h1 { font-size: 23px; font-weight: 800; letter-spacing: 2px; text-align: center; margin: 0; }
+          #competition-participant-print .print-subtitle { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-align: center; margin: 4px 0 14px; }
+          #competition-participant-print h2 { font-size: 17px; font-weight: 700; text-align: center; margin: 0 0 10px; }
+          #competition-participant-print .print-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 9px; }
+          #competition-participant-print .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+          #competition-participant-print .print-table th { background: #eff6ff !important; font-weight: 700; text-align: left; }
+          #competition-participant-print .print-table th, #competition-participant-print .print-table td { border: 1px solid #cbd5e1; padding: 7px 6px; overflow-wrap: anywhere; vertical-align: top; }
+          #competition-participant-print .print-table tr { break-inside: avoid; page-break-inside: avoid; }
+          #competition-participant-print .print-empty { text-align: center; padding: 24px; }
+          #competition-participant-print .print-subline { display: block; margin-top: 3px; color: #475569; font-size: 8px; }
+          #competition-participant-print .print-footer { display: flex; justify-content: space-between; border-top: 1px solid #cbd5e1; margin-top: 14px; padding-top: 8px; font-size: 9px; }
+        }
+      `}</style>
+      </>
     </AdminLayout>
   );
 }
