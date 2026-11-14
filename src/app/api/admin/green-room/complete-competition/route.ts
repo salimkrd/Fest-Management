@@ -3,6 +3,8 @@ import { AuthService } from '@/services/authService';
 import { CompetitionScheduleService } from '@/services/competitionScheduleService';
 import { handleApiError } from '@/lib/apiErrorHelper';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   try {
     const authorization = req.headers.get('authorization') || '';
