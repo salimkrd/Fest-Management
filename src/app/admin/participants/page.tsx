@@ -14,7 +14,7 @@ import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { Plus, Search, Edit2, Trash2, IdCard, FileDown } from 'lucide-react';
 
 export default function ParticipantsPage() {
-  const { participants, teams, categories, competitions, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const { participants, teams, categories, competitions, schedules, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -279,11 +279,24 @@ export default function ParticipantsPage() {
         const competition = competitions.find(item => item.id === entry.competitionId);
         const name = entry.competitionName || competition?.name || 'Unknown competition';
         const code = competition?.code || '';
-        const date = competition?.date || '—';
-        const schedule = [
-          competition?.timeSlot || '',
-          competition?.stageName || ''
-        ].filter(Boolean).join('\n') || '—';
+        // Schedule page is the source of truth for competition date, time and venue.
+        // Support multiple schedule slots for the same competition without using stale
+        // date/time values from the Competition record.
+        const competitionSchedules = schedules
+          .filter(slot => slot.competitionId === entry.competitionId)
+          .sort((a, b) =>
+            a.date.localeCompare(b.date) ||
+            a.startTime.localeCompare(b.startTime)
+          );
+        const date = competitionSchedules.length > 0
+          ? competitionSchedules.map(slot => formatScheduleDate(slot.date)).join('\n')
+          : 'Not scheduled';
+        const schedule = competitionSchedules.length > 0
+          ? competitionSchedules.map(slot => [
+              (slot.startTime || '—') + ' - ' + (slot.endTime || '—'),
+              slot.stageName || ''
+            ].filter(Boolean).join('\n')).join('\n\n')
+          : 'Not scheduled';
         return {
           key: entry.id,
           values: [
