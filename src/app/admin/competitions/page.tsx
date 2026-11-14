@@ -39,7 +39,7 @@ export default function CompetitionsPage() {
       const columnWidths = [60, 145, 280, 210, 220, 185];
       const columnLabels = ['No.', 'Bib / Chest No.', 'Participant / Group Leader', 'Team', 'Registration ID', 'Status'];
       const lineHeight = 22;
-      const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
+      const participantsById = new Map(participants.map((participant) => [participant.id, participant] as const));
       let currentPageNumber = 1;
       let currentCanvas = document.createElement('canvas');
       let currentContext = currentCanvas.getContext('2d') as CanvasRenderingContext2D;
