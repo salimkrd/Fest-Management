@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
         date: contest.date || '',
         timeSlot: contest.timeSlot || '',
         stageName: contest.stageName || '',
+        scheduleStatus: contest.scheduleStatus === 'LIVE' || contest.scheduleStatus === 'COMPLETED' ? contest.scheduleStatus : 'SCHEDULED',
         registrationStatus: reg.status,
         groupName: reg.type === 'GROUP' ? reg.participantName : undefined,
         published: !!rank,
