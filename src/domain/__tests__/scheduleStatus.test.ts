@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getKolkataDateInput,
   getScheduleStartTimestamp,
   parseScheduleTimeMinutes,
   resolveCompetitionScheduleStatus,
@@ -22,6 +23,10 @@ describe('competition schedule lifecycle', () => {
     expect(parseScheduleTimeMinutes('09:75')).toBeNull();
     expect(getScheduleStartTimestamp('2026-02-30', '09:00 AM')).toBeNull();
     expect(getScheduleStartTimestamp('not-a-date', '09:00 AM')).toBeNull();
+  });
+
+  it('derives the current festival date in Asia/Kolkata even near a UTC date boundary', () => {
+    expect(getKolkataDateInput(new Date('2026-11-16T19:00:00.000Z'))).toBe('2026-11-17');
   });
 
   it('interprets a festival schedule as Asia/Kolkata time regardless of server timezone', () => {
