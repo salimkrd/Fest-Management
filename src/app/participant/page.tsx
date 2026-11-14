@@ -16,6 +16,7 @@ type Entry = {
   registrationId: string; name: string; code: string; type: 'SOLO' | 'GROUP';
   mode: 'STAGE' | 'OFF_STAGE' | null; date: string; timeSlot: string;
   stageName: string; registrationStatus: string; groupName?: string;
+  scheduleStatus: 'SCHEDULED' | 'LIVE' | 'COMPLETED';
   published: boolean; score: number | null; grade: string | null;
   position: number | null; individualPoints: number; groupTeamPoints: number;
 };
@@ -237,6 +238,13 @@ export default function ParticipantDashboard() {
                       </span>
                       <span className="text-[10px] font-semibold rounded-full px-2 py-1 bg-[#F1F5F9] text-[#526070]">
                         {event.mode === 'STAGE' ? 'STAGE' : event.mode === 'OFF_STAGE' ? 'OFF STAGE' : 'UNCLASSIFIED'}
+                      </span>
+                      <span className={'text-[10px] font-bold rounded-full px-2 py-1 ' + (
+                        event.scheduleStatus === 'LIVE' ? 'bg-red-50 text-red-700' :
+                        event.scheduleStatus === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
+                        'bg-slate-100 text-slate-600'
+                      )}>
+                        {event.scheduleStatus}
                       </span>
                     </div>
                     <h3 className="font-bold text-[#111827] mt-2">{event.name}</h3>
