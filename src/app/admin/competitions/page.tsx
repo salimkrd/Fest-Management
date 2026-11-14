@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Competition, CompetitionType, CompetitionStatus, CompetitionPerformanceMode } from '@/types/fest';
@@ -22,23 +23,248 @@ export default function CompetitionsPage() {
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [printCompetition, setPrintCompetition] = useState<Competition | null>(null);
-
-  useEffect(() => {
-    if (!printCompetition) return;
-    const handleAfterPrint = () => setPrintCompetition(null);
-    window.addEventListener('afterprint', handleAfterPrint);
-    const printTimer = window.setTimeout(() => window.print(), 150);
-    return () => {
-      window.clearTimeout(printTimer);
-      window.removeEventListener('afterprint', handleAfterPrint);
-    };
-  }, [printCompetition]);
-
   const getCompetitionRegistrations = (competitionId: string) =>
     registrations
       .filter(reg => reg.competitionId === competitionId && reg.status !== 'REJECTED' && reg.status !== 'CANCELLED')
       .sort((a, b) => a.teamName.localeCompare(b.teamName) || a.participantName.localeCompare(b.participantName));
+
+  const handleDownloadParticipants = (competition: Competition) => {
+    try {
+      const entries = getCompetitionRegistrations(competition.id);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const pageWidth = 1240;
+      const pageHeight = 1754;
+      const margin = 70;
+      const contentWidth = pageWidth - margin * 2;
+      const columnWidths = [60, 145, 280, 210, 220, 185];
+      const columnLabels = ['No.', 'Bib / Chest No.', 'Participant / Group Leader', 'Team', 'Registration ID', 'Status'];
+      const lineHeight = 22;
+      const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
+      let currentPageNumber = 1;
+      let currentCanvas = document.createElement('canvas');
+      let currentContext = currentCanvas.getContext('2d') as CanvasRenderingContext2D;
+      let currentY = 0;
+
+      const wrapText = (ctx: CanvasRenderingContext2D, value: string, maxWidth: number) => {
+        const output: string[] = [];
+        String(value || '-').split('\n').forEach((paragraph) => {
+          const words = paragraph.split(/\s+/).filter(Boolean);
+          if (words.length === 0) {
+            output.push('');
+            return;
+          }
+          let line = '';
+          words.forEach((word) => {
+            const candidate = line ? line + ' ' + word : word;
+            if (ctx.measureText(candidate).width <= maxWidth) {
+              line = candidate;
+              return;
+            }
+            if (line) output.push(line);
+            if (ctx.measureText(word).width <= maxWidth) {
+              line = word;
+              return;
+            }
+            let fragment = '';
+            Array.from(word).forEach((character) => {
+              const next = fragment + character;
+              if (fragment && ctx.measureText(next).width > maxWidth) {
+                output.push(fragment);
+                fragment = character;
+              } else {
+                fragment = next;
+              }
+            });
+            line = fragment;
+          });
+          if (line) output.push(line);
+        });
+        return output.length ? output : ['-'];
+      };
+
+      const drawTableHeader = (ctx: CanvasRenderingContext2D, top: number) => {
+        ctx.fillStyle = '#eaf1ff';
+        ctx.fillRect(margin, top, contentWidth, 48);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.font = 'bold 17px Arial, sans-serif';
+        let x = margin;
+        columnLabels.forEach((label, index) => {
+          const lines = wrapText(ctx, label, columnWidths[index] - 14);
+          ctx.strokeRect(x, top, columnWidths[index], 48);
+          ctx.fillStyle = '#172554';
+          lines.slice(0, 2).forEach((line, lineIndex) => {
+            ctx.fillText(line, x + 8, top + 8 + lineIndex * 20);
+          });
+          x += columnWidths[index];
+        });
+      };
+
+      const createPage = (continued: boolean) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = pageWidth;
+        canvas.height = pageHeight;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Unable to prepare the PDF page.');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, pageWidth, pageHeight);
+        context.textBaseline = 'top';
+        context.textAlign = 'left';
+
+        let y = 58;
+        if (continued) {
+          context.fillStyle = '#1e40af';
+          context.font = 'bold 25px Arial, sans-serif';
+          context.fillText('INSPIRATH', margin, y);
+          context.fillStyle = '#475569';
+          context.font = '16px Arial, sans-serif';
+          context.textAlign = 'right';
+          context.fillText('PARTICIPANT LIST - CONTINUED', pageWidth - margin, y + 6);
+          context.textAlign = 'left';
+          y += 54;
+          context.fillStyle = '#0f172a';
+          context.font = 'bold 21px Arial, sans-serif';
+          const titleLines = wrapText(context, competition.name, contentWidth);
+          titleLines.slice(0, 2).forEach((line, index) => context.fillText(line, margin, y + index * 26));
+          y += Math.min(titleLines.length, 2) * 26 + 14;
+        } else {
+          context.fillStyle = '#1e40af';
+          context.font = 'bold 34px Arial, sans-serif';
+          context.textAlign = 'center';
+          context.fillText('INSPIRATH', pageWidth / 2, y);
+          context.fillStyle = '#334155';
+          context.font = 'bold 16px Arial, sans-serif';
+          context.fillText('OFFICIAL COMPETITION PARTICIPANT LIST', pageWidth / 2, y + 42);
+          context.fillStyle = '#0f172a';
+          context.font = 'bold 27px Arial, sans-serif';
+          const titleLines = wrapText(context, competition.name, contentWidth);
+          titleLines.slice(0, 2).forEach((line, index) => context.fillText(line, pageWidth / 2, y + 76 + index * 32));
+          context.textAlign = 'left';
+          y += 76 + Math.min(titleLines.length, 2) * 32 + 18;
+
+          context.fillStyle = '#334155';
+          context.font = '17px Arial, sans-serif';
+          const meta = 'Code: ' + competition.code + '    Category: ' + competition.categoryName + '    Type: ' +
+            (competition.type === 'GROUP' ? 'Group' : 'Individual') + '    Date: ' + (competition.date || '-');
+          const metaLines = wrapText(context, meta, contentWidth);
+          metaLines.forEach((line, index) => context.fillText(line, margin, y + index * 24));
+          y += metaLines.length * 24 + 18;
+          context.strokeStyle = '#1d4ed8';
+          context.lineWidth = 3;
+          context.beginPath();
+          context.moveTo(margin, y);
+          context.lineTo(pageWidth - margin, y);
+          context.stroke();
+          y += 22;
+        }
+        drawTableHeader(context, y);
+        y += 48;
+        return { canvas, context, y };
+      };
+
+      const saveCurrentPage = (isLastPage: boolean) => {
+        currentContext.strokeStyle = '#cbd5e1';
+        currentContext.lineWidth = 1.5;
+        currentContext.beginPath();
+        currentContext.moveTo(margin, pageHeight - 78);
+        currentContext.lineTo(pageWidth - margin, pageHeight - 78);
+        currentContext.stroke();
+        currentContext.fillStyle = '#475569';
+        currentContext.font = '15px Arial, sans-serif';
+        currentContext.textAlign = 'left';
+        if (isLastPage) {
+          currentContext.font = 'bold 16px Arial, sans-serif';
+          currentContext.fillText('Total registered entries: ' + entries.length, margin, pageHeight - 64);
+        } else {
+          currentContext.fillText('INSPIRATH Fest Management', margin, pageHeight - 64);
+        }
+        currentContext.textAlign = 'right';
+        currentContext.font = '15px Arial, sans-serif';
+        currentContext.fillText('Page ' + currentPageNumber, pageWidth - margin, pageHeight - 64);
+        currentContext.textAlign = 'left';
+
+        const image = currentCanvas.toDataURL('image/jpeg', 0.94);
+        if (currentPageNumber > 1) pdf.addPage();
+        pdf.addImage(image, 'JPEG', 0, 0, 210, 297, 'participant-page-' + currentPageNumber, 'FAST');
+      };
+
+      const beginPage = (continued: boolean) => {
+        const page = createPage(continued);
+        currentCanvas = page.canvas;
+        currentContext = page.context;
+        currentY = page.y;
+      };
+
+      beginPage(false);
+      const rows = entries.map((entry, index) => {
+        const participant = participantsById.get(entry.participantId || entry.groupLeaderId || '');
+        const participantName = entry.participantName || participant?.name || '-';
+        const displayName = entry.type === 'GROUP' ? participantName + '\nGroup entry - leader' : participantName;
+        return [
+          String(index + 1),
+          entry.chestNumber || participant?.bib || '-',
+          displayName,
+          entry.teamName ? entry.teamName + (entry.teamCode ? ' (' + entry.teamCode + ')' : '') : '-',
+          entry.code || '-',
+          entry.status || '-'
+        ];
+      });
+
+      if (rows.length === 0) {
+        const emptyHeight = 56;
+        currentContext.fillStyle = '#64748b';
+        currentContext.font = '18px Arial, sans-serif';
+        currentContext.fillText('No participants registered for this competition.', margin + 12, currentY + 18);
+        currentContext.strokeStyle = '#cbd5e1';
+        currentContext.strokeRect(margin, currentY, contentWidth, emptyHeight);
+        currentY += emptyHeight;
+      } else {
+        rows.forEach((row, rowIndex) => {
+          currentContext.font = '16px Arial, sans-serif';
+          const cellLines = row.map((value, columnIndex) =>
+            wrapText(currentContext, value, columnWidths[columnIndex] - 16)
+          );
+          const maxLines = Math.max(...cellLines.map((lines) => lines.length));
+          const rowHeight = Math.max(42, maxLines * lineHeight + 16);
+          if (currentY + rowHeight > pageHeight - 96) {
+            saveCurrentPage(false);
+            currentPageNumber += 1;
+            beginPage(true);
+          }
+
+          currentContext.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc';
+          currentContext.fillRect(margin, currentY, contentWidth, rowHeight);
+          currentContext.strokeStyle = '#cbd5e1';
+          currentContext.lineWidth = 1;
+          let x = margin;
+          cellLines.forEach((lines, columnIndex) => {
+            currentContext.strokeRect(x, currentY, columnWidths[columnIndex], rowHeight);
+            currentContext.fillStyle = '#0f172a';
+            currentContext.font = columnIndex === 0 ? 'bold 16px Arial, sans-serif' : '16px Arial, sans-serif';
+            lines.forEach((line, lineIndex) => {
+              currentContext.fillText(line, x + 8, currentY + 8 + lineIndex * lineHeight);
+            });
+            x += columnWidths[columnIndex];
+          });
+          currentY += rowHeight;
+        });
+      }
+
+      saveCurrentPage(true);
+      pdf.setProperties({
+        title: competition.name + ' - Participant List',
+        subject: 'A4 competition participant list',
+        creator: 'INSPIRATH Fest Management'
+      });
+      const safeName = (competition.code + '-' + competition.name + '-participants')
+        .replace(/[^\w-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'competition-participants';
+      pdf.save(safeName + '.pdf');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to generate the participant PDF.');
+    }
+  };
 
   // Form State
   const [name, setName] = useState('');
@@ -380,7 +606,7 @@ export default function CompetitionsPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setPrintCompetition(comp)}
+                            onClick={() => handleDownloadParticipants(comp)}
                             className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                             title="Download Participants List (A4)"
                             aria-label={`Download participant list for ${comp.name}`}
@@ -533,91 +759,6 @@ export default function CompetitionsPage() {
           </form>
         </Modal>
       </div>
-      {printCompetition && (() => {
-        const entries = getCompetitionRegistrations(printCompetition.id);
-        return (
-          <section id="competition-participant-print" aria-label="Competition participant list">
-            <header className="print-header">
-              <h1>INSPIRATH</h1>
-              <p className="print-subtitle">OFFICIAL COMPETITION PARTICIPANT LIST</p>
-              <h2>{printCompetition.name}</h2>
-              <div className="print-meta">
-                <span><strong>Code:</strong> {printCompetition.code}</span>
-                <span><strong>Category:</strong> {printCompetition.categoryName}</span>
-                <span><strong>Type:</strong> {printCompetition.type === 'GROUP' ? 'Group' : 'Individual'}</span>
-                <span><strong>Date:</strong> {printCompetition.date || '—'}</span>
-              </div>
-            </header>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '7%' }}>No.</th>
-                  <th style={{ width: '15%' }}>Bib / Chest No.</th>
-                  <th>Participant / Group Leader</th>
-                  <th style={{ width: '23%' }}>Team</th>
-                  <th style={{ width: '16%' }}>Registration ID</th>
-                  <th style={{ width: '12%' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.length === 0 ? (
-                  <tr><td colSpan={6} className="print-empty">No participants registered for this competition.</td></tr>
-                ) : entries.map((entry, index) => {
-                  const participant = participants.find(item =>
-                    item.id === entry.participantId || item.id === entry.groupLeaderId
-                  );
-                  return (
-                    <tr key={entry.id}>
-                      <td>{index + 1}</td>
-                      <td>{entry.chestNumber || participant?.bib || '—'}</td>
-                      <td>
-                        <strong>{entry.participantName || participant?.name || '—'}</strong>
-                        {entry.type === 'GROUP' && <small className="print-subline">Group entry – leader</small>}
-                      </td>
-                      <td>{entry.teamName} ({entry.teamCode})</td>
-                      <td>{entry.code || '—'}</td>
-                      <td>{entry.status}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <footer className="print-footer">
-              <span>Total registered entries: <strong>{entries.length}</strong></span>
-              <span>Generated from INSPIRATH Fest Management</span>
-            </footer>
-          </section>
-        );
-      })()}
-      <style jsx global>{`
-        @page { size: A4 portrait; margin: 12mm; }
-        @media print {
-          body * { visibility: hidden !important; }
-          #competition-participant-print,
-          #competition-participant-print * { visibility: visible !important; }
-          #competition-participant-print {
-            display: block !important;
-            position: absolute !important;
-            inset: 0 auto auto 0 !important;
-            width: 100% !important;
-            color: #111827 !important;
-            background: #fff !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-          }
-          #competition-participant-print .print-header { border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 16px; }
-          #competition-participant-print h1 { font-size: 23px; font-weight: 800; letter-spacing: 2px; text-align: center; margin: 0; }
-          #competition-participant-print .print-subtitle { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; text-align: center; margin: 4px 0 14px; }
-          #competition-participant-print h2 { font-size: 17px; font-weight: 700; text-align: center; margin: 0 0 10px; }
-          #competition-participant-print .print-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 9px; }
-          #competition-participant-print .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
-          #competition-participant-print .print-table th { background: #eff6ff !important; font-weight: 700; text-align: left; }
-          #competition-participant-print .print-table th, #competition-participant-print .print-table td { border: 1px solid #cbd5e1; padding: 7px 6px; overflow-wrap: anywhere; vertical-align: top; }
-          #competition-participant-print .print-table tr { break-inside: avoid; page-break-inside: avoid; }
-          #competition-participant-print .print-empty { text-align: center; padding: 24px; }
-          #competition-participant-print .print-subline { display: block; margin-top: 3px; color: #475569; font-size: 8px; }
-          #competition-participant-print .print-footer { display: flex; justify-content: space-between; border-top: 1px solid #cbd5e1; margin-top: 14px; padding-top: 8px; font-size: 9px; }
-        }
-      `}</style>
       </>
     </AdminLayout>
   );
