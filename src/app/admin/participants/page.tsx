@@ -13,8 +13,34 @@ import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { Plus, Search, Edit2, Trash2, IdCard, FileDown } from 'lucide-react';
 
+const formatPdfScheduleDate = (value: string): string => {
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return value || '—';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(parts[0], parts[1] - 1, parts[2]));
+};
+
+const getPdfScheduleTimeMinutes = (value: string): number => {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const rawHours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes > 59) return Number.MAX_SAFE_INTEGER;
+  if (match[3]) {
+    if (rawHours < 1 || rawHours > 12) return Number.MAX_SAFE_INTEGER;
+    let hours = rawHours % 12;
+    if (match[3].toUpperCase() === 'PM') hours += 12;
+    return hours * 60 + minutes;
+  }
+  if (rawHours > 23) return Number.MAX_SAFE_INTEGER;
+  return rawHours * 60 + minutes;
+};
+
 export default function ParticipantsPage() {
-  const { participants, teams, categories, competitions, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const { participants, teams, categories, competitions, schedules, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -279,11 +305,24 @@ export default function ParticipantsPage() {
         const competition = competitions.find(item => item.id === entry.competitionId);
         const name = entry.competitionName || competition?.name || 'Unknown competition';
         const code = competition?.code || '';
-        const date = competition?.date || '—';
-        const schedule = [
-          competition?.timeSlot || '',
-          competition?.stageName || ''
-        ].filter(Boolean).join('\n') || '—';
+        // Schedule page is the source of truth for competition date, time and venue.
+        // Support multiple schedule slots for the same competition without using stale
+        // date/time values from the Competition record.
+        const competitionSchedules = schedules
+          .filter(slot => slot.competitionId === entry.competitionId)
+          .sort((a, b) =>
+            a.date.localeCompare(b.date) ||
+            getPdfScheduleTimeMinutes(a.startTime) - getPdfScheduleTimeMinutes(b.startTime)
+          );
+        const date = competitionSchedules.length > 0
+          ? competitionSchedules.map(slot => formatPdfScheduleDate(slot.date)).join('\n')
+          : 'Not scheduled';
+        const schedule = competitionSchedules.length > 0
+          ? competitionSchedules.map(slot => [
+              (slot.startTime || '—') + ' - ' + (slot.endTime || '—'),
+              slot.stageName || ''
+            ].filter(Boolean).join('\n')).join('\n\n')
+          : 'Not scheduled';
         return {
           key: entry.id,
           values: [
