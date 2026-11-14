@@ -502,12 +502,12 @@ export default function GreenRoomPage() {
               </span>
               {selectedCompetition.scheduleStatus !== 'COMPLETED' && schedules.some(slot => slot.competitionId === selectedCompetition.id) && (
                 <Button
-                  variant="primary"
+                  variant="outline"
                   size="sm"
-                  leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                  leftIcon={<CheckCircle2 className="h-4 w-4" />}
                   onClick={() => setCompleteCompetitionModalOpen(true)}
                   disabled={isCompletingCompetition}
-                  className="bg-white text-blue-900 hover:bg-blue-50"
+                  className="min-h-10 shrink-0 whitespace-nowrap border-white/80 bg-white px-4 !text-blue-900 shadow-sm hover:bg-blue-50"
                 >
                   Mark Competition Completed
                 </Button>
