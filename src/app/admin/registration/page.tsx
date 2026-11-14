@@ -24,7 +24,7 @@ export default function RegistrationManagementPage() {
   const [teamId, setTeamId] = useState(teams[0]?.id || '');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
-  const [participantId, setParticipantId] = useState('');
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
   const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
 
@@ -56,7 +56,99 @@ export default function RegistrationManagementPage() {
     setCategoryId(initCat);
     const initialComps = competitions.filter(c => c.categoryId === initCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
+    setSelectedParticipantIds([]);
+    setChestNumber('');
+    setError('');
+    setModalOpen(true);
+  };
+
+  const handleTeamChange = (newTeamId: string) => {
+    setTeamId(newTeamId);
     setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleCategoryChange = (newCatId: string) => {
+    setCategoryId(newCatId);
+    const matchingComps = competitions.filter(c => c.categoryId === newCatId);
+    if (matchingComps.length > 0) {
+      setCompetitionId(matchingComps[0].id);
+    } else {
+      setCompetitionId('');
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+  const handleCompetitionChange = (newCompId: string) => {
+    setCompetitionId(newCompId);
+    const comp = competitions.find(c => c.id === newCompId);
+    if (comp && comp.categoryId && comp.categoryId !== categoryId) {
+      setCategoryId(comp.categoryId);
+    }
+    setParticipantId('');
+    setChestNumber('');
+  };
+
+ client';
+
+import React, { useState } from 'react';
+import { AdminLayout } from '@/components/layout/AdminLayout';
+import { useFest } from '@/context/FestContext';
+import { isParticipantEligibleForCategory } from '@/domain/eligibility';
+import { Registration } from '@/types/fest';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
+import { Plus, Search, Check, Trash2, ClipboardList, Filter } from 'lucide-react';
+
+export default function RegistrationManagementPage() {
+  const { registrations, teams, categories, competitions, participants, addRegistration, updateRegistrationStatus, deleteRegistration } = useFest();
+
+  const [search, setSearch] = useState('');
+  const [teamFilter, setTeamFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Form State
+  const [teamId, setTeamId] = useState(teams[0]?.id || '');
+  const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
+  const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
+  const [chestNumber, setChestNumber] = useState('');
+  const [error, setError] = useState('');
+
+  // Derived available competitions
+  const selectedCategory = categories.find(c => c.id === categoryId);
+  const availableCompetitions = competitions.filter(c => c.categoryId === categoryId);
+  const selectedCompetition = competitions.find(c => c.id === competitionId);
+  const isGroup = selectedCompetition?.type === 'GROUP';
+  const approvedCount = registrations.filter(r => r.status === 'APPROVED').length;
+  const pendingCount = registrations.filter(r => r.status === 'PENDING').length;
+
+  // Derived available participants for selected team & category using domain eligibility engine
+  const availableParticipants = participants.filter(p =>
+    p.teamId === teamId && isParticipantEligibleForCategory(p, selectedCategory, categories)
+  );
+
+  const filteredRegistrations = registrations.filter(r => {
+    const term = search.trim().toLowerCase();
+    const matchesSearch = !term || [r.code, r.participantName, r.competitionName, r.teamName, r.categoryName].some(value => (value || '').toLowerCase().includes(term));
+    const matchesTeam = teamFilter === 'ALL' || r.teamId === teamFilter;
+    const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
+    return matchesSearch && matchesTeam && matchesStatus;
+  });
+
+  const handleOpenAdd = () => {
+    const initTeam = teams[0]?.id || '';
+    const initCat = categories[0]?.id || '';
+    setTeamId(initTeam);
+    setCategoryId(initCat);
+    const initialComps = competitions.filter(c => c.categoryId === initCat);
+    setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
+    setSelectedParticipantIds([]);
     setChestNumber('');
     setError('');
     setModalOpen(true);
@@ -117,29 +209,18 @@ export default function RegistrationManagementPage() {
       return;
     }
 
-    let participantName = '';
-    if (comp.type !== 'GROUP') {
-      const part = availableParticipants.find(p => p.id === participantId);
-      if (!part) {
-        setError('Please select a student contestant.');
-        return;
-      }
-      participantName = part.name;
-    } else {
-      const leader = availableParticipants.find(p => p.id === participantId);
-      if (!leader) {
-        setError('Select a registered participant to represent this group.');
-        return;
-      }
-      participantName = `${leader.name} & Team`;
+    const selectedParticipants = availableParticipants.filter(p => selectedParticipantIds.includes(p.id));
+    if (selectedParticipants.length === 0) {
+      setError(comp.type === 'GROUP' ? 'Select at least one group leader.' : 'Select at least one contestant.');
+      return;
     }
 
     setSaving(true);
     try {
       await addRegistration({
-        participantId: comp.type !== 'GROUP' ? participantId : undefined,
-        groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
-        participantName,
+        participantIds: comp.type !== 'GROUP' ? selectedParticipants.map(p => p.id) : undefined,
+        groupLeaderIds: comp.type === 'GROUP' ? selectedParticipants.map(p => p.id) : undefined,
+        participantName: selectedParticipants.map(p => p.name).join(', '),
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
@@ -148,7 +229,6 @@ export default function RegistrationManagementPage() {
         competitionId: comp.id,
         competitionName: comp.name,
         type: comp.type,
-        chestNumber: chestNumber || (comp.type !== 'GROUP' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
         status: 'APPROVED'
       });
       setModalOpen(false);
@@ -340,7 +420,7 @@ export default function RegistrationManagementPage() {
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" onClick={() => { const form = document.querySelector<HTMLFormElement>('[data-registration-form]'); form?.requestSubmit(); }} isLoading={saving} disabled={saving}>
+              <Button variant="primary" size="sm" onClick={() => { const form = document.querySelector<HTMLFormElement>('[data-registration-form]'); form?.requestSubmit(); }} isLoading={saving} disabled={saving || selectedParticipantIds.length === 0}>
                 Confirm Registration
               </Button>
             </div>
@@ -381,49 +461,44 @@ export default function RegistrationManagementPage() {
               </p>
             )}
 
-            {isGroup ? (
-              <div className="space-y-2">
-                <Select
-                  label="Group Leader (registered participant)"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[{ value: '', label: '-- Select Group Leader --' }, ...availableParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib})` }))]}
-                  required
-                />
-                <p className="text-xs text-[#526070]">{selectedCompetition?.groupSize || 'Not set'} members per group. Only the leader is recorded. Unlimited groups per team; group marks count toward the team only.</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-semibold text-slate-800">
+                  {isGroup ? 'Select Group Leaders' : 'Select Student Contestants'} <span className="text-red-600">*</span>
+                </label>
+                <span className="text-xs font-medium text-blue-700">{selectedParticipantIds.length} selected</span>
               </div>
-            ) : (
-              <div>
-                <Select
-                  label="Select Student Contestant"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[
-                    { value: '', label: '-- Select Enrolled Student --' },
-                    ...availableParticipants.map(p => ({
-                      value: p.id,
-                      label: `${p.name} (${p.bib || 'No Bib'} - ${p.categoryName || p.classGrade || 'Contestant'})`
-                    }))
-                  ]}
-                  required
-                />
+              <p className="text-xs leading-5 text-slate-500">
+                {isGroup
+                  ? 'Select one leader for each group. Each selected leader will create a separate group entry; do not select the full group roster.'
+                  : 'Select multiple contestants. Each selected contestant will receive a separate registration entry.'}
+              </p>
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                {availableParticipants.map(participant => (
+                  <label key={participant.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-blue-50">
+                    <input
+                      type="checkbox"
+                      checked={selectedParticipantIds.includes(participant.id)}
+                      onChange={event => setSelectedParticipantIds(current =>
+                        event.target.checked
+                          ? [...current, participant.id]
+                          : current.filter(id => id !== participant.id)
+                      )}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-slate-900">{participant.name}</span>
+                      <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'} · {participant.categoryName || participant.classGrade || 'Contestant'}</span>
+                    </span>
+                  </label>
+                ))}
                 {availableParticipants.length === 0 && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                    <p className="text-xs text-amber-800 font-medium">
-                      No participants found under selected team eligible for {selectedCategory?.name || 'this category'}. Please register students first.
-                    </p>
-                  </div>
+                  <p className="px-3 py-5 text-center text-xs text-slate-500">No eligible participants found for this team and category.</p>
                 )}
               </div>
-            )}
+            </div>
 
-            <Input
-              label="Assigned Chest / Bib Number"
-              placeholder="#1042"
-              value={chestNumber}
-              onChange={(e) => setChestNumber(e.target.value)}
-              helperText="Auto-generated or custom physical chest number tag"
-            />
+>
           </form>
         </Modal>
       </div>
