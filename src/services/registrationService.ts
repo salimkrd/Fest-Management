@@ -76,11 +76,10 @@ export class RegistrationService {
 
       // A bulk submit creates one independent registration document per contestant/group.
       // This preserves the existing result, green-room, chest-number and scoring model.
-      const selectedIds = Array.from(new Set(
-        isGroup
-          ? (input.groupLeaderIds?.length ? input.groupLeaderIds : [input.groupLeaderId || ''])
-          : (input.participantIds?.length ? input.participantIds : [input.participantId || ''])
-      ).filter(Boolean));
+      const rawSelectedIds = isGroup
+        ? (input.groupLeaderIds?.length ? input.groupLeaderIds : [input.groupLeaderId || ''])
+        : (input.participantIds?.length ? input.participantIds : [input.participantId || '']);
+      const selectedIds = Array.from(new Set(rawSelectedIds.filter((id): id is string => typeof id === 'string' && id.length > 0)));
       if (selectedIds.length === 0) {
         throw new Error(isGroup
           ? 'Validation Error: Select at least one group leader.'
