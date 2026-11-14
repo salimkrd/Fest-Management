@@ -1421,14 +1421,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   // Keep timetable status accurate while an Admin or Green Room Staff portal is open.
   // The server performs the authoritative Asia/Kolkata time check and Firestore writes.
   useEffect(() => {
-    if (isIsolatedDemoOrTest || !auth || typeof window === 'undefined') return;
+    const firebaseAuth = auth;
+    if (isIsolatedDemoOrTest || !firebaseAuth || typeof window === 'undefined') return;
 
     let active = true;
     let intervalId: number | undefined;
     let syncInFlight = false;
 
     const syncDueSchedules = async () => {
-      const user = auth.currentUser;
+      const user = firebaseAuth.currentUser;
       if (!active || !user || syncInFlight) return;
       syncInFlight = true;
       try {
@@ -1448,7 +1449,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const unsubscribe = onAuthStateChanged(auth, async user => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async user => {
       if (intervalId !== undefined) {
         window.clearInterval(intervalId);
         intervalId = undefined;
