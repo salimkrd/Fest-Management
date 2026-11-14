@@ -1459,7 +1459,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const tokenResult = await user.getIdTokenResult();
         if (!active || !['ADMIN', 'GREEN_ROOM_STAFF'].includes(String(tokenResult.claims.role || ''))) return;
         void syncDueSchedules();
-        intervalId = window.setInterval(() => { void syncDueSchedules(); }, 15_000);
+        intervalId = window.setInterval(() => { void syncDueSchedules(); }, 30_000);
       } catch (error) {
         console.warn('[FestContext] Could not initialize automatic schedule sync:', error);
       }
