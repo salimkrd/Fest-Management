@@ -16,8 +16,14 @@ export async function POST(
     }
 
     const { id: teamId } = await params;
-    const registration = await RegistrationService.createForTeam(idToken, teamId, await req.json());
-    return NextResponse.json({ success: true, registration }, { status: 201 });
+    const body = await req.json();
+    const registrations = await RegistrationService.createManyForTeam(idToken, teamId, body);
+    return NextResponse.json({
+      success: true,
+      registrations,
+      // Keep the singular response field for any older client still expecting it.
+      registration: registrations[0]
+    }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
