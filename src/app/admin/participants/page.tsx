@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { Participant } from '@/types/fest';
@@ -10,10 +11,10 @@ import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
-import { Plus, Search, Edit2, Trash2, IdCard } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, IdCard, FileDown } from 'lucide-react';
 
 export default function ParticipantsPage() {
-  const { participants, teams, categories, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
+  const { participants, teams, categories, competitions, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -77,7 +78,285 @@ export default function ParticipantsPage() {
     }
   };
 
-  const getRegisteredEventCount = (participantId: string) => new Set(registrations.filter(reg => reg.status !== 'REJECTED' && (reg.participantId === participantId || reg.groupLeaderId === participantId)).map(reg => reg.competitionId)).size;
+  const getParticipantRegistrations = (participantId: string) =>
+    registrations
+      .filter(reg =>
+        reg.status !== 'REJECTED' &&
+        reg.status !== 'CANCELLED' &&
+        (reg.participantId === participantId || reg.groupLeaderId === participantId)
+      )
+      .sort((a, b) => {
+        const competitionA = competitions.find(item => item.id === a.competitionId);
+        const competitionB = competitions.find(item => item.id === b.competitionId);
+        const dateCompare = (competitionA?.date || '').localeCompare(competitionB?.date || '');
+        return dateCompare || (a.competitionName || '').localeCompare(b.competitionName || '');
+      });
+
+  const getRegisteredEventCount = (participantId: string) =>
+    new Set(getParticipantRegistrations(participantId).map(reg => reg.competitionId)).size;
+
+  const handleDownloadCompetitionList = (participant: Participant) => {
+    try {
+      const entries = getParticipantRegistrations(participant.id);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const pageWidth = 1240;
+      const pageHeight = 1754;
+      const margin = 54;
+      const contentWidth = pageWidth - margin * 2;
+      const columnWidths = [42, 300, 144, 100, 118, 170, 150, 108];
+      const columnLabels = ['No.', 'Competition', 'Category', 'Format', 'Date', 'Time / Venue', 'Registration ID', 'Status'];
+      const lineHeight = 22;
+      let currentPageNumber = 1;
+      let currentCanvas = document.createElement('canvas');
+      let currentContext = currentCanvas.getContext('2d') as CanvasRenderingContext2D;
+      let currentY = 0;
+
+      const wrapText = (ctx: CanvasRenderingContext2D, value: string, maxWidth: number) => {
+        const output: string[] = [];
+        String(value || '—').split('\n').forEach((paragraph) => {
+          const words = paragraph.split(/\s+/).filter(Boolean);
+          if (words.length === 0) {
+            output.push('');
+            return;
+          }
+          let line = '';
+          words.forEach((word) => {
+            const candidate = line ? line + ' ' + word : word;
+            if (ctx.measureText(candidate).width <= maxWidth) {
+              line = candidate;
+              return;
+            }
+            if (line) output.push(line);
+            if (ctx.measureText(word).width <= maxWidth) {
+              line = word;
+              return;
+            }
+            let fragment = '';
+            Array.from(word).forEach((character) => {
+              const next = fragment + character;
+              if (fragment && ctx.measureText(next).width > maxWidth) {
+                output.push(fragment);
+                fragment = character;
+              } else {
+                fragment = next;
+              }
+            });
+            line = fragment;
+          });
+          if (line) output.push(line);
+        });
+        return output.length ? output : ['—'];
+      };
+
+      const drawTableHeader = (ctx: CanvasRenderingContext2D, top: number) => {
+        ctx.fillStyle = '#eaf1ff';
+        ctx.fillRect(margin, top, contentWidth, 50);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.font = 'bold 16px Arial, sans-serif';
+        let x = margin;
+        columnLabels.forEach((label, index) => {
+          const lines = wrapText(ctx, label, columnWidths[index] - 14);
+          ctx.strokeRect(x, top, columnWidths[index], 50);
+          ctx.fillStyle = '#172554';
+          lines.slice(0, 2).forEach((line, lineIndex) => {
+            ctx.fillText(line, x + 7, top + 8 + lineIndex * 20);
+          });
+          x += columnWidths[index];
+        });
+      };
+
+      const createPage = (continued: boolean) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = pageWidth;
+        canvas.height = pageHeight;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Unable to prepare the PDF page.');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, pageWidth, pageHeight);
+        context.textBaseline = 'top';
+        context.textAlign = 'left';
+
+        let y = 54;
+        if (continued) {
+          context.fillStyle = '#1e40af';
+          context.font = 'bold 28px Arial, sans-serif';
+          context.fillText('INSPIRATH', margin, y);
+          context.fillStyle = '#475569';
+          context.font = 'bold 16px Arial, sans-serif';
+          context.textAlign = 'right';
+          context.fillText('COMPETITION LIST - CONTINUED', pageWidth - margin, y + 7);
+          context.textAlign = 'left';
+          y += 48;
+          context.fillStyle = '#0f172a';
+          context.font = 'bold 22px Arial, sans-serif';
+          context.fillText(participant.name || 'Unnamed participant', margin, y);
+          context.fillStyle = '#475569';
+          context.font = '16px Arial, sans-serif';
+          context.fillText('Bib: ' + (participant.bib || '—') + '    Team: ' + (participant.teamName || '—'), margin, y + 30);
+          y += 66;
+        } else {
+          context.fillStyle = '#1e40af';
+          context.font = 'bold 36px Arial, sans-serif';
+          context.textAlign = 'center';
+          context.fillText('INSPIRATH', pageWidth / 2, y);
+          context.fillStyle = '#334155';
+          context.font = 'bold 16px Arial, sans-serif';
+          context.fillText('PARTICIPANT COMPETITION REGISTRATION LIST', pageWidth / 2, y + 44);
+          context.textAlign = 'left';
+          y += 100;
+
+          context.fillStyle = '#0f172a';
+          context.font = 'bold 27px Arial, sans-serif';
+          context.fillText(participant.name || 'Unnamed participant', margin, y);
+          context.fillStyle = '#334155';
+          context.font = '17px Arial, sans-serif';
+          y += 42;
+          const details = [
+            'Bib / Chest No.: ' + (participant.bib || '—'),
+            'Team: ' + (participant.teamName || '—') + (participant.teamCode ? ' (' + participant.teamCode + ')' : ''),
+            'Category: ' + (participant.categoryName || '—'),
+            'Class / Grade: ' + (participant.classGrade || '—')
+          ];
+          const detailLines = details.join('     |     ');
+          const wrappedDetails = wrapText(context, detailLines, contentWidth);
+          wrappedDetails.forEach((line, index) => context.fillText(line, margin, y + index * 24));
+          y += wrappedDetails.length * 24 + 16;
+
+          context.fillStyle = '#1e40af';
+          context.font = 'bold 18px Arial, sans-serif';
+          context.fillText('Registered Competitions: ' + entries.length, margin, y);
+          y += 36;
+
+          context.strokeStyle = '#1d4ed8';
+          context.lineWidth = 3;
+          context.beginPath();
+          context.moveTo(margin, y);
+          context.lineTo(pageWidth - margin, y);
+          context.stroke();
+          y += 18;
+        }
+
+        drawTableHeader(context, y);
+        y += 50;
+        return { canvas, context, y };
+      };
+
+      const saveCurrentPage = (isLastPage: boolean) => {
+        currentContext.strokeStyle = '#cbd5e1';
+        currentContext.lineWidth = 1.5;
+        currentContext.beginPath();
+        currentContext.moveTo(margin, pageHeight - 78);
+        currentContext.lineTo(pageWidth - margin, pageHeight - 78);
+        currentContext.stroke();
+        currentContext.fillStyle = '#475569';
+        currentContext.font = '15px Arial, sans-serif';
+        currentContext.textAlign = 'left';
+        if (isLastPage) {
+          currentContext.font = 'bold 16px Arial, sans-serif';
+          currentContext.fillText('Total registered competitions: ' + entries.length, margin, pageHeight - 64);
+        } else {
+          currentContext.fillText('INSPIRATH Fest Management', margin, pageHeight - 64);
+        }
+        currentContext.textAlign = 'right';
+        currentContext.font = '15px Arial, sans-serif';
+        currentContext.fillText('Page ' + currentPageNumber, pageWidth - margin, pageHeight - 64);
+        currentContext.textAlign = 'left';
+
+        const image = currentCanvas.toDataURL('image/jpeg', 0.92);
+        if (currentPageNumber > 1) pdf.addPage();
+        pdf.addImage(image, 'JPEG', 0, 0, 210, 297, 'participant-competitions-' + currentPageNumber, 'FAST');
+      };
+
+      const beginPage = (continued: boolean) => {
+        const page = createPage(continued);
+        currentCanvas = page.canvas;
+        currentContext = page.context;
+        currentY = page.y;
+      };
+
+      const rows = entries.map((entry, index) => {
+        const competition = competitions.find(item => item.id === entry.competitionId);
+        const name = entry.competitionName || competition?.name || 'Unknown competition';
+        const code = competition?.code || '';
+        const date = competition?.date || '—';
+        const schedule = [
+          competition?.timeSlot || '',
+          competition?.stageName || ''
+        ].filter(Boolean).join('\n') || '—';
+        return {
+          key: entry.id,
+          values: [
+            String(index + 1),
+            code ? code + '\n' + name : name,
+            entry.categoryName || competition?.categoryName || '—',
+            entry.type === 'GROUP' ? 'Group' : 'Individual',
+            date,
+            schedule,
+            entry.code || '—',
+            entry.status
+          ]
+        };
+      });
+
+      beginPage(false);
+      if (rows.length === 0) {
+        const emptyHeight = 64;
+        currentContext.fillStyle = '#64748b';
+        currentContext.font = '19px Arial, sans-serif';
+        currentContext.fillText('No active competition registrations found for this participant.', margin + 12, currentY + 20);
+        currentContext.strokeStyle = '#cbd5e1';
+        currentContext.strokeRect(margin, currentY, contentWidth, emptyHeight);
+        currentY += emptyHeight;
+      } else {
+        rows.forEach((row, rowIndex) => {
+          currentContext.font = '16px Arial, sans-serif';
+          const cellLines = row.values.map((value, columnIndex) =>
+            wrapText(currentContext, value, columnWidths[columnIndex] - 16)
+          );
+          const maxLines = Math.max(...cellLines.map(lines => lines.length));
+          const rowHeight = Math.max(44, maxLines * lineHeight + 16);
+          if (currentY + rowHeight > pageHeight - 96) {
+            saveCurrentPage(false);
+            currentPageNumber += 1;
+            beginPage(true);
+          }
+
+          currentContext.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc';
+          currentContext.fillRect(margin, currentY, contentWidth, rowHeight);
+          currentContext.strokeStyle = '#cbd5e1';
+          currentContext.lineWidth = 1;
+          let x = margin;
+          cellLines.forEach((lines, columnIndex) => {
+            currentContext.strokeRect(x, currentY, columnWidths[columnIndex], rowHeight);
+            currentContext.fillStyle = '#0f172a';
+            currentContext.font = columnIndex === 0 ? 'bold 16px Arial, sans-serif' : '16px Arial, sans-serif';
+            lines.forEach((line, lineIndex) => {
+              currentContext.fillText(line, x + 7, currentY + 8 + lineIndex * lineHeight);
+            });
+            x += columnWidths[columnIndex];
+          });
+          currentY += rowHeight;
+        });
+      }
+
+      saveCurrentPage(true);
+      pdf.setProperties({
+        title: participant.name + ' - Competition Registration List',
+        subject: 'A4 participant competition registration list',
+        creator: 'INSPIRATH Fest Management'
+      });
+      const safeName = ((participant.bib || 'PARTICIPANT') + '-' + (participant.name || 'competitions') + '-competitions')
+        .replace(/[^\w-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'participant-competitions';
+      pdf.save(safeName + '.pdf');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to generate the participant competition PDF.');
+    }
+  };
+
+
 
   return (
     <AdminLayout>
@@ -213,6 +492,15 @@ export default function ParticipantsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
+                          onClick={() => handleDownloadCompetitionList(p)}
+                          className="p-1.5 rounded-lg text-[#526070] hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                          title="Download Participant Competition List (PDF)"
+                          aria-label={`Download competition list for ${p.name}`}
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setSelectedIdCardPart(p)}
                           className="p-1.5 rounded-lg text-[#526070] hover:text-[#2563EB] hover:bg-blue-50 transition-colors"
                           title="View & Print Digital ID Card"
@@ -268,7 +556,7 @@ export default function ParticipantsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <Badge variant="success" size="sm">{p.idStatus || 'GENERATED'}</Badge>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => setSelectedIdCardPart(p)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50" title="View & Print Digital ID Card" aria-label={`View ID card for ${p.name}`}><IdCard className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => handleDownloadCompetitionList(p)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-50" title="Download Participant Competition List (PDF)" aria-label={`Download competition list for ${p.name}`}><FileDown className="w-4 h-4" /></button><button type="button" onClick={() => setSelectedIdCardPart(p)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50" title="View & Print Digital ID Card" aria-label={`View ID card for ${p.name}`}><IdCard className="w-4 h-4" /></button>
                     <button type="button" onClick={() => handleOpenEdit(p)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50" title="Edit Participant" aria-label={`Edit ${p.name}`}><Edit2 className="w-4 h-4" /></button>
                     <button type="button" onClick={() => handleDelete(p.id, p.name)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-600 hover:text-red-700 hover:bg-red-50" title="Delete Participant" aria-label={`Delete ${p.name}`}><Trash2 className="w-4 h-4" /></button>
                   </div>
