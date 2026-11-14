@@ -16,8 +16,8 @@ export async function POST(
     }
 
     const { id: teamId } = await params;
-    const registration = await RegistrationService.createForTeam(idToken, teamId, await req.json());
-    return NextResponse.json({ success: true, registration }, { status: 201 });
+    const registrations = await RegistrationService.createForTeam(idToken, teamId, await req.json());
+    return NextResponse.json({ success: true, registrations, registration: registrations[0] }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
