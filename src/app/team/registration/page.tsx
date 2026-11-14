@@ -192,6 +192,14 @@ export default function TeamRegistrationPage() {
     return 'border-amber-200 bg-amber-50 text-amber-700';
   };
 
+  const getCompetitionScheduleStatus = (competitionId: string) =>
+    competitions.find(competition => competition.id === competitionId)?.scheduleStatus || 'SCHEDULED';
+
+  const scheduleStatusClass = (status: string) =>
+    status === 'LIVE' ? 'bg-red-50 text-red-700' :
+    status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
+    'bg-slate-100 text-slate-600';
+
   return (
     <TeamLayout>
       <div className="space-y-5 sm:space-y-6">
@@ -291,6 +299,9 @@ export default function TeamRegistrationPage() {
                       <div className="min-w-0">
                         <p className="break-words text-sm font-semibold text-slate-950">{registration.participantName}</p>
                         <p className="mt-1 text-xs text-slate-500">{registration.competitionName}</p>
+                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${scheduleStatusClass(getCompetitionScheduleStatus(registration.competitionId))}`}>
+                          {getCompetitionScheduleStatus(registration.competitionId)}
+                        </span>
                       </div>
                       <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusClass(registration.status)}`}>
                         {registration.status}
@@ -337,7 +348,12 @@ export default function TeamRegistrationPage() {
                           <p className="text-sm font-semibold text-slate-900">{registration.participantName}</p>
                           <p className="mt-0.5 text-xs text-slate-500">Bib / chest: {registration.chestNumber || '—'}</p>
                         </td>
-                        <td className="px-5 py-4 text-sm font-medium text-slate-800">{registration.competitionName}</td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-medium text-slate-800">{registration.competitionName}</p>
+                          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${scheduleStatusClass(getCompetitionScheduleStatus(registration.competitionId))}`}>
+                            {getCompetitionScheduleStatus(registration.competitionId)}
+                          </span>
+                        </td>
                         <td className="px-5 py-4 text-sm text-slate-600">{registration.categoryName}</td>
                         <td className="px-5 py-4 text-sm text-slate-600">{registration.type === 'SOLO' ? 'Individual' : 'Group'}</td>
                         <td className="px-5 py-4 text-center">

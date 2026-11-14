@@ -1284,6 +1284,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 stageName: dt.stageName || '',
                 assignedJudges: dt.assignedJudges || [],
                 status: dt.status || 'SCHEDULED',
+                scheduleStatus: dt.scheduleStatus === 'LIVE' || dt.scheduleStatus === 'COMPLETED' ? dt.scheduleStatus : 'SCHEDULED',
                 date: dt.date || '',
                 timeSlot: dt.timeSlot || '',
                 durationMinutes: dt.durationMinutes || 60,
@@ -1416,6 +1417,65 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       console.warn('[FestContext] Could not subscribe to schedules:', error);
     }
   }, [isIsolatedDemoOrTest, db]);
+
+  // Keep timetable status accurate while an Admin or Green Room Staff portal is open.
+  // The server performs the authoritative Asia/Kolkata time check and Firestore writes.
+  useEffect(() => {
+    const firebaseAuth = auth;
+    if (isIsolatedDemoOrTest || !firebaseAuth || typeof window === 'undefined') return;
+
+    let active = true;
+    let intervalId: number | undefined;
+    let syncInFlight = false;
+
+    const syncDueSchedules = async () => {
+      const user = firebaseAuth.currentUser;
+      if (!active || !user || syncInFlight) return;
+      syncInFlight = true;
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/admin/schedule/sync', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}` },
+          cache: 'no-store'
+        });
+        if (!response.ok && response.status >= 500) {
+          console.warn('[FestContext] Automatic schedule status sync failed:', response.status);
+        }
+      } catch (error) {
+        console.warn('[FestContext] Automatic schedule status sync unavailable:', error);
+      } finally {
+        syncInFlight = false;
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async user => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+      if (!user) return;
+
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        if (!active || !['ADMIN', 'GREEN_ROOM_STAFF'].includes(String(tokenResult.claims.role || ''))) return;
+        void syncDueSchedules();
+        intervalId = window.setInterval(() => { void syncDueSchedules(); }, 30_000);
+      } catch (error) {
+        console.warn('[FestContext] Could not initialize automatic schedule sync:', error);
+      }
+    });
+
+    const handleFocus = () => { void syncDueSchedules(); };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      active = false;
+      unsubscribe();
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isIsolatedDemoOrTest]);
 
   // Realtime Firestore points ledger synchronization for live production
   useEffect(() => {

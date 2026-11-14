@@ -81,7 +81,6 @@ export default function SchedulePage() {
   const [date, setDate] = useState(getTodayDateInput);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
-  const [status, setStatus] = useState<ScheduleSlot['status']>('SCHEDULED');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -118,7 +117,6 @@ export default function SchedulePage() {
     setDate(getTodayDateInput());
     setStartTime('09:00');
     setEndTime('10:00');
-    setStatus('SCHEDULED');
     setError('');
     setModalOpen(true);
   };
@@ -131,7 +129,6 @@ export default function SchedulePage() {
     setDate(slot.date);
     setStartTime(toTimeInputValue(slot.startTime));
     setEndTime(toTimeInputValue(slot.endTime));
-    setStatus(slot.status);
     setError('');
     setModalOpen(true);
   };
@@ -178,7 +175,7 @@ export default function SchedulePage() {
       return;
     }
 
-    const slotData = {
+    const slotData: Omit<ScheduleSlot, 'id'> = {
       competitionId,
       competitionName: competition.name,
       categoryName: competition.categoryName,
@@ -188,7 +185,9 @@ export default function SchedulePage() {
       date,
       startTime: toStoredTime(startTime),
       endTime: toStoredTime(endTime),
-      status
+      // Status transitions are system-controlled: start time makes a slot LIVE,
+      // while Green Room confirmation is the only way to mark it COMPLETED.
+      status: editingSlot?.status === 'COMPLETED' ? 'COMPLETED' : 'SCHEDULED'
     };
 
     setSaving(true);
@@ -679,22 +678,11 @@ export default function SchedulePage() {
                 />
               </div>
               <Input label="Schedule date" type="date" value={date} onChange={event => setDate(event.target.value)} required />
-              <Select
-                label="Schedule status"
-                value={status}
-                onChange={event => setStatus(event.target.value as ScheduleSlot['status'])}
-                options={[
-                  { value: 'SCHEDULED', label: 'Scheduled' },
-                  { value: 'LIVE', label: 'Live on stage' },
-                  { value: 'COMPLETED', label: 'Completed' },
-                  { value: 'DELAYED', label: 'Delayed' }
-                ]}
-              />
               <Input label="Start time" type="time" value={startTime} onChange={event => setStartTime(event.target.value)} required />
               <Input label="End time" type="time" value={endTime} onChange={event => setEndTime(event.target.value)} required />
             </div>
             <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-500">
-              Time slots cannot overlap with another competition assigned to the same stage on the same date.
+              Status is automatic: the slot becomes LIVE when its scheduled start time arrives. Mark it COMPLETED from Green Room after the competition has finished. Time slots cannot overlap on the same stage and date.
             </p>
           </form>
         </Modal>

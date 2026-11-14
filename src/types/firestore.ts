@@ -143,6 +143,10 @@ export interface FirestoreCompetition {
   stageId: string;
   stageName: string;
   status: 'SCHEDULED' | 'IN_PROGRESS' | 'MARKS_ENTERED' | 'PUBLISHED';
+  scheduleStatus?: 'SCHEDULED' | 'LIVE' | 'COMPLETED';
+  scheduleStartedAt?: string;
+  scheduleCompletedAt?: string;
+  scheduleCompletedBy?: string;
   date: string;
   timeSlot: string;
   durationMinutes: number;

@@ -13,7 +13,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle, FileDown } from 'lucide-react';
 
 export default function CompetitionsPage() {
-  const { competitions, categories, stages, registrations, participants, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
+  const { competitions, categories, schedules, registrations, participants, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -273,9 +273,6 @@ export default function CompetitionsPage() {
   const [type, setType] = useState<CompetitionType>('SOLO');
   const [performanceMode, setPerformanceMode] = useState<CompetitionPerformanceMode | ''>('STAGE');
   const [groupSize, setGroupSize] = useState(2);
-  const [stageId, setStageId] = useState(stages[0]?.id || '');
-  const [date, setDate] = useState('2025-11-15');
-  const [timeSlot, setTimeSlot] = useState('09:30 AM - 11:00 AM');
   const [durationMinutes, setDurationMinutes] = useState(90);
   const [maxEntriesPerTeam, setMaxEntriesPerTeam] = useState(2);
   const [status, setStatus] = useState<CompetitionStatus>('SCHEDULED');
@@ -313,9 +310,6 @@ export default function CompetitionsPage() {
     setType('SOLO');
     setPerformanceMode('STAGE');
     setGroupSize(2);
-    setStageId(stages[0]?.id || '');
-    setDate('2025-11-15');
-    setTimeSlot('10:00 AM - 11:30 AM');
     setDurationMinutes(90);
     setMaxEntriesPerTeam(2);
     setStatus('SCHEDULED');
@@ -331,9 +325,6 @@ export default function CompetitionsPage() {
     setType(comp.type);
     setPerformanceMode(comp.performanceMode || '');
     setGroupSize(comp.groupSize || 2);
-    setStageId(comp.stageId);
-    setDate(comp.date);
-    setTimeSlot(comp.timeSlot);
     setDurationMinutes(comp.durationMinutes);
     setMaxEntriesPerTeam(comp.maxEntriesPerTeam);
     setStatus(comp.status);
@@ -371,8 +362,6 @@ export default function CompetitionsPage() {
       setError('Group members per entry must be at least 2.');
       return;
     }
-    const stage = stages.find(s => s.id === stageId);
-
     const compData = {
       name,
       code: code.toUpperCase(),
@@ -381,10 +370,6 @@ export default function CompetitionsPage() {
       type,
       performanceMode,
       groupSize: type === 'GROUP' ? groupSize : 1,
-      stageId,
-      stageName: stage?.name || 'Main Auditorium',
-      date,
-      timeSlot,
       durationMinutes: Number(durationMinutes),
       maxEntriesPerTeam: Number(maxEntriesPerTeam),
       assignedJudges: editingComp ? editingComp.assignedJudges : ['Prof. David Miller'],
@@ -401,7 +386,7 @@ export default function CompetitionsPage() {
       if (editingComp) {
         await updateCompetition(editingComp.id, compData);
       } else {
-        await addCompetition(compData);
+        await addCompetition({ ...compData, stageId: '', stageName: '', date: '', timeSlot: '' });
       }
       setModalOpen(false);
     } catch (err: unknown) {
@@ -425,17 +410,15 @@ export default function CompetitionsPage() {
     }
   };
 
-  const getStatusBadge = (st: CompetitionStatus) => {
-    switch (st) {
-      case 'PUBLISHED':
-        return <Badge variant="success" size="sm">PUBLISHED</Badge>;
-      case 'MARKS_ENTERED':
-        return <Badge variant="info" size="sm">MARKS ENTERED</Badge>;
-      case 'IN_PROGRESS':
-        return <Badge variant="warning" size="sm">IN PROGRESS</Badge>;
+  const getScheduleStatusBadge = (status: Competition['scheduleStatus']) => {
+    switch (status || 'SCHEDULED') {
+      case 'LIVE':
+        return <Badge variant="error" size="sm" dot>LIVE</Badge>;
+      case 'COMPLETED':
+        return <Badge variant="success" size="sm" dot>COMPLETED</Badge>;
       case 'SCHEDULED':
       default:
-        return <Badge variant="default" size="sm">SCHEDULED</Badge>;
+        return <Badge variant="default" size="sm" dot>SCHEDULED</Badge>;
     }
   };
 
@@ -593,14 +576,16 @@ export default function CompetitionsPage() {
                       <td className="px-4 py-4 text-slate-600">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-[#526070] shrink-0" />
-                          <span className="truncate max-w-[150px]">{comp.stageName}</span>
+                          <span className="truncate max-w-[150px]">
+                            {[...new Set(schedules.filter(slot => slot.competitionId === comp.id).map(slot => slot.stageName).filter(Boolean))].join(', ') || 'Not scheduled'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {getAssignedJudgeNames(comp.id).length > 0 ? getAssignedJudgeNames(comp.id).join(', ') : 'Pending Assignment'}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        {getStatusBadge(comp.status)}
+                        {getScheduleStatusBadge(comp.scheduleStatus)}
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -712,12 +697,6 @@ export default function CompetitionsPage() {
               )}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-              <Select
-                label="Assigned Stage Venue"
-                value={stageId}
-                onChange={(e) => setStageId(e.target.value)}
-                options={stages.map(s => ({ value: s.id, label: s.name }))}
-              />
               {type === 'SOLO' ? <Input
                 label="Max Registrations / Team"
                 type="number"
@@ -728,22 +707,9 @@ export default function CompetitionsPage() {
               /> : <p className="self-center rounded-xl bg-slate-50 px-3 py-3 text-sm leading-5 text-slate-600 sm:col-span-2">Unlimited groups per team. Register each group using its leader.</p>}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
-              <Input
-                label="Competition Date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-              <div className="sm:col-span-2">
-                <Input
-                  label="Time Slot Window"
-                  placeholder="09:30 AM - 11:00 AM"
-                  value={timeSlot}
-                  onChange={(e) => setTimeSlot(e.target.value)}
-                />
-              </div>
-            </div>
+            <p className="rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 text-xs leading-5 text-blue-800">
+              Stage venue, competition date and time slot are managed centrally from the Schedule page after the competition is created.
+            </p>
 
             <Select
               label="Evaluation State"
