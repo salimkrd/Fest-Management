@@ -74,7 +74,7 @@ interface FestContextType {
 
   registrations: Registration[];
   registrationsSyncState: 'loading' | 'ready' | 'error' | 'idle';
-  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => Promise<void>;
+  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'> & { participantIds?: string[]; groupLeaderIds?: string[] }) => Promise<void>;
   updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => Promise<void>;
   deleteRegistration: (id: string) => Promise<void>;
 
