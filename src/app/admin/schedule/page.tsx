@@ -175,7 +175,7 @@ export default function SchedulePage() {
       return;
     }
 
-    const slotData = {
+    const slotData: Omit<ScheduleSlot, 'id'> = {
       competitionId,
       competitionName: competition.name,
       categoryName: competition.categoryName,
