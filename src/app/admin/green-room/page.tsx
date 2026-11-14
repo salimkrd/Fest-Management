@@ -27,6 +27,8 @@ export default function GreenRoomPage() {
   const { competitions, registrations } = useFest();
 
   const [selectedCompId, setSelectedCompId] = useState<string>('');
+  const [competitionSearch, setCompetitionSearch] = useState<string>('');
+  const [competitionPickerOpen, setCompetitionPickerOpen] = useState<boolean>(false);
   const [roster, setRoster] = useState<FirestoreGreenRoomAssignment[]>([]);
   const [loadingRoster, setLoadingRoster] = useState<boolean>(false);
   const [canProvisionStaff, setCanProvisionStaff] = useState(false);
@@ -86,6 +88,15 @@ export default function GreenRoomPage() {
   const selectedCompetition = useMemo(() => {
     return competitions.find(c => c.id === effectiveCompId) || null;
   }, [competitions, effectiveCompId]);
+
+  const filteredCompetitions = useMemo(() => {
+    const term = competitionSearch.trim().toLowerCase();
+    if (!term) return competitions;
+    return competitions.filter(comp =>
+      [comp.code, comp.name, comp.categoryName, comp.stageName, comp.type]
+        .some(value => String(value || '').toLowerCase().includes(term))
+    );
+  }, [competitions, competitionSearch]);
 
   // Approved registrations for current competition
   const currentCompRegistrations = useMemo(() => {
@@ -337,18 +348,79 @@ export default function GreenRoomPage() {
               <label htmlFor="comp-selector" className="text-[10px] uppercase font-bold text-[#526070] mb-1">
                 Active Competition Desk:
               </label>
-              <select
-                id="comp-selector"
-                value={effectiveCompId}
-                onChange={(e) => setSelectedCompId(e.target.value)}
-                className="w-full min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              >
-                {competitions.map((comp) => (
-                  <option key={comp.id} value={comp.id}>
-                    {comp.code} - {comp.name} ({comp.categoryName})
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="comp-selector"
+                    type="search"
+                    role="combobox"
+                    aria-label="Search and select active competition"
+                    aria-expanded={competitionPickerOpen}
+                    aria-controls="competition-search-results"
+                    aria-autocomplete="list"
+                    autoComplete="off"
+                    value={competitionPickerOpen ? competitionSearch : (selectedCompetition ? `${selectedCompetition.code} - ${selectedCompetition.name}` : competitionSearch)}
+                    onFocus={() => {
+                      setCompetitionSearch('');
+                      setCompetitionPickerOpen(true);
+                    }}
+                    onChange={(e) => {
+                      setCompetitionSearch(e.target.value);
+                      setCompetitionPickerOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setCompetitionPickerOpen(false);
+                        setCompetitionSearch('');
+                        e.currentTarget.blur();
+                      }
+                      if (e.key === 'Enter' && filteredCompetitions.length === 1) {
+                        setSelectedCompId(filteredCompetitions[0].id);
+                        setCompetitionSearch('');
+                        setCompetitionPickerOpen(false);
+                        e.preventDefault();
+                      }
+                    }}
+                    placeholder="Search by competition, code or category..."
+                    className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-800 placeholder:font-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                {competitionPickerOpen && (
+                  <div
+                    id="competition-search-results"
+                    role="listbox"
+                    aria-label="Matching competitions"
+                    className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+                  >
+                    {filteredCompetitions.length > 0 ? filteredCompetitions.map((comp) => (
+                      <button
+                        key={comp.id}
+                        type="button"
+                        role="option"
+                        aria-selected={comp.id === effectiveCompId}
+                        onClick={() => {
+                          setSelectedCompId(comp.id);
+                          setCompetitionSearch('');
+                          setCompetitionPickerOpen(false);
+                        }}
+                        className={`flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${comp.id === effectiveCompId ? 'bg-blue-50' : ''}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-900">{comp.name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-slate-500">{comp.code} · {comp.categoryName} · {comp.stageName}</span>
+                        </span>
+                        {comp.id === effectiveCompId && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />}
+                      </button>
+                    )) : (
+                      <p className="px-3 py-5 text-center text-sm text-slate-500">No competitions match your search.</p>
+                    )}
+                    <div className="border-t border-slate-100 px-3 py-2 text-[10px] text-slate-400">
+                      {filteredCompetitions.length} of {competitions.length} competitions
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {canProvisionStaff && (
