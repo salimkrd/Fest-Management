@@ -81,6 +81,7 @@ export default function TeamRegistrationPage() {
     setCategoryId(initialCategoryId);
     setCompetitionId(initialCompetitions[0]?.id || '');
     setSelectedParticipantIds([]);
+
     setError('');
     setModalOpen(true);
   };
@@ -90,6 +91,7 @@ export default function TeamRegistrationPage() {
     const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
     setCompetitionId(matchingCompetitions[0]?.id || '');
     setSelectedParticipantIds([]);
+
     setError('');
   };
 
@@ -98,117 +100,10 @@ export default function TeamRegistrationPage() {
     setCompetitionId(nextCompetitionId);
     if (competition?.categoryId) setCategoryId(competition.categoryId);
     setSelectedParticipantIds([]);
+
     setError('');
   };
 
- client';
-
-import React, { useEffect, useState } from 'react';
-import { TeamLayout } from '@/components/layout/TeamLayout';
-import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
-import { useFest } from '@/context/FestContext';
-import { isParticipantEligibleForCategory } from '@/domain/eligibility';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Trash2, ClipboardList, CalendarDays, Users } from 'lucide-react';
-
-export default function TeamRegistrationPage() {
-  const {
-    currentTeamUser,
-    registrations,
-    registrationsSyncState,
-    categories,
-    categoriesSyncState,
-    competitions,
-    competitionsSyncState,
-    participants,
-    participantsSyncState,
-    addRegistration,
-    deleteRegistration
-  } = useFest();
-
-  const team = currentTeamUser;
-  const [search, setSearch] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [categoryId, setCategoryId] = useState('');
-  const [competitionId, setCompetitionId] = useState('');
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState('');
-
-  // Firestore data arrives asynchronously. Keep category and competition selections
-  // valid when the live lists first load or change while the manager is signed in.
-  useEffect(() => {
-    if (categories.length === 0) {
-      if (categoryId) setCategoryId('');
-      if (competitionId) setCompetitionId('');
-      return;
-    }
-
-    const categoryStillExists = categories.some(category => category.id === categoryId);
-    const nextCategoryId = categoryStillExists ? categoryId : categories[0].id;
-    if (nextCategoryId !== categoryId) setCategoryId(nextCategoryId);
-
-    const competitionsForCategory = competitions.filter(comp => comp.categoryId === nextCategoryId);
-    const selectedIsValid = competitionsForCategory.some(comp => comp.id === competitionId);
-    if (!selectedIsValid) {
-      setCompetitionId(competitionsForCategory[0]?.id || '');
-    }
-  }, [categories, competitions, categoryId, competitionId]);
-
-  // Every list is scoped to the authenticated team; never fall back to the first team.
-  const myRegistrations = registrations.filter(registration => registration.teamId === team?.id);
-  const myTeamParticipants = participants.filter(participant => participant.teamId === team?.id);
-  const selectedCategory = categories.find(category => category.id === categoryId);
-  const availableCompetitions = competitions.filter(comp => comp.categoryId === categoryId);
-  const selectedCompetition = availableCompetitions.find(comp => comp.id === competitionId);
-  const isGroup = selectedCompetition?.type === 'GROUP';
-
-  const teamEligibleParticipants = myTeamParticipants.filter(participant =>
-    isParticipantEligibleForCategory(participant, selectedCategory, categories)
-  );
-
-  const normalizedSearch = search.trim().toLowerCase();
-  const filtered = myRegistrations.filter(registration =>
-    registration.participantName.toLowerCase().includes(normalizedSearch) ||
-    registration.competitionName.toLowerCase().includes(normalizedSearch) ||
-    registration.code.toLowerCase().includes(normalizedSearch)
-  );
-
-  const handleOpenAdd = () => {
-    const initialCategoryId = categories[0]?.id || '';
-    const initialCompetitions = competitions.filter(comp => comp.categoryId === initialCategoryId);
-    setCategoryId(initialCategoryId);
-    setCompetitionId(initialCompetitions[0]?.id || '');
-    setSelectedParticipantIds([]);
-    setError('');
-    setModalOpen(true);
-  };
-
-  const handleCategoryChange = (nextCategoryId: string) => {
-    setCategoryId(nextCategoryId);
-    const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
-    setCompetitionId(matchingCompetitions[0]?.id || '');
-    setSelectedParticipantIds([]);
-    setError('');
-  };
-
-  const handleCompetitionChange = (nextCompetitionId: string) => {
-    const competition = competitions.find(comp => comp.id === nextCompetitionId);
-    setCompetitionId(nextCompetitionId);
-    if (competition?.categoryId) setCategoryId(competition.categoryId);
-    setSelectedParticipantIds([]);
-    setError('');
-  };
-
-  const handleParticipantChange = (nextParticipantId: string) => {
-    setParticipantId(nextParticipantId);
-    const participant = myTeamParticipants.find(item => item.id === nextParticipantId);
-    setChestNumber(participant?.bib || '');
-  };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -251,8 +146,9 @@ export default function TeamRegistrationPage() {
         status: 'APPROVED'
       });
       setModalOpen(false);
-      setSelectedParticipantIds([]);
-      } catch (saveError) {
+    setSelectedParticipantIds([]);
+
+    } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
     } finally {
       setSaving(false);
@@ -514,38 +410,20 @@ export default function TeamRegistrationPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-semibold text-slate-800">
-                  {isGroup ? 'Select Group Leaders' : 'Select Team Contestants'} <span className="text-red-600">*</span>
-                </label>
+                <label className="text-sm font-semibold text-slate-800">{isGroup ? 'Select Group Leaders' : 'Select Team Contestants'} <span className="text-red-600">*</span></label>
                 <span className="text-xs font-semibold text-blue-700">{selectedParticipantIds.length} selected</span>
               </div>
-              <p className="text-xs leading-5 text-slate-500">
-                {isGroup
-                  ? 'Select one leader for each group. Each leader represents a separate group entry; do not select the full group roster.'
-                  : 'Select multiple contestants in one go. Each contestant is saved as a separate registration.'}
-              </p>
+              <p className="text-xs leading-5 text-slate-500">{isGroup ? 'Select one leader for each group. Each leader represents a separate group entry. Do not select the full group roster.' : 'Select multiple contestants in one go. Each contestant is saved as a separate registration.'}</p>
               <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                 {teamEligibleParticipants.map(participant => (
                   <label key={participant.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-blue-50">
-                    <input
-                      type="checkbox"
-                      checked={selectedParticipantIds.includes(participant.id)}
-                      onChange={event => setSelectedParticipantIds(current =>
-                        event.target.checked
-                          ? [...current, participant.id]
-                          : current.filter(id => id !== participant.id)
-                      )}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-slate-900">{participant.name}</span>
-                      <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
-                    </span>
+                    <input type="checkbox" checked={selectedParticipantIds.includes(participant.id)}
+                      onChange={event => setSelectedParticipantIds(current => event.target.checked ? [...current, participant.id] : current.filter(id => id !== participant.id))}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="min-w-0 flex-1"><span className="block font-medium text-slate-900">{participant.name}</span><span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span></span>
                   </label>
                 ))}
-                {teamEligibleParticipants.length === 0 && (
-                  <p className="px-3 py-5 text-center text-xs text-slate-500">No eligible participants are available.</p>
-                )}
+                {teamEligibleParticipants.length === 0 && <p className="px-3 py-5 text-center text-xs text-slate-500">No eligible participants are available.</p>}
               </div>
             </div>
 
