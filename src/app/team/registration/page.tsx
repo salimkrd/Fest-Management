@@ -437,7 +437,6 @@ export default function TeamRegistrationPage() {
               </p>
             ) : null}
 
->
           </form>
         </Modal>
       </div>
