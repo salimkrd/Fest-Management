@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { VerifiedUserContext } from '@/services/authService';
 import {
+  getKolkataDateInput,
   resolveCompetitionScheduleStatus,
   shouldScheduleBecomeLive
 } from '@/domain/scheduleStatus';
@@ -21,16 +22,22 @@ export class CompetitionScheduleService {
 
     const nowMs = now.getTime();
     const nowIso = now.toISOString();
-    const dueSnapshot = await db.collection('schedules').where('status', '==', 'SCHEDULED').get();
+    // Query only today's timetable in India time; this keeps frequent portal polling efficient.
+    const todayDate = getKolkataDateInput(now);
+    const dueSnapshot = await db.collection('schedules').where('date', '==', todayDate).get();
     const dueCompetitionIds = new Set<string>();
 
     for (const slotDoc of dueSnapshot.docs) {
       const slot = slotDoc.data();
-      if (slot.competitionId && shouldScheduleBecomeLive({
-        date: String(slot.date || ''),
-        startTime: String(slot.startTime || ''),
-        status: String(slot.status || '')
-      }, nowMs)) {
+      const slotStatus = String(slot.status || '');
+      if (slot.competitionId && (
+        slotStatus === 'LIVE' ||
+        shouldScheduleBecomeLive({
+          date: String(slot.date || ''),
+          startTime: String(slot.startTime || ''),
+          status: slotStatus
+        }, nowMs)
+      )) {
         dueCompetitionIds.add(String(slot.competitionId));
       }
     }
