@@ -158,7 +158,7 @@ export class RegistrationService {
       if (!Number.isInteger(lastCodeNumber) || lastCodeNumber < 8820) {
         const allRegistrations = await transaction.get(db.collection('registrations'));
         lastCodeNumber = allRegistrations.docs.reduce((maximum, doc) => {
-          const match = /^REG-(\\d+)$/.exec(String(doc.data().code || ''));
+          const match = /^REG-(\d+)$/.exec(String(doc.data().code || ''));
           return match ? Math.max(maximum, Number(match[1])) : maximum;
         }, 8820);
       }
