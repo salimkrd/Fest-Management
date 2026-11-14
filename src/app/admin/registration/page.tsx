@@ -6,7 +6,6 @@ import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -82,8 +81,7 @@ export default function RegistrationManagementPage() {
     if (comp && comp.categoryId && comp.categoryId !== categoryId) {
       setCategoryId(comp.categoryId);
     }
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
   };
 
   const toggleParticipant = (participantId: string) => {
