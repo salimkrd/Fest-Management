@@ -13,6 +13,32 @@ import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { Plus, Search, Edit2, Trash2, IdCard, FileDown } from 'lucide-react';
 
+const formatPdfScheduleDate = (value: string): string => {
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return value || '—';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(parts[0], parts[1] - 1, parts[2]));
+};
+
+const getPdfScheduleTimeMinutes = (value: string): number => {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const rawHours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes > 59) return Number.MAX_SAFE_INTEGER;
+  if (match[3]) {
+    if (rawHours < 1 || rawHours > 12) return Number.MAX_SAFE_INTEGER;
+    let hours = rawHours % 12;
+    if (match[3].toUpperCase() === 'PM') hours += 12;
+    return hours * 60 + minutes;
+  }
+  if (rawHours > 23) return Number.MAX_SAFE_INTEGER;
+  return rawHours * 60 + minutes;
+};
+
 export default function ParticipantsPage() {
   const { participants, teams, categories, competitions, schedules, registrations, addParticipant, updateParticipant, deleteParticipant } = useFest();
 
@@ -286,10 +312,10 @@ export default function ParticipantsPage() {
           .filter(slot => slot.competitionId === entry.competitionId)
           .sort((a, b) =>
             a.date.localeCompare(b.date) ||
-            a.startTime.localeCompare(b.startTime)
+            getPdfScheduleTimeMinutes(a.startTime) - getPdfScheduleTimeMinutes(b.startTime)
           );
         const date = competitionSchedules.length > 0
-          ? competitionSchedules.map(slot => formatScheduleDate(slot.date)).join('\n')
+          ? competitionSchedules.map(slot => formatPdfScheduleDate(slot.date)).join('\n')
           : 'Not scheduled';
         const schedule = competitionSchedules.length > 0
           ? competitionSchedules.map(slot => [
