@@ -2324,8 +2324,18 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addRegistration = async (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
-    let newReg: Registration;
+  const addRegistration = async (
+    regData: Omit<Registration, 'id' | 'code' | 'registeredAt'> & {
+      participantIds?: string[];
+      groupLeaderIds?: string[];
+    }
+  ) => {
+    let newRegistrations: Registration[];
+    const { participantIds, groupLeaderIds, ...baseData } = regData;
+    const selectedIds = regData.type === 'GROUP'
+      ? (groupLeaderIds?.length ? groupLeaderIds : [regData.groupLeaderId || '']).filter(Boolean)
+      : (participantIds?.length ? participantIds : [regData.participantId || '']).filter(Boolean);
+
     if (!isIsolatedDemoOrTest && db) {
       const user = auth?.currentUser;
       if (!user) throw new Error('Unauthorized: Sign in before registering for a competition.');
@@ -2339,31 +2349,46 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify({
           competitionId: regData.competitionId,
-          participantId: regData.participantId,
-          participantName: regData.participantName,
-          groupLeaderId: regData.groupLeaderId,
-          groupMembers: regData.groupMembers
+          participantIds: regData.type === 'GROUP' ? undefined : selectedIds,
+          groupLeaderIds: regData.type === 'GROUP' ? selectedIds : undefined
         })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not register for the competition.');
-      newReg = payload.registration as Registration;
+      newRegistrations = Array.isArray(payload.registrations)
+        ? payload.registrations as Registration[]
+        : payload.registration ? [payload.registration as Registration] : [];
+      if (newRegistrations.length === 0) throw new Error('The registration service returned no saved entries.');
     } else {
       let maxRegNum = 8820;
       for (const registration of registrations) {
         const num = parseInt((registration.code || '').replace('REG-', ''), 10);
         if (!isNaN(num) && num > maxRegNum) maxRegNum = num;
       }
-      newReg = {
-        ...regData,
-        id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
-        code: `REG-${maxRegNum + 1}`,
-        registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-      };
+      const chosenParticipants = selectedIds.length ? selectedIds : [''];
+      newRegistrations = chosenParticipants.map((selectedId, index) => {
+        const participant = participants.find(item => item.id === selectedId);
+        const id = 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 8) + index;
+        const isGroup = regData.type === 'GROUP';
+        return {
+          ...baseData,
+          id,
+          code: `REG-${maxRegNum + index + 1}`,
+          participantId: isGroup ? undefined : selectedId,
+          groupLeaderId: isGroup ? selectedId : undefined,
+          groupMembers: isGroup ? [selectedId] : undefined,
+          participantName: isGroup ? `${participant?.name || regData.participantName} & Team` : (participant?.name || regData.participantName),
+          chestNumber: isGroup ? `GRP-${regData.teamCode}-${id.slice(-6)}` : (participant?.bib || regData.chestNumber),
+          groupSize: isGroup ? competitions.find(item => item.id === regData.competitionId)?.groupSize : undefined,
+          registeredAt: new Date().toISOString()
+        } as Registration;
+      });
     }
 
-    setRegistrations(prev => [...prev.filter(r => r.id !== newReg.id), newReg]);
-    setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
+    setRegistrations(prev => [...prev, ...newRegistrations]);
+    setCompetitions(prev => prev.map(c => c.id === regData.competitionId
+      ? { ...c, entriesCount: (c.entriesCount ?? 0) + newRegistrations.length }
+      : c));
   };
 
   const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => {
