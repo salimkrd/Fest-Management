@@ -6,7 +6,6 @@ import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -33,7 +32,6 @@ export default function TeamRegistrationPage() {
   const [categoryId, setCategoryId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
-  const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
@@ -83,7 +81,6 @@ export default function TeamRegistrationPage() {
     setCategoryId(initialCategoryId);
     setCompetitionId(initialCompetitions[0]?.id || '');
     setSelectedParticipantIds([]);
-    setChestNumber('');
     setError('');
     setModalOpen(true);
   };
@@ -92,8 +89,7 @@ export default function TeamRegistrationPage() {
     setCategoryId(nextCategoryId);
     const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
     setCompetitionId(matchingCompetitions[0]?.id || '');
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
     setError('');
   };
 
@@ -101,8 +97,7 @@ export default function TeamRegistrationPage() {
     const competition = competitions.find(comp => comp.id === nextCompetitionId);
     setCompetitionId(nextCompetitionId);
     if (competition?.categoryId) setCategoryId(competition.categoryId);
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
     setError('');
   };
 
@@ -114,7 +109,6 @@ import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -141,7 +135,6 @@ export default function TeamRegistrationPage() {
   const [categoryId, setCategoryId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
-  const [chestNumber, setChestNumber] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
@@ -191,7 +184,6 @@ export default function TeamRegistrationPage() {
     setCategoryId(initialCategoryId);
     setCompetitionId(initialCompetitions[0]?.id || '');
     setSelectedParticipantIds([]);
-    setChestNumber('');
     setError('');
     setModalOpen(true);
   };
@@ -200,8 +192,7 @@ export default function TeamRegistrationPage() {
     setCategoryId(nextCategoryId);
     const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
     setCompetitionId(matchingCompetitions[0]?.id || '');
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
     setError('');
   };
 
@@ -209,8 +200,7 @@ export default function TeamRegistrationPage() {
     const competition = competitions.find(comp => comp.id === nextCompetitionId);
     setCompetitionId(nextCompetitionId);
     if (competition?.categoryId) setCategoryId(competition.categoryId);
-    setParticipantId('');
-    setChestNumber('');
+    setSelectedParticipantIds([]);
     setError('');
   };
 
@@ -262,8 +252,7 @@ export default function TeamRegistrationPage() {
       });
       setModalOpen(false);
       setSelectedParticipantIds([]);
-      setChestNumber('');
-    } catch (saveError) {
+      } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
     } finally {
       setSaving(false);
@@ -569,12 +558,6 @@ export default function TeamRegistrationPage() {
                   : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
               </p>
             ) : null}
-
-            {isGroup && selectedCompetition && (
-              <p className="text-xs leading-5 text-slate-500">
-                Select one leader for the group entry. Championship points are credited to the team, not to the group leader as an individual.
-              </p>
-            )}
 
 >
           </form>
