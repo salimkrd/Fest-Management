@@ -120,6 +120,7 @@ export default function RegistrationManagementPage() {
         participantIds: comp.type !== 'GROUP' ? selectedParticipants.map(p => p.id) : undefined,
         groupLeaderIds: comp.type === 'GROUP' ? selectedParticipants.map(p => p.id) : undefined,
         participantName: selectedParticipants.map(p => p.name).join(', '),
+        chestNumber: '', // Assigned individually by the registration service.
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
