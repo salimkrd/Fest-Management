@@ -32,7 +32,6 @@ export class RegistrationService {
     const teamRef = db.collection('teams').doc(teamId);
     const competitionRef = db.collection('competitions').doc(input.competitionId);
     const counterRef = db.collection('systemCounters').doc('registrationCode');
-    const legacyGroupMembers = Array.isArray(input.groupMembers) ? input.groupMembers : [];
 
     return db.runTransaction(async transaction => {
       const [teamSnapshot, competitionSnapshot, counterSnapshot, existingRegistrations] = await Promise.all([
