@@ -6,7 +6,6 @@ import { TeamSyncStatus } from '@/components/domain/TeamSyncStatus';
 import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -32,8 +31,7 @@ export default function TeamRegistrationPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
-  const [participantId, setParticipantId] = useState('');
-  const [chestNumber, setChestNumber] = useState('');
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
@@ -82,8 +80,7 @@ export default function TeamRegistrationPage() {
     const initialCompetitions = competitions.filter(comp => comp.categoryId === initialCategoryId);
     setCategoryId(initialCategoryId);
     setCompetitionId(initialCompetitions[0]?.id || '');
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
     setError('');
     setModalOpen(true);
   };
@@ -106,10 +103,10 @@ export default function TeamRegistrationPage() {
     setError('');
   };
 
-  const handleParticipantChange = (nextParticipantId: string) => {
-    setParticipantId(nextParticipantId);
-    const participant = myTeamParticipants.find(item => item.id === nextParticipantId);
-    setChestNumber(participant?.bib || '');
+  const toggleParticipant = (participantId: string) => {
+    setParticipantIds(current => current.includes(participantId)
+      ? current.filter(id => id !== participantId)
+      : [...current, participantId]);
   };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -123,12 +120,25 @@ export default function TeamRegistrationPage() {
       return;
     }
 
-    const selectedParticipant = teamEligibleParticipants.find(item => item.id === participantId);
-    if (!selectedParticipant) {
+    const selectedParticipants = teamEligibleParticipants.filter(item => participantIds.includes(item.id));
+    if (selectedParticipants.length !== participantIds.length || selectedParticipants.length === 0) {
       setError(isGroup
-        ? 'Choose an eligible participant as the group leader.'
-        : 'Choose an eligible participant from your team roster.');
+        ? 'Choose at least one eligible group leader.'
+        : 'Choose at least one eligible participant from your team roster.');
       return;
+    }
+    if (!competition) return;
+    if (competition.type === 'SOLO') {
+      const maximumEntries = Math.max(1, Number(competition.maxEntriesPerTeam) || 1);
+      const activeEntries = myRegistrations.filter(registration =>
+        registration.competitionId === competition.id &&
+        registration.status !== 'REJECTED' &&
+        registration.status !== 'CANCELLED'
+      ).length;
+      if (activeEntries + selectedParticipants.length > maximumEntries) {
+        setError(`This competition allows ${maximumEntries} entries from your team; ${activeEntries} already registered.`);
+        return;
+      }
     }
 
     if (!team) {
@@ -141,9 +151,9 @@ export default function TeamRegistrationPage() {
     try {
       const groupEntry = competition.type === 'GROUP';
       await addRegistration({
-        participantId: groupEntry ? undefined : selectedParticipant.id,
-        groupLeaderId: groupEntry ? selectedParticipant.id : undefined,
-        participantName: groupEntry ? `${selectedParticipant.name} & Team` : selectedParticipant.name,
+        participantIds: groupEntry ? undefined : selectedParticipants.map(participant => participant.id),
+        groupLeaderIds: groupEntry ? selectedParticipants.map(participant => participant.id) : undefined,
+        participantName: selectedParticipants.map(participant => participant.name).join(', '),
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
@@ -152,12 +162,11 @@ export default function TeamRegistrationPage() {
         competitionId: competition.id,
         competitionName: competition.name,
         type: competition.type,
-        chestNumber: chestNumber.trim() || selectedParticipant.bib || (groupEntry ? `GRP-${team.code}-${competition.code}` : '—'),
+        chestNumber: '',
         status: 'APPROVED'
       });
       setModalOpen(false);
-      setParticipantId('');
-      setChestNumber('');
+      setParticipantIds([]);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
     } finally {
@@ -418,42 +427,42 @@ export default function TeamRegistrationPage() {
               </div>
             )}
 
-            <Select
-              label={isGroup ? 'Select Group Leader' : 'Select Team Participant'}
-              value={participantId}
-              onChange={event => handleParticipantChange(event.target.value)}
-              required
-              options={[
-                { value: '', label: isGroup ? 'Choose a group leader' : 'Choose a team participant' },
-                ...teamEligibleParticipants.map(participant => ({
-                  value: participant.id,
-                  label: `${participant.name} (${participant.bib || 'No Bib'})`
-                }))
-              ]}
-            />
-
-            {participantsSyncState === 'loading' ? (
-              <p className="text-xs text-blue-700">Loading your team roster…</p>
-            ) : teamEligibleParticipants.length === 0 ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-800">
-                {myTeamParticipants.length === 0
-                  ? 'Your team has no participants yet. Add participants from My Participants first.'
-                  : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
-              </p>
-            ) : null}
-
-            {isGroup && selectedCompetition && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-semibold text-slate-800">{isGroup ? 'Select Group Leader(s)' : 'Select Team Participant(s)'}</label>
+                <span className="text-xs font-semibold text-blue-700">{participantIds.length} selected</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                {teamEligibleParticipants.map(participant => (
+                  <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={participantIds.includes(participant.id)}
+                      onChange={() => toggleParticipant(participant.id)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
+                      <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
+                    </span>
+                  </label>
+                ))}
+                {participantsSyncState === 'loading' ? (
+                  <p className="px-3 py-4 text-xs text-blue-700">Loading your team roster…</p>
+                ) : teamEligibleParticipants.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-amber-700">
+                    {myTeamParticipants.length === 0
+                      ? 'Your team has no participants yet. Add participants from My Participants first.'
+                      : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
+                  </p>
+                ) : null}
+              </div>
               <p className="text-xs leading-5 text-slate-500">
-                Select one leader for the group entry. Championship points are credited to the team, not to the group leader as an individual.
+                {isGroup
+                  ? `Select one leader for each group. Each leader creates a separate group entry; group members are not individually registered. Championship points remain credited to the team.`
+                  : 'Select multiple contestants in one submission. Each contestant gets a separate registration and Bib number.'}
               </p>
-            )}
-
-            <Input
-              label="Assigned Chest / Bib Number"
-              placeholder="Auto-filled from participant Bib"
-              value={chestNumber}
-              onChange={event => setChestNumber(event.target.value)}
-            />
+            </div>
           </form>
         </Modal>
       </div>
