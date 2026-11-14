@@ -379,7 +379,6 @@ export default function RegistrationManagementPage() {
               </div>
             </div>
 
->
           </form>
         </Modal>
       </div>
