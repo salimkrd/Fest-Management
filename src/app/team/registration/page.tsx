@@ -135,6 +135,7 @@ export default function TeamRegistrationPage() {
         participantIds: groupEntry ? undefined : selectedParticipants.map(item => item.id),
         groupLeaderIds: groupEntry ? selectedParticipants.map(item => item.id) : undefined,
         participantName: selectedParticipants.map(item => item.name).join(', '),
+        chestNumber: '', // Assigned individually by the registration service.
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
