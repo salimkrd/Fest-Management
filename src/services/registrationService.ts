@@ -16,7 +16,21 @@ interface CreateRegistrationInput {
 }
 
 export class RegistrationService {
+
+  // Backward-compatible single-entry API used by existing integrations and tests.
   static async createForTeam(
+    idToken: string,
+    teamId: string,
+    input: CreateRegistrationInput
+  ): Promise<FirestoreRegistration> {
+    const registrations = await this.createManyForTeam(idToken, teamId, input);
+    if (registrations.length !== 1) {
+      throw new Error('Validation Error: Use the bulk registration endpoint when selecting multiple contestants.');
+    }
+    return registrations[0];
+  }
+
+  static async createManyForTeam(
     idToken: string,
     teamId: string,
     input: CreateRegistrationInput
