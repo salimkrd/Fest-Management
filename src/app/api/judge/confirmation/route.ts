@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyHash, JudgeAssignmentRecord } from '@/domain/judgeAuth';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,21 +74,64 @@ export async function POST(req: NextRequest) {
         }));
     }
 
-    if (anonymousRoster.length === 0 && scoreRegistrationIds.length > 0) {
-      const rosterSnapshot = await db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get();
-      const assigned = new Map<string, { codeLetter: string; codeIndex: number }>();
-      rosterSnapshot.docs.forEach((doc, index) => {
-        const data = doc.data();
-        if (data.registrationId && data.codeLetter) {
-          assigned.set(String(data.registrationId), {
-            codeLetter: String(data.codeLetter).trim().toUpperCase(),
-            codeIndex: Number.isFinite(Number(data.codeIndex)) ? Number(data.codeIndex) : index
-          });
-        }
-      });
+    // New receipts carry the exact server-only Code Letter -> registration
+    // snapshot. Verify it against the canonical current roster, but never return
+    // registration IDs or participant identity to the judge.
+    if (Array.isArray(markEntry.codeRegistrationSnapshot)) {
+      const rosterSnapshot = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', competitionId)
+        .get();
+      const roster = buildGreenRoomRosterSnapshot(
+        competitionId,
+        rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
+      const archivedMapping = markEntry.codeRegistrationSnapshot
+        .filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+        .map((item: Record<string, unknown>) => ({
+          registrationId: String(item.registrationId || ''),
+          codeLetter: String(item.codeLetter || '').trim().toUpperCase(),
+          codeIndex: Number(item.codeIndex)
+        }))
+        .sort((a: { codeIndex: number }, b: { codeIndex: number }) => a.codeIndex - b.codeIndex);
+      const currentMapping = roster.entries.map(({ registrationId, codeLetter, codeIndex }) => ({
+        registrationId,
+        codeLetter,
+        codeIndex
+      }));
+      if (
+        markEntry.rosterVersion !== roster.version ||
+        JSON.stringify(archivedMapping) !== JSON.stringify(currentMapping)
+      ) {
+        return error('The archived scorecard no longer matches the verified Green Room Code Letter roster.', 409);
+      }
+
+      const expectedRegistrationIds = roster.entries.map(entry => entry.registrationId).sort();
+      if (JSON.stringify(scoreRegistrationIds.slice().sort()) !== JSON.stringify(expectedRegistrationIds)) {
+        return error('The archived scorecard does not contain marks for the exact verified Green Room roster.', 409);
+      }
+      const expectedAnonymousRoster = roster.entries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
+      if (JSON.stringify(anonymousRoster) !== JSON.stringify(expectedAnonymousRoster)) {
+        return error('The archived anonymous Code Letter receipt does not match the verified Green Room roster.', 409);
+      }
+    } else if (anonymousRoster.length === 0 && scoreRegistrationIds.length > 0) {
+      // Backward-compatible legacy receipt reconstruction still uses the same
+      // fail-closed canonical mapping; duplicate codes are never overwritten.
+      const rosterSnapshot = await db.collection('greenRoomAssignments')
+        .where('competitionId', '==', competitionId)
+        .get();
+      const roster = buildGreenRoomRosterSnapshot(
+        competitionId,
+        rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
       anonymousRoster = scoreRegistrationIds
-        .map(registrationId => assigned.get(registrationId))
+        .map(registrationId => {
+          const item = roster.registrationToCode.get(registrationId);
+          return item ? { codeLetter: item.codeLetter, codeIndex: item.codeIndex } : undefined;
+        })
         .filter((item): item is { codeLetter: string; codeIndex: number } => Boolean(item));
+      if (anonymousRoster.length !== scoreRegistrationIds.length) {
+        return error('The legacy scorecard cannot be matched to the verified Green Room roster.', 409);
+      }
     }
 
     anonymousRoster.sort((a, b) => a.codeIndex - b.codeIndex);
@@ -108,7 +152,11 @@ export async function POST(req: NextRequest) {
       contestants: anonymousRoster
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (cause) {
-    console.error('[JudgeConfirmation] Receipt verification failed:', cause instanceof Error ? cause.message : 'unknown error');
+    const message = cause instanceof Error ? cause.message : 'unknown error';
+    console.error('[JudgeConfirmation] Receipt verification failed:', message);
+    if (message.includes('Roster Integrity Error')) {
+      return error('The official receipt cannot be matched to a verified Green Room Code Letter roster.', 409);
+    }
     return error('The official receipt could not be verified. Please retry using the original judge session.', 500);
   }
 }
