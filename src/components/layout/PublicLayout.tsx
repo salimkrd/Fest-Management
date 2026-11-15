@@ -30,9 +30,9 @@ function PublicNavLinks() {
           <Link
             key={link.name}
             href={link.href}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`public-nav-link flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
               isActive
-                ? 'bg-neutral-100 text-[#111111]'
+                ? 'is-active bg-neutral-100 text-[#111111]'
                 : 'text-[#526070] hover:text-[#111111] hover:bg-[#F8FAFC]'
             }`}
           >
@@ -58,13 +58,13 @@ function PublicSearchBar() {
 
   return (
     <form onSubmit={handleSearchSubmit} className="relative w-64 lg:w-72">
-      <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <Search className="w-4 h-4 text-[#FDBF0F] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
       <input
         type="text"
         placeholder="Search Bib, Candidate, Event..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full text-xs pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E1E7EF] rounded-lg text-[#111111] placeholder:text-[#8E9CAE] focus:outline-none focus:bg-white focus:border-[#2563EB] transition-all"
+        className="public-search-input w-full text-xs pl-9 pr-4 py-2.5 rounded-lg transition-all"
       />
     </form>
   );
@@ -76,7 +76,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
 
   return (
     <div 
-      className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors"
+      className="public-experience min-h-screen bg-[#FFF8EE] text-[#1A080B] flex flex-col transition-colors"
       style={{
         '--fest-primary': theme.primaryColor,
         '--fest-secondary': theme.secondaryColor || '#111111',
@@ -87,8 +87,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
 
       {/* Top Festival Announcement Bar */}
       <div 
-        className="text-white text-xs py-2 px-4 text-center font-medium transition-colors"
-        style={{ backgroundColor: theme.primaryColor }}
+        className="public-announcement text-[#FFF8EE] text-[11px] sm:text-xs py-2.5 px-4 text-center font-medium transition-colors"
       >
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
           <span className="font-bold tracking-wide uppercase"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span>
@@ -99,20 +98,20 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         </div>
       </div>
 
-      <div className="bg-white flex justify-center py-1"><FestivalStatusBadge /></div>
+      <div className="public-status-strip flex justify-center py-2"><FestivalStatusBadge className="public-festival-status" /></div>
 
       {/* Main Navbar */}
-      <header className="bg-white border-b border-[#E1E7EF] sticky top-0 z-30 shadow-xs">
+      <header className="public-site-header sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-18">
             {/* Brand Logo & Title */}
             <Link href="/" className="flex items-center gap-3">
-              <FestivalLogo size={40} />
+              <FestivalLogo size={40} className="public-logo" />
               <div>
-                <span className="text-base font-extrabold text-[#111111] tracking-tight block leading-tight">
+                <span className="public-brand-title text-base font-extrabold tracking-tight block leading-tight">
                   <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
                 </span>
-                <span className="text-[11px] text-[#526070] font-medium block">
+                <span className="public-brand-subtitle text-[10px] font-medium block">
                   {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}
                 </span>
               </div>
@@ -134,7 +133,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
             <div className="flex lg:hidden items-center gap-2">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-lg text-[#526070] hover:bg-[#F8FAFC]"
+                className="public-mobile-toggle p-2 rounded-lg"
                 aria-label="Toggle navigation"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -145,7 +144,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-[#E1E7EF] bg-white px-4 pt-3 pb-6 space-y-3">
+          <div className="public-mobile-drawer lg:hidden border-t px-4 pt-3 pb-5 space-y-3">
             <Suspense fallback={null}>
               <PublicSearchBar />
             </Suspense>
@@ -153,7 +152,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 href="/"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#111111] hover:bg-neutral-100"
+                className="public-mobile-link flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Latest Results</span>
@@ -161,7 +160,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 href="/public/directory"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#526070] hover:bg-neutral-100"
+                className="public-mobile-link flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold"
               >
                 <FileText className="w-4 h-4" />
                 <span>Results Directory</span>
@@ -180,17 +179,17 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="min-w-0 flex-1 max-w-7xl mx-auto w-full overflow-x-clip px-4 sm:px-6 lg:px-8 py-8">
+      <main className="public-main min-w-0 flex-1 max-w-7xl mx-auto w-full overflow-x-clip px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {children}
       </main>
 
       {/* Public Footer */}
-      <footer className="bg-white border-t border-[#E1E7EF] mt-auto">
+      <footer className="public-site-footer mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#526070]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
             <div>
               <span className="font-bold text-[#111111]"><span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span></span> — {theme.tagline || (themeSyncState === 'loading' ? 'Loading festival settings…' : '')}
-              <p className="text-[11px] mt-0.5">Results authenticated by the Central Board of Fest Adjudication</p>
+              <p className="public-footer-note text-[11px] mt-1">Official festival information and published competition results.</p>
             </div>
 
           </div>
