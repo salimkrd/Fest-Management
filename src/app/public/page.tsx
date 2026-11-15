@@ -197,7 +197,7 @@ export default function InspirathPublicHomePage() {
         >
           {/* HEADER: Deep Ruby-Espresso Header strictly matching approved branding */}
           <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
-            <div className="max-w-[1440px] mx-auto flex items-center justify-between py-10 px-8">
+            <div className="max-w-[1440px] mx-auto flex items-center justify-between py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
               <Link
                 className="flex items-center gap-2 group"
                 data-path="home"
@@ -258,7 +258,7 @@ export default function InspirathPublicHomePage() {
 
             {/* Mobile Navigation Drawer */}
             {mobileMenuOpen && (
-              <div id="mobile-navigation" className="md:hidden bg-[#1A080B]/95 border-b border-[#FDBF0F]/40 px-8 py-6 backdrop-blur-lg space-y-4 shadow-2xl">
+              <div id="mobile-navigation" className="md:hidden bg-[#1A080B]/95 border-b border-[#FDBF0F]/40 px-5 py-4 backdrop-blur-lg space-y-4 shadow-2xl">
                 <Link
                   href="#home"
                   onClick={() => setMobileMenuOpen(false)}
@@ -302,7 +302,7 @@ export default function InspirathPublicHomePage() {
             }}
           />
 
-          <div className="max-w-[1440px] mx-auto px-8 relative z-10 pt-32 pb-24">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-32 pb-24">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
               {/* Left Hero Identity Column */}
               <div className="lg:col-span-7 flex flex-col items-start">
@@ -341,7 +341,7 @@ export default function InspirathPublicHomePage() {
                       <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">calendar_month</span>
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
-                      <span className="text-sm sm:text-base font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
+                      <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
                         {formattedDates}
                       </span>
                       <span className="text-xs text-[#FFF8EE]/80 mt-0.5 whitespace-nowrap">
@@ -355,7 +355,7 @@ export default function InspirathPublicHomePage() {
                       <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">location_on</span>
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
-                      <span className="text-sm sm:text-base font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
+                      <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
                         {institutionName}
                       </span>
                       <span className="text-xs text-[#FFF8EE]/80 mt-0.5 whitespace-nowrap">
@@ -425,8 +425,8 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
-        <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-14">
-          <div className="max-w-[1440px] mx-auto px-8">
+        <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2.5 mb-5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4A0A1C]" />
@@ -435,11 +435,11 @@ export default function InspirathPublicHomePage() {
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4A0A1C]" />
               </div>
-              <h2 className="font-cinematic-editorial text-3xl sm:text-5xl font-extrabold text-[#1A080B] tracking-[0.16em] mb-4 uppercase drop-shadow-sm">
+              <h2 className="font-cinematic-editorial text-2xl sm:text-4xl font-extrabold text-[#1A080B] tracking-[0.16em] mb-4 uppercase drop-shadow-sm">
                 Proactive Paradigms
               </h2>
               <div className="w-16 h-1 bg-[#4A0A1C] mx-auto mb-8 rounded-full opacity-30" />
-              <p className="font-editorial text-lg md:text-xl text-[#2D1217] leading-relaxed max-w-3xl mx-auto font-medium text-center">
+              <p className="font-editorial text-base md:text-lg text-[#2D1217] leading-relaxed max-w-3xl mx-auto font-medium text-center">
                 “Proactive Paradigms” represents a shift from reacting to problems after they emerge to anticipating
                 challenges and preparing meaningful solutions in advance. It calls upon Ulama to understand changing
                 realities and create relevant approaches across education, public life, human rights and media. Through
@@ -452,18 +452,18 @@ export default function InspirathPublicHomePage() {
 
         {/* RESULTS & STANDINGS CONSOLE (SPLIT-COLUMN LAYOUT) */}
         {/* Dark Ruby/Espresso atmosphere backdrop (#2D1217 to #4A0A1C) with gold highlights */}
-        <section className="w-full console-dark-bg text-[#FFF8EE] border-b border-[#4A0A1C]/80 py-12" id="team-championship">
-          <div className="max-w-[1440px] mx-auto px-8">
+        <section className="w-full console-dark-bg text-[#FFF8EE] border-b border-[#4A0A1C]/80 py-10 sm:py-12" id="team-championship">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#FDBF0F]/20">
               <div>
                 <span className="text-sm uppercase tracking-[0.2em] text-[#FDBF0F] font-bold">
                   Ratified Tabulation Portal
                 </span>
-                <h2 className="font-cinematic-editorial text-2xl sm:text-4xl font-bold text-[#FFF8EE] mt-1 tracking-[0.14em] uppercase">
+                <h2 className="font-cinematic-editorial text-lg sm:text-2xl font-bold text-[#FFF8EE] mt-1 tracking-[0.14em] uppercase">
                   Results &amp; Standings Console
                 </h2>
               </div>
-              <div className="hidden sm:flex items-center gap-2 text-sm text-[#FFF8EE]/80 font-medium">
+              <div className="hidden sm:flex items-center gap-2 text-[13px] text-[#FFF8EE]/80 font-medium">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                 <span>Official Live Standing • Cycle {theme.year || '2026'}</span>
               </div>
@@ -473,7 +473,7 @@ export default function InspirathPublicHomePage() {
               {/* LEFT COLUMN: House Championship Standings (From Live Firebase Teams) */}
               <div className="lg:col-span-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-cinematic-editorial text-lg sm:text-xl font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
+                  <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
                     <span className="material-symbols-outlined text-[#FDBF0F] text-[24px]">trophy</span>
                     <span>House Championship Standings</span>
                   </h3>
@@ -486,16 +486,16 @@ export default function InspirathPublicHomePage() {
                 </div>
 
                 {teamsSyncState === 'loading' ? (
-                  <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
+                  <div className="p-5 sm:p-6 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
                     <p className="text-sm font-semibold text-[#FFF8EE]">Loading official championship standings…</p>
                   </div>
                 ) : teamsSyncState === 'error' ? (
-                  <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
+                  <div className="p-5 sm:p-6 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
                     <p className="text-sm font-semibold text-[#FFF8EE]">Championship standings are temporarily unavailable.</p>
                     <p className="text-xs text-[#FFF8EE]/70 mt-1">Please check back shortly.</p>
                   </div>
                 ) : sortedTeams.length === 0 ? (
-                  <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
+                  <div className="p-5 sm:p-6 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
                     <span className="material-symbols-outlined text-[#FDBF0F] text-[36px] mb-2 inline-block">
                       leaderboard
                     </span>
@@ -512,7 +512,7 @@ export default function InspirathPublicHomePage() {
                       return (
                         <div
                           key={team.id}
-                          className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-5 border-2 border-[#FDBF0F] shadow-lg flex items-center justify-between relative overflow-hidden"
+                          className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-4 sm:p-5 border-2 border-[#FDBF0F] shadow-lg flex items-center justify-between relative overflow-hidden"
                           style={{
                             background:
                               'linear-gradient(135deg, rgba(74, 10, 28, 0.95) 0%, rgba(189, 16, 1, 0.65) 55%, rgba(45, 18, 23, 0.95) 100%)',
@@ -528,20 +528,20 @@ export default function InspirathPublicHomePage() {
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-cinematic-editorial text-xl sm:text-2xl font-extrabold text-[#FFF8EE] tracking-[0.1em] uppercase">
+                                <h4 className="font-cinematic-editorial text-lg sm:text-xl font-extrabold text-[#FFF8EE] tracking-[0.1em] uppercase">
                                   {team.name}
                                 </h4>
                                 <span className="px-2.5 py-0.5 rounded bg-[#FDBF0F] text-[#1A080B] text-xs uppercase font-extrabold tracking-wider">
                                   Leader
                                 </span>
                               </div>
-                              <p className="text-sm text-[#FFF8EE]/90 mt-1 font-medium">
+                              <p className="text-[13px] text-[#FFF8EE]/90 mt-1 font-medium">
                                 {team.zone || team.code || 'House Guild'} • {leaderMargin > 0 ? `+${leaderMargin} pt margin` : 'Current Leader'}
                               </p>
                             </div>
                           </div>
                           <div className="text-right z-10">
-                            <span className="text-4xl font-extrabold text-[#FDBF0F]">{team.totalPoints || 0}</span>
+                            <span className="text-3xl font-extrabold text-[#FDBF0F]">{team.totalPoints || 0}</span>
                             <span className="block text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
                           </div>
                         </div>
@@ -551,7 +551,7 @@ export default function InspirathPublicHomePage() {
                     return (
                       <div
                         key={team.id}
-                        className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-5 border border-[#FDBF0F]/30 shadow-sm flex items-center justify-between"
+                        className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-3.5 sm:p-4 border border-[#FDBF0F]/30 shadow-sm flex items-center justify-between"
                         style={{
                           background:
                             'linear-gradient(135deg, rgba(74, 10, 28, 0.9) 0%, rgba(189, 16, 1, 0.3) 100%)',
@@ -566,14 +566,14 @@ export default function InspirathPublicHomePage() {
                             </span>
                           </div>
                           <div>
-                            <h4 className="text-xl font-bold text-[#FFF8EE]">{team.name}</h4>
-                            <p className="text-sm text-[#FFF8EE]/80 mt-0.5 font-medium">
+                            <h4 className="text-lg font-bold text-[#FFF8EE]">{team.name}</h4>
+                            <p className="text-[13px] text-[#FFF8EE]/80 mt-0.5 font-medium">
                               {team.zone || team.code || 'House Guild'}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-3xl font-extrabold text-[#FFF8EE]">{team.totalPoints || 0}</span>
+                          <span className="text-2xl font-extrabold text-[#FFF8EE]">{team.totalPoints || 0}</span>
                           <span className="block text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
                         </div>
                       </div>
@@ -585,7 +585,7 @@ export default function InspirathPublicHomePage() {
               {/* RIGHT COLUMN: Quick Competition Result Finder with Real Searchable Dropdowns/Filters */}
               <div className="lg:col-span-6 flex flex-col">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-cinematic-editorial text-lg sm:text-xl font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
+                  <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
                     <span className="material-symbols-outlined text-[#FDBF0F] text-[24px]">manage_search</span>
                     <span>Quick Competition Result Finder</span>
                   </h3>
@@ -593,7 +593,7 @@ export default function InspirathPublicHomePage() {
                 </div>
 
                 <div
-                  className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-6 border border-[#FDBF0F]/30 shadow-lg mt-1"
+                  className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-4 sm:p-5 border border-[#FDBF0F]/30 shadow-lg mt-1"
                   style={{
                     background:
                       'linear-gradient(140deg, rgba(74, 10, 28, 0.95) 0%, rgba(189, 16, 1, 0.4) 60%, rgba(45, 18, 23, 0.95) 100%)',
@@ -601,7 +601,7 @@ export default function InspirathPublicHomePage() {
                     boxShadow: 'rgba(189, 16, 1, 0.25) 0px 8px 30px',
                   }}
                 >
-                  <p className="text-sm text-[#FFF8EE]/90 mb-4">
+                  <p className="text-[13px] text-[#FFF8EE]/90 mb-4">
                     Filter ratified scores by official festival category, competition event, or enter candidate bib number:
                   </p>
 
@@ -680,7 +680,7 @@ export default function InspirathPublicHomePage() {
                   </form>
 
                   {/* Interactive Search Result Preview Box */}
-                  <div className="mt-5 p-5 rounded bg-[#1A080B] border border-[#FDBF0F]/40" id="finder-preview">
+                  <div className="mt-4 sm:mt-5 p-3 sm:p-4 rounded bg-[#1A080B] border border-[#FDBF0F]/40" id="finder-preview">
                     {matchedRecord ? (
                       <div>
                         <div className="flex items-center justify-between pb-2 border-b border-[#FDBF0F]/20 mb-3">
@@ -694,7 +694,7 @@ export default function InspirathPublicHomePage() {
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h5 className="text-lg font-bold text-[#FFF8EE]">{matchedRecord.rank.candidateName}</h5>
-                            <p className="text-sm text-[#FFF8EE]/90 mt-0.5 font-medium">
+                            <p className="text-[13px] text-[#FFF8EE]/90 mt-0.5 font-medium">
                               Bib #{matchedRecord.rank.bib} • {matchedRecord.rank.teamName} • {matchedRecord.result.categoryName} Category
                             </p>
                             <p className="text-sm text-[#FDBF0F] font-semibold mt-1">
@@ -716,7 +716,7 @@ export default function InspirathPublicHomePage() {
                         <span className="material-symbols-outlined text-[#FDBF0F]/60 text-[32px] block mb-1">
                           search_off
                         </span>
-                        <p className="text-sm font-bold text-[#FFF8EE]">No Matching Ratified Record Found</p>
+                        <p className="text-[13px] font-bold text-[#FFF8EE]">No Matching Ratified Record Found</p>
                         <p className="text-xs text-[#FFF8EE]/70 mt-1">
                           Check the bib number or candidate name spelling, or ensure the event result is published.
                         </p>
@@ -739,8 +739,8 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* LATEST RESULTS GAZETTE - Styled in #FDBF0F with Deep Dark Ruby / Rich Espresso elements */}
-        <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-14" id="results-directory">
-          <div className="max-w-[1440px] mx-auto px-8">
+        <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12" id="results-directory">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-10">
               <div className="inline-flex items-center gap-2 mb-3">
                 <span className="w-2 h-2 rounded-full bg-[#4A0A1C] animate-pulse" />
@@ -749,7 +749,7 @@ export default function InspirathPublicHomePage() {
                 </span>
                 <span className="w-2 h-2 rounded-full bg-[#4A0A1C] animate-pulse" />
               </div>
-              <h2 className="font-cinematic-editorial text-3xl sm:text-5xl font-extrabold text-[#1A080B] tracking-[0.15em] uppercase">
+              <h2 className="font-cinematic-editorial text-2xl sm:text-4xl font-extrabold text-[#1A080B] tracking-[0.15em] uppercase">
                 Latest Competition Results
               </h2>
               <div className="w-16 h-1 bg-[#4A0A1C] mx-auto my-3 rounded-full opacity-30" />
@@ -859,7 +859,7 @@ export default function InspirathPublicHomePage() {
                   return (
                     <div
                       key={res.id}
-                      className="bg-[#4A0A1C] text-[#FFF8EE] rounded-xl p-6 border border-[#FDBF0F]/30 shadow-xl relative overflow-hidden flex flex-col justify-between group"
+                      className="bg-[#4A0A1C] text-[#FFF8EE] rounded-xl p-4 sm:p-5 border border-[#FDBF0F]/30 shadow-xl relative overflow-hidden flex flex-col justify-between group"
                       style={{
                         background: 'linear-gradient(145deg, #4A0A1C 0%, #3B161E 50%, #2D1217 100%)',
                       }}
@@ -874,20 +874,20 @@ export default function InspirathPublicHomePage() {
                           </span>
                         </div>
 
-                        <h3 className="font-cinematic-editorial text-lg sm:text-xl font-bold text-[#FFF8EE] mb-2 tracking-[0.1em] uppercase">
+                        <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] mb-2 tracking-[0.1em] uppercase">
                           {res.competitionName}
                         </h3>
 
                         {/* Top 3 Ranks Preview */}
-                        <div className="space-y-2.5 mt-4">
+                        <div className="space-y-2 mt-3">
                           {rank1 && (
-                            <div className="flex items-center justify-between p-2.5 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/20">
+                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/20">
                               <div className="flex items-center gap-2.5">
                                 <span className="w-6 h-6 rounded-full bg-[#FDBF0F] text-[#1A080B] font-bold text-xs flex items-center justify-center shrink-0">
                                   1
                                 </span>
                                 <div>
-                                  <h4 className="text-sm font-bold text-[#FFF8EE]">{rank1.candidateName}</h4>
+                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank1.candidateName}</h4>
                                   <p className="text-xs text-[#FFF8EE]/80">
                                     Bib #{rank1.bib} • {rank1.teamName}
                                   </p>
@@ -903,13 +903,13 @@ export default function InspirathPublicHomePage() {
                           )}
 
                           {rank2 && (
-                            <div className="flex items-center justify-between p-2.5 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
+                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
                               <div className="flex items-center gap-2.5">
                                 <span className="w-6 h-6 rounded-full bg-[#2D1217] text-[#FFF8EE] border border-[#FDBF0F]/40 font-bold text-xs flex items-center justify-center shrink-0">
                                   2
                                 </span>
                                 <div>
-                                  <h4 className="text-sm font-bold text-[#FFF8EE]">{rank2.candidateName}</h4>
+                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank2.candidateName}</h4>
                                   <p className="text-xs text-[#FFF8EE]/80">
                                     Bib #{rank2.bib} • {rank2.teamName}
                                   </p>
@@ -925,13 +925,13 @@ export default function InspirathPublicHomePage() {
                           )}
 
                           {rank3 && (
-                            <div className="flex items-center justify-between p-2.5 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
+                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
                               <div className="flex items-center gap-2.5">
                                 <span className="w-6 h-6 rounded-full bg-[#2D1217] text-[#FFF8EE] border border-[#FDBF0F]/40 font-bold text-xs flex items-center justify-center shrink-0">
                                   3
                                 </span>
                                 <div>
-                                  <h4 className="text-sm font-bold text-[#FFF8EE]">{rank3.candidateName}</h4>
+                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank3.candidateName}</h4>
                                   <p className="text-xs text-[#FFF8EE]/80">
                                     Bib #{rank3.bib} • {rank3.teamName}
                                   </p>
@@ -985,10 +985,10 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* OFFICIAL PUBLISHED RESULTS DIRECTORY BANNER */}
-        <section className="w-full banner-ruby-bg text-[#FFF8EE] border-b border-[#4A0A1C] py-10">
-          <div className="max-w-[1440px] mx-auto px-8">
+        <section className="w-full banner-ruby-bg text-[#FFF8EE] border-b border-[#4A0A1C] py-8 sm:py-10">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div
-              className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 bg-[#4A0A1C]/80 border border-[#FDBF0F]/50 rounded-xl p-8 backdrop-blur-sm shadow-2xl"
+              className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 bg-[#4A0A1C]/80 border border-[#FDBF0F]/50 rounded-xl p-5 sm:p-6 backdrop-blur-sm shadow-2xl"
               style={{
                 background:
                   'linear-gradient(135deg, rgba(74, 10, 28, 0.92) 0%, rgba(189, 16, 1, 0.7) 50%, rgba(45, 18, 23, 0.92) 100%)',
@@ -1004,10 +1004,10 @@ export default function InspirathPublicHomePage() {
                     Official Published Results
                   </span>
                 </div>
-                <h3 className="font-cinematic-editorial text-xl sm:text-3xl font-bold text-[#FFF8EE] tracking-[0.12em] uppercase">
+                <h3 className="font-cinematic-editorial text-lg sm:text-2xl font-bold text-[#FFF8EE] tracking-[0.12em] uppercase">
                   Explore the Results Directory
                 </h3>
-                <p className="text-sm sm:text-base text-[#FFF8EE]/90 font-normal mt-1 max-w-xl leading-relaxed">
+                <p className="text-xs sm:text-[13px] text-[#FFF8EE]/90 font-normal mt-1 max-w-xl leading-relaxed">
                   Browse officially published competition results, view awarded grades, and access released result posters through the public directory.
                 </p>
               </div>
@@ -1030,7 +1030,7 @@ export default function InspirathPublicHomePage() {
 
       {/* OFFICIAL SECRETARIAT FOOTER: Deep Ruby-Espresso base with Bruno Ace mark */}
       <footer className="w-full bg-[#1A080B] text-[#FFF8EE] border-t border-[#FDBF0F]/30 py-10">
-        <div className="max-w-[1440px] mx-auto px-8 font-body">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 font-body">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-[#FDBF0F]/20">
             {/* Brand Info */}
             <div className="md:col-span-6 flex flex-col">
@@ -1040,7 +1040,7 @@ export default function InspirathPublicHomePage() {
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F]" />
               </div>
-              <p className="text-sm text-[#FFF8EE]/80 max-w-md mt-2 leading-relaxed">
+              <p className="text-[13px] text-[#FFF8EE]/80 max-w-md mt-2 leading-relaxed">
                 The biennial academic, literary, and classical arts convocation hosted exclusively for Huffazul
                 Qur&apos;an at {institutionName}, {venueLocation}, Edavannappara, Malappuram, Kerala.
               </p>
@@ -1056,21 +1056,21 @@ export default function InspirathPublicHomePage() {
                 Festival Navigation
               </span>
               <Link
-                className="text-sm text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
+                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
                 data-path="home"
                 href="#home"
               >
                 Home
               </Link>
               <Link
-                className="text-sm text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
+                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
                 data-path="results-directory"
                 href="/public/directory"
               >
                 Results Directory
               </Link>
               <Link
-                className="text-sm text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
+                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
                 data-path="team-championship"
                 href="/public/championship"
               >
@@ -1083,7 +1083,7 @@ export default function InspirathPublicHomePage() {
               <span className="text-sm uppercase tracking-wider text-[#FDBF0F] font-bold mb-1">
                 Convocation Secretariat
               </span>
-              <p className="text-sm text-[#FFF8EE]/80 leading-relaxed">
+              <p className="text-[13px] text-[#FFF8EE]/80 leading-relaxed">
                 {institutionName}
                 <br />
                 Vavoor, Edavannappara
