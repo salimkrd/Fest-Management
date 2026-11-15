@@ -130,4 +130,35 @@ describe('INSPIRAATH 2026 Stitch Approved Homepage Implementation', () => {
       expect(pageSrc).toContain('aria-expanded={mobileMenuOpen}');
     });
   });
+}
+  describe('6. Final regression corrections', () => {
+    it('keeps the transparent Header inside the Hero section', () => {
+      expect(pageSrc.indexOf('id="home"')).toBeLessThan(pageSrc.indexOf('HEADER: Deep Ruby-Espresso'));
+      expect(pageSrc.indexOf('HEADER: Deep Ruby-Espresso')).toBeLessThan(pageSrc.indexOf('Ambient Glows'));
+    });
+
+    it('does not hardcode a fallback festival date or weekday', () => {
+      expect(pageSrc).toContain("'Dates to be announced'");
+      expect(pageSrc).not.toContain('Nov 24 & 25');
+      expect(pageSrc).not.toContain('Tuesday & Wednesday');
+    });
+
+    it('does not claim a fabricated 100 percent verification result', () => {
+      expect(pageSrc).not.toContain('Verified 100%');
+      expect(pageSrc).toContain('Official Published Results');
+      expect(pageSrc).not.toContain('authenticated judge ratings');
+    });
+
+    it('does not return an arbitrary first record for an empty finder submission', () => {
+      expect(pageSrc).toContain("if (!query && finderCategory === 'all' && finderEvent === 'all')");
+      expect(pageSrc).toContain('finderHasSearched && (finderInput.trim() || finderCategory !==');
+    });
+
+    it('distinguishes Firestore loading and error states from true empty states', () => {
+      expect(pageSrc).toContain("teamsSyncState === 'loading'");
+      expect(pageSrc).toContain("teamsSyncState === 'error'");
+      expect(pageSrc).toContain("resultsSyncState === 'loading'");
+      expect(pageSrc).toContain("resultsSyncState === 'error'");
+    });
+  });
 });
