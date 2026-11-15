@@ -947,6 +947,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     await adminDb.collection('registrations').doc('reg-service-1').set({
       id: 'reg-service-1',
       competitionId: compId,
+      participantName: 'Service Contestant 1',
       bib: 'bib-service-1',
       status: 'APPROVED'
     });
@@ -954,6 +955,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     await adminDb.collection('registrations').doc('reg-service-2').set({
       id: 'reg-service-2',
       competitionId: compId,
+      participantName: 'Service Contestant 2',
       bib: 'bib-service-2',
       status: 'APPROVED'
     });
@@ -976,6 +978,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-1`,
       competitionId: compId,
       registrationId: 'reg-service-1',
+      participantNameSnapshot: 'Service Contestant 1',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -985,6 +988,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-2`,
       competitionId: compId,
       registrationId: 'reg-service-2',
+      participantNameSnapshot: 'Service Contestant 2',
       codeLetter: 'B',
       codeIndex: 1,
       status: 'CHECKED_IN'
