@@ -28,14 +28,20 @@ function normalizedId(value: unknown): string {
 }
 
 function normalizedIdList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
+  if (value === null || value === undefined || value === '') return [];
+  if (!Array.isArray(value)) {
+    throw new Error('Roster Integrity Error: Group membership data is malformed. Judging has been blocked.');
+  }
   return Array.from(new Set(value.map(normalizedId).filter(Boolean))).sort();
 }
 
 function normalizedGroupSize(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('Roster Integrity Error: Declared group size is invalid. Judging has been blocked.');
+  }
+  return parsed;
 }
 
 /**
@@ -168,6 +174,11 @@ export function buildGreenRoomRosterSnapshot(
       groupLeaderId: normalizedId(data.groupLeaderId),
       groupSize: normalizedGroupSize(data.groupSize)
     };
+    if (!entry.participantId && !entry.participantName && entry.groupMembers.length === 0) {
+      throw new Error(
+        `Roster Integrity Error: Code Letter "${rawCode}" has no verifiable participant or group identity. Judging has been blocked.`
+      );
+    }
 
     codeToRegistration.set(rawCode, registrationId);
     registrationToCode.set(registrationId, entry);
