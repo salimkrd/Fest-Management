@@ -48,11 +48,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: 200 });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : '';
-    if (msg.includes('Eligibility Error')) {
-      return NextResponse.json({ error: msg }, { status: 400 });
+    if (msg.includes('Lock Error')) {
+      return NextResponse.json({ error: msg }, { status: 423 });
     }
-    if (msg.includes('Conflict Error')) {
+    if (msg.includes('Roster Integrity Error') || msg.includes('Conflict Error')) {
       return NextResponse.json({ error: msg }, { status: 409 });
+    }
+    if (msg.includes('Eligibility Error') || msg.includes('Validation Error')) {
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
     return handleApiError(error);
   }
