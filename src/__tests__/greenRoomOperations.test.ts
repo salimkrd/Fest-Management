@@ -1837,4 +1837,59 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       });
     });
   });
+
+  describe('12. Ambiguous registration identity must fail closed', () => {
+    it('does not assign a Code Letter when one identifier matches two registrations', async () => {
+      const compId = 'cmp-gr-ambiguous-ident-test';
+      const registrationIds = ['reg-gr-ambiguous-1', 'reg-gr-ambiguous-2'];
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'AMB-01',
+          name: 'Ambiguous Identity Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'SCHEDULED'
+        });
+
+        await Promise.all(registrationIds.map((id, index) =>
+          db.collection('registrations').doc(id).set({
+            id,
+            competitionId: compId,
+            participantId: `part-gr-ambiguous-${index + 1}`,
+            participantName: `Ambiguous Contestant ${index + 1}`,
+            status: 'APPROVED',
+            chestNumber: 'AMB-01',
+            bib: '#AMB-01'
+          })
+        ));
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'AMB-01',
+            checkInMethod: 'MANUAL_LOOKUP',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/matches more than one registration.*check-in has been blocked/i);
+
+        const assignments = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(assignments.empty).toBe(true);
+      } finally {
+        const batch = db.batch();
+        registrationIds.forEach(id => {
+          batch.delete(db.collection('registrations').doc(id));
+          batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${id}`));
+        });
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
 });
