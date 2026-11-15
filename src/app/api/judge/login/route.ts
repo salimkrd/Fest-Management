@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
             .map(doc => doc.id)
         );
         const registrationById = new Map(
-          registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+          registrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
         );
         for (const entry of roster.entries) {
           if (!approvedRegistrationIds.has(entry.registrationId)) {
