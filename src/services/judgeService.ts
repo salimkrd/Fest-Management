@@ -575,6 +575,27 @@ export class JudgeService {
             'Roster Integrity Error: Final result generation blocked because the archived anonymous roster does not match the official Green Room mapping.'
           );
         }
+
+        const archivedMapping = Array.isArray(markData.codeRegistrationSnapshot)
+          ? markData.codeRegistrationSnapshot
+              .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+              .map(item => ({
+                registrationId: String(item.registrationId || ''),
+                codeLetter: String(item.codeLetter || '').trim().toUpperCase(),
+                codeIndex: Number(item.codeIndex)
+              }))
+              .sort((a, b) => a.codeIndex - b.codeIndex)
+          : [];
+        const currentMapping = finalRoster.entries.map(({ registrationId, codeLetter, codeIndex }) => ({
+          registrationId,
+          codeLetter,
+          codeIndex
+        }));
+        if (JSON.stringify(archivedMapping) !== JSON.stringify(currentMapping)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because the archived Code Letter-to-registration mapping does not match the official Green Room mapping.'
+          );
+        }
       }
     }
 
