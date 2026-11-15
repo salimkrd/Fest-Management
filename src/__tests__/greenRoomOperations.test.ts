@@ -841,16 +841,8 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
     it('Judge submits scores using anonymous Code Letters; server resolves accurately to registrationId', async () => {
       // Judge evaluates Code Letter B (Ahmad Rayan) and Code Letter C (Fathima Zahra)
       const judgeScores = {
-        'B': {
-          'cr-pitch': 38,
-          'cr-expression': 32,
-          'cr-diction': 24
-        }, // Total 94
-        'C': {
-          'cr-pitch': 32,
-          'cr-expression': 30,
-          'cr-diction': 20
-        } // Total 82
+        'B': 94, // Green Room Code B belongs to reg-gr-solo-02
+        'C': 82  // Green Room Code C belongs to reg-gr-solo-01
       };
 
       const result = await JudgeService.submitMarks({
@@ -869,8 +861,13 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       const markSnap = await db.collection('markEntries').doc(`me-${assignmentId}`).get();
       const markData = markSnap.data();
       expect(markData?.status).toBe('SUBMITTED');
-      expect(markData?.scores['reg-gr-solo-02']).toBeDefined(); // Code B resolved to reg-gr-solo-02
-      expect(markData?.scores['reg-gr-solo-01']).toBeDefined(); // Code C resolved to reg-gr-solo-01
+      expect(markData?.scores['reg-gr-solo-02']).toBe(94); // Code B -> reg-gr-solo-02
+      expect(markData?.scores['reg-gr-solo-01']).toBe(82); // Code C -> reg-gr-solo-01
+      expect(markData?.anonymousRoster).toEqual([
+        { codeLetter: 'B', codeIndex: 1 },
+        { codeLetter: 'C', codeIndex: 2 }
+      ]);
+      expect(markData?.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
 
       // Verify official result calculation in results collection
       const resSnap = await db.collection('results').doc(`res-${testCompId}`).get();
