@@ -947,7 +947,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     await adminDb.collection('registrations').doc('reg-service-1').set({
       id: 'reg-service-1',
       competitionId: compId,
+      participantId: 'part-service-1',
       participantName: 'Service Contestant 1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-1',
       bib: 'bib-service-1',
       status: 'APPROVED'
     });
@@ -955,7 +960,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     await adminDb.collection('registrations').doc('reg-service-2').set({
       id: 'reg-service-2',
       competitionId: compId,
+      participantId: 'part-service-2',
       participantName: 'Service Contestant 2',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-2',
       bib: 'bib-service-2',
       status: 'APPROVED'
     });
@@ -978,7 +988,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-1`,
       competitionId: compId,
       registrationId: 'reg-service-1',
+      participantId: 'part-service-1',
       participantNameSnapshot: 'Service Contestant 1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-1',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -988,7 +1003,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-2`,
       competitionId: compId,
       registrationId: 'reg-service-2',
+      participantId: 'part-service-2',
       participantNameSnapshot: 'Service Contestant 2',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-2',
       codeLetter: 'B',
       codeIndex: 1,
       status: 'CHECKED_IN'
