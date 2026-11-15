@@ -135,6 +135,8 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="public-mobile-toggle p-2 rounded-lg"
                 aria-label="Toggle navigation"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="public-mobile-navigation"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -144,7 +146,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="public-mobile-drawer lg:hidden border-t px-4 pt-3 pb-5 space-y-3">
+          <div id="public-mobile-navigation" className="public-mobile-drawer lg:hidden border-t px-4 pt-3 pb-5 space-y-3">
             <Suspense fallback={null}>
               <PublicSearchBar />
             </Suspense>
