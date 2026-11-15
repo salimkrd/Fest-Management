@@ -679,17 +679,11 @@ export class GreenRoomService {
       .where('competitionId', '==', competitionId)
       .get();
 
-    const roster = buildGreenRoomRosterSnapshot(
-      competitionId,
-      snap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
-    );
-    const assignments = roster.entries.map(entry => {
-      const matchingDoc = snap.docs.find(doc => doc.id === `${competitionId}_${entry.registrationId}`);
-      if (!matchingDoc) {
-        throw new Error('Roster Integrity Error: A Green Room assignment could not be resolved to its canonical document.');
-      }
-      return matchingDoc.data() as FirestoreGreenRoomAssignment;
-    });
+    // Keep the complete raw roster visible to Admin so a duplicate/corrupt
+    // assignment can be identified and corrected. Judge/session resolution
+    // uses buildGreenRoomRosterSnapshot and fails closed on the same data.
+    const assignments = snap.docs.map(doc => doc.data() as FirestoreGreenRoomAssignment);
+    assignments.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
     return assignments;
   }
 
