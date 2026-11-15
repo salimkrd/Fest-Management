@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     if (!assignmentId || !competitionId || !secret || !rosterVersion || !scores) {
       return NextResponse.json(
-        { error: 'Bad Request: assignmentId, competitionId, secret, and scores are required.' },
+        { error: 'Bad Request: assignmentId, competitionId, secret, rosterVersion, and scores are required.' },
         { status: 400 }
       );
     }
