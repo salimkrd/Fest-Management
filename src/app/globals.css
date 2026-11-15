@@ -897,3 +897,49 @@
   }
 }
 
+
+/* Finish normalising retained utility markup inside the public experience. */
+.public-experience h1,
+.public-experience h2,
+.public-experience .public-section-title {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+}
+.public-experience [class*="text-[#526070]"],
+.public-experience [class*="text-[#64748B]"],
+.public-experience [class*="text-slate-500"],
+.public-experience [class*="text-slate-600"] {
+  color: #765F57 !important;
+}
+.public-experience [class*="text-[#2563EB]"],
+.public-experience [class*="text-[#1D4ED8]"],
+.public-experience [class*="text-blue-"],
+.public-experience [class*="text-emerald-"] {
+  color: #86152C !important;
+}
+.public-experience [class*="bg-blue-50"],
+.public-experience [class*="bg-emerald-50"],
+.public-experience [class*="bg-amber-50"],
+.public-experience [class*="bg-slate-50"],
+.public-experience [class*="bg-[#F8FAFC]"] {
+  background-color: #F5EBDD !important;
+}
+.public-experience [class*="border-blue-"],
+.public-experience [class*="border-emerald-"],
+.public-experience [class*="border-[#E1E7EF]"] {
+  border-color: rgba(197, 139, 0, 0.35) !important;
+}
+.public-experience [class*="bg-[#2563EB]"] {
+  background-color: #4A0A1C !important;
+}
+.public-experience .public-grade-pill {
+  color: #4A0A1C !important;
+  background: rgba(253, 191, 15, 0.2) !important;
+  border-color: rgba(197, 139, 0, 0.42) !important;
+}
+.public-experience .public-points-text {
+  color: #8A641C !important;
+}
+.public-experience .public-site-header .public-nav-link.is-active {
+  color: #1A080B !important;
+}
+
