@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyHash, JudgeAssignmentRecord } from '@/domain/judgeAuth';
-import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration
+} from '@/domain/greenRoomRoster';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,13 +81,31 @@ export async function POST(req: NextRequest) {
     // snapshot. Verify it against the canonical current roster, but never return
     // registration IDs or participant identity to the judge.
     if (Array.isArray(markEntry.codeRegistrationSnapshot)) {
-      const rosterSnapshot = await db.collection('greenRoomAssignments')
-        .where('competitionId', '==', competitionId)
-        .get();
+      const [rosterSnapshot, registrationsSnapshot] = await Promise.all([
+        db.collection('greenRoomAssignments')
+          .where('competitionId', '==', competitionId)
+          .get(),
+        db.collection('registrations')
+          .where('competitionId', '==', competitionId)
+          .get()
+      ]);
       const roster = buildGreenRoomRosterSnapshot(
         competitionId,
         rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
       );
+      const registrationById = new Map(
+        registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
+      for (const entry of roster.entries) {
+        const liveRegistration = registrationById.get(entry.registrationId);
+        if (
+          !liveRegistration ||
+          String(liveRegistration.status || '').trim().toUpperCase() !== 'APPROVED'
+        ) {
+          throw new Error('Roster Integrity Error: The receipt cannot be matched to an approved registration.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
+      }
       const archivedMapping = markEntry.codeRegistrationSnapshot
         .filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
         .map((item: Record<string, unknown>) => ({
@@ -116,13 +137,31 @@ export async function POST(req: NextRequest) {
     } else if (anonymousRoster.length === 0 && scoreRegistrationIds.length > 0) {
       // Backward-compatible legacy receipt reconstruction still uses the same
       // fail-closed canonical mapping; duplicate codes are never overwritten.
-      const rosterSnapshot = await db.collection('greenRoomAssignments')
-        .where('competitionId', '==', competitionId)
-        .get();
+      const [rosterSnapshot, registrationsSnapshot] = await Promise.all([
+        db.collection('greenRoomAssignments')
+          .where('competitionId', '==', competitionId)
+          .get(),
+        db.collection('registrations')
+          .where('competitionId', '==', competitionId)
+          .get()
+      ]);
       const roster = buildGreenRoomRosterSnapshot(
         competitionId,
         rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
       );
+      const registrationById = new Map(
+        registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
+      for (const entry of roster.entries) {
+        const liveRegistration = registrationById.get(entry.registrationId);
+        if (
+          !liveRegistration ||
+          String(liveRegistration.status || '').trim().toUpperCase() !== 'APPROVED'
+        ) {
+          throw new Error('Roster Integrity Error: The receipt cannot be matched to an approved registration.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
+      }
       anonymousRoster = scoreRegistrationIds
         .map(registrationId => {
           const item = roster.registrationToCode.get(registrationId);
