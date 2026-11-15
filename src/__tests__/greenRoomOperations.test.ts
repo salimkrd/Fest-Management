@@ -36,6 +36,7 @@ import {
   codeLetterToIndex
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
+import { POST as judgeSessionHandler } from '@/app/api/judge/session/route';
 import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
 import { POST as syncClaimsHandler } from '@/app/api/auth/sync-claims/route';
 import { POST as provisionStaffHandler } from '@/app/api/admin/green-room/provision-staff/route';
@@ -754,6 +755,30 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(c.bib).toBeUndefined();
         expect(c.photoUrl).toBeUndefined();
       });
+    });
+
+    it('POST /api/judge/session returns a verified anonymous roster and fingerprint only', async () => {
+      const req = new NextRequest('http://localhost:3000/api/judge/session', {
+        method: 'POST',
+        body: JSON.stringify({
+          assignmentId,
+          competitionId: testCompId,
+          secret: judgeSecret
+        })
+      });
+      const res = await judgeSessionHandler(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      const data = await res.json();
+      expect(data.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
+      expect(data.contestants.length).toBeGreaterThanOrEqual(2);
+      for (const contestant of data.contestants) {
+        expect(contestant.codeLetter).toBeDefined();
+        expect(contestant.registrationId).toBeUndefined();
+        expect(contestant.participantName).toBeUndefined();
+        expect(contestant.teamName).toBeUndefined();
+        expect(contestant.chestNumber).toBeUndefined();
+      }
     });
 
     it('blocks judge login when the Green Room roster contains a duplicate Code Letter', async () => {
