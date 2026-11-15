@@ -94,6 +94,8 @@ describe('Green Room roster integrity', () => {
 
   it('verifies the stored participant, team, chest and group identity against the live registration', () => {
     const identity = {
+      id: 'reg-1',
+      competitionId: 'cmp-roster-test',
       participantId: 'part-1',
       participantName: 'Student One',
       teamId: 'team-1',
