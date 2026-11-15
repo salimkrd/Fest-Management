@@ -230,7 +230,7 @@ function CompetitionDetailContent() {
                   <span className="public-accent-text text-base font-black">Grade {rank1.grade || '—'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-[#526070] uppercase font-bold block">Points Awarded</span>
+                  <span className="public-muted text-[9px] uppercase font-bold block">Points Awarded</span>
                   <span className="public-points-text text-[13px] font-extrabold">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts{result.type === 'GROUP' ? ' · Team' : ''}</span>
                 </div>
               </div>
@@ -261,11 +261,11 @@ function CompetitionDetailContent() {
 
               <div className="public-winner-stats mt-5 pt-3 border-t grid grid-cols-2 gap-3">
                 <div className="text-left">
-                  <span className="text-[10px] text-[#526070] uppercase font-bold block">Official Grade</span>
+                  <span className="public-muted text-[9px] uppercase font-bold block">Official Grade</span>
                   <span className="public-accent-text text-sm font-black">Grade {rank2.grade || '—'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-[#526070] uppercase font-bold block">Points Awarded</span>
+                  <span className="public-muted text-[9px] uppercase font-bold block">Points Awarded</span>
                   <span className="public-points-text text-xs font-extrabold">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts{result.type === 'GROUP' ? ' · Team' : ''}</span>
                 </div>
               </div>
@@ -287,21 +287,21 @@ function CompetitionDetailContent() {
                   className="w-14 h-14 rounded-full border-4 border-[#D7B68A] shadow-xs bg-[#F5E6D0] mb-3"
                 />
 
-                <h3 className="text-sm font-bold text-[#111111] leading-tight">{rank3.candidateName}</h3>
-                <span className="text-xs font-mono font-semibold text-[#526070]">{rank3.bib}</span>
-                <div className="mt-1 text-xs font-semibold text-[#526070]">
+                <h3 className="public-card-title text-[13px] font-bold leading-tight">{rank3.candidateName}</h3>
+                <span className="public-muted text-[11px] font-mono font-semibold">{rank3.bib}</span>
+                <div className="public-muted mt-1 text-[11px] font-semibold">
                   {rank3.teamName} ({rank3.teamCode})
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-[#E1E7EF] grid grid-cols-2 gap-3">
+              <div className="public-winner-stats mt-5 pt-3 border-t grid grid-cols-2 gap-3">
                 <div className="text-left">
-                  <span className="text-[10px] text-[#526070] uppercase font-bold block">Official Grade</span>
-                  <span className="text-base font-black text-[#2563EB]">Grade {rank3.grade || '—'}</span>
+                  <span className="public-muted text-[9px] uppercase font-bold block">Official Grade</span>
+                  <span className="public-accent-text text-sm font-black">Grade {rank3.grade || '—'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-[#526070] uppercase font-bold block">Points Awarded</span>
-                  <span className="text-base font-extrabold text-emerald-700">+{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 0} pts{result.type === 'GROUP' ? ' · Team' : ''}</span>
+                  <span className="public-muted text-[9px] uppercase font-bold block">Points Awarded</span>
+                  <span className="public-points-text text-xs font-extrabold">+{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 0} pts{result.type === 'GROUP' ? ' · Team' : ''}</span>
                 </div>
               </div>
             </div>
@@ -331,27 +331,27 @@ function CompetitionDetailContent() {
             <tbody className="public-table-body divide-y">
               {result.ranks.map(rk => (
                 <tr key={rk.registrationId} className="public-table-row">
-                  <td className="py-4 px-6 font-bold text-[#111111]">
+                  <td className="py-3 px-4 font-bold text-[#111111]">
                     {rk.rank === 1 && <span className="text-amber-600 font-extrabold">🥇 1st Place</span>}
                     {rk.rank === 2 && <span className="text-slate-600 font-extrabold">🥈 2nd Place</span>}
                     {rk.rank === 3 && <span className="text-amber-800 font-extrabold">🥉 3rd Place</span>}
                     {!rk.rank && <span className="text-[#526070]">Participated</span>}
                   </td>
-                  <td className="py-4 px-6 font-bold text-[#111111]">
+                  <td className="py-3 px-4 font-bold text-[#111111]">
                     {rk.candidateName}
                   </td>
-                  <td className="py-4 px-6 font-mono text-[#526070]">
+                  <td className="py-3 px-4 font-mono text-[#526070]">
                     {rk.bib}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4">
                     <span className="font-semibold text-[#111111]">{rk.teamName}</span> ({rk.teamCode})
                   </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  <td className="py-3 px-4 text-center">
+                    <span className="public-grade-pill font-bold px-2 py-0.5 rounded border">
                       Grade {rk.grade}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-right font-black text-emerald-600 text-sm">
+                  <td className="py-3 px-4 text-right font-black text-emerald-600 text-sm">
                     +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts{result.type === 'GROUP' ? ' (Team only)' : ''}
                   </td>
                 </tr>
