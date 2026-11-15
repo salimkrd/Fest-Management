@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
     const isAuthError = message.toLowerCase().includes('unauthorized');
-    const isConflictError = message.toLowerCase().includes('lock conflict') || message.toLowerCase().includes('stale mapping');
+    const isConflictError = message.toLowerCase().includes('lock conflict') ||
+      message.toLowerCase().includes('stale mapping') ||
+      message.toLowerCase().includes('roster integrity');
     const isValidationError = message.toLowerCase().includes('validation error');
     const status = isAuthError ? 401 : isConflictError ? 409 : isValidationError ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
