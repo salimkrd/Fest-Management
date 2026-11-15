@@ -1113,6 +1113,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-rubric-01`,
       competitionId: compId,
       registrationId: 'reg-rubric-01',
+      participantId: 'part-rubric-01',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -1407,6 +1409,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-approved-1`,
       competitionId: compId,
       registrationId: 'reg-approved-1',
+      participantId: 'part-approved-1',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -1496,6 +1500,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-dupe-1`,
       competitionId: compId,
       registrationId: 'reg-dupe-1',
+      participantId: 'part-dupe-1',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
