@@ -168,7 +168,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <Link
                 href="/public/championship"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#526070] hover:bg-neutral-100"
+                className="public-mobile-link flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold"
               >
                 <Trophy className="w-4 h-4" />
                 <span>Team Championship</span>
