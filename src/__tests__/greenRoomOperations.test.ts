@@ -1853,6 +1853,44 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(restored.codeLetter).toBe(firstCodeLetter);
       });
 
+      it('rejects marks if the registration ID now refers to a different participant identity', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
+        const registrationRef = db.collection('registrations').doc('reg-stale-1');
+        const registrationSnapshot = await registrationRef.get();
+        const originalParticipantId = registrationSnapshot.data()?.participantId;
+
+        try {
+          // Keep the registration document ID and Code Letter unchanged, but
+          // simulate that this registration has been edited/reused for another
+          // participant. The assignment-time identity snapshot must catch it.
+          await registrationRef.update({
+            participantId: 'part-stale-reassigned-person',
+            participantName: 'Different Contestant Identity'
+          });
+
+          await expect(
+            JudgeService.saveDraftMarks({
+              assignmentId: staleJudgeAssignId,
+              competitionId: staleCompId,
+              secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
+              scores: {
+                [firstCodeLetter]: 91,
+                [secondCodeLetter]: 80
+              }
+            })
+          ).rejects.toThrow(/Roster Integrity Error: Code Letter .* participant and group identity snapshot/i);
+
+          const markEntry = await db.collection('markEntries').doc(`me-${staleJudgeAssignId}`).get();
+          expect(markEntry.exists).toBe(false);
+        } finally {
+          await registrationRef.update({
+            participantId: originalParticipantId,
+            participantName: 'Stale Contestant 1'
+          });
+        }
+      });
+
       it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
         const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Spy on validateScoresPayload to simulate a concurrent race condition:
