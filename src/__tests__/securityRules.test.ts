@@ -895,12 +895,20 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString()
     });
 
+    const draftRosterSnapshot = await adminDb.collection('greenRoomAssignments')
+      .where('competitionId', '==', 'comp-1')
+      .get();
+    const draftScores = Object.fromEntries(
+      draftRosterSnapshot.docs.map(doc => [String(doc.data().codeLetter).trim().toUpperCase(), 88])
+    );
+    expect(Object.keys(draftScores).length).toBeGreaterThan(0);
+
     const draftResult = await JudgeService.saveDraftMarks({
       assignmentId: 'asgn-draft-service-test',
       competitionId: 'comp-1',
       secret: pin,
       rosterVersion: await getTestRosterVersion('comp-1'),
-      scores: { 'A': 88 },
+      scores: draftScores,
       remarks: 'Saved draft'
     });
 
