@@ -239,6 +239,61 @@
 .font-body {
   font-family: 'Sora', sans-serif;
 }
+.font-bruno {
+  font-family: 'Bruno Ace SC', 'Bruno Ace', cursive, sans-serif;
+}
+.font-sora {
+  font-family: 'Sora', sans-serif;
+}
+
+/* Material Symbols Display & Anti-wrap Safeguard */
+.material-symbols-outlined,
+.material-symbols-Outlined {
+  font-family: 'Material Symbols Outlined', 'Material Icons', sans-serif !important;
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none !important;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap !important;
+  direction: ltr;
+  font-feature-settings: 'liga' 1;
+  -webkit-font-feature-settings: 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile Safe Area & Theme Classes */
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.crimson-hero-gradient {
+  background: radial-gradient(circle at 50% 30%, #BA1912 0%, #9B120C 58%, #720b07 82%, #1B090B 100%);
+}
+.theme-glow {
+  filter: drop-shadow(0 4px 14px rgba(27, 9, 11, 0.5));
+}
+
+/* Semantic Theme Color Utilities */
+.bg-crimson { background-color: #BA1912; }
+.text-crimson { color: #BA1912; }
+.border-crimson { border-color: #BA1912; }
+
+.bg-gold { background-color: #FDBF0F; }
+.text-gold { color: #FDBF0F; }
+.border-gold { border-color: #FDBF0F; }
+
+.bg-espresso { background-color: #1B090B; }
+.text-espresso { color: #1B090B; }
+.border-espresso { border-color: #1B090B; }
+
+.bg-ivory { background-color: #F2F3E6; }
+.text-ivory { color: #F2F3E6; }
+.border-ivory { border-color: #F2F3E6; }
 
 /* Rich Ruby-Crimson Depth Gradient with subtle lighting */
 .hero-ruby-bg {
@@ -371,9 +426,88 @@
   transform: scale(0.98);
 }
 
+/* Lantern Floating & Flickering Flame Glow Animations */
+@keyframes lampFloatFlicker {
+  0%, 100% {
+    transform: translateY(0px);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35)) brightness(1);
+  }
+  25% {
+    transform: translateY(-2.5px);
+    filter: drop-shadow(0 0 26px rgba(253, 191, 15, 0.8)) drop-shadow(0 0 48px rgba(253, 191, 15, 0.45)) brightness(1.08);
+  }
+  50% {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 0 22px rgba(253, 191, 15, 0.6)) drop-shadow(0 0 42px rgba(253, 191, 15, 0.3)) brightness(0.98);
+  }
+  75% {
+    transform: translateY(-2.8px);
+    filter: drop-shadow(0 0 28px rgba(253, 191, 15, 0.85)) drop-shadow(0 0 52px rgba(253, 191, 15, 0.5)) brightness(1.1);
+  }
+  88% {
+    transform: translateY(-1.2px);
+    filter: drop-shadow(0 0 19px rgba(253, 191, 15, 0.58)) drop-shadow(0 0 36px rgba(253, 191, 15, 0.32)) brightness(0.95);
+  }
+}
+
+@keyframes haloPulse {
+  0%, 100% {
+    transform: scale(0.75);
+    opacity: 0.35;
+  }
+  35% {
+    transform: scale(0.88);
+    opacity: 0.55;
+  }
+  65% {
+    transform: scale(0.78);
+    opacity: 0.38;
+  }
+  80% {
+    transform: scale(0.92);
+    opacity: 0.6;
+  }
+}
+
+.animated-lamp {
+  animation: lampFloatFlicker 4s ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+.animated-halo {
+  animation: haloPulse 4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes lampSway {
+  0% {
+    transform: rotate(-5deg);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35));
+  }
+  50% {
+    transform: rotate(5deg);
+    filter: drop-shadow(0 0 28px rgba(253, 191, 15, 0.85)) drop-shadow(0 0 50px rgba(253, 191, 15, 0.5));
+  }
+  100% {
+    transform: rotate(-5deg);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35));
+  }
+}
+
+.pendulum-lamp {
+  transform-origin: top center;
+  animation: lampSway 3.5s ease-in-out infinite;
+  will-change: transform, filter;
+  display: block;
+  margin: 0 auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lamp-glow,
   .ambient-glow,
+  .animated-lamp,
+  .animated-halo,
+  .pendulum-lamp,
   .btn-hero-primary,
   .btn-hero-secondary,
   .btn-lookup,

@@ -192,7 +192,7 @@ export default function InspirathPublicHomePage() {
       <main className="w-full">
         {/* HERO SECTION: Vibrant Rich Ruby-Crimson (#4A0A1C -> #86152C -> #A91D3A), theme.png as primary title, solo glowing lamp */}
         <section
-          className="relative w-full hero-ruby-bg text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
+          className="relative w-full hero-ruby-bg crimson-hero-gradient text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
           id="home"
         >
           {/* HEADER: Deep Ruby-Espresso Header strictly matching approved branding */}
@@ -205,10 +205,10 @@ export default function InspirathPublicHomePage() {
                 id="brand-logo"
                 aria-label={`${festivalTitle} Home`}
               >
-                <span className="font-brand text-4xl sm:text-5xl font-extrabold tracking-wider text-[#FFF8EE] group-hover:text-[#FDBF0F] transition-colors uppercase leading-none">
+                <span className="font-brand font-bruno text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-wider text-[#FFF8EE] group-hover:text-[#FDBF0F] transition-colors uppercase leading-none whitespace-nowrap">
                   {festivalTitle}
                 </span>
-                <span className="w-2 h-2 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_8px_rgba(253,191,15,0.9)]" />
+                <span className="w-2 h-2 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_8px_rgba(253,191,15,0.9)] shrink-0" />
               </Link>
 
               {/* Desktop Navigation */}
@@ -322,7 +322,7 @@ export default function InspirathPublicHomePage() {
                 </div>
 
                 {/* PRIMARY HERO TITLE: Exact Theme PNG asset (theme.png) */}
-                <div className="w-full max-w-3xl mb-10">
+                <div className="w-full max-w-3xl mb-10 theme-glow">
                   <Image
                     src="/images/theme.png"
                     alt="Proactive Paradigms"
@@ -366,27 +366,27 @@ export default function InspirathPublicHomePage() {
                 </div>
 
                 {/* Primary CTAs with enhanced hover animations & glowing effects */}
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
                   <Link
-                    className="btn-hero-primary px-7 py-3.5 rounded text-[#1A080B] font-body text-sm sm:text-base uppercase tracking-wider font-bold shadow-lg border-2 border-[#FDBF0F] inline-flex items-center justify-center gap-2.5 group cursor-pointer leading-none"
+                    className="btn-hero-primary px-7 py-3.5 rounded text-[#1A080B] font-body text-sm sm:text-base uppercase tracking-wider font-bold shadow-lg border-2 border-[#FDBF0F] inline-flex items-center justify-center gap-2.5 group cursor-pointer leading-none whitespace-nowrap w-full sm:w-auto"
                     data-path="results-directory"
                     href="#results-directory"
                   >
                     <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform text-[#1A080B]">
                       verified
                     </span>
-                    <span>Explore Results</span>
+                    <span className="tracking-wide">Explore Results</span>
                   </Link>
 
                   <Link
-                    className="btn-hero-secondary px-7 py-3.5 rounded text-[#FFF8EE] font-body text-sm sm:text-base uppercase tracking-wider font-bold backdrop-blur-md inline-flex items-center justify-center gap-2.5 group shadow-lg cursor-pointer leading-none"
+                    className="btn-hero-secondary px-7 py-3.5 rounded text-[#FFF8EE] font-body text-sm sm:text-base uppercase tracking-wider font-bold backdrop-blur-md inline-flex items-center justify-center gap-2.5 group shadow-lg cursor-pointer leading-none whitespace-nowrap w-full sm:w-auto"
                     data-path="team-championship"
                     href="#team-championship"
                   >
                     <span className="material-symbols-outlined text-[20px] group-hover:translate-x-0.5 transition-transform text-[#FDBF0F]">
                       leaderboard
                     </span>
-                    <span>Team Championship</span>
+                    <span className="tracking-wide">Team Championship</span>
                   </Link>
                 </div>
               </div>
@@ -394,12 +394,12 @@ export default function InspirathPublicHomePage() {
               {/* Right Hero Visual Artwork: Exclusive Lamp PNG with gentle golden glow & flicker */}
               <div className="lg:col-span-5 relative flex items-center justify-center py-2">
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="sm:w-[450px] sm:h-[450px] rounded-full border border-[#FDBF0F]/30 opacity-50 w-[460px] h-[460px]" />
+                  <div className="sm:w-[450px] sm:h-[450px] rounded-full border border-[#FDBF0F]/30 opacity-50 w-[460px] h-[460px] animated-halo" />
                   <div className="rounded-full border border-[#FDBF0F]/15 opacity-30 w-[520px] h-[520px]" />
                 </div>
                 <div className="relative z-10 w-full flex flex-col items-center max-w-lg">
                   <div
-                    className="w-full flex justify-center"
+                    className="w-full flex justify-center pendulum-lamp"
                     style={{
                       transformOrigin: 'center top',
                       animation: '4.2s ease-in-out 0s infinite alternate none running lampSwing',
@@ -411,7 +411,7 @@ export default function InspirathPublicHomePage() {
                       width={512}
                       height={512}
                       priority
-                      className="w-full h-auto object-contain select-none"
+                      className="w-full h-auto object-contain select-none animated-lamp"
                       style={{
                         transformOrigin: 'top center',
                         animation: 'lampFlameGlow 3.6s ease-in-out infinite',
@@ -670,7 +670,7 @@ export default function InspirathPublicHomePage() {
                         />
                       </div>
                       <button
-                        className="btn-lookup px-7 py-3 border border-[#FDBF0F] rounded font-body text-sm font-bold uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer text-[#1A080B]"
+                        className="btn-lookup px-5 sm:px-7 py-3 border border-[#FDBF0F] rounded font-body text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer text-[#1A080B] whitespace-nowrap"
                         type="submit"
                       >
                         <span className="material-symbols-outlined text-[20px] text-[#1A080B]">search</span>
@@ -974,11 +974,11 @@ export default function InspirathPublicHomePage() {
 
             <div className="text-center mt-10">
               <Link
-                className="inline-flex items-center gap-2 px-8 py-3.5 rounded bg-[#4A0A1C] hover:bg-[#2D1217] text-[#FDBF0F] border-2 border-[#FDBF0F] font-body text-sm font-bold uppercase tracking-wider shadow-lg transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded bg-[#4A0A1C] hover:bg-[#2D1217] text-[#FDBF0F] border-2 border-[#FDBF0F] font-body text-xs sm:text-sm font-bold uppercase tracking-wider shadow-lg transition-colors cursor-pointer max-w-full"
                 href="/public/directory"
               >
-                <span className="material-symbols-outlined text-[20px]">menu_book</span>
-                <span>View All Published Results ({publishedResults.length} Events)</span>
+                <span className="material-symbols-outlined text-[20px] shrink-0">menu_book</span>
+                <span className="whitespace-nowrap">View All Published Results ({publishedResults.length} Events)</span>
               </Link>
             </div>
           </div>
@@ -1029,13 +1029,13 @@ export default function InspirathPublicHomePage() {
       </main>
 
       {/* OFFICIAL SECRETARIAT FOOTER: Deep Ruby-Espresso base with Bruno Ace mark */}
-      <footer className="w-full bg-[#1A080B] text-[#FFF8EE] border-t border-[#FDBF0F]/30 py-10">
+      <footer className="w-full bg-[#1A080B] text-[#FFF8EE] border-t border-[#FDBF0F]/30 py-10 pb-safe md:pb-10">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 font-body">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-[#FDBF0F]/20">
             {/* Brand Info */}
             <div className="md:col-span-6 flex flex-col">
               <div className="flex items-baseline gap-2 mb-3">
-                <span className="font-brand tracking-wider text-[#FFF8EE] uppercase leading-none text-4xl sm:text-5xl font-extrabold">
+                <span className="font-brand font-bruno tracking-wider text-[#FFF8EE] uppercase leading-none text-2xl sm:text-4xl md:text-5xl font-extrabold whitespace-nowrap">
                   {festivalTitle}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F]" />
@@ -1097,6 +1097,32 @@ export default function InspirathPublicHomePage() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#1B090B]/95 backdrop-blur-md border-t border-[#FDBF0F]/30 px-4 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.6)]"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+        aria-label="Mobile Bottom Navigation"
+      >
+        <div className="max-w-md mx-auto flex items-center justify-around">
+          <Link href="#home" className="flex flex-col items-center gap-1 text-[#FDBF0F] py-1">
+            <span className="material-symbols-outlined text-[22px]">home</span>
+            <span className="text-[10px] font-bold tracking-wider uppercase font-sora">Home</span>
+          </Link>
+          <Link href="#results-directory" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
+            <span className="material-symbols-outlined text-[22px]">menu_book</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Results</span>
+          </Link>
+          <Link href="#team-championship" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
+            <span className="material-symbols-outlined text-[22px]">trophy</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Points</span>
+          </Link>
+          <Link href="/public/directory" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
+            <span className="material-symbols-outlined text-[22px]">search</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Lookup</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }
