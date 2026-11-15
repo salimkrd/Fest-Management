@@ -41,6 +41,7 @@ import { POST as provisionStaffHandler } from '@/app/api/admin/green-room/provis
 import { GET as qrIssuanceHandler } from '@/app/api/participants/[id]/qr/route';
 import { QrSignerService } from '@/services/qrSignerService';
 import { NextRequest } from 'next/server';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 describe('Green Room Management & Anonymous Judging Workflow', () => {
   let adminIdToken = '';
@@ -58,6 +59,16 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
 
   const testCompId = 'cmp-green-room-test';
   const testGroupCompId = 'cmp-group-green-room-test';
+
+  const getRosterVersion = async (competitionId: string): Promise<string> => {
+    const snapshot = await db.collection('greenRoomAssignments')
+      .where('competitionId', '==', competitionId)
+      .get();
+    return buildGreenRoomRosterSnapshot(
+      competitionId,
+      snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    ).version;
+  };
 
   beforeAll(async () => {
     // 1. Initialize Client Auth connected to local emulator
