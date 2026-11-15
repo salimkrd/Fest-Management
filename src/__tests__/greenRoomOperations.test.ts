@@ -907,6 +907,10 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         { codeLetter: 'B', codeIndex: 1 },
         { codeLetter: 'C', codeIndex: 2 }
       ]);
+      expect(markData?.codeRegistrationSnapshot).toEqual([
+        { registrationId: 'reg-gr-solo-02', codeLetter: 'B', codeIndex: 1 },
+        { registrationId: 'reg-gr-solo-01', codeLetter: 'C', codeIndex: 2 }
+      ]);
       expect(markData?.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
 
       // Verify official result calculation in results collection
