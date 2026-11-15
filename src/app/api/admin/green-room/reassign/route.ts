@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (msg.includes('Lock Error')) {
       return NextResponse.json({ error: msg }, { status: 423 });
     }
-    if (msg.includes('Conflict Error')) {
+    if (msg.includes('Roster Integrity Error') || msg.includes('Conflict Error')) {
       return NextResponse.json({ error: msg }, { status: 409 });
     }
     return handleApiError(error);
