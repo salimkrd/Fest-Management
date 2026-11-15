@@ -491,10 +491,11 @@ export class JudgeService {
     db: FirebaseFirestore.Firestore,
     competitionId: string
   ): Promise<void> {
-    const [competitionSnapshot, assignmentSnapshot, registrationSnapshot] = await Promise.all([
+    const [competitionSnapshot, assignmentSnapshot, registrationSnapshot, greenRoomSnapshot] = await Promise.all([
       db.collection('competitions').doc(competitionId).get(),
       db.collection('judgeAssignments').where('competitionId', '==', competitionId).get(),
-      db.collection('registrations').where('competitionId', '==', competitionId).get()
+      db.collection('registrations').where('competitionId', '==', competitionId).get(),
+      db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
     ]);
 
     if (!competitionSnapshot.exists) return;
@@ -510,6 +511,72 @@ export class JudgeService {
       return markSnapshot.exists ? markSnapshot.data() : null;
     }));
     if (submittedMarks.some(mark => !mark || mark.status !== 'SUBMITTED')) return;
+
+    // Defense in depth: before generating official ranks, verify that every
+    // archived judge scorecard still belongs to this competition's canonical
+    // Green Room roster. New scorecards must match the exact session fingerprint
+    // and full roster; legacy scorecards may be partial, but every scored
+    // registration must still be present in the canonical roster.
+    const finalRoster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      greenRoomSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    const approvedRegistrationIds = new Set(
+      registrationSnapshot.docs
+        .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+        .map(doc => doc.id)
+    );
+    for (const entry of finalRoster.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Final result generation blocked because Code Letter "${entry.codeLetter}" no longer points to an approved registration.`
+        );
+      }
+    }
+    const expectedRegistrationIds = finalRoster.entries
+      .map(entry => entry.registrationId)
+      .sort();
+    for (const mark of submittedMarks) {
+      const markData = mark as Record<string, unknown>;
+      const scoreMap = markData.scores && typeof markData.scores === 'object'
+        ? markData.scores as Record<string, unknown>
+        : {};
+      const submittedRegistrationIds = Object.keys(scoreMap).sort();
+      if (submittedRegistrationIds.some(id => !finalRoster.registrationToCode.has(id))) {
+        throw new Error(
+          'Roster Integrity Error: Final result generation blocked because a submitted score points to a registration outside the current Green Room roster.'
+        );
+      }
+
+      if (typeof markData.rosterVersion === 'string') {
+        if (markData.rosterVersion !== finalRoster.version) {
+          throw new Error(
+            'Stale Mapping Error: Final result generation blocked because a judge scorecard was recorded against a different Green Room roster version.'
+          );
+        }
+        if (JSON.stringify(submittedRegistrationIds) !== JSON.stringify(expectedRegistrationIds)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because a new-format judge scorecard does not cover the exact Green Room roster.'
+          );
+        }
+
+        const archivedRoster = Array.isArray(markData.anonymousRoster)
+          ? markData.anonymousRoster
+              .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+              .map(item => ({
+                codeLetter: String(item.codeLetter || '').trim().toUpperCase(),
+                codeIndex: Number(item.codeIndex)
+              }))
+              .sort((a, b) => a.codeIndex - b.codeIndex)
+          : [];
+        const currentAnonymousRoster = finalRoster.entries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
+        if (JSON.stringify(archivedRoster) !== JSON.stringify(currentAnonymousRoster)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because the archived anonymous roster does not match the official Green Room mapping.'
+          );
+        }
+      }
+    }
 
     const criteria = Array.isArray(competition.criteria) ? competition.criteria : [];
     const maxMarks = Number(competition.maxMarks) ||
