@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
-import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration
+} from '@/domain/greenRoomRoster';
 
 /**
  * Server API Endpoint for Secure Jury Authentication (/api/judge/login)
@@ -170,12 +173,20 @@ export async function POST(req: NextRequest) {
             .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
             .map(doc => doc.id)
         );
+        const registrationById = new Map(
+          registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        );
         for (const entry of roster.entries) {
           if (!approvedRegistrationIds.has(entry.registrationId)) {
             throw new Error(
               `Roster Integrity Error: Code Letter "${entry.codeLetter}" does not point to an approved registration.`
             );
           }
+          const liveRegistration = registrationById.get(entry.registrationId);
+          if (!liveRegistration) {
+            throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record.');
+          }
+          assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
         }
 
         rosterVersion = roster.version;
