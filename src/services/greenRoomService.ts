@@ -22,7 +22,10 @@ import {
 import { QrSignerService } from './qrSignerService';
 import { GreenRoomContestantStatus } from '@/types/fest';
 import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firestore';
-import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration
+} from '@/domain/greenRoomRoster';
 
 export interface CheckInContestantParams {
   competitionId: string;
@@ -232,12 +235,20 @@ export class GreenRoomService {
           .map(doc => doc.id)
       );
 
+      const registrationById = new Map(
+        registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
       for (const entry of roster.entries) {
         if (!approvedRegistrationIds.has(entry.registrationId)) {
           throw new Error(
             `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is no longer approved.`
           );
         }
+        const liveRegistration = registrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Green Room Code Letter has no live registration record.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       const currentRegistration = registrationSnapshot.docs.find(doc => doc.id === registrationId);
@@ -248,6 +259,7 @@ export class GreenRoomService {
         throw new Error('Eligibility Error: Registration is no longer approved for this competition. Refresh the Green Room roster.');
       }
 
+      const transactionRegData = currentRegistration.data() as Record<string, unknown>;
       const lockData = lockDoc.exists ? lockDoc.data() || {} : {};
       const assignedCodes = roster.entries.map(entry => entry.codeLetter);
       const eligibleCount = approvedRegistrationIds.size;
@@ -323,15 +335,21 @@ export class GreenRoomService {
         stageId: compData.stageId || '',
         stageName: compData.stageName || '',
         registrationId,
-        registrationCode: regData.code || '',
-        participantId: regData.participantId || undefined,
-        participantName: regData.participantName || 'Contestant',
-        teamId: regData.teamId || '',
-        teamCode: regData.teamCode || '',
-        teamName: regData.teamName || '',
-        chestNumber: regData.chestNumber || '',
-        type: compData.type || regData.type || 'SOLO',
-        groupMembers: regData.groupMembers || undefined,
+        registrationCode: transactionRegData.code ? String(transactionRegData.code) : '',
+        participantId: transactionRegData.participantId ? String(transactionRegData.participantId) : undefined,
+        participantName: transactionRegData.participantName ? String(transactionRegData.participantName) : 'Contestant',
+        teamId: transactionRegData.teamId ? String(transactionRegData.teamId) : '',
+        teamCode: transactionRegData.teamCode ? String(transactionRegData.teamCode) : '',
+        teamName: transactionRegData.teamName ? String(transactionRegData.teamName) : '',
+        chestNumber: transactionRegData.chestNumber ? String(transactionRegData.chestNumber) : '',
+        type: compData.type || transactionRegData.type || 'SOLO',
+        groupMembers: Array.isArray(transactionRegData.groupMembers)
+          ? transactionRegData.groupMembers.map((value: unknown) => String(value))
+          : undefined,
+        groupLeaderId: transactionRegData.groupLeaderId ? String(transactionRegData.groupLeaderId) : undefined,
+        groupSize: Number.isInteger(Number(transactionRegData.groupSize)) && transactionRegData.groupSize !== null && transactionRegData.groupSize !== undefined
+          ? Number(transactionRegData.groupSize)
+          : undefined,
         codeLetter: assignedCode,
         codeIndex,
         status: 'CHECKED_IN',
@@ -532,12 +550,20 @@ export class GreenRoomService {
       if (!approvedRegistrationIds.has(registrationId)) {
         throw new Error('Eligibility Error: Only an approved registration can keep a Green Room Code Letter.');
       }
+      const registrationById = new Map(
+        registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
       for (const entry of roster.entries) {
         if (!approvedRegistrationIds.has(entry.registrationId)) {
           throw new Error(
             `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is no longer approved.`
           );
         }
+        const liveRegistration = registrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Green Room Code Letter has no live registration record.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       const eligibleCount = approvedRegistrationIds.size;
@@ -698,14 +724,29 @@ export class GreenRoomService {
     const db = getAdminDb();
     if (!db) return new Map();
 
-    const snap = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', competitionId)
-      .get();
+    const [snap, registrationsSnapshot] = await Promise.all([
+      db.collection('greenRoomAssignments')
+        .where('competitionId', '==', competitionId)
+        .get(),
+      db.collection('registrations')
+        .where('competitionId', '==', competitionId)
+        .get()
+    ]);
 
     const roster = buildGreenRoomRosterSnapshot(
       competitionId,
       snap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
     );
+    const registrationById = new Map(
+      registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+    );
+    for (const entry of roster.entries) {
+      const liveRegistration = registrationById.get(entry.registrationId);
+      if (!liveRegistration || String(liveRegistration.status || '').trim().toUpperCase() !== 'APPROVED') {
+        throw new Error('Roster Integrity Error: Code Letter does not resolve to a current approved registration.');
+      }
+      assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
+    }
     return roster.codeToRegistration;
   }
 }
