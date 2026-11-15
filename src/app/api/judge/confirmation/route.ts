@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
         rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
       );
       const registrationById = new Map(
-        registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        registrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of roster.entries) {
         const liveRegistration = registrationById.get(entry.registrationId);
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
         rosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
       );
       const registrationById = new Map(
-        registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        registrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of roster.entries) {
         const liveRegistration = registrationById.get(entry.registrationId);
