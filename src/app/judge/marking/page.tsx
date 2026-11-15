@@ -127,7 +127,7 @@ function JudgeMarkingContent() {
       const nextScores: LocalScores = {};
 
       nextContestants.forEach(contestant => {
-        nextScores[contestant.codeLetter] = '0';
+        nextScores[contestant.codeLetter] = '';
       });
 
       if (result.scores && typeof result.scores === 'object') {
@@ -397,6 +397,7 @@ function JudgeMarkingContent() {
           <div className="space-y-4">
             {contestants.map((contestant, index) => {
               const total = calculateTotal(contestant.codeLetter);
+              const hasMark = (scores[contestant.codeLetter] ?? '').trim() !== '';
               const { grade, color: gradeColor } = getGrade(total);
               return (
                 <article key={contestant.codeLetter} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -427,7 +428,7 @@ function JudgeMarkingContent() {
                             max={maxMarksTotal}
                             step={1}
                             inputMode="numeric"
-                            value={scores[contestant.codeLetter] ?? '0'}
+                            value={scores[contestant.codeLetter] ?? ''}
                             onChange={event => adjustScore(contestant.codeLetter, event.target.value)}
                             disabled={savingDraft || submitting}
                             aria-label={`Enter mark for Code ${contestant.codeLetter}, from 0 to ${maxMarksTotal}`}
@@ -436,7 +437,9 @@ function JudgeMarkingContent() {
                           <span className="shrink-0 text-xs font-bold text-slate-500">/ {maxMarksTotal}</span>
                         </div>
                       </div>
-                      <span className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${gradeColor}`}>Grade {grade}</span>
+                      <span className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${hasMark ? gradeColor : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                        {hasMark ? `Grade ${grade}` : 'NOT SCORED'}
+                      </span>
                     </div>
                   </div>
                 </article>
@@ -464,7 +467,7 @@ function JudgeMarkingContent() {
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
               <Gavel className="h-4 w-4 shrink-0 text-blue-600" />
-              <span>{contestants.length} anonymous contestants · {criteria.length} criteria</span>
+              <span>{contestants.length} anonymous codes · Marks out of {maxMarksTotal}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
               <Button variant="outline" size="md" className="w-full sm:w-auto" leftIcon={<Save className="h-4 w-4" />} onClick={handleSaveDraft} disabled={savingDraft || submitting} isLoading={savingDraft}>Save draft</Button>
@@ -489,7 +492,7 @@ function JudgeMarkingContent() {
           <div className="space-y-4">
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs leading-5 text-amber-950">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every anonymous code and criterion score. After signing, amendments require administrator authorization.</p></div>
+              <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every Code Letter and its total mark. After signing, amendments require administrator authorization.</p></div>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs">
               <div className="col-span-2"><span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Assigned competition</span><span className="mt-1 block font-bold text-slate-950">{competition?.name}</span></div>
