@@ -623,11 +623,20 @@ export class JudgeService {
     const legacyTotalsByRegistration = new Map<string, number[]>();
 
     submittedMarks.forEach(mark => {
-      const scorecard = mark!.scores as Record<string, Record<string, number> | number>;
+      const markData = mark as Record<string, unknown>;
+      const scorecard = markData.scores as Record<string, Record<string, number> | number>;
+      const hasVerifiedHundredPointSnapshot = typeof markData.rosterVersion === 'string';
       Object.entries(scorecard).forEach(([registrationId, value]) => {
         if (typeof value === 'number') {
+          if (!Number.isFinite(value) || value < 0 || value > (hasVerifiedHundredPointSnapshot ? 100 : maxMarks)) {
+            throw new Error(
+              `Validation Error: Stored total mark for registration "${registrationId}" is outside the allowed competition range.`
+            );
+          }
           const totals = legacyTotalsByRegistration.get(registrationId) || [];
-          totals.push(value);
+          // The new roster-version scorecards are explicitly out of 100.
+          // Older numeric scorecards used the competition's historical maximum.
+          totals.push(hasVerifiedHundredPointSnapshot ? value : Number(((value / maxMarks) * 100).toFixed(2)));
           legacyTotalsByRegistration.set(registrationId, totals);
           return;
         }
@@ -657,7 +666,9 @@ export class JudgeService {
       });
     });
 
-    const registrations = registrationSnapshot.docs.filter(doc => doc.data().status === 'APPROVED');
+    const registrations = registrationSnapshot.docs.filter(doc =>
+      String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
+    );
     const evaluated = registrations.flatMap(doc => {
       const criterionMap = criterionMarksByRegistration.get(doc.id);
       const criterionScorecardTotals = criterionScorecardTotalsByRegistration.get(doc.id) || [];
