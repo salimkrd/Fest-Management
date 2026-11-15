@@ -60,7 +60,7 @@ interface FestContextType {
 
   participants: Participant[];
   participantsSyncState: 'loading' | 'ready' | 'error' | 'idle';
-  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<void>;
+  addParticipant: (part: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => Promise<Participant>;
   updateParticipant: (id: string, part: Partial<Participant>) => Promise<void>;
   deleteParticipant: (id: string) => Promise<void>;
   checkParticipantCategoryConflicts: (participantId: string, newCategoryId: string) => Promise<Array<{
@@ -74,7 +74,13 @@ interface FestContextType {
 
   registrations: Registration[];
   registrationsSyncState: 'loading' | 'ready' | 'error' | 'idle';
-  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => Promise<void>;
+  addRegistration: (reg: Omit<Registration, 'id' | 'code' | 'registeredAt' | 'participantName' | 'participantId' | 'groupLeaderId'> & {
+    participantName?: string;
+    participantId?: string;
+    groupLeaderId?: string;
+    participantIds?: string[];
+    groupLeaderIds?: string[];
+  }) => Promise<void>;
   updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => Promise<void>;
   deleteRegistration: (id: string) => Promise<void>;
 
@@ -1278,6 +1284,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                 stageName: dt.stageName || '',
                 assignedJudges: dt.assignedJudges || [],
                 status: dt.status || 'SCHEDULED',
+                scheduleStatus: dt.scheduleStatus === 'LIVE' || dt.scheduleStatus === 'COMPLETED' ? dt.scheduleStatus : 'SCHEDULED',
                 date: dt.date || '',
                 timeSlot: dt.timeSlot || '',
                 durationMinutes: dt.durationMinutes || 60,
@@ -1410,6 +1417,65 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       console.warn('[FestContext] Could not subscribe to schedules:', error);
     }
   }, [isIsolatedDemoOrTest, db]);
+
+  // Keep timetable status accurate while an Admin or Green Room Staff portal is open.
+  // The server performs the authoritative Asia/Kolkata time check and Firestore writes.
+  useEffect(() => {
+    const firebaseAuth = auth;
+    if (isIsolatedDemoOrTest || !firebaseAuth || typeof window === 'undefined') return;
+
+    let active = true;
+    let intervalId: number | undefined;
+    let syncInFlight = false;
+
+    const syncDueSchedules = async () => {
+      const user = firebaseAuth.currentUser;
+      if (!active || !user || syncInFlight) return;
+      syncInFlight = true;
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/admin/schedule/sync', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}` },
+          cache: 'no-store'
+        });
+        if (!response.ok && response.status >= 500) {
+          console.warn('[FestContext] Automatic schedule status sync failed:', response.status);
+        }
+      } catch (error) {
+        console.warn('[FestContext] Automatic schedule status sync unavailable:', error);
+      } finally {
+        syncInFlight = false;
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async user => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+      if (!user) return;
+
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        if (!active || !['ADMIN', 'GREEN_ROOM_STAFF'].includes(String(tokenResult.claims.role || ''))) return;
+        void syncDueSchedules();
+        intervalId = window.setInterval(() => { void syncDueSchedules(); }, 30_000);
+      } catch (error) {
+        console.warn('[FestContext] Could not initialize automatic schedule sync:', error);
+      }
+    });
+
+    const handleFocus = () => { void syncDueSchedules(); };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      active = false;
+      unsubscribe();
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isIsolatedDemoOrTest]);
 
   // Realtime Firestore points ledger synchronization for live production
   useEffect(() => {
@@ -2166,6 +2232,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
     setParticipants(prev => [...prev.filter(p => p.id !== newParticipant.id), newParticipant]);
     setTeams(prev => prev.map(t => t.id === partData.teamId ? { ...t, contestantsCount: t.contestantsCount + 1 } : t));
+    return newParticipant;
   };
 
   const checkParticipantCategoryConflicts = useCallback(async (
@@ -2323,8 +2390,14 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addRegistration = async (regData: Omit<Registration, 'id' | 'code' | 'registeredAt'>) => {
-    let newReg: Registration;
+  const addRegistration = async (regData: Omit<Registration, 'id' | 'code' | 'registeredAt' | 'participantName' | 'participantId' | 'groupLeaderId'> & {
+    participantName?: string;
+    participantId?: string;
+    groupLeaderId?: string;
+    participantIds?: string[];
+    groupLeaderIds?: string[];
+  }) => {
+    let newRegistrations: Registration[];
     if (!isIsolatedDemoOrTest && db) {
       const user = auth?.currentUser;
       if (!user) throw new Error('Unauthorized: Sign in before registering for a competition.');
@@ -2339,30 +2412,53 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           competitionId: regData.competitionId,
           participantId: regData.participantId,
-          participantName: regData.participantName,
+          participantIds: regData.participantIds,
           groupLeaderId: regData.groupLeaderId,
+          groupLeaderIds: regData.groupLeaderIds,
           groupMembers: regData.groupMembers
         })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not register for the competition.');
-      newReg = payload.registration as Registration;
+      newRegistrations = Array.isArray(payload.registrations)
+        ? payload.registrations as Registration[]
+        : payload.registration ? [payload.registration as Registration] : [];
+      if (newRegistrations.length === 0) throw new Error('Registration was not confirmed by the server.');
     } else {
+      const selectedIds = Array.from(new Set([
+        ...(regData.participantIds || []),
+        ...(regData.groupLeaderIds || []),
+        ...(regData.participantId ? [regData.participantId] : []),
+        ...(regData.groupLeaderId ? [regData.groupLeaderId] : [])
+      ]));
+      if (!selectedIds.length) throw new Error('Select at least one contestant or group leader.');
       let maxRegNum = 8820;
       for (const registration of registrations) {
         const num = parseInt((registration.code || '').replace('REG-', ''), 10);
         if (!isNaN(num) && num > maxRegNum) maxRegNum = num;
       }
-      newReg = {
-        ...regData,
-        id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
-        code: `REG-${maxRegNum + 1}`,
-        registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-      };
+      const selectedIsGroup = regData.type === 'GROUP';
+      newRegistrations = selectedIds.map((selectedId, index) => {
+        const participant = participants.find(item => item.id === selectedId);
+        if (!participant) throw new Error('A selected participant could not be found.');
+        return {
+          ...regData,
+          participantId: selectedIsGroup ? undefined : selectedId,
+          groupLeaderId: selectedIsGroup ? selectedId : undefined,
+          participantName: selectedIsGroup ? `${participant.name} & Team` : participant.name,
+          id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6) + '-' + index,
+          code: `REG-${maxRegNum + index + 1}`,
+          chestNumber: selectedIsGroup ? `GRP-${regData.teamCode}-${index + 1}` : participant.bib,
+          registeredAt: new Date().toISOString()
+        };
+      });
     }
 
-    setRegistrations(prev => [...prev.filter(r => r.id !== newReg.id), newReg]);
-    setCompetitions(prev => prev.map(c => c.id === regData.competitionId ? { ...c, entriesCount: c.entriesCount + 1 } : c));
+    setRegistrations(prev => [...prev, ...newRegistrations]);
+    setCompetitions(prev => prev.map(c => c.id === regData.competitionId
+      ? { ...c, entriesCount: c.entriesCount + newRegistrations.length }
+      : c
+    ));
   };
 
   const updateRegistrationStatus = async (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => {

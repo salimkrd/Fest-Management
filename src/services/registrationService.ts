@@ -8,17 +8,34 @@ import { FirestoreRegistration } from '@/types/firestore';
 interface CreateRegistrationInput {
   competitionId: string;
   participantId?: string;
+  participantIds?: string[];
   participantName?: string;
   groupMembers?: string[]; // Read-only legacy compatibility
   groupLeaderId?: string;
+  groupLeaderIds?: string[];
 }
 
 export class RegistrationService {
+  /** Backwards-compatible single-entry API used by older callers. */
   static async createForTeam(
     idToken: string,
     teamId: string,
     input: CreateRegistrationInput
   ): Promise<FirestoreRegistration> {
+    const registrations = await this.createManyForTeam(idToken, teamId, input);
+    return registrations[0];
+  }
+
+  /**
+   * Creates one independent registration document per selected contestant/group leader
+   * in a single Firestore transaction. This preserves one chest number, Green Room
+   * code letter, scorecard and result rank per entrant while allowing one bulk submit.
+   */
+  static async createManyForTeam(
+    idToken: string,
+    teamId: string,
+    input: CreateRegistrationInput
+  ): Promise<FirestoreRegistration[]> {
     await AuthService.assertTeamManager(idToken, teamId);
 
     const db = getAdminDb();
@@ -30,8 +47,26 @@ export class RegistrationService {
     const teamRef = db.collection('teams').doc(teamId);
     const competitionRef = db.collection('competitions').doc(input.competitionId);
     const counterRef = db.collection('systemCounters').doc('registrationCode');
-    const registrationId = `reg-${randomUUID()}`;
-    const registrationRef = db.collection('registrations').doc(registrationId);
+    const selectedIds = Array.from(new Set(
+      (input.groupLeaderIds?.length
+        ? input.groupLeaderIds
+        : input.participantIds?.length
+          ? input.participantIds
+          : [input.groupLeaderId || input.participantId || ''])
+        .map(id => typeof id === 'string' ? id.trim() : '')
+        .filter(Boolean)
+    ));
+
+    if (selectedIds.length === 0) {
+      throw new Error('Validation Error: Select at least one contestant or group leader.');
+    }
+    if (selectedIds.length > 100) {
+      throw new Error('Validation Error: You can submit up to 100 entries at a time.');
+    }
+
+    const registrationRefs = selectedIds.map(() =>
+      db.collection('registrations').doc(`reg-${randomUUID()}`)
+    );
 
     return db.runTransaction(async transaction => {
       const [teamSnapshot, competitionSnapshot, counterSnapshot, existingRegistrations] = await Promise.all([
@@ -60,27 +95,15 @@ export class RegistrationService {
       const allCategories = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
 
       const isGroup = competition.type === 'GROUP';
-      const groupLeaderId = isGroup ? input.groupLeaderId : undefined;
       if (isGroup && (!Number.isInteger(competition.groupSize) || competition.groupSize < 2)) {
         throw new Error('Validation Error: Set a valid Members Per Group value (minimum 2) in the competition first.');
       }
-      if (isGroup && !groupLeaderId) {
-        throw new Error('Validation Error: Select a registered team member as the group leader.');
+      if (!isGroup && input.groupLeaderIds?.length) {
+        throw new Error('Validation Error: Group leaders can only be selected for group competitions.');
       }
-      if (!isGroup && !input.participantId) {
-        throw new Error('Validation Error: A participant is required for an individual competition.');
-      }
-
-      const groupMemberIds = isGroup
-        ? Array.from(new Set([
-            groupLeaderId!,
-            ...(Array.isArray(input.groupMembers) ? input.groupMembers : [])
-          ].filter((id): id is string => Boolean(id) && typeof id === 'string')))
-        : [];
-      const participantIds = isGroup ? groupMemberIds : [input.participantId!];
 
       const participantSnapshots = await Promise.all(
-        participantIds.map(id => transaction.get(db.collection('participants').doc(id)))
+        selectedIds.map(id => transaction.get(db.collection('participants').doc(id)))
       );
       const participants = participantSnapshots.map(snapshot => {
         if (!snapshot.exists) {
@@ -100,21 +123,35 @@ export class RegistrationService {
       const activeTeamEntries = currentTeamEntries.filter(
         doc => doc.data().status !== 'REJECTED' && doc.data().status !== 'CANCELLED'
       );
-      const maximumEntries = Number(competition.maxEntriesPerTeam) || 1;
-      if (!isGroup && activeTeamEntries.length >= maximumEntries) {
-        throw new Error(`Validation Error: Team has reached the ${maximumEntries}-entry limit for this competition.`);
-      }
-      if (!isGroup && activeTeamEntries.some(doc => doc.data().participantId === input.participantId)) {
-        throw new Error('Validation Error: This participant is already registered for the competition.');
-      }
-      if (isGroup && activeTeamEntries.some(doc => {
-        const d = doc.data();
-        const existingMembers = Array.isArray(d.groupMembers)
-          ? d.groupMembers
-          : [d.groupLeaderId].filter(Boolean);
-        return participantIds.some(pId => pId === d.groupLeaderId || existingMembers.includes(pId));
-      })) {
-        throw new Error('Validation Error: One or more selected participants are already registered for a group in this competition.');
+      const selectedSet = new Set(selectedIds);
+      if (!isGroup) {
+        const maximumEntries = Number(competition.maxEntriesPerTeam) || 1;
+        if (activeTeamEntries.length + selectedIds.length > maximumEntries) {
+          throw new Error(`Validation Error: This team can register ${maximumEntries} entr${maximumEntries === 1 ? 'y' : 'ies'} for this competition; ${activeTeamEntries.length} already registered.`);
+        }
+        const alreadyRegistered = activeTeamEntries
+          .map(doc => doc.data().participantId)
+          .filter((id): id is string => typeof id === 'string' && selectedSet.has(id));
+        if (alreadyRegistered.length) {
+          const names = participants.filter(p => alreadyRegistered.includes(p.id)).map(p => p.name).join(', ');
+          throw new Error(`Validation Error: Already registered: ${names}.`);
+        }
+      } else {
+        const existingLeaderIds = new Set<string>();
+        for (const doc of activeTeamEntries) {
+          const data = doc.data();
+          if (data.groupLeaderId) existingLeaderIds.add(data.groupLeaderId);
+          // Retain protection against overlap with legacy full-roster group records.
+          if (Array.isArray(data.groupMembers)) {
+            for (const memberId of data.groupMembers) {
+              if (typeof memberId === 'string') existingLeaderIds.add(memberId);
+            }
+          }
+        }
+        const duplicates = participants.filter(p => existingLeaderIds.has(p.id));
+        if (duplicates.length) {
+          throw new Error(`Validation Error: Already registered as a group leader or legacy group member: ${duplicates.map(p => p.name).join(', ')}.`);
+        }
       }
 
       let lastCodeNumber = Number(counterSnapshot.data()?.value);
@@ -126,55 +163,56 @@ export class RegistrationService {
         }, 8820);
       }
 
-      const leader = participants.find(p => p.id === groupLeaderId) || participants[0];
-      const registration: FirestoreRegistration = {
-        id: registrationId,
-        code: `REG-${lastCodeNumber + 1}`,
-        participantId: isGroup ? undefined : leader.id,
-        participantName: isGroup ? `${leader.name} & Team` : leader.name,
-        teamId,
-        teamCode: team.code || '',
-        teamName: team.name || '',
-        categoryId: competition.categoryId,
-        categoryName: competition.categoryName || category.name,
-        competitionId: input.competitionId,
-        competitionName: competition.name || '',
-        type: isGroup ? 'GROUP' : 'SOLO',
-        chestNumber: isGroup
-          ? `GRP-${team.code || teamId}-${registrationId.slice(-6)}`
-          : leader.bib,
-        status: 'APPROVED',
-        groupLeaderId: isGroup ? groupLeaderId : undefined,
-        groupSize: isGroup ? competition.groupSize : undefined,
-        groupMembers: isGroup ? participantIds : undefined,
-        registeredAt: new Date().toISOString()
-      };
       const now = new Date().toISOString();
-      transaction.set(counterRef, { value: lastCodeNumber + 1, updatedAt: now }, { merge: true });
-      transaction.create(registrationRef, registration);
-      transaction.set(competitionRef, {
-        entriesCount: Number(competition.entriesCount || 0) + 1
-      }, { merge: true });
-
-      // Touch category document in transaction to ensure mutual write contention with concurrent category policy updates
-      transaction.update(db.collection('categories').doc(competition.categoryId), {
-        updatedAt: now
+      const registrations: FirestoreRegistration[] = participants.map((participant, index) => {
+        const registrationId = registrationRefs[index].id;
+        return {
+          id: registrationId,
+          code: `REG-${lastCodeNumber + index + 1}`,
+          participantId: isGroup ? undefined : participant.id,
+          participantName: isGroup ? `${participant.name} & Team` : participant.name,
+          teamId,
+          teamCode: team.code || '',
+          teamName: team.name || '',
+          categoryId: competition.categoryId,
+          categoryName: competition.categoryName || category.name,
+          competitionId: input.competitionId,
+          competitionName: competition.name || '',
+          type: isGroup ? 'GROUP' : 'SOLO',
+          chestNumber: isGroup
+            ? `GRP-${team.code || teamId}-${registrationId.slice(-6)}`
+            : participant.bib,
+          status: 'APPROVED',
+          groupLeaderId: isGroup ? participant.id : undefined,
+          groupSize: isGroup ? competition.groupSize : undefined,
+          // New records intentionally store only the group leader, never the full roster.
+          groupMembers: undefined,
+          registeredAt: now
+        };
       });
 
-      // Update registeredEventIds and timestamp for ALL registered participants (leader + members)
-      // for atomic concurrency conflict detection
-      for (const p of participants) {
-        const currentEvents: string[] = Array.isArray(p.registeredEventIds)
-          ? p.registeredEventIds
+      transaction.set(counterRef, { value: lastCodeNumber + registrations.length, updatedAt: now }, { merge: true });
+      transaction.set(competitionRef, {
+        entriesCount: Number(competition.entriesCount || 0) + registrations.length
+      }, { merge: true });
+      transaction.update(db.collection('categories').doc(competition.categoryId), { updatedAt: now });
+
+      registrations.forEach((registration, index) => {
+        transaction.create(registrationRefs[index], registration);
+      });
+
+      // Update each selected contestant's registered-event mirror in the same transaction.
+      participants.forEach(participant => {
+        const currentEvents: string[] = Array.isArray(participant.registeredEventIds)
+          ? participant.registeredEventIds
           : [];
-        const updatedEvents = Array.from(new Set([...currentEvents, input.competitionId]));
-        transaction.update(db.collection('participants').doc(p.id), {
-          registeredEventIds: updatedEvents,
+        transaction.update(db.collection('participants').doc(participant.id), {
+          registeredEventIds: Array.from(new Set([...currentEvents, input.competitionId])),
           updatedAt: now
         });
-      }
+      });
 
-      return registration;
+      return registrations;
     });
   }
 }

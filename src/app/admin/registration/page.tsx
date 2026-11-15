@@ -6,7 +6,6 @@ import { useFest } from '@/context/FestContext';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
 import { Registration } from '@/types/fest';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -24,8 +23,7 @@ export default function RegistrationManagementPage() {
   const [teamId, setTeamId] = useState(teams[0]?.id || '');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
-  const [participantId, setParticipantId] = useState('');
-  const [chestNumber, setChestNumber] = useState('');
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   // Derived available competitions
@@ -56,16 +54,14 @@ export default function RegistrationManagementPage() {
     setCategoryId(initCat);
     const initialComps = competitions.filter(c => c.categoryId === initCat);
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
     setError('');
     setModalOpen(true);
   };
 
   const handleTeamChange = (newTeamId: string) => {
     setTeamId(newTeamId);
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
   };
 
   const handleCategoryChange = (newCatId: string) => {
@@ -76,8 +72,7 @@ export default function RegistrationManagementPage() {
     } else {
       setCompetitionId('');
     }
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
   };
 
   const handleCompetitionChange = (newCompId: string) => {
@@ -86,16 +81,13 @@ export default function RegistrationManagementPage() {
     if (comp && comp.categoryId && comp.categoryId !== categoryId) {
       setCategoryId(comp.categoryId);
     }
-    setParticipantId('');
-    setChestNumber('');
+    setParticipantIds([]);
   };
 
-  const handleParticipantChange = (newPartId: string) => {
-    setParticipantId(newPartId);
-    const part = participants.find(p => p.id === newPartId);
-    if (part?.bib) {
-      setChestNumber(part.bib);
-    }
+  const toggleParticipant = (participantId: string) => {
+    setParticipantIds(current => current.includes(participantId)
+      ? current.filter(id => id !== participantId)
+      : [...current, participantId]);
   };
 
   const [saving, setSaving] = useState(false);
@@ -117,29 +109,33 @@ export default function RegistrationManagementPage() {
       return;
     }
 
-    let participantName = '';
-    if (comp.type !== 'GROUP') {
-      const part = availableParticipants.find(p => p.id === participantId);
-      if (!part) {
-        setError('Please select a student contestant.');
+    const selectedParticipants = availableParticipants.filter(participant => participantIds.includes(participant.id));
+    if (selectedParticipants.length !== participantIds.length || selectedParticipants.length === 0) {
+      setError(comp.type === 'GROUP'
+        ? 'Select at least one eligible group leader.'
+        : 'Select at least one eligible student contestant.');
+      return;
+    }
+    if (comp.type === 'SOLO') {
+      const maximumEntries = Math.max(1, Number(comp.maxEntriesPerTeam) || 1);
+      const activeTeamEntries = registrations.filter(registration =>
+        registration.teamId === team.id &&
+        registration.competitionId === comp.id &&
+        registration.status !== 'REJECTED' &&
+        registration.status !== 'CANCELLED'
+      ).length;
+      if (activeTeamEntries + selectedParticipants.length > maximumEntries) {
+        setError(`This team can register ${maximumEntries} entries for this competition; ${activeTeamEntries} already registered.`);
         return;
       }
-      participantName = part.name;
-    } else {
-      const leader = availableParticipants.find(p => p.id === participantId);
-      if (!leader) {
-        setError('Select a registered participant to represent this group.');
-        return;
-      }
-      participantName = `${leader.name} & Team`;
     }
 
     setSaving(true);
     try {
       await addRegistration({
-        participantId: comp.type !== 'GROUP' ? participantId : undefined,
-        groupLeaderId: comp.type === 'GROUP' ? participantId : undefined,
-        participantName,
+        participantIds: comp.type !== 'GROUP' ? selectedParticipants.map(participant => participant.id) : undefined,
+        groupLeaderIds: comp.type === 'GROUP' ? selectedParticipants.map(participant => participant.id) : undefined,
+        participantName: selectedParticipants.map(participant => participant.name).join(', '),
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
@@ -148,7 +144,7 @@ export default function RegistrationManagementPage() {
         competitionId: comp.id,
         competitionName: comp.name,
         type: comp.type,
-        chestNumber: chestNumber || (comp.type !== 'GROUP' ? (availableParticipants.find(p => p.id === participantId)?.bib || '#1000') : `GRP-${team.code}`),
+        chestNumber: '',
         status: 'APPROVED'
       });
       setModalOpen(false);
@@ -381,49 +377,36 @@ export default function RegistrationManagementPage() {
               </p>
             )}
 
-            {isGroup ? (
-              <div className="space-y-2">
-                <Select
-                  label="Group Leader (registered participant)"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[{ value: '', label: '-- Select Group Leader --' }, ...availableParticipants.map(p => ({ value: p.id, label: `${p.name} (${p.bib})` }))]}
-                  required
-                />
-                <p className="text-xs text-[#526070]">{selectedCompetition?.groupSize || 'Not set'} members per group. Only the leader is recorded. Unlimited groups per team; group marks count toward the team only.</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-semibold text-slate-800">{isGroup ? 'Select Group Leader(s)' : 'Select Student Contestant(s)'}</label>
+                <span className="text-xs font-semibold text-blue-700">{participantIds.length} selected</span>
               </div>
-            ) : (
-              <div>
-                <Select
-                  label="Select Student Contestant"
-                  value={participantId}
-                  onChange={(e) => handleParticipantChange(e.target.value)}
-                  options={[
-                    { value: '', label: '-- Select Enrolled Student --' },
-                    ...availableParticipants.map(p => ({
-                      value: p.id,
-                      label: `${p.name} (${p.bib || 'No Bib'} - ${p.categoryName || p.classGrade || 'Contestant'})`
-                    }))
-                  ]}
-                  required
-                />
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                {availableParticipants.map(participant => (
+                  <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={participantIds.includes(participant.id)}
+                      onChange={() => toggleParticipant(participant.id)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
+                      <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'} · {participant.categoryName || participant.classGrade || 'Contestant'}</span>
+                    </span>
+                  </label>
+                ))}
                 {availableParticipants.length === 0 && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                    <p className="text-xs text-amber-800 font-medium">
-                      No participants found under selected team eligible for {selectedCategory?.name || 'this category'}. Please register students first.
-                    </p>
-                  </div>
+                  <p className="px-3 py-4 text-xs text-amber-700">No eligible participants found in this team and category. Please register students first.</p>
                 )}
               </div>
-            )}
-
-            <Input
-              label="Assigned Chest / Bib Number"
-              placeholder="#1042"
-              value={chestNumber}
-              onChange={(e) => setChestNumber(e.target.value)}
-              helperText="Auto-generated or custom physical chest number tag"
-            />
+              <p className="text-xs text-slate-500">
+                {isGroup
+                  ? `Select one leader for each group. Only selected group leaders are registered; ${selectedCompetition?.groupSize || 'The configured'} members per group are not individually registered.`
+                  : `Select multiple eligible contestants. Each selected contestant receives a separate registration and Bib number.`}
+              </p>
+            </div>
           </form>
         </Modal>
       </div>

@@ -24,9 +24,11 @@ import {
 } from 'lucide-react';
 
 export default function GreenRoomPage() {
-  const { competitions, registrations } = useFest();
+  const { competitions, registrations, schedules } = useFest();
 
   const [selectedCompId, setSelectedCompId] = useState<string>('');
+  const [competitionSearch, setCompetitionSearch] = useState<string>('');
+  const [competitionPickerOpen, setCompetitionPickerOpen] = useState<boolean>(false);
   const [roster, setRoster] = useState<FirestoreGreenRoomAssignment[]>([]);
   const [loadingRoster, setLoadingRoster] = useState<boolean>(false);
   const [canProvisionStaff, setCanProvisionStaff] = useState(false);
@@ -39,6 +41,8 @@ export default function GreenRoomPage() {
 
   // Modals state
   const [slipModalOpen, setSlipModalOpen] = useState<boolean>(false);
+  const [completeCompetitionModalOpen, setCompleteCompetitionModalOpen] = useState(false);
+  const [isCompletingCompetition, setIsCompletingCompetition] = useState(false);
   const [selectedAssignmentForSlip, setSelectedAssignmentForSlip] = useState<FirestoreGreenRoomAssignment | null>(null);
 
   const [reassignModalOpen, setReassignModalOpen] = useState<boolean>(false);
@@ -86,6 +90,15 @@ export default function GreenRoomPage() {
   const selectedCompetition = useMemo(() => {
     return competitions.find(c => c.id === effectiveCompId) || null;
   }, [competitions, effectiveCompId]);
+
+  const filteredCompetitions = useMemo(() => {
+    const term = competitionSearch.trim().toLowerCase();
+    if (!term) return competitions;
+    return competitions.filter(comp =>
+      [comp.code, comp.name, comp.categoryName, comp.stageName, comp.type]
+        .some(value => String(value || '').toLowerCase().includes(term))
+    );
+  }, [competitions, competitionSearch]);
 
   // Approved registrations for current competition
   const currentCompRegistrations = useMemo(() => {
@@ -225,6 +238,41 @@ export default function GreenRoomPage() {
     }
   };
 
+  // Confirm the overall competition has finished. Contestant-level statuses stay independent.
+  const handleCompleteCompetition = async () => {
+    if (!selectedCompetition || isCompletingCompetition) return;
+    setIsCompletingCompetition(true);
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/admin/green-room/complete-competition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ competitionId: selectedCompetition.id })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not complete this competition.');
+
+      setCompleteCompetitionModalOpen(false);
+      setFeedbackMessage({
+        type: 'success',
+        text: data.alreadyCompleted
+          ? `${selectedCompetition.name} is already marked COMPLETED.`
+          : `${selectedCompetition.name} marked COMPLETED. Schedule and competition status have been updated.`
+      });
+    } catch (err: unknown) {
+      setFeedbackMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Competition completion failed.'
+      });
+    } finally {
+      setIsCompletingCompetition(false);
+    }
+  };
+
   // Reassignment handler
   const handleReassignSubmit = async () => {
     if (!selectedCompetition || !reassignTarget) return;
@@ -337,18 +385,79 @@ export default function GreenRoomPage() {
               <label htmlFor="comp-selector" className="text-[10px] uppercase font-bold text-[#526070] mb-1">
                 Active Competition Desk:
               </label>
-              <select
-                id="comp-selector"
-                value={effectiveCompId}
-                onChange={(e) => setSelectedCompId(e.target.value)}
-                className="w-full min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              >
-                {competitions.map((comp) => (
-                  <option key={comp.id} value={comp.id}>
-                    {comp.code} - {comp.name} ({comp.categoryName})
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="comp-selector"
+                    type="search"
+                    role="combobox"
+                    aria-label="Search and select active competition"
+                    aria-expanded={competitionPickerOpen}
+                    aria-controls="competition-search-results"
+                    aria-autocomplete="list"
+                    autoComplete="off"
+                    value={competitionPickerOpen ? competitionSearch : (selectedCompetition ? `${selectedCompetition.code} - ${selectedCompetition.name}` : competitionSearch)}
+                    onFocus={() => {
+                      setCompetitionSearch('');
+                      setCompetitionPickerOpen(true);
+                    }}
+                    onChange={(e) => {
+                      setCompetitionSearch(e.target.value);
+                      setCompetitionPickerOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setCompetitionPickerOpen(false);
+                        setCompetitionSearch('');
+                        e.currentTarget.blur();
+                      }
+                      if (e.key === 'Enter' && filteredCompetitions.length === 1) {
+                        setSelectedCompId(filteredCompetitions[0].id);
+                        setCompetitionSearch('');
+                        setCompetitionPickerOpen(false);
+                        e.preventDefault();
+                      }
+                    }}
+                    placeholder="Search by competition, code or category..."
+                    className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-800 placeholder:font-normal placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                {competitionPickerOpen && (
+                  <div
+                    id="competition-search-results"
+                    role="listbox"
+                    aria-label="Matching competitions"
+                    className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+                  >
+                    {filteredCompetitions.length > 0 ? filteredCompetitions.map((comp) => (
+                      <button
+                        key={comp.id}
+                        type="button"
+                        role="option"
+                        aria-selected={comp.id === effectiveCompId}
+                        onClick={() => {
+                          setSelectedCompId(comp.id);
+                          setCompetitionSearch('');
+                          setCompetitionPickerOpen(false);
+                        }}
+                        className={`flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${comp.id === effectiveCompId ? 'bg-blue-50' : ''}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-900">{comp.name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-slate-500">{comp.code} · {comp.categoryName} · {comp.stageName}</span>
+                        </span>
+                        {comp.id === effectiveCompId && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />}
+                      </button>
+                    )) : (
+                      <p className="px-3 py-5 text-center text-sm text-slate-500">No competitions match your search.</p>
+                    )}
+                    <div className="border-t border-slate-100 px-3 py-2 text-[10px] text-slate-400">
+                      {filteredCompetitions.length} of {competitions.length} competitions
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {canProvisionStaff && (
@@ -368,25 +477,45 @@ export default function GreenRoomPage() {
         {/* Selected Competition Metadata Bar */}
         {selectedCompetition && (
           <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 bg-white/20 rounded backdrop-blur-xs">
                   {selectedCompetition.code}
                 </span>
                 <h2 className="text-base font-extrabold">{selectedCompetition.name}</h2>
+                {selectedCompetition.scheduleStatus === 'LIVE' ? (
+                  <Badge variant="error" size="sm" dot>LIVE</Badge>
+                ) : selectedCompetition.scheduleStatus === 'COMPLETED' ? (
+                  <Badge variant="success" size="sm" dot>COMPLETED</Badge>
+                ) : (
+                  <Badge variant="default" size="sm" dot>SCHEDULED</Badge>
+                )}
               </div>
               <p className="text-xs text-blue-200 mt-1">
-                Category: <strong>{selectedCompetition.categoryName}</strong> · Stage: <strong>{selectedCompetition.stageName}</strong> · Format: <strong>{selectedCompetition.type}</strong>
+                Category: <strong>{selectedCompetition.categoryName}</strong> · Stage: <strong>{selectedCompetition.stageName}</strong> · Format: <strong>{selectedCompetition.type === 'SOLO' ? 'Individual' : 'Group'}</strong>
               </p>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
-                {selectedCompetition.status}
-              </span>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="px-2.5 py-1 rounded-full bg-white/10 text-blue-100 font-medium">
                 {selectedCompetition.type === 'GROUP' ? 'Group entries / team: Unlimited' : `Max ${selectedCompetition.maxEntriesPerTeam} entries / team`}
               </span>
+              {selectedCompetition.scheduleStatus !== 'COMPLETED' && schedules.some(slot => slot.competitionId === selectedCompetition.id) && (
+                <Button
+                  variant="outline"
+                  size="md"
+                  leftIcon={<CheckCircle2 className="h-4 w-4 text-[#16356B]" />}
+                  onClick={() => setCompleteCompetitionModalOpen(true)}
+                  disabled={isCompletingCompetition}
+                  style={{ color: '#16356B' }}
+                  className="min-h-11 w-full sm:w-auto shrink-0 whitespace-nowrap border-2 border-white bg-white px-5 text-sm font-extrabold shadow-md hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <span className="text-sm font-extrabold" style={{ color: '#16356B' }}>Mark Competition Completed</span>
+                </Button>
+              )}
+              {selectedCompetition.scheduleStatus !== 'COMPLETED' && !schedules.some(slot => slot.competitionId === selectedCompetition.id) && (
+                <span className="text-[11px] text-blue-200">Add a schedule slot to enable completion confirmation</span>
+              )}
             </div>
           </div>
         )}
@@ -735,6 +864,40 @@ export default function GreenRoomPage() {
             </div>
           </div>
         </div>
+
+        {/* Competition Completion Confirmation */}
+        <Modal
+          isOpen={completeCompetitionModalOpen}
+          onClose={() => { if (!isCompletingCompetition) setCompleteCompetitionModalOpen(false); }}
+          title="Confirm competition completion?"
+          description={`Mark ${selectedCompetition?.name || 'this competition'} as completed? All of its schedule slots will be marked COMPLETED and this action will be recorded in the audit log.`}
+          maxWidth="sm"
+          footer={
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCompleteCompetitionModalOpen(false)}
+                disabled={isCompletingCompetition}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                onClick={() => void handleCompleteCompetition()}
+                disabled={isCompletingCompetition || !selectedCompetition}
+              >
+                {isCompletingCompetition ? 'Confirming…' : 'Confirm Completed'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            Use this after the competition has actually finished. The scheduled end time alone will not complete a competition.
+          </div>
+        </Modal>
 
         {/* Modal 1: Code Slip Modal */}
         <GreenRoomCodeSlip

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
+import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
 import { Plus, Search, Edit2, Trash2, IdCard, Users, ClipboardList } from 'lucide-react';
 
 export default function TeamParticipantsPage() {
@@ -66,19 +67,33 @@ export default function TeamParticipantsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = async (data: Omit<Participant, 'id' | 'bib' | 'idStatus'>) => {
+  const handleSave = async (
+    data: Omit<Participant, 'id' | 'bib' | 'idStatus'>,
+    photoFile?: File | null
+  ): Promise<string> => {
     if (!team || data.teamId !== team.id || (editingPart && editingPart.teamId !== team.id)) {
       throw new Error('You can only manage participants belonging to your assigned team.');
     }
 
+    let participantId: string;
     if (editingPart) {
       // Preserve server-managed registration links while editing permitted profile fields.
       const profileUpdates: Partial<Participant> = { ...data };
       delete profileUpdates.registeredEventIds;
       await updateParticipant(editingPart.id, profileUpdates);
+      participantId = editingPart.id;
     } else {
-      await addParticipant(data);
+      const created = await addParticipant(data);
+      participantId = created.id;
+      // If upload fails, the open editor becomes an edit session, avoiding duplicate creation on retry.
+      setEditingPart(created);
     }
+
+    if (photoFile) {
+      const photoUrl = await uploadParticipantPhoto(participantId, photoFile);
+      await updateParticipant(participantId, { photoUrl });
+    }
+    return participantId;
   };
 
   const handleDelete = async (participant: Participant) => {

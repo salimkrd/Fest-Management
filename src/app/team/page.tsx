@@ -158,7 +158,15 @@ export default function TeamManagerDashboardPage() {
                     <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
                       <div className="text-left sm:text-right">
                         <p className="text-xs font-semibold text-slate-800">{slot.date || 'Date to be announced'}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">{slot.startTime || 'Time to be announced'} · {slot.status}</p>
+                        <div className="mt-1 flex items-center gap-2 sm:justify-end">
+                          <span className="text-xs text-slate-500">{slot.startTime || 'Time to be announced'}</span>
+                          <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + (
+                            slot.status === 'LIVE' ? 'bg-red-50 text-red-700' :
+                            slot.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
+                            slot.status === 'DELAYED' ? 'bg-amber-50 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
+                          )}>{slot.status}</span>
+                        </div>
                       </div>
                     </div>
                   </article>
