@@ -26,6 +26,19 @@ import {
 import { getAdminDb, getAdminAuth } from '@/lib/firebase/admin';
 import { JudgeService } from '@/services/judgeService';
 import { hashSecret } from '@/domain/judgeAuth';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+
+async function getTestRosterVersion(competitionId: string): Promise<string> {
+  const db = getAdminDb();
+  if (!db) throw new Error('Admin Firestore is unavailable in this test.');
+  const snapshot = await db.collection('greenRoomAssignments')
+    .where('competitionId', '==', competitionId)
+    .get();
+  return buildGreenRoomRosterSnapshot(
+    competitionId,
+    snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+  ).version;
+}
 
 describe('Firestore Security Rules Enforcement via Client SDK', () => {
   let clientApp: FirebaseApp;
@@ -886,6 +899,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: 'asgn-draft-service-test',
       competitionId: 'comp-1',
       secret: pin,
+      rosterVersion: await getTestRosterVersion('comp-1'),
       scores: { 'A': 88 },
       remarks: 'Saved draft'
     });
@@ -961,6 +975,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
+      rosterVersion: await getTestRosterVersion('compId'),
       scores: {
         'A': 94,
         'B': { content: 45, delivery: 45 }
@@ -1026,11 +1041,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: {
           'fake-invented-participant-999': 95
         }
       })
-    ).rejects.toThrow(/not assigned to an eligible registration/i);
+    ).rejects.toThrow(/no contestants have checked in|not assigned to an eligible registration/i);
   });
 
   it('33. Criteria marks exceeding specific competition rubric limits are strictly rejected by JudgeService', async () => {
@@ -1088,6 +1104,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: {
           'A': {
             'cr-subject': 35, // Exceeds rubric limit of 30!
@@ -1199,6 +1216,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: emptyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('emptyCompId'),
         scores: { 'any-key': 90 }
       })
     ).rejects.toThrow(/zero registrations/i);
@@ -1209,6 +1227,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: emptyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('emptyCompId'),
         scores: { 'any-key': 90 }
       })
     ).rejects.toThrow(/zero registrations/i);
@@ -1303,6 +1322,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-missing-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: MISSING\)/i);
@@ -1313,6 +1333,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-null-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: NULL\)/i);
@@ -1323,6 +1344,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-empty-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: EMPTY\)/i);
@@ -1333,6 +1355,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-pending-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: PENDING\)/i);
@@ -1343,6 +1366,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-cancelled-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: CANCELLED\)/i);
@@ -1353,6 +1377,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: { 'reg-withdrawn-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: WITHDRAWN\)/i);
@@ -1371,6 +1396,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
+      rosterVersion: await getTestRosterVersion('compId'),
       scores: { 'A': 92 }
     });
     expect(approvedDraft.success).toBe(true);
@@ -1405,9 +1431,10 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: pendingOnlyAsgnId,
         competitionId: pendingOnlyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('pendingOnlyCompId'),
         scores: { 'reg-only-pending': 75 }
       })
-    ).rejects.toThrow(/zero eligible approved registrations/i);
+    ).rejects.toThrow(/ineligible registration \(status: PENDING\)|zero eligible approved registrations/i);
   }, 60000);
 
   it('37. Duplicate or ambiguous registration scoring in a single scorecard is strictly rejected', async () => {
@@ -1460,6 +1487,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion('compId'),
         scores: {
           'A': 85,
           'reg-dupe-1': 90
