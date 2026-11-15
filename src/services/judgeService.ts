@@ -248,9 +248,9 @@ export class JudgeService {
 
       // Validate numeric score values and criteria against competition rubric
       if (typeof scoreVal === 'number') {
-        if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > compMaxMarks) {
+        if (!Number.isInteger(scoreVal) || scoreVal < 0 || scoreVal > 100) {
           throw new Error(
-            `Validation Error: Score for participant "${scoreKey}" (${scoreVal}) exceeds permitted competition limit [0 to ${compMaxMarks}].`
+            `Validation Error: Total mark for Code Letter "${scoreKey}" (${scoreVal}) must be a whole number from 0 to 100.`
           );
         }
       } else if (typeof scoreVal === 'object' && scoreVal !== null) {
@@ -526,7 +526,8 @@ export class JudgeService {
         criterionMarksByRegistration.set(registrationId, byCriterion);
 
         const scorecardTotals = criterionScorecardTotalsByRegistration.get(registrationId) || [];
-        scorecardTotals.push(scorecardTotal);
+        // Older criterion-wise judge scorecards are converted to the new /100 scale.
+        scorecardTotals.push(Number(((scorecardTotal / maxMarks) * 100).toFixed(2)));
         criterionScorecardTotalsByRegistration.set(registrationId, scorecardTotals);
       });
     });
@@ -545,12 +546,13 @@ export class JudgeService {
         const allJudgeTotals = [...legacyTotals, ...criterionScorecardTotals];
         score = Number((allJudgeTotals.reduce((sum, value) => sum + value, 0) / allJudgeTotals.length).toFixed(2));
       } else if (criterionMap && criterionMap.size > 0) {
-        // Preserve the previous criterion-wise averaging behaviour for existing scorecards.
+        // Preserve criterion-wise averaging, then normalize the result to marks out of 100.
         const criterionAverages = criterionDefinitions.map(criterion => {
           const marks = criterionMap.get(criterion.id) || [];
           return marks.length ? marks.reduce((sum, mark) => sum + mark, 0) / marks.length : 0;
         });
-        score = Number(criterionAverages.reduce((sum, average) => sum + average, 0).toFixed(2));
+        const criterionTotal = criterionAverages.reduce((sum, average) => sum + average, 0);
+        score = Number(((criterionTotal / maxMarks) * 100).toFixed(2));
       } else {
         if (legacyTotals.length === 0) return [];
         score = Number((legacyTotals.reduce((sum, value) => sum + value, 0) / legacyTotals.length).toFixed(2));
@@ -566,7 +568,7 @@ export class JudgeService {
         teamName: registration.teamName || '',
         teamColor: '#2563EB',
         score,
-        grade: calculateGrade(score, maxMarks)
+        grade: calculateGrade(score, 100)
       }];
     }).sort((a, b) => b.score - a.score);
 
