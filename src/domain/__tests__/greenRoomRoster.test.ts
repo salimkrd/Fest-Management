@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration
+} from '@/domain/greenRoomRoster';
 
 const assignment = (
   registrationId: string,
   codeLetter: string,
   codeIndex: number,
-  competitionId = 'cmp-roster-test'
+  competitionId = 'cmp-roster-test',
+  identity: Record<string, unknown> = {}
 ) => ({
   id: `${competitionId}_${registrationId}`,
   data: {
@@ -13,7 +17,8 @@ const assignment = (
     registrationId,
     codeLetter,
     codeIndex,
-    status: 'CHECKED_IN'
+    status: 'CHECKED_IN',
+    ...identity
   }
 });
 
@@ -85,6 +90,68 @@ describe('Green Room roster integrity', () => {
     expect(() => buildGreenRoomRosterSnapshot('cmp-roster-test', [
       assignment('reg-1', 'B', 0)
     ])).toThrow(/inconsistent code index/);
+  });
+
+  it('verifies the stored participant, team, chest and group identity against the live registration', () => {
+    const identity = {
+      participantId: 'part-1',
+      participantName: 'Student One',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      chestNumber: '101',
+      groupMembers: ['part-1', 'part-2'],
+      groupLeaderId: 'part-1',
+      groupSize: 2
+    };
+    const roster = buildGreenRoomRosterSnapshot('cmp-roster-test', [
+      assignment('reg-1', 'A', 0, 'cmp-roster-test', identity)
+    ]);
+    const entry = roster.entries[0];
+
+    expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
+      ...identity,
+      teamCode: 'sha',
+      chestNumber: '101',
+      groupMembers: ['part-2', 'part-1']
+    })).not.toThrow();
+
+    expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
+      ...identity,
+      participantId: 'part-reassigned'
+    })).toThrow(/participant and group identity snapshot/);
+
+    expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
+      ...identity,
+      participantName: 'Different Student'
+    })).toThrow(/participant and group identity snapshot/);
+
+    expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
+      ...identity,
+      groupMembers: ['part-1']
+    })).toThrow(/participant and group identity snapshot/);
+  });
+
+  it('changes the roster version if the registration identity changes even when Code Letter and registration ID stay the same', () => {
+    const original = buildGreenRoomRosterSnapshot('cmp-roster-test', [
+      assignment('reg-1', 'A', 0, 'cmp-roster-test', {
+        participantId: 'part-original',
+        participantName: 'Original Student',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        chestNumber: '101'
+      })
+    ]);
+    const identityChanged = buildGreenRoomRosterSnapshot('cmp-roster-test', [
+      assignment('reg-1', 'A', 0, 'cmp-roster-test', {
+        participantId: 'part-reassigned',
+        participantName: 'Different Student',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        chestNumber: '101'
+      })
+    ]);
+
+    expect(identityChanged.version).not.toBe(original.version);
   });
 
   it('changes the roster version whenever a Code Letter is mapped to another registration', () => {
