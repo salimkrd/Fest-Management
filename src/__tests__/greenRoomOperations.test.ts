@@ -37,6 +37,7 @@ import {
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
 import { POST as judgeSessionHandler } from '@/app/api/judge/session/route';
+import { POST as judgeConfirmationHandler } from '@/app/api/judge/confirmation/route';
 import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
 import { POST as syncClaimsHandler } from '@/app/api/auth/sync-claims/route';
 import { POST as provisionStaffHandler } from '@/app/api/admin/green-room/provision-staff/route';
@@ -974,6 +975,28 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         { registrationId: 'reg-gr-solo-01', codeLetter: 'C', codeIndex: 2 }
       ]);
       expect(markData?.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
+
+      // Receipt must prove the same anonymous roster without exposing the
+      // private registration-ID mapping archived on the server.
+      const receiptReq = new NextRequest('http://localhost:3000/api/judge/confirmation', {
+        method: 'POST',
+        body: JSON.stringify({
+          assignmentId,
+          competitionId: testCompId,
+          secret: judgeSecret,
+          verificationHash: result.verificationHash
+        })
+      });
+      const receiptRes = await judgeConfirmationHandler(receiptReq);
+      expect(receiptRes.status).toBe(200);
+      const receiptData = await receiptRes.json();
+      expect(receiptData.contestants).toEqual([
+        { codeLetter: 'B', codeIndex: 1 },
+        { codeLetter: 'C', codeIndex: 2 }
+      ]);
+      expect(JSON.stringify(receiptData)).not.toContain('reg-gr-solo-01');
+      expect(JSON.stringify(receiptData)).not.toContain('reg-gr-solo-02');
+      expect(JSON.stringify(receiptData)).not.toContain('codeRegistrationSnapshot');
 
       // Verify official result calculation in results collection
       const resSnap = await db.collection('results').doc(`res-${testCompId}`).get();
