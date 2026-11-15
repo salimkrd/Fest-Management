@@ -78,10 +78,10 @@ function DirectoryContent() {
             aria-label="Filter by Competition Format"
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none"
+            className="public-control text-xs font-semibold py-2 px-3 rounded-lg focus:outline-none"
           >
             <option value="ALL">All Formats</option>
-            <option value="SOLO">Solo Items</option>
+            <option value="SOLO">Individual Items</option>
             <option value="GROUP">Group Ensembles</option>
           </select>
         </div>
@@ -159,7 +159,7 @@ function DirectoryContent() {
                           </span>
                           <span className="public-winner-name font-medium line-clamp-1">{rank2.candidateName}</span>
                         </div>
-                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank2.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
+                        <span className="shrink-0 text-right"><span className="public-grade-text block text-[10px] font-bold">Grade {rank2.grade || '—'}</span><span className="public-points-text block text-[10px] font-extrabold">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
                       </div>
                     )}
                   </div>
