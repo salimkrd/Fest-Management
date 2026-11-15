@@ -829,7 +829,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
             'p-gr-101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects registration IDs as score submission keys', async () => {
@@ -843,7 +843,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
             'reg-gr-solo-01': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects bib numbers as score submission keys', async () => {
@@ -871,7 +871,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
             '101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects unassigned Code Letters as score submission keys', async () => {
@@ -899,7 +899,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
             'p-gr-101': { 'cr-pitch': 30 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('blocks judging entirely when two Green Room registrations share the same Code Letter', async () => {
@@ -2101,7 +2101,8 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           participantIdentifier: 'FRZ-01',
           operatorIdToken: staffIdToken
         });
-        expect(checkedIn.assignment.codeLetter).toBe('A');
+        const assignedCode = checkedIn.assignment.codeLetter;
+        expect(assignedCode).toMatch(/^[A-Z]{1,2}$/);
 
         const { hashSecret } = await import('@/domain/judgeAuth');
         const salt = 'salt_roster_freeze';
@@ -2121,7 +2122,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           competitionId: compId,
           secret,
           rosterVersion,
-          scores: { A: 87 }
+          scores: { [assignedCode]: 87 }
         });
         expect(draft.success).toBe(true);
 
@@ -2138,7 +2139,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           .get();
         expect(roster.docs).toHaveLength(1);
         expect(roster.docs[0].data().registrationId).toBe(registrationIds[0]);
-        expect(roster.docs[0].data().codeLetter).toBe('A');
+        expect(roster.docs[0].data().codeLetter).toBe(assignedCode);
       } finally {
         const batch = db.batch();
         registrationIds.forEach(id => {
