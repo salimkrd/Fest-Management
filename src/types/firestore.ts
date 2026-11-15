@@ -383,6 +383,7 @@ export interface FirestoreGreenRoomAssignment {
   registrationCode: string;
   participantId?: string;
   participantName: string;
+  participantNameSnapshot?: string;
   teamId: string;
   teamCode: string;
   teamName: string;
