@@ -2154,4 +2154,53 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       }
     });
   });
+
+  describe('14. Green Room rejects registrations without a stable person identity', () => {
+    it('does not allocate a Code Letter to an approved registration with no participant or group identity', async () => {
+      const compId = 'cmp-gr-no-identity-test';
+      const registrationId = 'reg-gr-no-identity-test';
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'NO-ID-01',
+          name: 'Missing Identity Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'SCHEDULED'
+        });
+        await db.collection('registrations').doc(registrationId).set({
+          id: registrationId,
+          competitionId: compId,
+          status: 'APPROVED',
+          chestNumber: 'NO-ID-01'
+        });
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'NO-ID-01',
+            checkInMethod: 'MANUAL_LOOKUP',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/no verifiable participant or group identity/i);
+
+        const roster = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(roster.empty).toBe(true);
+        const counter = await db.collection('greenRoomCounters').doc(compId).get();
+        expect(counter.exists).toBe(false);
+      } finally {
+        const batch = db.batch();
+        batch.delete(db.collection('registrations').doc(registrationId));
+        batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${registrationId}`));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
 });
