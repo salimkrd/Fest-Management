@@ -61,7 +61,7 @@ describe('Green Room roster integrity', () => {
           codeIndex: 1
         }
       }
-    ])).toThrow(/does not match its canonical registration mapping/);
+    ])).toThrow(/does not match its canonical registration record/);
   });
 
   it('rejects mismatched document IDs, competitions and code indexes', () => {
@@ -75,7 +75,7 @@ describe('Green Room roster integrity', () => {
           codeIndex: 0
         }
       }
-    ])).toThrow(/does not match its canonical registration mapping/);
+    ])).toThrow(/does not match its canonical registration record/);
 
     expect(() => buildGreenRoomRosterSnapshot('cmp-roster-test', [
       {
