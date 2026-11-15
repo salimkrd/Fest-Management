@@ -177,12 +177,12 @@ export class JudgeService {
       const cleanUpperKey = cleanKey.toUpperCase();
       if (ineligibleKeys.has(scoreKey) || ineligibleKeys.has(cleanKey)) {
         throw new Error(
-          `Validation Error: Participant or registration "${scoreKey}" is an ${ineligibleKeys.get(scoreKey) || ineligibleKeys.get(cleanKey)}. Only APPROVED registrations can be scored.`
+          `Validation Error: This score key resolves to an ${ineligibleKeys.get(scoreKey) || ineligibleKeys.get(cleanKey)}. Only Code Letters assigned to approved registrations can be scored.`
         );
       }
       if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
         throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number) and is strictly rejected. It is not a valid assigned Green Room Code Letter. Judges must submit scores using ONLY assigned Green Room Code Letters.`
+          'Validation Error: Direct contestant identifiers are not accepted. Judges must submit scores using only assigned anonymous Green Room Code Letters.'
         );
       }
       if (!cleanUpperKey) {
@@ -655,10 +655,11 @@ export class JudgeService {
       const scorecard = markData.scores as Record<string, Record<string, number> | number>;
       const hasVerifiedHundredPointSnapshot = typeof markData.rosterVersion === 'string';
       Object.entries(scorecard).forEach(([registrationId, value]) => {
+        const resultCodeLetter = finalRoster.registrationToCode.get(registrationId)?.codeLetter || 'an unknown Code Letter';
         if (typeof value === 'number') {
           if (!Number.isFinite(value) || value < 0 || value > (hasVerifiedHundredPointSnapshot ? 100 : maxMarks)) {
             throw new Error(
-              `Validation Error: Stored total mark for registration "${registrationId}" is outside the allowed competition range.`
+              `Validation Error: Stored total mark for Code "${resultCodeLetter}" is outside the allowed competition range.`
             );
           }
           const totals = legacyTotalsByRegistration.get(registrationId) || [];
@@ -674,11 +675,11 @@ export class JudgeService {
         Object.entries(value).forEach(([criterionKey, rawScore]) => {
           const criterionId = criterionLookup.get(criterionKey.trim().toLowerCase());
           if (!criterionId) {
-            throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in a submitted scorecard for registration "${registrationId}".`);
+            throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in the submitted scorecard for Code "${resultCodeLetter}".`);
           }
           const markValue = Number(rawScore);
           if (!Number.isFinite(markValue)) {
-            throw new Error(`Validation Error: Invalid mark for criterion "${criterionKey}" in scorecard for registration "${registrationId}".`);
+            throw new Error(`Validation Error: Invalid mark for criterion "${criterionKey}" in the scorecard for Code "${resultCodeLetter}".`);
           }
           scorecardTotal += markValue;
           const values = byCriterion.get(criterionId) || [];
