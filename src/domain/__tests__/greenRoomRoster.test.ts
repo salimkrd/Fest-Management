@@ -18,6 +18,8 @@ const assignment = (
     codeLetter,
     codeIndex,
     status: 'CHECKED_IN',
+    participantId: `part-${registrationId}`,
+    participantName: `Contestant ${registrationId}`,
     ...identity
   }
 });
@@ -137,6 +139,21 @@ describe('Green Room roster integrity', () => {
       ...identity,
       teamName: 'A Different Team'
     })).toThrow(/participant and group identity snapshot/);
+  });
+
+  it('fails closed when a Code Letter has no stable participant or group identity', () => {
+    expect(() => buildGreenRoomRosterSnapshot('cmp-roster-test', [
+      {
+        id: 'cmp-roster-test_reg-anonymous',
+        data: {
+          competitionId: 'cmp-roster-test',
+          registrationId: 'reg-anonymous',
+          codeLetter: 'A',
+          codeIndex: 0,
+          status: 'CHECKED_IN'
+        }
+      }
+    ])).toThrow(/no verifiable participant or group identity/);
   });
 
   it('changes the roster version if the registration identity changes even when Code Letter and registration ID stay the same', () => {
