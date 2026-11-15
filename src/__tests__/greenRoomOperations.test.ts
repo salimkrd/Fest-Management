@@ -760,6 +760,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'p-gr-101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -773,6 +774,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'reg-gr-solo-01': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -786,6 +788,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             '#101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -799,6 +802,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             '101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -812,6 +816,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'Z': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -825,6 +830,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'p-gr-101': { 'cr-pitch': 30 }
           }
@@ -851,6 +857,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         assignmentId,
         competitionId: testCompId,
         secret: judgeSecret,
+        rosterVersion: await getRosterVersion(testCompId),
         scores: judgeScores
       });
 
@@ -968,6 +975,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         assignmentId: draftAsgnId,
         competitionId: draftCompId,
         secret: draftSecret,
+        rosterVersion: await getRosterVersion(draftCompId),
         scores: { 'A': { 'cr-draft-1': 45 } }
       });
       expect(draftResult.success).toBe(true);
@@ -1049,6 +1057,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: concAsgnId,
           competitionId: concCompId,
           secret: concSecret,
+          rosterVersion: await getRosterVersion(concCompId),
           scores: { 'A': { 'cr-race-1': 40 } }
         })
       ).rejects.toThrow(/Lock Conflict: Code Letter reassignment is currently in progress/i);
@@ -1059,6 +1068,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: concAsgnId,
           competitionId: concCompId,
           secret: concSecret,
+          rosterVersion: await getRosterVersion(concCompId),
           scores: { 'A': { 'cr-race-1': 40 } }
         })
       ).rejects.toThrow(/Lock Conflict: Code Letter reassignment is currently in progress/i);
@@ -1073,6 +1083,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         assignmentId: concAsgnId,
         competitionId: concCompId,
         secret: concSecret,
+        rosterVersion: await getRosterVersion(concCompId),
         scores: { 'A': { 'cr-race-1': 42 } }
       });
       expect(finalRes.success).toBe(true);
@@ -1170,6 +1181,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: emptyAsgnId,
           competitionId: emptyCompId,
           secret: emptySecret,
+          rosterVersion: await getRosterVersion(emptyCompId),
           scores: { 'A': { 'cr-1': 85 } }
         })
       ).rejects.toThrow(/Validation Error.*(No contestants have checked in|"A")/i);
@@ -1676,6 +1688,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               assignmentId: staleJudgeAssignId,
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
               scores: {
                 [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
                 [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
@@ -1712,6 +1725,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               assignmentId: staleJudgeAssignId,
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
               scores: {
                 [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
                 [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
@@ -1735,6 +1749,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: staleJudgeAssignId,
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
+          rosterVersion: await getRosterVersion(staleCompId),
           scores: {
             [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
             [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
@@ -1747,6 +1762,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: staleJudgeAssignId,
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
+          rosterVersion: await getRosterVersion(staleCompId),
           scores: {
             [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
             [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
