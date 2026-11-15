@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,10 +50,11 @@ export async function POST(req: NextRequest) {
     const verification = await verifyJudgeAssignment(assignment, secret);
     if (!verification.valid) return error('The secure judge session could not be verified. Please sign in again.', 401);
 
-    const [competitionDoc, greenRoomSnapshot, markEntryDoc] = await Promise.all([
+    const [competitionDoc, greenRoomSnapshot, markEntryDoc, registrationsSnapshot] = await Promise.all([
       db.collection('competitions').doc(competitionId).get(),
       db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get(),
-      db.collection('markEntries').doc(`me-${assignmentId}`).get()
+      db.collection('markEntries').doc(`me-${assignmentId}`).get(),
+      db.collection('registrations').where('competitionId', '==', competitionId).get()
     ]);
 
     if (!competitionDoc.exists) return error('The assigned competition is no longer available.', 404);
@@ -67,27 +69,30 @@ export async function POST(req: NextRequest) {
           .filter(item => Boolean(item.id && item.name && Number.isFinite(item.maxMarks) && item.maxMarks > 0))
       : [];
 
-    const roster = greenRoomSnapshot.docs
-      .map(doc => {
-        const data = doc.data() as Record<string, unknown>;
-        return {
-          documentId: doc.id,
-          registrationId: typeof data.registrationId === 'string' ? data.registrationId : '',
-          codeLetter: typeof data.codeLetter === 'string' ? data.codeLetter.trim().toUpperCase() : '',
-          codeIndex: Number.isFinite(Number(data.codeIndex)) ? Number(data.codeIndex) : null,
-          status: String(data.status || 'CHECKED_IN')
-        };
-      })
-      .filter(item => Boolean(item.registrationId && /^[A-Z]{1,2}$/.test(item.codeLetter)))
-      .map((item, index: number) => ({
-        registrationId: item.registrationId,
-        codeLetter: item.codeLetter,
-        codeIndex: item.codeIndex !== null ? item.codeIndex : index,
-        status: item.status
+    const rosterSnapshot = buildGreenRoomRosterSnapshot(
+      competitionId,
+      greenRoomSnapshot.docs.map(doc => ({
+        id: doc.id,
+        data: doc.data() as Record<string, unknown>
       }))
-      .sort((a, b) => a.codeIndex - b.codeIndex);
+    );
+    const approvedRegistrationIds = new Set(
+      registrationsSnapshot.docs
+        .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+        .map(doc => doc.id)
+    );
+    for (const entry of rosterSnapshot.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Code Letter "${entry.codeLetter}" does not point to an approved registration. Judging has been blocked.`
+        );
+      }
+    }
 
-    const codeByRegistration = new Map<string, string>(roster.map(item => [item.registrationId, item.codeLetter] as [string, string]));
+    const roster = rosterSnapshot.entries;
+    const codeByRegistration = new Map<string, string>(
+      roster.map(item => [item.registrationId, item.codeLetter] as [string, string])
+    );
     const rawMarkEntry = markEntryDoc.exists ? markEntryDoc.data() || {} : {};
     const rawScores = rawMarkEntry.status === 'DRAFT' && rawMarkEntry.scores && typeof rawMarkEntry.scores === 'object'
       ? rawMarkEntry.scores as Record<string, unknown>
@@ -126,13 +131,18 @@ export async function POST(req: NextRequest) {
         criteria
       },
       contestants: roster.map(({ codeLetter, codeIndex, status }) => ({ codeLetter, codeIndex, status })),
+      rosterVersion: rosterSnapshot.version,
       scores: isSubmitted ? {} : draftScores,
       draftRemarks: rawMarkEntry.status === 'DRAFT' ? String(rawMarkEntry.remarks || '') : '',
       draftUpdatedAt: rawMarkEntry.status === 'DRAFT' ? String(rawMarkEntry.updatedAt || '') : '',
       staleDraft
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (cause) {
-    console.error('[JudgeSession] Unable to load assigned judge session:', cause instanceof Error ? cause.message : 'unknown error');
+    const message = cause instanceof Error ? cause.message : 'unknown error';
+    console.error('[JudgeSession] Unable to load assigned judge session:', message);
+    if (message.includes('Roster Integrity Error')) {
+      return error('The anonymous Green Room roster has an integrity problem. Mark entry has been blocked; contact the administrator to reconcile the Code Letters.', 409);
+    }
     return error('The assigned judge session could not be loaded. Check your connection and retry.', 500);
   }
 }
