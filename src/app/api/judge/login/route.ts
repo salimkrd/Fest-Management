@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { verifyJudgeAssignment, JudgeAssignmentRecord } from '@/domain/judgeAuth';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 /**
  * Server API Endpoint for Secure Jury Authentication (/api/judge/login)
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest) {
       codeIndex: number;
       status: string;
     }> = [];
+    let rosterVersion = '';
 
     const effectiveCompId = assignment.competitionId || competitionId;
     if (effectiveCompId) {
@@ -150,26 +152,49 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const grSnap = await db.collection('greenRoomAssignments')
-          .where('competitionId', '==', effectiveCompId)
-          .get();
+        const [grSnap, registrationsSnapshot] = await Promise.all([
+          db.collection('greenRoomAssignments')
+            .where('competitionId', '==', effectiveCompId)
+            .get(),
+          db.collection('registrations')
+            .where('competitionId', '==', effectiveCompId)
+            .get()
+        ]);
 
-        if (!grSnap.empty) {
-          const sorted = grSnap.docs.map(d => d.data());
-          sorted.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
-          registrations = sorted.map(item => ({
-            id: item.codeLetter,
-            codeLetter: item.codeLetter,
-            codeIndex: item.codeIndex,
-            status: item.status || 'CHECKED_IN'
-          }));
-        } else {
-          // Requirement 1: Remove all fake/fallback Judge Code Letter generation.
-          // Judges must see only actual Green Room assignments from Firestore. Show an empty state until check-in.
-          registrations = [];
+        const roster = buildGreenRoomRosterSnapshot(
+          effectiveCompId,
+          grSnap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+        );
+        const approvedRegistrationIds = new Set(
+          registrationsSnapshot.docs
+            .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+            .map(doc => doc.id)
+        );
+        for (const entry of roster.entries) {
+          if (!approvedRegistrationIds.has(entry.registrationId)) {
+            throw new Error(
+              `Roster Integrity Error: Code Letter "${entry.codeLetter}" does not point to an approved registration.`
+            );
+          }
         }
+
+        rosterVersion = roster.version;
+        registrations = roster.entries.map(item => ({
+          id: item.codeLetter,
+          codeLetter: item.codeLetter,
+          codeIndex: item.codeIndex,
+          status: item.status
+        }));
       } catch (e) {
-        console.warn('[JudgeLogin] Could not fetch anonymous contestants:', e);
+        const message = e instanceof Error ? e.message : 'unknown roster error';
+        console.error('[JudgeLogin] Anonymous roster integrity check failed:', message);
+        return NextResponse.json(
+          {
+            error: 'The Green Room Code Letter roster could not be verified. Judge access to mark entry is blocked; contact the administrator.',
+            code: 'ROSTER_INTEGRITY_ERROR'
+          },
+          { status: 409, headers: { 'Cache-Control': 'no-store' } }
+        );
       }
     }
 
@@ -195,8 +220,9 @@ export async function POST(req: NextRequest) {
       assignment: sanitizedAssignment,
       competition: competitionData,
       contestants: registrations,
-      registrations
-    }, { status: 200 });
+      registrations,
+      rosterVersion
+    }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 
   } catch (error: unknown) {
     console.error('[JudgeLogin] Error during authentication:', error);
