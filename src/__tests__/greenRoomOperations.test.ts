@@ -741,6 +741,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(data.success).toBe(true);
       expect(data.contestants).toBeDefined();
       expect(data.contestants.length).toBeGreaterThanOrEqual(2);
+      expect(data.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
 
       // Verify zero personal identity leakage in contestants array
       data.contestants.forEach((c: Record<string, unknown>) => {
@@ -753,6 +754,42 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(c.bib).toBeUndefined();
         expect(c.photoUrl).toBeUndefined();
       });
+    });
+
+    it('blocks judge login when the Green Room roster contains a duplicate Code Letter', async () => {
+      const firstRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-01`);
+      const secondRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-02`);
+      const [firstSnapshot, secondSnapshot] = await Promise.all([firstRef.get(), secondRef.get()]);
+      const firstData = firstSnapshot.data()!;
+      const secondData = secondSnapshot.data()!;
+      const originalCode = String(firstData.codeLetter).trim().toUpperCase();
+      const duplicateCode = String(secondData.codeLetter).trim().toUpperCase();
+
+      try {
+        await firstRef.update({
+          codeLetter: duplicateCode,
+          codeIndex: codeLetterToIndex(duplicateCode),
+          updatedAt: new Date().toISOString()
+        });
+
+        const req = new NextRequest('http://localhost:3000/api/judge/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            accessCode: judgeAccessCode,
+            competitionId: testCompId,
+            secret: judgeSecret
+          })
+        });
+        const res = await judgeLoginHandler(req);
+        expect(res.status).toBe(409);
+        expect((await res.json()).code).toBe('ROSTER_INTEGRITY_ERROR');
+      } finally {
+        await firstRef.update({
+          codeLetter: originalCode,
+          codeIndex: codeLetterToIndex(originalCode),
+          updatedAt: new Date().toISOString()
+        });
+      }
     });
 
     it('rejects participant IDs as score submission keys', async () => {
