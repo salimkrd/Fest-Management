@@ -213,8 +213,8 @@ function JudgeMarkingContent() {
     if (!assignmentId || !secret || !competition?.id || !rosterVersion) {
       throw new Error('Your verified Green Room roster session is missing. Refresh the judge session before saving.');
     }
-    if (contestants.length === 0 || criteria.length === 0) {
-      throw new Error('The current contestant roster or scoring rubric is empty. Refresh the session or contact the administrator.');
+    if (contestants.length === 0) {
+      throw new Error('The Green Room roster is empty. Refresh the session or contact the administrator.');
     }
 
     const validatedScores: Record<string, number> = {};
