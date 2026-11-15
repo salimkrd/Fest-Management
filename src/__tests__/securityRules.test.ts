@@ -1574,7 +1574,16 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     const unauthRes = await marksApiHandler(unauthReq);
     expect(unauthRes.status).toBe(401);
 
-    // 3. Valid draft request -> 200 OK
+    // 3. Valid draft request -> 200 OK. Score the complete current Green Room
+    // roster exactly as the Judge Portal does, never a hard-coded single Code A.
+    const apiRosterSnapshot = await getAdminDb()!.collection('greenRoomAssignments')
+      .where('competitionId', '==', 'comp-1')
+      .get();
+    const apiDraftScores = Object.fromEntries(
+      apiRosterSnapshot.docs.map(doc => [String(doc.data().codeLetter).trim().toUpperCase(), 92])
+    );
+    expect(Object.keys(apiDraftScores).length).toBeGreaterThan(0);
+
     const validDraftReq = new NextRequest('http://localhost:3000/api/judge/marks', {
       method: 'POST',
       body: JSON.stringify({
@@ -1583,7 +1592,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         competitionId: 'comp-1',
         secret: '9911',
         rosterVersion: await getTestRosterVersion('comp-1'),
-        scores: { 'A': 92 },
+        scores: apiDraftScores,
         remarks: 'API draft test'
       })
     });
