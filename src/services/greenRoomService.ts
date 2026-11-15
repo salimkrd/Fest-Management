@@ -236,7 +236,7 @@ export class GreenRoomService {
       );
 
       const registrationById = new Map(
-        registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        registrationSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of roster.entries) {
         if (!approvedRegistrationIds.has(entry.registrationId)) {
@@ -556,7 +556,7 @@ export class GreenRoomService {
         throw new Error('Eligibility Error: Only an approved registration can keep a Green Room Code Letter.');
       }
       const registrationById = new Map(
-        registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        registrationSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of roster.entries) {
         if (!approvedRegistrationIds.has(entry.registrationId)) {
@@ -743,7 +743,7 @@ export class GreenRoomService {
       snap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
     );
     const registrationById = new Map(
-      registrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      registrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
     );
     for (const entry of roster.entries) {
       const liveRegistration = registrationById.get(entry.registrationId);
