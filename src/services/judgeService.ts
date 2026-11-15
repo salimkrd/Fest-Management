@@ -209,7 +209,7 @@ export class JudgeService {
       }
       if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
         throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number). Judges must submit scores using ONLY assigned Green Room Code Letters.`
+          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number) and is strictly rejected. It is not a valid assigned Green Room Code Letter. Judges must submit scores using ONLY assigned Green Room Code Letters.`
         );
       }
       if (!cleanUpperKey) {
@@ -232,7 +232,7 @@ export class JudgeService {
       .filter(codeLetter => !roster.codeToRegistration.has(codeLetter));
     if (unexpectedCodes.length > 0) {
       throw new Error(
-        `Validation Error: Code Letter "${unexpectedCodes[0]}" is not assigned in the current Green Room roster.`
+        `Validation Error: Code Letter "${unexpectedCodes[0]}" is not a valid assigned Green Room Code Letter in the current roster.`
       );
     }
     if (missingCodes.length > 0 || normalizedScoreKeys.size !== roster.entries.length) {
