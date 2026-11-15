@@ -32,7 +32,8 @@ import { JudgeService } from '@/services/judgeService';
 import {
   encodeParticipantQrPayload,
   parseParticipantQrPayload,
-  generateQrVerificationToken
+  generateQrVerificationToken,
+  codeLetterToIndex
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
 import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
@@ -1446,6 +1447,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         db.collection('markEntries').doc('me-' + staleJudgeAssignId).delete(),
         db.collection('registrations').doc('reg-stale-1').delete(),
         db.collection('registrations').doc('reg-stale-2').delete(),
+        db.collection('registrations').doc('reg-stale-3').delete(),
         db.collection('judgeAssignments').doc(staleJudgeAssignId).delete(),
         db.collection('competitions').doc(staleCompId).delete(),
       ]);
@@ -1497,6 +1499,22 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         bib: '#ST-02'
       });
 
+      // A third approved entry leaves Code C available to exercise a real
+      // post-session reassignment without creating a third checked-in code.
+      await db.collection('registrations').doc('reg-stale-3').set({
+        id: 'reg-stale-3',
+        competitionId: staleCompId,
+        participantId: 'part-stale-3',
+        participantName: 'Stale Contestant 3',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        teamName: 'Team Al-Shabab',
+        status: 'APPROVED',
+        code: 'STALE-REG-3',
+        chestNumber: 'ST-03',
+        bib: '#ST-03'
+      });
+
       // Seed Judge Assignment with hashed secret and salt
       const { hashSecret } = await import('@/domain/judgeAuth');
       const secretHash = await hashSecret('secure_pin_987654', 'salt_stale_race');
@@ -1518,6 +1536,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       await db.collection('competitions').doc(staleCompId).delete().catch(() => {});
       await db.collection('registrations').doc('reg-stale-1').delete().catch(() => {});
       await db.collection('registrations').doc('reg-stale-2').delete().catch(() => {});
+      await db.collection('registrations').doc('reg-stale-3').delete().catch(() => {});
       await db.collection('judgeAssignments').doc(staleJudgeAssignId).delete().catch(() => {});
       await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).delete().catch(() => {});
       await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).delete().catch(() => {});
@@ -1674,6 +1693,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
             codeLetter: 'X',
+            codeIndex: codeLetterToIndex('X'),
             updatedAt: new Date().toISOString()
           });
           return res;
@@ -1697,6 +1717,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           // Reset reg-stale-1 back to 'A'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
             codeLetter: firstCodeLetter,
+            codeIndex: codeLetterToIndex(firstCodeLetter),
             updatedAt: new Date().toISOString()
           });
         }
@@ -1711,6 +1732,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
             codeLetter: 'Z',
+            codeIndex: codeLetterToIndex('Z'),
             updatedAt: new Date().toISOString()
           });
           return res;
@@ -1734,6 +1756,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           // Reset reg-stale-2 back to 'B'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
             codeLetter: secondCodeLetter,
+            codeIndex: codeLetterToIndex(secondCodeLetter),
             updatedAt: new Date().toISOString()
           });
         }
