@@ -16,6 +16,7 @@ export interface GreenRoomRosterEntry {
   participantName: string;
   teamId: string;
   teamCode: string;
+  teamName: string;
   chestNumber: string;
   groupMembers: string[];
   groupLeaderId: string;
@@ -52,6 +53,7 @@ export function assertGreenRoomEntryMatchesRegistration(
   const participantName = normalizedId(registration.participantName);
   const teamId = normalizedId(registration.teamId);
   const teamCode = normalizedId(registration.teamCode).toUpperCase();
+  const teamName = normalizedId(registration.teamName);
   const chestNumber = normalizedId(registration.chestNumber).toUpperCase();
   const groupMembers = normalizedIdList(registration.groupMembers);
   const groupLeaderId = normalizedId(registration.groupLeaderId);
@@ -64,6 +66,7 @@ export function assertGreenRoomEntryMatchesRegistration(
     entry.participantName === participantName &&
     entry.teamId === teamId &&
     entry.teamCode === teamCode &&
+    entry.teamName === teamName &&
     entry.chestNumber === chestNumber &&
     JSON.stringify(entry.groupMembers) === JSON.stringify(groupMembers) &&
     entry.groupLeaderId === groupLeaderId &&
@@ -159,6 +162,7 @@ export function buildGreenRoomRosterSnapshot(
       participantName: normalizedId(data.participantNameSnapshot ?? data.participantName),
       teamId: normalizedId(data.teamId),
       teamCode: normalizedId(data.teamCode).toUpperCase(),
+      teamName: normalizedId(data.teamName),
       chestNumber: normalizedId(data.chestNumber).toUpperCase(),
       groupMembers: normalizedIdList(data.groupMembers),
       groupLeaderId: normalizedId(data.groupLeaderId),
@@ -184,6 +188,7 @@ export function buildGreenRoomRosterSnapshot(
       participantName,
       teamId,
       teamCode,
+      teamName,
       chestNumber,
       groupMembers,
       groupLeaderId,
@@ -196,6 +201,7 @@ export function buildGreenRoomRosterSnapshot(
       participantName,
       teamId,
       teamCode,
+      teamName,
       chestNumber,
       groupMembers,
       groupLeaderId,
