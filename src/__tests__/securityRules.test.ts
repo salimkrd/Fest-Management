@@ -929,7 +929,11 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       code: 'CMP-SERVICE',
       name: 'Test Competition',
       status: 'IN_PROGRESS',
-      maxMarks: 100
+      maxMarks: 100,
+      criteria: [
+        { id: 'content', name: 'Content', maxMarks: 50 },
+        { id: 'delivery', name: 'Delivery', maxMarks: 50 }
+      ]
     });
 
     await adminDb.collection('registrations').doc('reg-service-1').set({
