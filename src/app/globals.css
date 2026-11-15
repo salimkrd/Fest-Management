@@ -383,3 +383,517 @@
     transition: none !important;
   }
 }
+
+
+/* =========================================================================
+   INSPIRATH Public Experience — shared visual system for all public routes
+   Scoped to PublicLayout; poster dialogs also use the standalone public-* classes.
+   ========================================================================= */
+.public-experience {
+  --public-ruby: #4A0A1C;
+  --public-ruby-mid: #86152C;
+  --public-crimson: #A91D3A;
+  --public-gold: #FDBF0F;
+  --public-ivory: #FFF8EE;
+  --public-espresso: #1A080B;
+  --public-muted: #765F57;
+  min-height: 100vh;
+  color: var(--public-espresso);
+  background:
+    radial-gradient(circle at 92% 3%, rgba(253, 191, 15, 0.13), transparent 27rem),
+    linear-gradient(180deg, #FFF8EE 0%, #FFF9F0 52%, #F8EBDD 100%);
+  font-family: 'Sora', sans-serif !important;
+}
+.public-experience .festival-name {
+  font-family: 'Bruno Ace', cursive, sans-serif !important;
+}
+.public-announcement {
+  background: linear-gradient(90deg, #1A080B 0%, #4A0A1C 48%, #86152C 100%);
+  border-bottom: 1px solid rgba(253, 191, 15, 0.45);
+  letter-spacing: 0.025em;
+}
+.public-status-strip {
+  background: #1A080B;
+}
+.public-experience .public-festival-status {
+  border-color: rgba(253, 191, 15, 0.65) !important;
+  background: rgba(253, 191, 15, 0.12) !important;
+  color: #FDBF0F !important;
+  font-size: 9px !important;
+  letter-spacing: 0.11em !important;
+}
+.public-experience .public-festival-status span {
+  background-color: #FDBF0F !important;
+}
+.public-site-header {
+  background: linear-gradient(105deg, #1A080B 0%, #4A0A1C 62%, #2D1217 100%);
+  border-bottom: 1px solid rgba(253, 191, 15, 0.5);
+  box-shadow: 0 8px 24px rgba(26, 8, 11, 0.16);
+}
+.public-experience .public-logo {
+  border: 1px solid rgba(253, 191, 15, 0.55);
+  background: #FDBF0F !important;
+  color: #1A080B !important;
+  border-radius: 10px;
+}
+.public-brand-title {
+  color: #FFF8EE;
+  font-family: 'Bruno Ace', cursive, sans-serif;
+  letter-spacing: 0.035em;
+}
+.public-brand-subtitle {
+  color: rgba(255, 248, 238, 0.7);
+}
+.public-experience .public-nav-link {
+  color: rgba(255, 248, 238, 0.78);
+  border: 1px solid transparent;
+}
+.public-experience .public-nav-link:hover {
+  color: #FDBF0F;
+  background: rgba(253, 191, 15, 0.08);
+}
+.public-experience .public-nav-link.is-active {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+  border-color: #FDBF0F;
+}
+.public-experience .public-nav-link svg {
+  color: currentColor !important;
+}
+.public-search-input {
+  color: #FFF8EE !important;
+  background: rgba(26, 8, 11, 0.8) !important;
+  border: 1px solid rgba(253, 191, 15, 0.38) !important;
+}
+.public-search-input::placeholder {
+  color: rgba(255, 248, 238, 0.48) !important;
+}
+.public-search-input:focus {
+  border-color: #FDBF0F !important;
+  box-shadow: 0 0 0 2px rgba(253, 191, 15, 0.16);
+}
+.public-mobile-toggle {
+  color: #FDBF0F !important;
+  border: 1px solid rgba(253, 191, 15, 0.45);
+  background: rgba(26, 8, 11, 0.75);
+}
+.public-mobile-toggle:hover {
+  background: rgba(253, 191, 15, 0.12);
+}
+.public-mobile-drawer {
+  background: #1A080B;
+  border-color: rgba(253, 191, 15, 0.32);
+}
+.public-experience .public-mobile-link {
+  color: #FFF8EE;
+  border: 1px solid rgba(253, 191, 15, 0.15);
+}
+.public-experience .public-mobile-link:hover {
+  color: #FDBF0F;
+  background: rgba(253, 191, 15, 0.09);
+}
+.public-main {
+  padding-top: clamp(1.25rem, 3vw, 2rem);
+  padding-bottom: clamp(2rem, 4vw, 3rem);
+}
+.public-site-footer {
+  color: rgba(255, 248, 238, 0.78);
+  background: linear-gradient(110deg, #1A080B 0%, #2D1217 55%, #4A0A1C 100%);
+  border-top: 1px solid rgba(253, 191, 15, 0.42);
+}
+.public-site-footer .font-bold,
+.public-site-footer .festival-name {
+  color: #FDBF0F !important;
+}
+.public-footer-note {
+  color: rgba(255, 248, 238, 0.58);
+}
+.public-page-stack {
+  color: #1A080B;
+}
+.public-page-title {
+  color: #1A080B;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+.public-page-description,
+.public-muted {
+  color: #765F57;
+}
+.public-eyebrow,
+.public-page-eyebrow {
+  color: #4A0A1C;
+  background: rgba(253, 191, 15, 0.16);
+  border: 1px solid rgba(197, 139, 0, 0.38);
+}
+.public-page-icon {
+  color: #FDBF0F;
+  background: linear-gradient(145deg, #4A0A1C, #86152C);
+  border: 1px solid rgba(253, 191, 15, 0.55);
+}
+.public-section-title {
+  color: #4A0A1C;
+}
+.public-card-title {
+  color: #1A080B;
+}
+.public-filter-panel {
+  background: rgba(255, 252, 245, 0.96);
+  border-color: rgba(197, 139, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(74, 10, 28, 0.055);
+}
+.public-control {
+  color: #1A080B !important;
+  background: #FFFDF8 !important;
+  border: 1px solid #D8C4A6 !important;
+  box-shadow: inset 0 1px 2px rgba(26, 8, 11, 0.025);
+}
+.public-control::placeholder {
+  color: #9A877A !important;
+}
+.public-control:focus {
+  outline: none;
+  border-color: #A91D3A !important;
+  box-shadow: 0 0 0 3px rgba(169, 29, 58, 0.12) !important;
+}
+.public-results-count {
+  color: #765F57;
+}
+.public-results-grid {
+  align-items: stretch;
+}
+.public-result-card,
+.public-template-card,
+.public-table-card,
+.public-podium-card {
+  background: rgba(255, 252, 245, 0.96);
+  border-color: rgba(197, 139, 0, 0.38);
+  box-shadow: 0 8px 24px rgba(74, 10, 28, 0.065);
+}
+.public-result-card {
+  min-width: 0;
+  border-radius: 15px;
+}
+.public-result-card:hover {
+  border-color: rgba(169, 29, 58, 0.55);
+  box-shadow: 0 14px 30px rgba(74, 10, 28, 0.12);
+  transform: translateY(-2px);
+}
+.public-code-badge {
+  color: #FDBF0F;
+  background: #4A0A1C;
+  border-color: rgba(253, 191, 15, 0.42);
+}
+.public-winner-row {
+  min-width: 0;
+  border-color: rgba(197, 139, 0, 0.28);
+}
+.public-winner-first {
+  background: linear-gradient(110deg, rgba(253, 191, 15, 0.2), rgba(255, 248, 238, 0.92));
+}
+.public-winner-secondary {
+  background: #F8F0E5;
+}
+.public-rank-dot {
+  color: #FFF8EE;
+}
+.public-rank-first {
+  color: #1A080B;
+  background: #FDBF0F;
+}
+.public-rank-secondary {
+  color: #FFF8EE;
+  background: #4A0A1C;
+}
+.public-winner-name {
+  color: #1A080B;
+}
+.public-grade-text,
+.public-accent-text {
+  color: #86152C !important;
+}
+.public-points-text {
+  color: #8A641C !important;
+}
+.public-card-footer {
+  border-color: rgba(197, 139, 0, 0.32);
+}
+.public-inline-link {
+  color: #86152C !important;
+}
+.public-inline-link:hover {
+  color: #A91D3A !important;
+  text-decoration: underline;
+}
+.public-empty-state {
+  color: #765F57;
+  background: rgba(255, 252, 245, 0.92);
+  border-color: rgba(197, 139, 0, 0.35);
+}
+.public-empty-state .public-card-title {
+  color: #4A0A1C;
+}
+.public-table-card {
+  border-radius: 16px;
+}
+.public-card-header {
+  background: linear-gradient(100deg, #4A0A1C, #2D1217);
+  border-color: rgba(253, 191, 15, 0.32);
+}
+.public-card-header .public-card-title {
+  color: #FFF8EE;
+}
+.public-card-header .public-muted {
+  color: rgba(255, 248, 238, 0.66);
+}
+.public-table {
+  color: #1A080B;
+}
+.public-table-head {
+  color: #FDBF0F;
+  background: #4A0A1C;
+  border-color: rgba(253, 191, 15, 0.35);
+}
+.public-table-head th {
+  white-space: nowrap;
+}
+.public-table-body {
+  border-color: rgba(197, 139, 0, 0.2);
+}
+.public-table-row {
+  background: rgba(255, 252, 245, 0.9);
+  border-color: rgba(197, 139, 0, 0.18);
+}
+.public-table-row:nth-child(even) {
+  background: rgba(248, 240, 229, 0.8);
+}
+.public-table-row:hover {
+  background: rgba(253, 191, 15, 0.1);
+}
+.public-table-row td {
+  color: #1A080B;
+}
+.public-table-row .public-muted {
+  color: #765F57;
+}
+.public-points-total {
+  color: #86152C;
+}
+.public-expand-button {
+  color: #86152C;
+  border: 1px solid rgba(197, 139, 0, 0.35);
+}
+.public-expand-button:hover {
+  color: #1A080B;
+  background: #FDBF0F;
+}
+.public-expanded-row {
+  background: #F5E8D7;
+}
+.public-expanded-panel {
+  color: #1A080B;
+  background: #FFFCF5;
+  border-color: rgba(197, 139, 0, 0.42);
+}
+.public-expanded-value {
+  color: #4A0A1C;
+}
+.public-podium-card {
+  background: rgba(255, 252, 245, 0.96);
+}
+.public-podium-base {
+  border-color: rgba(197, 139, 0, 0.3);
+}
+.public-podium-second {
+  background: linear-gradient(180deg, #F4EDE3, #E9DDCD);
+}
+.public-podium-first {
+  background: linear-gradient(180deg, #FFF1BD, #FBE2A0);
+  border-color: rgba(197, 139, 0, 0.55);
+}
+.public-podium-third {
+  background: linear-gradient(180deg, #F5E6D0, #EBD4B4);
+}
+.public-event-header {
+  color: #FFF8EE;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(253, 191, 15, 0.22), transparent 18rem),
+    linear-gradient(125deg, #4A0A1C 0%, #86152C 58%, #2D1217 100%);
+  border-color: rgba(253, 191, 15, 0.55);
+  box-shadow: 0 12px 30px rgba(74, 10, 28, 0.14);
+}
+.public-event-header .public-page-title {
+  color: #FFF8EE;
+}
+.public-event-header .public-muted {
+  color: rgba(255, 248, 238, 0.76);
+}
+.public-winner-card {
+  min-width: 0;
+  background: #FFFCF5;
+  border-color: rgba(197, 139, 0, 0.35);
+}
+.public-winner-card.public-winner-first {
+  background: linear-gradient(155deg, #FFF4D0 0%, #FFFCF5 65%, #F8E9D3 100%);
+  border-color: #D8A829;
+}
+.public-winner-card.public-winner-second {
+  background: linear-gradient(155deg, #F8F2E9, #FFFCF5);
+  border-color: #D8C4A6;
+}
+.public-winner-card.public-winner-third {
+  background: linear-gradient(155deg, #F5E7D3, #FFFCF5);
+  border-color: #C9A477;
+}
+.public-winner-label-first {
+  background: #FDBF0F;
+  color: #1A080B;
+}
+.public-winner-label-second {
+  background: #4A0A1C;
+  color: #FFF8EE;
+}
+.public-winner-label-third {
+  background: #8A641C;
+  color: #FFF8EE;
+}
+.public-winner-stats {
+  border-color: rgba(197, 139, 0, 0.35);
+}
+.public-table-card .public-table-head {
+  background: #4A0A1C;
+}
+.public-poster-cta {
+  background: linear-gradient(120deg, #FFF1BD 0%, #FFF8EE 54%, #F5E6D0 100%);
+  border-color: rgba(197, 139, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(74, 10, 28, 0.055);
+}
+.public-primary-button {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+  border: 1px solid #D6A000 !important;
+  box-shadow: 0 3px 10px rgba(74, 10, 28, 0.1);
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.public-primary-button:hover:not(:disabled) {
+  background: #F0B200 !important;
+  box-shadow: 0 5px 16px rgba(74, 10, 28, 0.16);
+  transform: translateY(-1px);
+}
+.public-action-button {
+  color: #FDBF0F !important;
+  background: #4A0A1C !important;
+  border: 1px solid rgba(253, 191, 15, 0.65) !important;
+  box-shadow: none !important;
+}
+.public-action-button:hover:not(:disabled) {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+.public-action-button-secondary {
+  color: #FFF8EE !important;
+  background: #86152C !important;
+}
+.public-action-button-secondary:hover:not(:disabled) {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+.public-published-badge {
+  color: #4A0A1C !important;
+  background: rgba(253, 191, 15, 0.22) !important;
+  border-color: rgba(197, 139, 0, 0.45) !important;
+}
+.public-released-badge {
+  color: #4A0A1C;
+  background: rgba(253, 191, 15, 0.25);
+  border: 1px solid rgba(197, 139, 0, 0.35);
+}
+.public-success-note {
+  color: #795126;
+}
+.public-alert {
+  color: #86152C;
+  background: #F8E8E8;
+  border-color: #D8A6A9;
+}
+.public-template-card {
+  min-width: 0;
+}
+.public-dialog-overlay {
+  background: rgba(26, 8, 11, 0.78);
+}
+.public-dialog {
+  color: #1A080B;
+  background: #FFF8EE;
+  border: 1px solid rgba(253, 191, 15, 0.55);
+  box-shadow: 0 24px 80px rgba(26, 8, 11, 0.38);
+}
+.public-dialog-header,
+.public-dialog-footer {
+  background: linear-gradient(100deg, #4A0A1C, #2D1217);
+  border-color: rgba(253, 191, 15, 0.35);
+}
+.public-dialog-header .public-dialog-title {
+  color: #FFF8EE;
+}
+.public-dialog-header .public-muted {
+  color: rgba(255, 248, 238, 0.72);
+}
+.public-dialog-body {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(253, 191, 15, 0.1), transparent 18rem),
+    #FFF8EE;
+}
+.public-dialog-close {
+  color: #FDBF0F !important;
+  background: rgba(26, 8, 11, 0.75) !important;
+  border-color: rgba(253, 191, 15, 0.5) !important;
+}
+.public-dialog-close:hover {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+.public-dialog-template-card {
+  background: #FFFCF5;
+  border-color: rgba(197, 139, 0, 0.4);
+}
+.public-poster-preview {
+  border-color: rgba(197, 139, 0, 0.35) !important;
+  background: #F5EBDD !important;
+}
+.public-dialog-footer .public-dialog-close {
+  background: #4A0A1C !important;
+}
+.public-dialog-footer .public-dialog-close:hover {
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+@media (max-width: 640px) {
+  .public-page-stack {
+    width: 100%;
+  }
+  .public-experience .public-main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .public-result-card,
+  .public-template-card,
+  .public-podium-card {
+    border-radius: 13px;
+  }
+  .public-table-card {
+    border-radius: 13px;
+  }
+  .public-dialog {
+    max-height: 94dvh;
+    border-radius: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-primary-button,
+  .public-result-card {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
