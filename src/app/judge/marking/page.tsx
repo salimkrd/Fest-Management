@@ -140,12 +140,16 @@ function JudgeMarkingContent() {
 
           // Convert drafts created by the previous criterion-wise UI into the
           // equivalent total mark so judges can continue editing without data loss.
-          const restoredTotal = Object.entries(rawScore || {}).reduce((sum, [criterionId, value]) => {
+          const restoredRawTotal = Object.entries(rawScore || {}).reduce((sum, [criterionId, value]) => {
             const isKnownCriterion = nextCriteria.some(criterion => criterion.id === criterionId);
             return isKnownCriterion && typeof value === 'number' && Number.isFinite(value)
               ? sum + value
               : sum;
           }, 0);
+          const previousCriteriaMaximum = nextCriteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0);
+          const restoredTotal = previousCriteriaMaximum > 0
+            ? Math.round((restoredRawTotal / previousCriteriaMaximum) * 100)
+            : restoredRawTotal;
           nextScores[codeLetter] = String(restoredTotal);
         });
       }
@@ -171,7 +175,8 @@ function JudgeMarkingContent() {
     void loadSession();
   }, [loadSession]);
 
-  const maxMarksTotal = useMemo(
+  const maxMarksTotal = 100;
+  const configuredCriteriaMax = useMemo(
     () => criteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0),
     [criteria]
   );
@@ -467,7 +472,7 @@ function JudgeMarkingContent() {
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
               <Gavel className="h-4 w-4 shrink-0 text-blue-600" />
-              <span>{contestants.length} anonymous codes · Marks out of {maxMarksTotal}</span>
+              <span>{contestants.length} anonymous codes · Marks out of 100</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
               <Button variant="outline" size="md" className="w-full sm:w-auto" leftIcon={<Save className="h-4 w-4" />} onClick={handleSaveDraft} disabled={savingDraft || submitting} isLoading={savingDraft}>Save draft</Button>
