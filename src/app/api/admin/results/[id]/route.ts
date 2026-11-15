@@ -48,7 +48,6 @@ export async function POST(
       if (!competitionSnapshot.exists) {
         return NextResponse.json({ error: 'Validation Error: Competition no longer exists.' }, { status: 400 });
       }
-      const competition = competitionSnapshot.data();
       const maxMarks = 100;
 
       const seen = new Set<string>();
