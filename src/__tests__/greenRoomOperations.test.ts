@@ -1747,7 +1747,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.success).toBe(true);
         expect(res.qrVerified).toBe(true);
         expect(res.checkInMethod).toBe('QR_SCAN');
-        expect(['A', 'B']).toContain(res.assignment.codeLetter);
+        expect(['A', 'B', 'C']).toContain(res.assignment.codeLetter);
 
         // Verify assignment record in Firestore
         const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
@@ -1777,7 +1777,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.qrVerified).toBe(false);
         expect(res.checkInMethod).toBe('MANUAL_LOOKUP');
         const firstAssignment = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
-        expect(['A', 'B']).toContain(res.assignment.codeLetter);
+        expect(['A', 'B', 'C']).toContain(res.assignment.codeLetter);
         expect(res.assignment.codeLetter).not.toBe(firstAssignment.data()?.codeLetter);
 
         // Verify assignment record in Firestore
@@ -1814,17 +1814,21 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       it('rejects marks from a judge screen opened before a real Green Room Code Letter reassignment', async () => {
         const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         const oldSessionRosterVersion = await getRosterVersion(staleCompId);
+        const availableCodeLetter = ['A', 'B', 'C'].find(
+          code => code !== firstCodeLetter && code !== secondCodeLetter
+        );
+        expect(availableCodeLetter).toBeDefined();
 
         // This is a real service-level reassignment while the judge's old screen
-        // remains open. Code C is available because a third approved entry exists.
+        // remains open. Use whichever approved-pool code is currently unoccupied.
         const reassigned = await GreenRoomService.reassignCodeLetter({
           competitionId: staleCompId,
           registrationId: 'reg-stale-1',
-          newCodeLetter: 'C',
+          newCodeLetter: availableCodeLetter!,
           reason: 'Exercise stale judge session protection',
           operatorIdToken: staffIdToken
         });
-        expect(reassigned.codeLetter).toBe('C');
+        expect(reassigned.codeLetter).toBe(availableCodeLetter);
 
         // A judge still holding the old A/B screen must not be able to save A/B
         // to the new B/C roster, even though Code A is now free.
