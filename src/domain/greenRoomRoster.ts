@@ -165,7 +165,10 @@ export function buildGreenRoomRosterSnapshot(
       codeIndex,
       status: typeof data.status === 'string' ? data.status : 'CHECKED_IN',
       participantId: normalizedId(data.participantId),
-      participantName: normalizedId(data.participantNameSnapshot ?? data.participantName),
+      participantName: normalizedId(
+        data.participantNameSnapshot ??
+        (data.participantName === 'Contestant' ? '' : data.participantName)
+      ),
       teamId: normalizedId(data.teamId),
       teamCode: normalizedId(data.teamCode).toUpperCase(),
       teamName: normalizedId(data.teamName),
