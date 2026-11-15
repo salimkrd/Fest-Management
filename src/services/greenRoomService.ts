@@ -497,7 +497,6 @@ export class GreenRoomService {
       // with judge score saves and new Green Room check-ins.
       const lockDoc = await transaction.get(lockRef);
       const assignmentDoc = await transaction.get(assignmentRef);
-      const counterDoc = await transaction.get(counterRef);
       const assignmentSnapshot = await transaction.get(assignmentQuery);
       const registrationSnapshot = await transaction.get(registrationQuery);
 
