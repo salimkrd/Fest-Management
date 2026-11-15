@@ -7,8 +7,15 @@ import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
 
+const parseFestivalCalendarDate = (value?: string): Date | null => {
+  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) return null;
+  return parsed;
+};
+
 export default function InspirathPublicHomePage() {
-  const { theme, teams, results, categories, competitions } = useFest();
+  const { theme, teams, results, categories, competitions, teamsSyncState, resultsSyncState } = useFest();
 
   // Mobile navigation drawer toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -56,14 +63,16 @@ export default function InspirathPublicHomePage() {
     setFinderHasSearched(true);
 
     const query = finderInput.trim().toLowerCase();
+    if (!query && finderCategory === 'all' && finderEvent === 'all') {
+      setMatchedRecord(null);
+      return;
+    }
 
     // Search through all published results
     for (const res of publishedResults) {
       // Category filter check
       if (finderCategory !== 'all') {
-        const catMatch =
-          res.categoryName.toLowerCase() === finderCategory.toLowerCase() ||
-          res.competitionId.toLowerCase() === finderCategory.toLowerCase();
+        const catMatch = res.categoryName.toLowerCase() === finderCategory.toLowerCase();
         if (!catMatch) continue;
       }
 
@@ -125,37 +134,50 @@ export default function InspirathPublicHomePage() {
     });
   }, [publishedResults, activeDivisionTab]);
 
-  // Format verified festival dates consistently
+  // Format only verified Festival Settings dates; never invent a fallback date.
   const formattedDates = useMemo(() => {
-    if (theme.festivalStartDate && theme.festivalEndDate) {
-      try {
-        const start = new Date(theme.festivalStartDate + 'T00:00:00Z');
-        const end = new Date(theme.festivalEndDate + 'T00:00:00Z');
-        const year = start.getUTCFullYear();
-        const startMonth = start.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
-        const startDay = start.getUTCDate();
-        const endDay = end.getUTCDate();
-        return `${year} ${startMonth} ${startDay} & ${endDay}`;
-      } catch {
-        return `${theme.year || '2026'} Nov 24 & 25`;
-      }
+    const start = parseFestivalCalendarDate(theme.festivalStartDate);
+    const end = parseFestivalCalendarDate(theme.festivalEndDate);
+    if (!start || !end || end.getTime() < start.getTime()) return 'Dates to be announced';
+
+    const startYear = start.getUTCFullYear();
+    const endYear = end.getUTCFullYear();
+    const startMonth = start.getUTCMonth();
+    const endMonth = end.getUTCMonth();
+    const startDay = start.getUTCDate();
+    const endDay = end.getUTCDate();
+
+    if (start.getTime() === end.getTime()) {
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+      }).format(start);
     }
-    return `${theme.year || '2026'} Nov 24 & 25`;
-  }, [theme.festivalStartDate, theme.festivalEndDate, theme.year]);
+
+    if (startYear === endYear && startMonth === endMonth) {
+      const month = start.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+      return `${startYear} ${month} ${startDay} & ${endDay}`;
+    }
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    return `${formatter.format(start)} – ${formatter.format(end)}`;
+  }, [theme.festivalStartDate, theme.festivalEndDate]);
 
   const formattedDays = useMemo(() => {
-    if (theme.festivalStartDate && theme.festivalEndDate) {
-      try {
-        const start = new Date(theme.festivalStartDate + 'T00:00:00Z');
-        const end = new Date(theme.festivalEndDate + 'T00:00:00Z');
-        const startDay = start.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-        const endDay = end.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-        return startDay === endDay ? startDay : `${startDay} & ${endDay}`;
-      } catch {
-        return 'Tuesday & Wednesday';
-      }
-    }
-    return 'Tuesday & Wednesday';
+    const start = parseFestivalCalendarDate(theme.festivalStartDate);
+    const end = parseFestivalCalendarDate(theme.festivalEndDate);
+    if (!start || !end || end.getTime() < start.getTime()) return 'Dates to be announced';
+
+    const startDay = start.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    const endDay = end.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    return start.getTime() === end.getTime() ? startDay : `${startDay} & ${endDay}`;
   }, [theme.festivalStartDate, theme.festivalEndDate]);
 
   // Displayed institution and venue
@@ -165,93 +187,7 @@ export default function InspirathPublicHomePage() {
 
   return (
     <div className="bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
-      {/* HEADER: Deep Ruby-Espresso Header strictly matching approved branding */}
-      <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between py-10 px-8">
-          <Link
-            className="flex items-center gap-2 group"
-            data-path="home"
-            href="#home"
-            id="brand-logo"
-            aria-label={`${festivalTitle} Home`}
-          >
-            <span className="font-brand text-4xl sm:text-5xl font-extrabold tracking-wider text-[#FFF8EE] group-hover:text-[#FDBF0F] transition-colors uppercase leading-none">
-              {festivalTitle}
-            </span>
-            <span className="w-2 h-2 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_8px_rgba(253,191,15,0.9)]" />
-          </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center font-body gap-8">
-            <Link
-              aria-current="page"
-              className="px-4 py-2 text-base uppercase tracking-wider font-bold text-[#FDBF0F] border-b-2 border-[#FDBF0F] transition-colors"
-              data-path="home"
-              href="#home"
-            >
-              Home
-            </Link>
-            <Link
-              className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
-              data-path="results-directory"
-              href="/public/directory"
-            >
-              Results Directory
-            </Link>
-            <Link
-              className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
-              data-path="team-championship"
-              href="/public/championship"
-            >
-              Team Championship
-            </Link>
-          </nav>
-
-          {/* Mobile Hamburger Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2.5 rounded-lg bg-[#4A0A1C]/90 text-[#FDBF0F] border border-[#FDBF0F]/40 hover:bg-[#86152C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#FDBF0F]"
-              aria-label="Toggle navigation menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? (
-                <span className="material-symbols-outlined text-[28px] block leading-none">close</span>
-              ) : (
-                <span className="material-symbols-outlined text-[28px] block leading-none">menu</span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Drawer */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-[#1A080B]/95 border-b border-[#FDBF0F]/40 px-8 py-6 backdrop-blur-lg space-y-4 shadow-2xl">
-            <Link
-              href="#home"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block text-base uppercase tracking-wider font-bold text-[#FDBF0F] py-2 border-b border-[#FDBF0F]/20"
-            >
-              Home
-            </Link>
-            <Link
-              href="/public/directory"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2 border-b border-[#FDBF0F]/20"
-            >
-              Results Directory
-            </Link>
-            <Link
-              href="/public/championship"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2"
-            >
-              Team Championship
-            </Link>
-          </div>
-        )}
-      </header>
 
       <main className="w-full">
         {/* HERO SECTION: Vibrant Rich Ruby-Crimson (#4A0A1C -> #86152C -> #A91D3A), theme.png as primary title, solo glowing lamp */}
@@ -259,6 +195,95 @@ export default function InspirathPublicHomePage() {
           className="relative w-full hero-ruby-bg text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
           id="home"
         >
+          {/* HEADER: Deep Ruby-Espresso Header strictly matching approved branding */}
+          <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
+            <div className="max-w-[1440px] mx-auto flex items-center justify-between py-10 px-8">
+              <Link
+                className="flex items-center gap-2 group"
+                data-path="home"
+                href="#home"
+                id="brand-logo"
+                aria-label={`${festivalTitle} Home`}
+              >
+                <span className="font-brand text-4xl sm:text-5xl font-extrabold tracking-wider text-[#FFF8EE] group-hover:text-[#FDBF0F] transition-colors uppercase leading-none">
+                  {festivalTitle}
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_8px_rgba(253,191,15,0.9)]" />
+              </Link>
+
+              {/* Desktop Navigation */}
+              <nav className="hidden md:flex items-center font-body gap-8">
+                <Link
+                  aria-current="page"
+                  className="px-4 py-2 text-base uppercase tracking-wider font-bold text-[#FDBF0F] border-b-2 border-[#FDBF0F] transition-colors"
+                  data-path="home"
+                  href="#home"
+                >
+                  Home
+                </Link>
+                <Link
+                  className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
+                  data-path="results-directory"
+                  href="/public/directory"
+                >
+                  Results Directory
+                </Link>
+                <Link
+                  className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
+                  data-path="team-championship"
+                  href="/public/championship"
+                >
+                  Team Championship
+                </Link>
+              </nav>
+
+              {/* Mobile Hamburger Button */}
+              <div className="md:hidden flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="p-2.5 rounded-lg bg-[#4A0A1C]/90 text-[#FDBF0F] border border-[#FDBF0F]/40 hover:bg-[#86152C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#FDBF0F]"
+                  aria-label="Toggle navigation menu"
+                  aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation"
+                >
+                  {mobileMenuOpen ? (
+                    <span className="material-symbols-outlined text-[28px] block leading-none">close</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-[28px] block leading-none">menu</span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Navigation Drawer */}
+            {mobileMenuOpen && (
+              <div id="mobile-navigation" className="md:hidden bg-[#1A080B]/95 border-b border-[#FDBF0F]/40 px-8 py-6 backdrop-blur-lg space-y-4 shadow-2xl">
+                <Link
+                  href="#home"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-base uppercase tracking-wider font-bold text-[#FDBF0F] py-2 border-b border-[#FDBF0F]/20"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/public/directory"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2 border-b border-[#FDBF0F]/20"
+                >
+                  Results Directory
+                </Link>
+                <Link
+                  href="/public/championship"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2"
+                >
+                  Team Championship
+                </Link>
+              </div>
+            )}
+          </header>
+
           {/* Ambient Glows */}
           <div
             className="ambient-glow absolute top-1/2 right-[14%] -translate-y-1/2 w-[520px] h-[520px] rounded-full pointer-events-none"
@@ -460,7 +485,16 @@ export default function InspirathPublicHomePage() {
                   </Link>
                 </div>
 
-                {sortedTeams.length === 0 ? (
+                {teamsSyncState === 'loading' ? (
+                  <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
+                    <p className="text-sm font-semibold text-[#FFF8EE]">Loading official championship standings…</p>
+                  </div>
+                ) : teamsSyncState === 'error' ? (
+                  <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
+                    <p className="text-sm font-semibold text-[#FFF8EE]">Championship standings are temporarily unavailable.</p>
+                    <p className="text-xs text-[#FFF8EE]/70 mt-1">Please check back shortly.</p>
+                  </div>
+                ) : sortedTeams.length === 0 ? (
                   <div className="p-8 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
                     <span className="material-symbols-outlined text-[#FDBF0F] text-[36px] mb-2 inline-block">
                       leaderboard
@@ -654,7 +688,7 @@ export default function InspirathPublicHomePage() {
                             Matched Ratified Record
                           </span>
                           <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold uppercase">
-                            Verified 100%
+                            Published
                           </span>
                         </div>
                         <div className="flex items-start justify-between gap-4">
@@ -677,7 +711,7 @@ export default function InspirathPublicHomePage() {
                           </div>
                         </div>
                       </div>
-                    ) : finderHasSearched ? (
+                    ) : finderHasSearched && (finderInput.trim() || finderCategory !== 'all' || finderEvent !== 'all') ? (
                       <div className="text-center py-4">
                         <span className="material-symbols-outlined text-[#FDBF0F]/60 text-[32px] block mb-1">
                           search_off
@@ -794,7 +828,16 @@ export default function InspirathPublicHomePage() {
             </div>
 
             {/* Results Grid */}
-            {filteredLatestResults.length === 0 ? (
+            {resultsSyncState === 'loading' ? (
+              <div className="max-w-md mx-auto text-center py-12 px-6 rounded-xl bg-[#F5B300]/60 border border-[#D69700]">
+                <p className="text-sm font-semibold text-[#1A080B]">Loading published competition results…</p>
+              </div>
+            ) : resultsSyncState === 'error' ? (
+              <div className="max-w-md mx-auto text-center py-12 px-6 rounded-xl bg-[#F5B300]/60 border border-[#D69700]">
+                <p className="text-sm font-semibold text-[#1A080B]">Published results are temporarily unavailable.</p>
+                <p className="text-xs text-[#2D1217] mt-1">Please check back shortly.</p>
+              </div>
+            ) : filteredLatestResults.length === 0 ? (
               <div className="max-w-md mx-auto text-center py-12 px-6 rounded-xl bg-[#F5B300]/60 border border-[#D69700]">
                 <span className="material-symbols-outlined text-[#4A0A1C] text-[40px] block mb-2">
                   rate_review
@@ -941,7 +984,7 @@ export default function InspirathPublicHomePage() {
           </div>
         </section>
 
-        {/* OFFICIAL CANDIDATE & BIB VERIFICATION PORTAL BANNER */}
+        {/* OFFICIAL PUBLISHED RESULTS DIRECTORY BANNER */}
         <section className="w-full banner-ruby-bg text-[#FFF8EE] border-b border-[#4A0A1C] py-10">
           <div className="max-w-[1440px] mx-auto px-8">
             <div
@@ -958,15 +1001,14 @@ export default function InspirathPublicHomePage() {
                 <div className="inline-flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">badge</span>
                   <span className="text-sm uppercase tracking-widest text-[#FDBF0F] font-bold">
-                    Authenticity Clearinghouse
+                    Official Published Results
                   </span>
                 </div>
                 <h3 className="font-cinematic-editorial text-xl sm:text-3xl font-bold text-[#FFF8EE] tracking-[0.12em] uppercase">
-                  Official Candidate &amp; Bib Verification Portal
+                  Explore the Results Directory
                 </h3>
                 <p className="text-sm sm:text-base text-[#FFF8EE]/90 font-normal mt-1 max-w-xl leading-relaxed">
-                  Verify candidate registration status, sanctioned events roster, and authenticated judge ratings
-                  across all four convocation guild halls.
+                  Browse officially published competition results, view awarded grades, and access released result posters through the public directory.
                 </p>
               </div>
 
@@ -979,7 +1021,7 @@ export default function InspirathPublicHomePage() {
                 <span className="material-symbols-outlined text-[20px] text-[#FDBF0F] group-hover:text-[#1A080B] group-hover:scale-110 transition-transform">
                   verified
                 </span>
-                <span>Verify Candidate</span>
+                <span>Open Results Directory</span>
               </Link>
             </div>
           </div>
