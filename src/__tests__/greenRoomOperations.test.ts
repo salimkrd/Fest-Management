@@ -839,6 +839,45 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
     });
 
+    it('blocks judging entirely when two Green Room registrations share the same Code Letter', async () => {
+      const firstRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-01`);
+      const secondRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-02`);
+      const [firstSnapshot, secondSnapshot] = await Promise.all([firstRef.get(), secondRef.get()]);
+      const firstData = firstSnapshot.data()!;
+      const secondData = secondSnapshot.data()!;
+      const originalCode = String(firstData.codeLetter).trim().toUpperCase();
+      const duplicateCode = String(secondData.codeLetter).trim().toUpperCase();
+
+      expect(originalCode).not.toBe(duplicateCode);
+
+      try {
+        await firstRef.update({
+          codeLetter: duplicateCode,
+          codeIndex: codeLetterToIndex(duplicateCode),
+          updatedAt: new Date().toISOString()
+        });
+
+        await expect(
+          JudgeService.submitMarks({
+            assignmentId,
+            competitionId: testCompId,
+            secret: judgeSecret,
+            rosterVersion: 'a'.repeat(64),
+            scores: { [duplicateCode]: 91 }
+          })
+        ).rejects.toThrow(/Roster Integrity Error: Code Letter .* assigned to more than one registration/i);
+
+        const markSnap = await db.collection('markEntries').doc(`me-${assignmentId}`).get();
+        expect(markSnap.exists).toBe(false);
+      } finally {
+        await firstRef.update({
+          codeLetter: originalCode,
+          codeIndex: codeLetterToIndex(originalCode),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
     it('Judge submits scores using anonymous Code Letters; server resolves accurately to registrationId', async () => {
       // Judge evaluates Code Letter B (Ahmad Rayan) and Code Letter C (Fathima Zahra)
       const judgeScores = {
