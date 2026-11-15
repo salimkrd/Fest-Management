@@ -680,9 +680,17 @@ export class GreenRoomService {
       .where('competitionId', '==', competitionId)
       .get();
 
-    const assignments = snap.docs.map(doc => doc.data() as FirestoreGreenRoomAssignment);
-    // Sort by codeIndex (A..Z, AA..ZZ)
-    assignments.sort((a, b) => (a.codeIndex ?? 0) - (b.codeIndex ?? 0));
+    const roster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      snap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    const assignments = roster.entries.map(entry => {
+      const matchingDoc = snap.docs.find(doc => doc.id === `${competitionId}_${entry.registrationId}`);
+      if (!matchingDoc) {
+        throw new Error('Roster Integrity Error: A Green Room assignment could not be resolved to its canonical document.');
+      }
+      return matchingDoc.data() as FirestoreGreenRoomAssignment;
+    });
     return assignments;
   }
 
@@ -701,14 +709,10 @@ export class GreenRoomService {
       .where('competitionId', '==', competitionId)
       .get();
 
-    const mapping = new Map<string, string>(); // codeLetter -> registrationId
-    snap.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.codeLetter && data.registrationId) {
-        mapping.set(data.codeLetter.trim().toUpperCase(), data.registrationId);
-      }
-    });
-
-    return mapping;
+    const roster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      snap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    return roster.codeToRegistration;
   }
 }
