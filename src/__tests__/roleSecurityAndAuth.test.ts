@@ -445,6 +445,7 @@ describe('Phase 3 Step 2B: Authentication & Role-Based Authorization Enforcement
           assignmentId: 'non-existent-or-scope-mismatch',
           competitionId: 'cmp-99',
           secret: 'secret',
+          rosterVersion: 'a'.repeat(64),
           scores: {}
         })
       ).rejects.toThrow(/Unauthorized/i);
