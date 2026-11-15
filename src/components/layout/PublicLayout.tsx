@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo } from '@/components/domain/FestivalBrand';
-import { Trophy, Search, Sparkles, FileText, Menu, X, Image as ImageIcon, Calendar, MapPin, ExternalLink } from 'lucide-react';
+import { Trophy, Search, Sparkles, FileText, Menu, X, Image as ImageIcon, Calendar } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -41,7 +41,6 @@ const formatFestivalDateSpan = (startDate?: string, endDate?: string) => {
 
 function PublicNavLinks() {
   const pathname = usePathname();
-  const { theme } = useFest();
 
   const navLinks = [
     { name: 'Latest Results', href: '/', icon: Sparkles, label: 'HOME' },
@@ -104,22 +103,21 @@ function MobileBottomNav() {
   const pathname = usePathname();
 
   const mobileTabs = [
-    { name: 'Home', href: '/', icon: Sparkles },
-    { name: 'Results', href: '/public/directory', icon: FileText },
-    { name: 'Teams', href: '/public/championship', icon: Trophy },
-    { name: 'Posters', href: '/public/posters', icon: ImageIcon },
+    { name: 'Home', href: '/', icon: 'home' },
+    { name: 'Results', href: '/public/directory', icon: 'menu_book' },
+    { name: 'Teams', href: '/public/championship', icon: 'military_tech' },
+    { name: 'Media', href: '/public/posters', icon: 'image' },
   ];
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-[#1B090B]/95 backdrop-blur-xl border-t border-[#BA1912]/40 shadow-[0_-4px_24px_rgba(0,0,0,0.6)]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)' }}
       aria-label="Mobile Navigation"
     >
       <div className="flex justify-around items-center h-16 px-2">
         {mobileTabs.map(tab => {
           const isActive = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href);
-          const Icon = tab.icon;
           return (
             <Link
               key={tab.name}
@@ -130,7 +128,7 @@ function MobileBottomNav() {
               }`}
             >
               <div className="relative">
-                <Icon className="w-5 h-5" />
+                <span className="material-symbols-outlined text-[22px]">{tab.icon}</span>
                 {isActive && (
                   <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#FDBF0F] shadow-[0_0_8px_#FDBF0F]" />
                 )}
@@ -185,10 +183,10 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <FestivalLogo size={40} className="public-logo ring-1 ring-[#FDBF0F]/30 rounded-full" />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="public-brand-title font-brand text-base sm:text-lg font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase">
+                  <span className="public-brand-title font-brand font-bruno text-base sm:text-xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase whitespace-nowrap">
                     <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F] shrink-0" />
                 </div>
                 <span className="public-brand-subtitle text-[10px] text-[#F2F3E6]/70 uppercase tracking-widest font-medium block">
                   {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}

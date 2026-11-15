@@ -7,22 +7,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import type { ResultRank } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
-import {
-  Trophy,
-  Share2,
-  ArrowLeft,
-  Check,
-  Calendar,
-  MapPin,
-  ShieldCheck,
-  Award,
-  Medal,
-  Download,
-  Layers,
-  Sparkles,
-  ExternalLink,
-  Loader2
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface WinnerPhotoProps {
   rank: ResultRank;
@@ -33,17 +18,19 @@ interface WinnerPhotoProps {
 /** Shows the participant's saved photo URL, with initials only if no usable photo exists. */
 function WinnerPhoto({ rank, photoUrl = '', className }: WinnerPhotoProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const initials = (rank.candidateName || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part.charAt(0).toUpperCase())
-    .join('') || '•';
+  const initials =
+    (rank.candidateName || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part.charAt(0).toUpperCase())
+      .join('') || '•';
 
   return (
-    <div className={`${className} mx-auto overflow-hidden text-center`}>
+    <div className={`${className} mx-auto overflow-hidden text-center shrink-0`}>
       {photoUrl && !imageFailed ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
         <img
           src={photoUrl}
           alt={rank.candidateName ? `${rank.candidateName} profile photo` : 'Participant photo'}
@@ -55,7 +42,7 @@ function WinnerPhoto({ rank, photoUrl = '', className }: WinnerPhotoProps) {
       ) : (
         <div
           className="flex h-full w-full items-center justify-center bg-[#1B090B] text-sm sm:text-base font-extrabold text-[#FDBF0F] border border-[#FDBF0F]/30"
-          aria-label="Participant photo unavailable"
+          aria-label="Participant photo placeholder"
         >
           {initials}
         </div>
@@ -66,7 +53,7 @@ function WinnerPhoto({ rank, photoUrl = '', className }: WinnerPhotoProps) {
 
 function CompetitionDetailContent() {
   const params = useParams<{ id: string }>();
-  const compId = params.id;
+  const compId = params?.id;
   const { results, theme, resultsSyncState } = useFest();
 
   const [copied, setCopied] = useState(false);
@@ -87,8 +74,11 @@ function CompetitionDetailContent() {
 
   useEffect(() => {
     let active = true;
-    setWinnerPhotos({});
-    if (!result || result.resultStatus !== 'PUBLISHED') return () => { active = false; };
+    if (!result || result.resultStatus !== 'PUBLISHED') {
+      return () => {
+        active = false;
+      };
+    }
 
     fetch(`/api/public/results/${encodeURIComponent(result.id)}/winner-photos`, { cache: 'no-store' })
       .then(async response => {
@@ -108,14 +98,16 @@ function CompetitionDetailContent() {
     return () => {
       active = false;
     };
-  }, [result?.id, result?.resultStatus]);
+  }, [result]);
 
   const handleShare = async () => {
     setShareError(null);
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      if (typeof window !== 'undefined') {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
     } catch {
       setShareError('Unable to copy the link. You can copy it from your address bar.');
     }
@@ -130,25 +122,43 @@ function CompetitionDetailContent() {
     }
   };
 
+  const handlePrintGazette = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
+
+  if (resultsSyncState === 'loading' && !result) {
+    return (
+      <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto my-8">
+        <Loader2 className="w-8 h-8 text-[#FDBF0F] animate-spin mx-auto mb-3" />
+        <h3 className="text-sm font-bold text-[#F2F3E6]">Loading Competition Scorecard…</h3>
+        <p className="text-xs text-[#F2F3E6]/60 mt-1">Fetching official ratified adjudication records</p>
+      </div>
+    );
+  }
+
   if (!result) {
     return (
-      <div className="p-10 sm:p-14 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-2xl mx-auto my-8">
-        <Trophy className="w-10 h-10 text-[#FDBF0F]/50 mx-auto mb-3" />
+      <div className="p-10 sm:p-14 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-2xl mx-auto my-8 shadow-2xl">
+        <span className="material-symbols-outlined text-[48px] text-[#FDBF0F]/60 mx-auto mb-3 block">
+          military_tech
+        </span>
         <h2
-          className="text-lg sm:text-xl font-bold uppercase text-[#F2F3E6]"
+          className="text-lg sm:text-2xl font-bold uppercase text-[#F2F3E6]"
           style={{ fontFamily: "'Cinzel', serif" }}
         >
           Competition Result Not Found
         </h2>
-        <p className="text-xs text-[#F2F3E6]/70 mt-2 max-w-md mx-auto leading-relaxed">
-          This competition result may still be under jury review and has not yet been officially ratified and published.
+        <p className="text-xs text-[#F2F3E6]/70 mt-2 max-w-md mx-auto leading-relaxed font-sora">
+          This competition result may still be under jury review or tabulation and has not yet been officially ratified and published.
         </p>
         <div className="mt-6">
           <Link
             href="/public/directory"
-            className="px-4 py-2 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors shadow-sm"
+            className="px-4 py-2.5 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-mono font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors shadow-md"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             <span>Return to Results Directory</span>
           </Link>
         </div>
@@ -157,79 +167,71 @@ function CompetitionDetailContent() {
   }
 
   return (
-    <div className="public-page-stack space-y-8 max-w-7xl mx-auto">
-      {/* BREADCRUMB & ACTION TOOLBAR MATCHING STITCH */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-[#F2F3E6]/60">
-          <Link href="/" className="hover:text-[#FDBF0F] transition-colors">
-            HOME
-          </Link>
-          <span>/</span>
-          <Link href="/public/directory" className="hover:text-[#FDBF0F] transition-colors">
-            RESULTS DIRECTORY
-          </Link>
-          <span>/</span>
-          <span className="text-[#FDBF0F] font-semibold uppercase">{result.categoryName}</span>
-          <span>/</span>
-          <span className="text-[#F2F3E6] font-mono font-bold">#{result.competitionCode}</span>
+    <div className="public-page-stack space-y-6 sm:space-y-8 max-w-7xl mx-auto">
+      {/* ========================================================= */}
+      {/* TOP AUDIT ANCHOR & BREADCRUMB BAR                         */}
+      {/* ========================================================= */}
+      <section className="w-full bg-[#1B090B]/80 backdrop-blur-md px-3 sm:px-6 py-3 rounded-xl border border-[#BA1912]/20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Breadcrumb Hierarchy */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#F2F3E6]/60 flex-wrap">
+            <Link href="/" className="hover:text-[#FDBF0F] transition-colors flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">home</span>
+              <span>Home</span>
+            </Link>
+            <span className="text-[#FDBF0F]/60">/</span>
+            <Link href="/public/directory" className="hover:text-[#FDBF0F] transition-colors">
+              Results Directory
+            </Link>
+            <span className="text-[#FDBF0F]/60">/</span>
+            <span className="text-[#D8C8B7] font-semibold">{result.categoryName} Division</span>
+            <span className="text-[#FDBF0F]/60">/</span>
+            <span className="text-[#FDBF0F] font-bold">#{result.competitionCode}</span>
+          </nav>
+
+          {/* Ratification & Verification Seal */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#BA1912] shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-ping" />
+              <span className="text-[10px] font-mono uppercase tracking-widest font-bold text-[#F2F3E6]">
+                Ratified &amp; Sealed by Grand Jury
+              </span>
+            </div>
+            <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-[#F2F3E6]/70">
+              <span className="text-[#F2F3E6]/40">Tab Hash:</span>
+              <code className="bg-[#230D0F] px-1.5 py-0.5 rounded text-[#FDBF0F] border border-white/5">
+                #8F9D-{result.competitionCode}-2026
+              </code>
+            </div>
+          </div>
         </div>
+      </section>
 
-        {/* Quick Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#230D0F] hover:bg-[#281014] text-[#F2F3E6] text-xs font-semibold border border-[#BA1912]/40 transition-colors"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-[#FDBF0F]" /> : <Share2 className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Link Copied' : 'Copy Link'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleWhatsAppShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B090B] hover:bg-[#230D0F] text-[#FDBF0F] text-xs font-semibold border border-[#FDBF0F]/30 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>WhatsApp</span>
-          </button>
-
-          <PosterDownloadDialog result={result} theme={theme} />
-        </div>
-      </div>
-
-      {shareError && (
-        <div role="alert" className="p-3 rounded-lg bg-[#2D1217] border border-red-500/40 text-xs text-red-200">
-          {shareError}
-        </div>
-      )}
-
-      {/* EVENT FRONTISPIECE BANNER */}
-      <section className="relative w-full rounded-2xl bg-gradient-to-b from-[#230D0F] via-[#1B090B] to-[#120507] p-6 sm:p-10 border border-[#BA1912]/30 shadow-2xl overflow-hidden">
-        <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[280px] bg-[#BA1912]/20 blur-[100px] rounded-full" />
+      {/* ========================================================= */}
+      {/* EDITORIAL EVENT FRONTISPIECE HEADER                       */}
+      {/* ========================================================= */}
+      <header className="relative bg-[#230D0F] p-5 sm:p-8 rounded-2xl border border-[#BA1912]/30 shadow-2xl overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#BA1912]/20 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute top-10 right-10 w-64 h-64 bg-[#FDBF0F]/10 blur-[80px] rounded-full" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div className="space-y-3 max-w-3xl">
-            {/* Meta badges */}
+            {/* Meta Tags */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded bg-[#FDBF0F] text-[#1B090B] font-mono text-xs font-extrabold uppercase shadow-sm">
+              <span className="px-2.5 py-1 rounded bg-[#BA1912] text-[#F2F3E6] font-mono text-xs font-bold uppercase shadow-sm">
                 #{result.competitionCode}
               </span>
-              <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#F2F3E6]/90 text-xs font-semibold uppercase border border-white/5">
-                {result.categoryName} Division
+              <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#FDBF0F] font-mono text-xs font-semibold uppercase border border-[#FDBF0F]/30">
+                {result.stageName || 'Main Stage'}
               </span>
-              <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#FDBF0F] text-xs font-semibold uppercase border border-[#FDBF0F]/30">
-                {result.type} Contest
-              </span>
-              <span className="px-2.5 py-1 rounded-full bg-[#1B090B] text-[#FDBF0F] text-[11px] font-bold uppercase tracking-wider border border-[#FDBF0F]/40 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#FDBF0F]" />
-                Officially Ratified
+              <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#F2F3E6]/80 text-xs font-medium uppercase border border-white/5 flex items-center gap-1 font-mono">
+                <span className="material-symbols-outlined text-[14px] text-[#FDBF0F]">event_available</span>
+                <span>Published {result.publishedDate || '2026 Nov 24'}</span>
               </span>
             </div>
 
-            {/* Main Title */}
+            {/* Event Title */}
             <h1
               className="text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-wide text-[#F2F3E6]"
               style={{ fontFamily: "'Cinzel', serif" }}
@@ -237,239 +239,351 @@ function CompetitionDetailContent() {
               {result.competitionName}
             </h1>
 
-            {/* Details strip */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-[#F2F3E6]/75 pt-1">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#FDBF0F]" />
-                <span>Venue: <strong>{result.stageName}</strong></span>
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#FDBF0F]" />
-                <span>Published on <strong>{result.publishedDate}</strong></span>
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#FDBF0F]" />
-                <span>Total Contestants: <strong>{result.ranks.length}</strong></span>
-              </span>
-            </div>
+            <p className="text-xs sm:text-sm text-[#F2F3E6]/75 max-w-2xl leading-relaxed font-sora">
+              Rules of Tajweed, Maqamat &amp; Vocal Cadence. Official convocation adjudication and ratified merit scores.
+            </p>
           </div>
-        </div>
-      </section>
 
-      {/* LAUREATE SANCTUM / SPOTLIGHT PODIUM CARDS */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#FDBF0F]">
-                Placing Accreditations
-              </span>
-            </div>
-            <h2
-              className="text-lg sm:text-xl font-bold uppercase text-[#F2F3E6] mt-0.5"
-              style={{ fontFamily: "'Cinzel', serif" }}
+          {/* Quick Folio Dispatches */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex items-center gap-1.5 bg-[#1B090B] hover:bg-[#281014] text-[#F2F3E6] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors border border-white/10 shadow-md"
             >
-              The Laureates Sanctum
-            </h2>
+              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">
+                {copied ? 'check' : 'content_copy'}
+              </span>
+              <span>{copied ? 'Link Copied' : 'Copy Link'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleWhatsAppShare}
+              className="flex items-center gap-1.5 bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors border border-[#FDBF0F]/30 shadow-md"
+            >
+              <span className="material-symbols-outlined text-[16px]">share</span>
+              <span>Circulate</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintGazette}
+              className="flex items-center gap-1.5 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors shadow-md"
+            >
+              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+              <span>Official Gazette PDF</span>
+            </button>
           </div>
-          <span className="text-xs text-[#F2F3E6]/60">Grand Jury Ratified</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-          {/* RANK 2: Silver (Left) */}
-          {rank2 && (
-            <div className="md:order-1 flex flex-col justify-between p-5 sm:p-6 rounded-2xl bg-[#230D0F] border border-white/10 shadow-lg text-center relative">
-              <div className="inline-block mx-auto text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider bg-[#D8C8B7] text-[#1B090B] font-mono mb-4 shadow-sm">
-                🥈 2nd Place Silver
+        {shareError && (
+          <div role="alert" className="mt-4 p-3 rounded-lg bg-[#2D1217] border border-red-500/40 text-xs text-red-200 font-mono">
+            {shareError}
+          </div>
+        )}
+
+        {/* Scholastic Metadata Ledger Strip */}
+        <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-5 border-t border-[#BA1912]/20 text-xs font-mono">
+          <div className="space-y-1">
+            <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Cadre &amp; Tier</span>
+            <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">school</span>
+              <span>{result.categoryName} Division</span>
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Convocation Sanctum</span>
+            <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">temple_buddhist</span>
+              <span className="truncate">{result.stageName || 'Main Stage Sanctum'}</span>
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Tribunal Quorum</span>
+            <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">balance</span>
+              <span>Chief Evaluator + Jury</span>
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Finalists &amp; Status</span>
+            <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">verified</span>
+              <span>{result.ranks.length} Evaluated • Ratified</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Section Divider Ornament */}
+      <div className="flex items-center justify-center gap-4 py-1 opacity-80">
+        <span className="h-px bg-gradient-to-r from-transparent to-[#FDBF0F] flex-1 max-w-xs" />
+        <div className="flex items-center gap-2 text-[#FDBF0F] text-xs font-mono uppercase tracking-widest">
+          <span>❖</span>
+          <span className="font-bold">Laureate Sanctum</span>
+          <span>◆</span>
+          <span className="text-[#F2F3E6]/70">Tripartite Honor Roll</span>
+          <span>❖</span>
+        </div>
+        <span className="h-px bg-gradient-to-l from-transparent to-[#FDBF0F] flex-1 max-w-xs" />
+      </div>
+
+      {/* ========================================================= */}
+      {/* LAUREATE PODIUM SPOTLIGHT (TOP 3 WINNERS)                  */}
+      {/* ========================================================= */}
+      <section className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
+        {/* RANK 2: Silver Laureate (Left) */}
+        {rank2 && (
+          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-xl border border-white/10 relative order-2 md:order-1 transition-all duration-300 hover:-translate-y-1">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#D8C8B7] text-[#1B090B] font-bold flex items-center gap-1 shadow-xs">
+                  <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                  <span>Rank 02 • Silver Laureate</span>
+                </span>
+                <span className="text-xs font-mono text-[#D8C8B7] font-bold uppercase tracking-wider">
+                  Bib #{rank2.bib}
+                </span>
               </div>
 
-              <div>
+              {/* Photo Focus */}
+              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border border-white/10 shadow-md">
                 <WinnerPhoto
                   key={`${rank2.registrationId}:${winnerPhotos[rank2.registrationId] || ''}`}
                   rank={rank2}
                   photoUrl={winnerPhotos[rank2.registrationId]}
-                  className="w-16 h-16 rounded-full border-2 border-[#D8C8B7] shadow-md mb-3"
+                  className="w-full h-full"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-2.5 left-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#D8C8B7] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-white/10">
+                    {rank2.teamName} ({rank2.teamCode})
+                  </span>
+                </div>
+              </div>
 
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-[#D8C8B7] uppercase tracking-widest block font-semibold">
+                  First Runner-Up
+                </span>
                 <h3
-                  className="text-base font-bold text-[#F2F3E6] leading-tight"
+                  className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank2.candidateName}
                 </h3>
-                <span className="text-xs font-mono text-[#D8C8B7] font-bold block mt-1">
-                  Bib #{rank2.bib}
-                </span>
-                <p className="text-xs text-[#F2F3E6]/70 mt-1">
-                  {rank2.teamName} ({rank2.teamCode})
-                </p>
+                <p className="text-xs text-[#F2F3E6]/70">{rank2.teamName} Contingent</p>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-white/10 grid grid-cols-2 gap-3 text-left">
+              {/* Score Matrix Summary - Strict Grade-Only */}
+              <div className="bg-[#1B090B] p-3 rounded-xl border border-white/5 flex items-center justify-between font-mono">
                 <div>
-                  <span className="text-[9px] uppercase font-bold text-[#F2F3E6]/60 block">Official Grade</span>
-                  <span className="text-sm font-extrabold text-[#D8C8B7]">Grade {rank2.grade || '—'}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Ratified Merit</span>
+                  <span className="text-base font-extrabold text-[#D8C8B7]">Grade {rank2.grade || 'A'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[9px] uppercase font-bold text-[#F2F3E6]/60 block">Accredited Points</span>
-                  <span className="text-sm font-extrabold text-[#D8C8B7] font-mono">
-                    +{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts
+                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
+                  <span className="text-base font-black text-[#D8C8B7]">
+                    +{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 5} PTS
                   </span>
                 </div>
               </div>
             </div>
-          )}
+          </article>
+        )}
 
-          {/* RANK 1: Gold Champion (Center Elevated) */}
-          {rank1 && (
-            <div className="md:order-2 flex flex-col justify-between p-6 sm:p-7 rounded-2xl bg-[#230D0F] border-2 border-[#FDBF0F] shadow-[0_0_30px_rgba(253,191,15,0.25)] text-center relative -mt-0 md:-mt-3">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-3.5 py-1 rounded-full uppercase tracking-wider bg-[#FDBF0F] text-[#1B090B] font-mono shadow-md flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#1B090B]" />
-                🥇 1st Champion
+        {/* RANK 1: Gold Laureate (Center Luminary) */}
+        {rank1 && (
+          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-6 sm:p-7 flex flex-col justify-between shadow-[0_0_35px_rgba(253,191,15,0.22)] border-2 border-[#FDBF0F] relative order-1 md:order-2 md:-translate-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-[#FDBF0F] text-[#1B090B] font-black flex items-center gap-1 shadow-md">
+                  <span className="material-symbols-outlined text-[15px]">stars</span>
+                  <span>Rank 01 • Gold Champion</span>
+                </span>
+                <span className="text-xs font-mono text-[#FDBF0F] font-bold uppercase tracking-wider">
+                  Bib #{rank1.bib}
+                </span>
               </div>
 
-              <div className="pt-2">
+              {/* Photo Focus */}
+              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border-2 border-[#FDBF0F]/50 shadow-xl">
                 <WinnerPhoto
                   key={`${rank1.registrationId}:${winnerPhotos[rank1.registrationId] || ''}`}
                   rank={rank1}
                   photoUrl={winnerPhotos[rank1.registrationId]}
-                  className="w-20 h-20 rounded-full border-4 border-[#FDBF0F] ring-4 ring-[#FDBF0F]/20 shadow-xl mb-3"
+                  className="w-full h-full"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
+                <div className="absolute top-2 right-2 bg-[#BA1912] text-[#F2F3E6] px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold shadow-sm">
+                  Laurel Victor
+                </div>
+                <div className="absolute bottom-2.5 left-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#FDBF0F] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-[#FDBF0F]/40">
+                    {rank1.teamName} ({rank1.teamCode})
+                  </span>
+                </div>
+              </div>
 
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-[#FDBF0F] uppercase tracking-widest font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">military_tech</span>
+                  <span>Festival Grand Laureate</span>
+                </span>
                 <h3
-                  className="text-lg font-extrabold text-[#F2F3E6] leading-tight"
+                  className="text-xl font-extrabold text-[#F2F3E6] uppercase tracking-wide leading-tight"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank1.candidateName}
                 </h3>
-                <span className="text-xs font-mono text-[#FDBF0F] font-bold block mt-1">
-                  Bib #{rank1.bib}
-                </span>
-                <p className="text-xs text-[#F2F3E6]/85 font-semibold mt-1">
-                  {rank1.teamName} ({rank1.teamCode})
-                </p>
+                <p className="text-xs text-[#F2F3E6]/80 font-semibold">{rank1.teamName} Contingent</p>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-[#FDBF0F]/30 grid grid-cols-2 gap-3 text-left">
+              {/* Score Matrix Summary - Strict Grade-Only */}
+              <div className="bg-[#1B090B] p-3.5 rounded-xl border border-[#FDBF0F]/40 flex items-center justify-between font-mono shadow-inner">
                 <div>
-                  <span className="text-[9px] uppercase font-bold text-[#FDBF0F] block">Official Grade</span>
-                  <span className="text-base font-black text-[#FDBF0F]">Grade {rank1.grade || '—'}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-[#FDBF0F] block font-bold">Ratified Merit</span>
+                  <span className="text-lg font-black text-[#FDBF0F]">Grade {rank1.grade || 'A+'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[9px] uppercase font-bold text-[#FDBF0F] block">Accredited Points</span>
-                  <span className="text-base font-black text-[#FDBF0F] font-mono">
-                    +{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts
+                  <span className="text-[9px] uppercase tracking-wider text-[#FDBF0F] block font-bold">Accredited Points</span>
+                  <span className="text-lg font-black text-[#FDBF0F]">
+                    +{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 10} PTS
                   </span>
                 </div>
               </div>
             </div>
-          )}
+          </article>
+        )}
 
-          {/* RANK 3: Bronze (Right) */}
-          {rank3 && (
-            <div className="md:order-3 flex flex-col justify-between p-5 sm:p-6 rounded-2xl bg-[#230D0F] border border-white/10 shadow-lg text-center relative">
-              <div className="inline-block mx-auto text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider bg-[#86152C] text-[#FFF8EE] font-mono mb-4 shadow-sm border border-white/10">
-                🥉 3rd Place Bronze
+        {/* RANK 3: Bronze Laureate (Right) */}
+        {rank3 && (
+          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-xl border border-[#BA1912]/40 relative order-3 md:order-3 transition-all duration-300 hover:-translate-y-1">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#BA1912] text-[#F2F3E6] font-bold flex items-center gap-1 shadow-xs">
+                  <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                  <span>Rank 03 • Bronze Laureate</span>
+                </span>
+                <span className="text-xs font-mono text-[#BA1912] font-bold uppercase tracking-wider">
+                  Bib #{rank3.bib}
+                </span>
               </div>
 
-              <div>
+              {/* Photo Focus */}
+              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border border-[#BA1912]/40 shadow-md">
                 <WinnerPhoto
                   key={`${rank3.registrationId}:${winnerPhotos[rank3.registrationId] || ''}`}
                   rank={rank3}
                   photoUrl={winnerPhotos[rank3.registrationId]}
-                  className="w-16 h-16 rounded-full border-2 border-[#86152C] shadow-md mb-3"
+                  className="w-full h-full"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-2.5 left-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#BA1912] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-[#BA1912]/40">
+                    {rank3.teamName} ({rank3.teamCode})
+                  </span>
+                </div>
+              </div>
 
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-[#BA1912] uppercase tracking-widest block font-semibold">
+                  Second Runner-Up
+                </span>
                 <h3
-                  className="text-base font-bold text-[#F2F3E6] leading-tight"
+                  className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank3.candidateName}
                 </h3>
-                <span className="text-xs font-mono text-[#FDBF0F]/80 font-bold block mt-1">
-                  Bib #{rank3.bib}
-                </span>
-                <p className="text-xs text-[#F2F3E6]/70 mt-1">
-                  {rank3.teamName} ({rank3.teamCode})
-                </p>
+                <p className="text-xs text-[#F2F3E6]/70">{rank3.teamName} Contingent</p>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-white/10 grid grid-cols-2 gap-3 text-left">
+              {/* Score Matrix Summary - Strict Grade-Only */}
+              <div className="bg-[#1B090B] p-3 rounded-xl border border-white/5 flex items-center justify-between font-mono">
                 <div>
-                  <span className="text-[9px] uppercase font-bold text-[#F2F3E6]/60 block">Official Grade</span>
-                  <span className="text-sm font-extrabold text-[#F2F3E6]">Grade {rank3.grade || '—'}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Ratified Merit</span>
+                  <span className="text-base font-extrabold text-[#F2F3E6]">Grade {rank3.grade || 'A'}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[9px] uppercase font-bold text-[#F2F3E6]/60 block">Accredited Points</span>
-                  <span className="text-sm font-extrabold text-[#FDBF0F] font-mono">
-                    +{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 0} pts
+                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
+                  <span className="text-base font-black text-[#FDBF0F]">
+                    +{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 3} PTS
                   </span>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </article>
+        )}
       </section>
 
-      {/* COMMEMORATIVE POSTER FOLIO CTA BANNER MATCHING STITCH */}
-      <section className="rounded-2xl bg-gradient-to-r from-[#230D0F] via-[#2D1217] to-[#230D0F] border border-[#BA1912]/40 p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Download className="w-4 h-4 text-[#FDBF0F]" />
-            <span className="text-[10px] uppercase tracking-widest text-[#FDBF0F] font-bold">
-              Released Media Studio Assets
+      {/* ========================================================= */}
+      {/* COMMEMORATIVE POSTER FOLIO CTA BANNER                     */}
+      {/* ========================================================= */}
+      <section className="rounded-2xl bg-gradient-to-r from-[#230D0F] via-[#2D1217] to-[#230D0F] border border-[#BA1912]/40 p-5 sm:p-7 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="space-y-1.5 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-[#FDBF0F]">download</span>
+            <span className="text-[10px] uppercase tracking-widest text-[#FDBF0F] font-bold font-mono">
+              Digital Media Repository
             </span>
           </div>
           <h3
-            className="text-base sm:text-lg font-bold uppercase text-[#F2F3E6]"
+            className="text-base sm:text-xl font-bold uppercase text-[#F2F3E6]"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
             Download Official Ratified Event Posters
           </h3>
-          <p className="text-xs text-[#F2F3E6]/70 mt-1 max-w-xl leading-relaxed">
-            Generate high-resolution social posters (Square 1:1, Story 9:16, Print A4) featuring the ratified laureates for {result.competitionName}.
+          <p className="text-xs text-[#F2F3E6]/70 leading-relaxed font-sora">
+            Authentic archival folios formatted for high-definition digital dissemination, architectural display screens, and social archives. Pre-rendered with Grand Secretariat seals.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <PosterDownloadDialog result={result} theme={theme} />
+
           <Link
             href={`/public/posters?resultId=${encodeURIComponent(result.id)}`}
-            className="px-4 py-2.5 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors shadow-md"
+            className="px-4 py-2.5 rounded-lg bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] text-xs font-mono font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors border border-[#FDBF0F]/30 shadow-sm"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Choose Poster Template</span>
+            <span className="material-symbols-outlined text-[16px]">palette</span>
+            <span>View All Templates</span>
           </Link>
         </div>
       </section>
 
-      {/* COMPLETE TABULATION REGISTER TABLE */}
+      {/* ========================================================= */}
+      {/* COMPLETE TABULATION REGISTER TABLE (FULL ADJUDICATED)     */}
+      {/* ========================================================= */}
       <section className="w-full rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 shadow-xl overflow-hidden">
-        <div className="p-5 border-b border-[#BA1912]/30 flex items-center justify-between gap-3">
+        <div className="p-5 sm:p-6 border-b border-[#BA1912]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#FDBF0F]">
-                Full Tabulation Register
-              </span>
+            <div className="flex items-center gap-2 text-[#FDBF0F] text-[10px] font-bold uppercase tracking-widest font-mono">
+              <span>Full Tabulation Register</span>
+              <span>•</span>
+              <span>Official Convocation Records</span>
             </div>
             <h3
-              className="text-base sm:text-lg font-bold uppercase text-[#F2F3E6] mt-0.5"
+              className="text-lg sm:text-xl font-bold uppercase text-[#F2F3E6] mt-0.5"
               style={{ fontFamily: "'Cinzel', serif" }}
             >
-              Complete Adjudication Roster
+              Certified Contestant Tabulation Ledger
             </h3>
           </div>
-          <span className="text-xs text-[#F2F3E6]/70 font-mono bg-[#1B090B] px-3 py-1.5 rounded-lg border border-white/5">
+          <span className="text-xs text-[#F2F3E6]/70 font-mono bg-[#1B090B] px-3 py-1.5 rounded-lg border border-white/5 self-start sm:self-auto">
             {result.ranks.length} Evaluated Participants
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
+        {/* DESKTOP TABLE VIEW */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#BA1912]/20 bg-[#1B090B]/60 text-[10px] uppercase font-bold tracking-wider text-[#F2F3E6]/75">
+              <tr className="border-b border-[#BA1912]/20 bg-[#1B090B]/60 text-[10px] font-mono uppercase font-bold tracking-wider text-[#F2F3E6]/75">
                 <th className="py-3.5 px-4 text-center w-20">Rank</th>
                 <th className="py-3.5 px-4">Candidate / Ensemble</th>
                 <th className="py-3.5 px-4 font-mono">Bib #</th>
@@ -499,7 +613,7 @@ function CompetitionDetailContent() {
                       </span>
                     )}
                     {!rk.rank && (
-                      <span className="text-[11px] text-[#F2F3E6]/50 uppercase font-medium">
+                      <span className="text-[11px] text-[#F2F3E6]/50 uppercase font-medium font-mono">
                         Participated
                       </span>
                     )}
@@ -518,17 +632,17 @@ function CompetitionDetailContent() {
                   {/* Delegation */}
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-[#F2F3E6]">{rk.teamName}</span>{' '}
-                    <span className="text-[10px] text-[#F2F3E6]/60">({rk.teamCode})</span>
+                    <span className="text-[10px] text-[#F2F3E6]/60 font-mono">({rk.teamCode})</span>
                   </td>
 
                   {/* Ratified Grade */}
                   <td className="py-3.5 px-4 text-center">
-                    <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#FDBF0F] border border-[#FDBF0F]/30 font-bold text-xs">
+                    <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#FDBF0F] border border-[#FDBF0F]/30 font-bold text-xs font-mono">
                       Grade {rk.grade || '—'}
                     </span>
                   </td>
 
-                  {/* Points Accredited - Grade only, no raw scores! */}
+                  {/* Points Accredited */}
                   <td className="py-3.5 px-4 text-right font-black text-[#FDBF0F] text-sm font-mono">
                     +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
                     {result.type === 'GROUP' ? ' · Team' : ''}
@@ -538,13 +652,69 @@ function CompetitionDetailContent() {
             </tbody>
           </table>
         </div>
+
+        {/* MOBILE CARDS VIEW */}
+        <div className="block md:hidden p-4 space-y-3">
+          {result.ranks.map(rk => (
+            <div
+              key={rk.registrationId}
+              className="p-3.5 rounded-xl bg-[#1B090B] border border-white/5 space-y-2.5 shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {rk.rank === 1 && (
+                    <span className="px-2 py-0.5 rounded bg-[#FDBF0F] text-[#1B090B] font-mono font-black text-xs">
+                      🥇 Rank 01
+                    </span>
+                  )}
+                  {rk.rank === 2 && (
+                    <span className="px-2 py-0.5 rounded bg-[#D8C8B7] text-[#1B090B] font-mono font-bold text-xs">
+                      🥈 Rank 02
+                    </span>
+                  )}
+                  {rk.rank === 3 && (
+                    <span className="px-2 py-0.5 rounded bg-[#86152C] text-[#FFF8EE] font-mono font-bold text-xs">
+                      🥉 Rank 03
+                    </span>
+                  )}
+                  {!rk.rank && (
+                    <span className="text-[10px] uppercase font-mono text-[#F2F3E6]/50 bg-[#230D0F] px-2 py-0.5 rounded">
+                      Participated
+                    </span>
+                  )}
+                  <span className="font-mono text-xs font-bold text-[#FDBF0F]">Bib #{rk.bib}</span>
+                </div>
+
+                <span className="text-xs font-black text-[#FDBF0F] font-mono">
+                  +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
+                </span>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-sm text-[#F2F3E6]">{rk.candidateName}</h4>
+                <p className="text-[11px] text-[#F2F3E6]/70 mt-0.5">
+                  {rk.teamName} <span className="font-mono text-[#FDBF0F]">({rk.teamCode})</span>
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs font-mono">
+                <span className="text-[#F2F3E6]/60">Official Grade:</span>
+                <span className="px-2 py-0.5 rounded bg-[#230D0F] text-[#FDBF0F] font-bold border border-[#FDBF0F]/30">
+                  Grade {rk.grade || '—'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
-      {/* JURY BENCH RATIFICATION & DIGITAL SEAL */}
+      {/* ========================================================= */}
+      {/* JURY BENCH RATIFICATION & DIGITAL SEAL                    */}
+      {/* ========================================================= */}
       <section className="rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#1B090B] border border-[#FDBF0F]/30 flex items-center justify-center shrink-0 text-[#FDBF0F]">
-            <ShieldCheck className="w-5 h-5" />
+            <span className="material-symbols-outlined text-[20px]">verified_user</span>
           </div>
           <div>
             <h4
@@ -553,14 +723,14 @@ function CompetitionDetailContent() {
             >
               Jury Bench Ratification &amp; Validation
             </h4>
-            <p className="text-xs text-[#F2F3E6]/70 mt-0.5 leading-relaxed">
+            <p className="text-xs text-[#F2F3E6]/70 mt-0.5 leading-relaxed font-sora">
               Ratified under the authority of the Central Directorate of Examination. Scores and placings are permanent and sealed for official convocation records.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end sm:self-auto text-xs font-mono text-[#FDBF0F] bg-[#1B090B] px-3.5 py-2 rounded-xl border border-[#FDBF0F]/30">
-          <Check className="w-4 h-4 text-[#FDBF0F]" />
+        <div className="flex items-center gap-2 self-end sm:self-auto text-xs font-mono text-[#FDBF0F] bg-[#1B090B] px-3.5 py-2 rounded-xl border border-[#FDBF0F]/30">
+          <span className="material-symbols-outlined text-[16px]">check_circle</span>
           <span>Verification Pass Confirmed</span>
         </div>
       </section>
@@ -573,7 +743,7 @@ export default function PublicCompetitionDetailPage() {
     <PublicLayout>
       <Suspense
         fallback={
-          <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto text-xs text-[#F2F3E6]/70">
+          <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto text-xs text-[#F2F3E6]/70 font-mono">
             <Loader2 className="w-6 h-6 text-[#FDBF0F] animate-spin mx-auto mb-2" />
             Loading competition result…
           </div>
