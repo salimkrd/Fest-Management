@@ -47,7 +47,7 @@ interface StoredJudgeSession {
   competition?: CompetitionSession;
 }
 
-type LocalScores = Record<string, Record<string, string>>;
+type LocalScores = Record<string, string>;
 
 function readStoredSession(): StoredJudgeSession | null {
   if (typeof window === 'undefined') return null;
@@ -127,26 +127,26 @@ function JudgeMarkingContent() {
       const nextScores: LocalScores = {};
 
       nextContestants.forEach(contestant => {
-        nextScores[contestant.codeLetter] = Object.fromEntries(
-          nextCriteria.map(criterion => [criterion.id, '0'])
-        );
+        nextScores[contestant.codeLetter] = '0';
       });
 
       if (result.scores && typeof result.scores === 'object') {
         Object.entries(result.scores as Record<string, Record<string, number> | number>).forEach(([codeLetter, rawScore]) => {
-          if (!nextScores[codeLetter]) return;
-          if (typeof rawScore === 'number') return;
-          nextScores[codeLetter] = {
-            ...nextScores[codeLetter],
-            ...Object.fromEntries(
-              Object.entries(rawScore || {})
-                .filter(([criterionId, value]) =>
-                  nextCriteria.some(criterion => criterion.id === criterionId) &&
-                  typeof value === 'number' && Number.isFinite(value)
-                )
-                .map(([criterionId, value]) => [criterionId, String(value)])
-            )
-          };
+          if (!(codeLetter in nextScores)) return;
+          if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
+            nextScores[codeLetter] = String(rawScore);
+            return;
+          }
+
+          // Convert drafts created by the previous criterion-wise UI into the
+          // equivalent total mark so judges can continue editing without data loss.
+          const restoredTotal = Object.entries(rawScore || {}).reduce((sum, [criterionId, value]) => {
+            const isKnownCriterion = nextCriteria.some(criterion => criterion.id === criterionId);
+            return isKnownCriterion && typeof value === 'number' && Number.isFinite(value)
+              ? sum + value
+              : sum;
+          }, 0);
+          nextScores[codeLetter] = String(restoredTotal);
         });
       }
 
@@ -177,11 +177,8 @@ function JudgeMarkingContent() {
   );
 
   const calculateTotal = (codeLetter: string) => {
-    const contestantScores = scores[codeLetter] || {};
-    return criteria.reduce((sum, criterion) => {
-      const value = Number(contestantScores[criterion.id] ?? '0');
-      return sum + (Number.isFinite(value) ? value : 0);
-    }, 0);
+    const value = Number(scores[codeLetter] ?? '0');
+    return Number.isFinite(value) ? value : 0;
   };
 
   const getGrade = (total: number) => {
@@ -196,13 +193,10 @@ function JudgeMarkingContent() {
     return { grade, color };
   };
 
-  const adjustScore = (codeLetter: string, criterionId: string, nextValue: string) => {
+  const adjustScore = (codeLetter: string, nextValue: string) => {
     setScores(previous => ({
       ...previous,
-      [codeLetter]: {
-        ...previous[codeLetter],
-        [criterionId]: nextValue
-      }
+      [codeLetter]: nextValue
     }));
     setIsDirty(true);
     setDraftSavedNotice(false);
@@ -216,20 +210,16 @@ function JudgeMarkingContent() {
       throw new Error('The current contestant roster or scoring rubric is empty. Refresh the session or contact the administrator.');
     }
 
-    const validatedScores: Record<string, Record<string, number>> = {};
+    const validatedScores: Record<string, number> = {};
     for (const contestant of contestants) {
-      const contestantScores: Record<string, number> = {};
-      for (const criterion of criteria) {
-        const rawValue = scores[contestant.codeLetter]?.[criterion.id] ?? '';
-        const value = Number(rawValue);
-        if (rawValue.trim() === '' || !Number.isInteger(value) || value < 0 || value > criterion.maxMarks) {
-          throw new Error(
-            `Enter a whole-number mark from 0 to ${criterion.maxMarks} for Code ${contestant.codeLetter} — ${criterion.name}.`
-          );
-        }
-        contestantScores[criterion.id] = value;
+      const rawValue = scores[contestant.codeLetter] ?? '';
+      const value = Number(rawValue);
+      if (rawValue.trim() === '' || !Number.isInteger(value) || value < 0 || value > maxMarksTotal) {
+        throw new Error(
+          `Enter a whole-number mark from 0 to ${maxMarksTotal} for Code ${contestant.codeLetter}.`
+        );
       }
-      validatedScores[contestant.codeLetter] = contestantScores;
+      validatedScores[contestant.codeLetter] = value;
     }
 
     const response = await fetch('/api/judge/marks', {
@@ -417,58 +407,37 @@ function JudgeMarkingContent() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-sm font-extrabold text-slate-950">Contestant {contestant.codeLetter}</h2>
+                          <h2 className="text-sm font-extrabold text-slate-950">Code {contestant.codeLetter}</h2>
                           <Badge variant="info" size="sm">ANONYMOUS</Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">Stage entry order #{index + 1}</p>
                         {contestant.status && <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{contestant.status.replaceAll('_', ' ')}</p>}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-2.5 sm:justify-end sm:bg-transparent sm:px-0 sm:py-0">
-                      <div className="sm:text-right">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Total score</span>
-                        <span className="text-2xl font-black tabular-nums text-slate-950">{total}<span className="ml-1 text-xs font-semibold text-slate-400">/ {maxMarksTotal}</span></span>
+                    <div className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3.5 sm:w-64 sm:flex-row sm:items-end sm:justify-end sm:bg-transparent sm:p-0">
+                      <div className="min-w-0 flex-1">
+                        <label htmlFor={`score-${contestant.codeLetter}`} className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Mark out of {maxMarksTotal}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id={`score-${contestant.codeLetter}`}
+                            type="number"
+                            min={0}
+                            max={maxMarksTotal}
+                            step={1}
+                            inputMode="numeric"
+                            value={scores[contestant.codeLetter] ?? '0'}
+                            onChange={event => adjustScore(contestant.codeLetter, event.target.value)}
+                            disabled={savingDraft || submitting}
+                            aria-label={`Enter mark for Code ${contestant.codeLetter}, from 0 to ${maxMarksTotal}`}
+                            className="h-12 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-center font-mono text-xl font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+                          />
+                          <span className="shrink-0 text-xs font-bold text-slate-500">/ {maxMarksTotal}</span>
+                        </div>
                       </div>
-                      <span className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${gradeColor}`}>Grade {grade}</span>
+                      <span className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${gradeColor}`}>Grade {grade}</span>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 p-3.5 sm:grid-cols-2 sm:gap-4 sm:p-5">
-                    {criteria.map(criterion => {
-                      const value = scores[contestant.codeLetter]?.[criterion.id] ?? '0';
-                      return (
-                        <section key={criterion.id} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 sm:p-4">
-                          <div className="mb-3 flex items-start justify-between gap-3">
-                            <h3 className="min-w-0 break-words text-xs font-bold leading-5 text-slate-900">{criterion.name}</h3>
-                            <span className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-slate-500">Max {criterion.maxMarks}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <label
-                              htmlFor={`score-${contestant.codeLetter}-${criterion.id}`}
-                              className="shrink-0 text-xs font-bold text-slate-600"
-                            >
-                              Marks
-                            </label>
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <input
-                                id={`score-${contestant.codeLetter}-${criterion.id}`}
-                                type="number"
-                                min={0}
-                                max={criterion.maxMarks}
-                                step={1}
-                                inputMode="numeric"
-                                value={value}
-                                onChange={event => adjustScore(contestant.codeLetter, criterion.id, event.target.value)}
-                                disabled={savingDraft || submitting}
-                                aria-label={`Enter ${criterion.name} mark for Code ${contestant.codeLetter}, from 0 to ${criterion.maxMarks}`}
-                                className="h-12 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-center font-mono text-lg font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
-                              />
-                              <span className="shrink-0 text-xs font-bold text-slate-500">/ {criterion.maxMarks}</span>
-                            </div>
-                          </div>
-                        </section>
-                      );
-                    })}
                   </div>
                 </article>
               );
