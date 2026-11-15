@@ -42,7 +42,7 @@ describe('Green Room roster integrity', () => {
     ])).toThrow(/Code Letter "A" is assigned to more than one registration/);
   });
 
-  it('fails closed when one registration has more than one Code Letter', () => {
+  it('rejects a non-canonical document claiming a second Code Letter for the same registration', () => {
     expect(() => buildGreenRoomRosterSnapshot('cmp-roster-test', [
       assignment('reg-1', 'A', 0),
       {
