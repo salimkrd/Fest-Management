@@ -20,14 +20,14 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
   if (!first) return null;
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-hidden bg-white rounded-2xl border border-[#E1E7EF] p-4 sm:p-6 shadow-xs">
+    <div className="public-podium-card w-full min-w-0 max-w-full overflow-hidden rounded-2xl border p-4 sm:p-5 shadow-xs">
       <div className="flex min-w-0 flex-col gap-3 mb-6 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h3 className="break-words text-sm sm:text-base font-bold text-[#111111]">Championship Laureates Podium</h3>
-          <p className="text-xs text-[#526070]">Top three performing contingent houses in active standings</p>
+          <h3 className="public-card-title break-words text-sm sm:text-base font-bold">Championship Laureates Podium</h3>
+          <p className="public-muted text-[11px]">Top three performing contingent houses in active standings</p>
         </div>
-        <div className="max-w-full self-start flex flex-wrap items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] sm:text-xs font-semibold text-amber-800 sm:self-auto">
-          <Trophy className="w-4 h-4 text-amber-600" />
+        <div className="public-page-eyebrow max-w-full self-start flex flex-wrap items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] sm:text-xs font-semibold sm:self-auto">
+          <Trophy className="w-4 h-4 text-[#FDBF0F]" />
           <span className="min-w-0 break-words"><span className="festival-name">{theme.festivalName}</span> Trophy Race</span>
           <FestivalStatusBadge />
         </div>
@@ -38,39 +38,39 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
         {/* 2nd Place - Silver (Left) */}
         {second && (
           <div className="flex flex-col items-center">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-slate-300 bg-slate-50 flex items-center justify-center text-slate-700 shadow-md mb-2 relative">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-4 border-[#C9BDAE] bg-[#F4EDE3] flex items-center justify-center text-[#4A0A1C] shadow-md mb-2 relative">
               <Award className="w-7 h-7 sm:w-8 sm:h-8" />
-              <span className="absolute -bottom-2 bg-slate-700 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+              <span className="absolute -bottom-2 bg-[#4A0A1C] text-[#FFF8EE] text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                 2nd
               </span>
             </div>
-            <h4 className="text-xs sm:text-sm font-bold text-[#111111] text-center mt-2 line-clamp-1">
+            <h4 className="public-card-title text-[11px] sm:text-xs font-bold text-center mt-2 line-clamp-1">
               {second.name}
             </h4>
-            <span className="text-[11px] font-semibold text-[#526070]">{second.code}</span>
-            <div className="w-full bg-slate-100 border border-slate-200 rounded-t-xl mt-3 pt-5 pb-4 text-center">
-              <span className="text-lg sm:text-2xl font-black text-slate-800 block">{second.totalPoints}</span>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase">Points</span>
+            <span className="public-muted text-[10px] font-semibold">{second.code}</span>
+            <div className="public-podium-base public-podium-second w-full border rounded-t-xl mt-3 pt-4 pb-3 text-center">
+              <span className="text-lg sm:text-xl font-black text-[#4A0A1C] block">{second.totalPoints}</span>
+              <span className="text-[9px] font-semibold text-[#6B5A50] uppercase">Points</span>
             </div>
           </div>
         )}
 
         {/* 1st Place - Gold (Center, Elevated) */}
         {first && (
-          <div className="flex flex-col items-center -mt-6">
-            <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-amber-400 bg-amber-50 flex items-center justify-center text-amber-600 shadow-xl mb-2 relative ring-4 ring-amber-100 animate-pulse">
-              <Trophy className="w-9 h-9 sm:w-10 sm:h-10 text-amber-500" />
-              <span className="absolute -bottom-2.5 bg-amber-500 text-neutral-900 text-xs font-black px-2.5 py-0.5 rounded-full shadow-sm">
+          <div className="flex flex-col items-center -mt-4">
+            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full border-4 border-[#FDBF0F] bg-[#FFF1BD] flex items-center justify-center text-[#86152C] shadow-xl mb-2 relative ring-4 ring-[#FDBF0F]/20">
+              <Trophy className="w-8 h-8 sm:w-9 sm:h-9 text-[#A87400]" />
+              <span className="absolute -bottom-2.5 bg-[#FDBF0F] text-[#1A080B] text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
                 1st
               </span>
             </div>
-            <h4 className="text-sm sm:text-base font-extrabold text-[#111111] text-center mt-2 line-clamp-1">
+            <h4 className="public-card-title text-xs sm:text-sm font-extrabold text-center mt-2 line-clamp-1">
               {first.name}
             </h4>
-            <span className="text-xs font-bold text-[#2563EB]">{first.code} · LEADER</span>
-            <div className="w-full bg-gradient-to-b from-amber-100 to-amber-50 border border-amber-200 rounded-t-2xl mt-3 pt-8 pb-5 text-center shadow-xs">
-              <span className="text-2xl sm:text-3xl font-black text-amber-900 block">{first.totalPoints}</span>
-              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Champion Pts</span>
+            <span className="text-[10px] font-bold text-[#86152C]">{first.code} · LEADER</span>
+            <div className="public-podium-base public-podium-first w-full border rounded-t-2xl mt-3 pt-6 pb-4 text-center shadow-xs">
+              <span className="text-xl sm:text-2xl font-black text-[#4A0A1C] block">{first.totalPoints}</span>
+              <span className="text-[9px] font-bold text-[#86152C] uppercase tracking-wider">Champion Pts</span>
             </div>
           </div>
         )}
@@ -78,9 +78,9 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
         {/* 3rd Place - Bronze (Right) */}
         {third && (
           <div className="flex flex-col items-center">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-amber-700/60 bg-amber-50/50 flex items-center justify-center text-amber-800 shadow-md mb-2 relative">
-              <Medal className="w-7 h-7 sm:w-8 sm:h-8 text-amber-700" />
-              <span className="absolute -bottom-2 bg-amber-800 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-4 border-[#B78647]/60 bg-[#F5E6D0] flex items-center justify-center text-[#795126] shadow-md mb-2 relative">
+              <Medal className="w-7 h-7 sm:w-8 sm:h-8 text-[#795126]" />
+              <span className="absolute -bottom-2 bg-[#795126] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                 3rd
               </span>
             </div>
@@ -88,9 +88,9 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
               {third.name}
             </h4>
             <span className="text-[11px] font-semibold text-[#526070]">{third.code}</span>
-            <div className="w-full bg-amber-50/80 border border-amber-200/80 rounded-t-xl mt-3 pt-3 pb-3 text-center">
-              <span className="text-lg sm:text-2xl font-black text-amber-900 block">{third.totalPoints}</span>
-              <span className="text-[10px] font-semibold text-amber-700/70 uppercase">Points</span>
+            <div className="public-podium-base public-podium-third w-full border rounded-t-xl mt-3 pt-3 pb-3 text-center">
+              <span className="text-lg sm:text-xl font-black text-[#795126] block">{third.totalPoints}</span>
+              <span className="text-[9px] font-semibold text-[#795126]/80 uppercase">Points</span>
             </div>
           </div>
         )}
