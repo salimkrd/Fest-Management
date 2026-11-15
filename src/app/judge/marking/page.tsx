@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
@@ -176,10 +176,6 @@ function JudgeMarkingContent() {
   }, [loadSession]);
 
   const maxMarksTotal = 100;
-  const configuredCriteriaMax = useMemo(
-    () => criteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0),
-    [criteria]
-  );
 
   const calculateTotal = (codeLetter: string) => {
     const value = Number(scores[codeLetter] ?? '0');
