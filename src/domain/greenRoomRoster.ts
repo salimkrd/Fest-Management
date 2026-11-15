@@ -58,8 +58,8 @@ export function assertGreenRoomEntryMatchesRegistration(
   const groupSize = normalizedGroupSize(registration.groupSize);
 
   const matches =
-    (!registrationDocumentId || registrationDocumentId === entry.registrationId) &&
-    (!registrationCompetitionId || registrationCompetitionId === entry.competitionId) &&
+    registrationDocumentId === entry.registrationId &&
+    registrationCompetitionId === entry.competitionId &&
     entry.participantId === participantId &&
     entry.participantName === participantName &&
     entry.teamId === teamId &&
