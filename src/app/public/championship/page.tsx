@@ -121,7 +121,7 @@ export default function PublicChampionshipPage() {
                                 className="h-full rounded-full transition-all duration-500"
                                 style={{
                                   width: `${sharePercent}%`,
-                                  backgroundColor: team.color || '#2563EB'
+                                  backgroundColor: team.color || '#86152C'
                                 }}
                               />
                             </div>
