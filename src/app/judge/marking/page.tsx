@@ -72,6 +72,7 @@ function JudgeMarkingContent() {
   const [contestants, setContestants] = useState<AnonymousContestant[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [scores, setScores] = useState<LocalScores>({});
+  const [rosterVersion, setRosterVersion] = useState('');
   const [remarks, setRemarks] = useState('');
   const [syncState, setSyncState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [refreshing, setRefreshing] = useState(false);
@@ -118,6 +119,10 @@ function JudgeMarkingContent() {
         return;
       }
 
+      if (typeof result.rosterVersion !== 'string' || !/^[a-f0-9]{64}$/.test(result.rosterVersion)) {
+        throw new Error('The anonymous Green Room roster could not be verified. Refresh the judge session before entering marks.');
+      }
+
       const nextCriteria = Array.isArray(result.competition?.criteria)
         ? result.competition.criteria as Criterion[]
         : [];
@@ -158,6 +163,7 @@ function JudgeMarkingContent() {
       setCriteria(nextCriteria);
       setContestants(nextContestants);
       setScores(nextScores);
+      setRosterVersion(result.rosterVersion);
       setRemarks(typeof result.draftRemarks === 'string' ? result.draftRemarks : '');
       setDraftSavedAt(typeof result.draftUpdatedAt === 'string' ? result.draftUpdatedAt : '');
       setStaleDraft(Boolean(result.staleDraft));
@@ -204,8 +210,8 @@ function JudgeMarkingContent() {
   };
 
   const saveMarks = async (action: 'DRAFT' | 'SUBMIT') => {
-    if (!assignmentId || !secret || !competition?.id) {
-      throw new Error('Your secure judge session is missing. Authenticate again before saving.');
+    if (!assignmentId || !secret || !competition?.id || !rosterVersion) {
+      throw new Error('Your verified Green Room roster session is missing. Refresh the judge session before saving.');
     }
     if (contestants.length === 0 || criteria.length === 0) {
       throw new Error('The current contestant roster or scoring rubric is empty. Refresh the session or contact the administrator.');
@@ -233,6 +239,7 @@ function JudgeMarkingContent() {
         assignmentId,
         competitionId: competition.id,
         secret,
+        rosterVersion,
         scores: validatedScores,
         remarks
       })
@@ -293,7 +300,7 @@ function JudgeMarkingContent() {
     });
   };
 
-  const isReadyToScore = syncState === 'ready' && contestants.length > 0 && criteria.length > 0 && !submitting;
+  const isReadyToScore = syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && !submitting;
   const statusText = syncState === 'loading'
     ? 'Syncing assignment'
     : syncState === 'error'
@@ -390,10 +397,6 @@ function JudgeMarkingContent() {
             <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">No anonymous contestants are currently assigned to this stage queue. Refresh the roster after the Green Room team checks contestants in.</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={handleRefresh} isLoading={refreshing}>Refresh roster</Button>
           </div>
-        ) : syncState === 'ready' && criteria.length === 0 ? (
-          <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            This competition has no configured marking criteria. Contact the administrator; do not use a sample rubric.
-          </div>
         ) : syncState === 'ready' ? (
           <div className="space-y-4">
             {contestants.map((contestant, index) => {
@@ -464,7 +467,7 @@ function JudgeMarkingContent() {
           </div>
         ) : null}
 
-        {syncState === 'ready' && contestants.length > 0 && criteria.length > 0 && (
+        {syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && (
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
               <Gavel className="h-4 w-4 shrink-0 text-blue-600" />
