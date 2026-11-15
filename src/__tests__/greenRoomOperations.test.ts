@@ -1892,4 +1892,100 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       }
     });
   });
+
+  describe('13. Green Room roster freezes when the first judge draft is saved', () => {
+    it('blocks a new check-in after a judge has started entering marks', async () => {
+      const compId = 'cmp-gr-roster-freeze-test';
+      const judgeAssignmentId = 'asgn-gr-roster-freeze-test';
+      const secret = 'roster_freeze_987';
+      const registrationIds = ['reg-gr-freeze-1', 'reg-gr-freeze-2'];
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'FREEZE-01',
+          name: 'Roster Freeze Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'IN_PROGRESS',
+          maxMarks: 100,
+          criteria: [{ id: 'cr-freeze', name: 'Overall', maxMarks: 100 }]
+        });
+
+        await db.collection('registrations').doc(registrationIds[0]).set({
+          id: registrationIds[0],
+          competitionId: compId,
+          participantId: 'part-gr-freeze-1',
+          participantName: 'Freeze Contestant 1',
+          status: 'APPROVED',
+          chestNumber: 'FRZ-01'
+        });
+        await db.collection('registrations').doc(registrationIds[1]).set({
+          id: registrationIds[1],
+          competitionId: compId,
+          participantId: 'part-gr-freeze-2',
+          participantName: 'Freeze Contestant 2',
+          status: 'APPROVED',
+          chestNumber: 'FRZ-02'
+        });
+
+        const checkedIn = await GreenRoomService.checkInContestant({
+          competitionId: compId,
+          participantIdentifier: 'FRZ-01',
+          operatorIdToken: staffIdToken
+        });
+        expect(checkedIn.assignment.codeLetter).toBe('A');
+
+        const { hashSecret } = await import('@/domain/judgeAuth');
+        const salt = 'salt_roster_freeze';
+        await db.collection('judgeAssignments').doc(judgeAssignmentId).set({
+          id: judgeAssignmentId,
+          judgeName: 'Roster Freeze Judge',
+          competitionId: compId,
+          secretHash: await hashSecret(secret, salt),
+          salt,
+          status: 'ACTIVE',
+          revoked: false
+        });
+
+        const rosterVersion = await getRosterVersion(compId);
+        const draft = await JudgeService.saveDraftMarks({
+          assignmentId: judgeAssignmentId,
+          competitionId: compId,
+          secret,
+          rosterVersion,
+          scores: { A: 87 }
+        });
+        expect(draft.success).toBe(true);
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'FRZ-02',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/Green Room check-in is locked because judge marking has started/i);
+
+        const roster = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(roster.docs).toHaveLength(1);
+        expect(roster.docs[0].data().registrationId).toBe(registrationIds[0]);
+        expect(roster.docs[0].data().codeLetter).toBe('A');
+      } finally {
+        const batch = db.batch();
+        registrationIds.forEach(id => {
+          batch.delete(db.collection('registrations').doc(id));
+          batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${id}`));
+        });
+        batch.delete(db.collection('judgeAssignments').doc(judgeAssignmentId));
+        batch.delete(db.collection('markEntries').doc(`me-${judgeAssignmentId}`));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
 });
