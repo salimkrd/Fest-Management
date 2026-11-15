@@ -9,9 +9,9 @@ import { JudgeService } from '@/services/judgeService';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, assignmentId, competitionId, secret, scores, remarks } = body;
+    const { action, assignmentId, competitionId, secret, rosterVersion, scores, remarks } = body;
 
-    if (!assignmentId || !competitionId || !secret || !scores) {
+    if (!assignmentId || !competitionId || !secret || !rosterVersion || !scores) {
       return NextResponse.json(
         { error: 'Bad Request: assignmentId, competitionId, secret, and scores are required.' },
         { status: 400 }
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
         assignmentId,
         competitionId,
         secret,
+        rosterVersion,
         scores,
         remarks
       });
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
         assignmentId,
         competitionId,
         secret,
+        rosterVersion,
         scores
       });
       return NextResponse.json(result, { status: 200 });
