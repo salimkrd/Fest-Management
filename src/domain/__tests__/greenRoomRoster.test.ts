@@ -100,6 +100,7 @@ describe('Green Room roster integrity', () => {
       participantName: 'Student One',
       teamId: 'team-1',
       teamCode: 'SHA',
+      teamName: 'Team Shamama',
       chestNumber: '101',
       groupMembers: ['part-1', 'part-2'],
       groupLeaderId: 'part-1',
@@ -130,6 +131,11 @@ describe('Green Room roster integrity', () => {
     expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
       ...identity,
       groupMembers: ['part-1']
+    })).toThrow(/participant and group identity snapshot/);
+
+    expect(() => assertGreenRoomEntryMatchesRegistration(entry, {
+      ...identity,
+      teamName: 'A Different Team'
     })).toThrow(/participant and group identity snapshot/);
   });
 
