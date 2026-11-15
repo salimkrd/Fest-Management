@@ -7,6 +7,7 @@ export interface GreenRoomRosterDocument {
 }
 
 export interface GreenRoomRosterEntry {
+  competitionId: string;
   registrationId: string;
   codeLetter: string;
   codeIndex: number;
@@ -45,6 +46,8 @@ export function assertGreenRoomEntryMatchesRegistration(
   entry: GreenRoomRosterEntry,
   registration: Record<string, unknown>
 ): void {
+  const registrationDocumentId = normalizedId(registration.id);
+  const registrationCompetitionId = normalizedId(registration.competitionId);
   const participantId = normalizedId(registration.participantId);
   const participantName = normalizedId(registration.participantName);
   const teamId = normalizedId(registration.teamId);
@@ -55,6 +58,8 @@ export function assertGreenRoomEntryMatchesRegistration(
   const groupSize = normalizedGroupSize(registration.groupSize);
 
   const matches =
+    (!registrationDocumentId || registrationDocumentId === entry.registrationId) &&
+    (!registrationCompetitionId || registrationCompetitionId === entry.competitionId) &&
     entry.participantId === participantId &&
     entry.participantName === participantName &&
     entry.teamId === teamId &&
@@ -111,19 +116,13 @@ export function buildGreenRoomRosterSnapshot(
       : '';
 
     if (recordCompetitionId !== competitionId) {
-      throw new Error(
-        `Roster Integrity Error: Green Room record "${document.id}" belongs to a different competition.`
-      );
+      throw new Error('Roster Integrity Error: A Green Room assignment belongs to a different competition.');
     }
     if (!registrationId || document.id !== `${competitionId}_${registrationId}`) {
-      throw new Error(
-        `Roster Integrity Error: Green Room record "${document.id}" does not match its canonical registration mapping.`
-      );
+      throw new Error('Roster Integrity Error: A Green Room assignment does not match its canonical registration record.');
     }
     if (!isValidCodeLetter(rawCode)) {
-      throw new Error(
-        `Roster Integrity Error: Registration "${registrationId}" has an invalid Code Letter.`
-      );
+      throw new Error('Roster Integrity Error: A Green Room assignment has an invalid Code Letter.');
     }
 
     const codeIndex = codeLetterToIndex(rawCode);
@@ -147,12 +146,11 @@ export function buildGreenRoomRosterSnapshot(
 
     const previousCode = registrationToCode.get(registrationId);
     if (previousCode && previousCode.codeLetter !== rawCode) {
-      throw new Error(
-        `Roster Integrity Error: Registration "${registrationId}" has more than one Code Letter. Judging has been blocked.`
-      );
+      throw new Error('Roster Integrity Error: One registration is assigned more than one Code Letter. Judging has been blocked.');
     }
 
     const entry: GreenRoomRosterEntry = {
+      competitionId,
       registrationId,
       codeLetter: rawCode,
       codeIndex,
