@@ -123,47 +123,16 @@ export class JudgeService {
     if (regsSnap.empty) {
       throw new Error(`Validation Error: Competition "${competitionId}" has zero registrations. Scoring cannot proceed.`);
     }
-    if (grSnap.empty) {
-      throw new Error(
-        `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". Scoring cannot proceed until contestants are checked in.`
-      );
-    }
-
     const compData = compDoc.data() || {};
     const criteriaList = (compData.criteria as Array<{ id: string; name: string; maxMarks: number }>) || [];
     const compMaxMarks = Number(compData.maxMarks) ||
       (criteriaList.length > 0 ? criteriaList.reduce((acc, criterion) => acc + (criterion.maxMarks || 0), 0) : 100);
-
-    // Validate the entire Code Letter <-> registration roster before resolving
-    // even one score. A duplicate or malformed assignment blocks all judging.
-    const roster = buildGreenRoomRosterSnapshot(
-      competitionId,
-      grSnap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
-    );
-    if (roster.version !== expectedRosterVersion) {
-      throw new Error(
-        'Stale Mapping Error: The Green Room Code Letter roster changed after this judge opened the scorecard. No marks were saved. Refresh the roster and verify every Code Letter again.'
-      );
-    }
 
     const approvedRegistrationIds = new Set(
       regsSnap.docs
         .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
         .map(doc => doc.id)
     );
-    if (approvedRegistrationIds.size === 0) {
-      throw new Error(
-        `Validation Error: Competition "${competitionId}" has zero eligible approved registrations. Scoring cannot proceed.`
-      );
-    }
-
-    for (const entry of roster.entries) {
-      if (!approvedRegistrationIds.has(entry.registrationId)) {
-        throw new Error(
-          `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is not currently approved. Judging has been blocked.`
-        );
-      }
-    }
 
     const ineligibleKeys = new Map<string, string>();
     const directContestantIdentifiers = new Set<string>();
@@ -221,6 +190,37 @@ export class JudgeService {
         );
       }
       normalizedScoreKeys.set(cleanUpperKey, scoreKey);
+    }
+
+    if (approvedRegistrationIds.size === 0) {
+      throw new Error(
+        `Validation Error: Competition "${competitionId}" has zero eligible approved registrations. Scoring cannot proceed.`
+      );
+    }
+    if (grSnap.empty) {
+      throw new Error(
+        `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". No Code Letter is assigned to an eligible registration, so scoring cannot proceed.`
+      );
+    }
+
+    // Validate the entire Code Letter <-> registration roster before resolving
+    // any mark. Duplicate, stale, malformed, or ineligible assignments block
+    // the complete scorecard rather than allowing a partial mapping.
+    const roster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      grSnap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    if (roster.version !== expectedRosterVersion) {
+      throw new Error(
+        'Stale Mapping Error: The Green Room Code Letter roster changed after this judge opened the scorecard. No marks were saved. Refresh the roster and verify every Code Letter again.'
+      );
+    }
+    for (const entry of roster.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is not currently approved. Judging has been blocked.`
+        );
+      }
     }
 
     // The submitted scorecard must cover the exact roster shown to the judge.
