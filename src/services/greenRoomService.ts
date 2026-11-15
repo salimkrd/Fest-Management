@@ -368,6 +368,19 @@ export class GreenRoomService {
         updatedAt: now
       };
 
+      // Validate the new snapshot against the transaction-current registration
+      // before assigning the Code Letter. Missing or malformed identity data is
+      // rejected at check-in, not deferred until a judge opens the scorecard.
+      const previewRoster = buildGreenRoomRosterSnapshot(competitionId, [{
+        id: assignmentDocId,
+        data: finalAssignment as unknown as Record<string, unknown>
+      }]);
+      assertGreenRoomEntryMatchesRegistration(previewRoster.entries[0], {
+        ...transactionRegData,
+        id: registrationId,
+        competitionId
+      });
+
       // Write 1: Green Room Assignment
       transaction.set(assignmentRef, finalAssignment);
 
