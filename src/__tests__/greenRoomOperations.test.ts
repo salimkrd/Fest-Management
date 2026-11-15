@@ -1682,6 +1682,49 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         }
         return { firstCodeLetter, secondCodeLetter };
       };
+
+      it('rejects marks from a judge screen opened before a real Green Room Code Letter reassignment', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
+        const oldSessionRosterVersion = await getRosterVersion(staleCompId);
+
+        // This is a real service-level reassignment while the judge's old screen
+        // remains open. Code C is available because a third approved entry exists.
+        const reassigned = await GreenRoomService.reassignCodeLetter({
+          competitionId: staleCompId,
+          registrationId: 'reg-stale-1',
+          newCodeLetter: 'C',
+          reason: 'Exercise stale judge session protection',
+          operatorIdToken: staffIdToken
+        });
+        expect(reassigned.codeLetter).toBe('C');
+
+        // A judge still holding the old A/B screen must not be able to save A/B
+        // to the new B/C roster, even though Code A is now free.
+        await expect(
+          JudgeService.saveDraftMarks({
+            assignmentId: staleJudgeAssignId,
+            competitionId: staleCompId,
+            secret: 'secure_pin_987654',
+            rosterVersion: oldSessionRosterVersion,
+            scores: {
+              [firstCodeLetter]: { 'c1': 91, 'c2': 0 },
+              [secondCodeLetter]: { 'c1': 80, 'c2': 0 }
+            }
+          })
+        ).rejects.toThrow(/Stale Mapping Error/);
+
+        // Restore the original identity mapping so the following race tests
+        // start from the known A/B fixture.
+        const restored = await GreenRoomService.reassignCodeLetter({
+          competitionId: staleCompId,
+          registrationId: 'reg-stale-1',
+          newCodeLetter: firstCodeLetter,
+          reason: 'Restore stale session test fixture',
+          operatorIdToken: staffIdToken
+        });
+        expect(restored.codeLetter).toBe(firstCodeLetter);
+      });
+
       it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
         const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Spy on validateScoresPayload to simulate a concurrent race condition:
