@@ -12,8 +12,6 @@ import {
   AlertCircle,
   AlertTriangle,
   Gavel,
-  Minus,
-  Plus,
   RefreshCw,
   Save,
   Send,
@@ -49,7 +47,7 @@ interface StoredJudgeSession {
   competition?: CompetitionSession;
 }
 
-type LocalScores = Record<string, Record<string, number>>;
+type LocalScores = Record<string, Record<string, string>>;
 
 function readStoredSession(): StoredJudgeSession | null {
   if (typeof window === 'undefined') return null;
@@ -130,7 +128,7 @@ function JudgeMarkingContent() {
 
       nextContestants.forEach(contestant => {
         nextScores[contestant.codeLetter] = Object.fromEntries(
-          nextCriteria.map(criterion => [criterion.id, 0])
+          nextCriteria.map(criterion => [criterion.id, '0'])
         );
       });
 
@@ -141,10 +139,12 @@ function JudgeMarkingContent() {
           nextScores[codeLetter] = {
             ...nextScores[codeLetter],
             ...Object.fromEntries(
-              Object.entries(rawScore || {}).filter(([criterionId, value]) =>
-                nextCriteria.some(criterion => criterion.id === criterionId) &&
-                typeof value === 'number' && Number.isFinite(value)
-              )
+              Object.entries(rawScore || {})
+                .filter(([criterionId, value]) =>
+                  nextCriteria.some(criterion => criterion.id === criterionId) &&
+                  typeof value === 'number' && Number.isFinite(value)
+                )
+                .map(([criterionId, value]) => [criterionId, String(value)])
             )
           };
         });
@@ -178,7 +178,10 @@ function JudgeMarkingContent() {
 
   const calculateTotal = (codeLetter: string) => {
     const contestantScores = scores[codeLetter] || {};
-    return criteria.reduce((sum, criterion) => sum + (contestantScores[criterion.id] || 0), 0);
+    return criteria.reduce((sum, criterion) => {
+      const value = Number(contestantScores[criterion.id] ?? '0');
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
   };
 
   const getGrade = (total: number) => {
@@ -193,12 +196,12 @@ function JudgeMarkingContent() {
     return { grade, color };
   };
 
-  const adjustScore = (codeLetter: string, criterionId: string, nextValue: number, max: number) => {
+  const adjustScore = (codeLetter: string, criterionId: string, nextValue: string) => {
     setScores(previous => ({
       ...previous,
       [codeLetter]: {
         ...previous[codeLetter],
-        [criterionId]: Math.max(0, Math.min(max, Math.round(nextValue)))
+        [criterionId]: nextValue
       }
     }));
     setIsDirty(true);
@@ -213,6 +216,22 @@ function JudgeMarkingContent() {
       throw new Error('The current contestant roster or scoring rubric is empty. Refresh the session or contact the administrator.');
     }
 
+    const validatedScores: Record<string, Record<string, number>> = {};
+    for (const contestant of contestants) {
+      const contestantScores: Record<string, number> = {};
+      for (const criterion of criteria) {
+        const rawValue = scores[contestant.codeLetter]?.[criterion.id] ?? '';
+        const value = Number(rawValue);
+        if (rawValue.trim() === '' || !Number.isInteger(value) || value < 0 || value > criterion.maxMarks) {
+          throw new Error(
+            `Enter a whole-number mark from 0 to ${criterion.maxMarks} for Code ${contestant.codeLetter} — ${criterion.name}.`
+          );
+        }
+        contestantScores[criterion.id] = value;
+      }
+      validatedScores[contestant.codeLetter] = contestantScores;
+    }
+
     const response = await fetch('/api/judge/marks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -223,7 +242,7 @@ function JudgeMarkingContent() {
         assignmentId,
         competitionId: competition.id,
         secret,
-        scores,
+        scores: validatedScores,
         remarks
       })
     });
@@ -416,40 +435,36 @@ function JudgeMarkingContent() {
 
                   <div className="grid grid-cols-1 gap-3 p-3.5 sm:grid-cols-2 sm:gap-4 sm:p-5">
                     {criteria.map(criterion => {
-                      const value = scores[contestant.codeLetter]?.[criterion.id] ?? 0;
+                      const value = scores[contestant.codeLetter]?.[criterion.id] ?? '0';
                       return (
                         <section key={criterion.id} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 sm:p-4">
                           <div className="mb-3 flex items-start justify-between gap-3">
                             <h3 className="min-w-0 break-words text-xs font-bold leading-5 text-slate-900">{criterion.name}</h3>
                             <span className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-slate-500">Max {criterion.maxMarks}</span>
                           </div>
-                          <div className="flex items-center gap-2.5 sm:gap-3">
-                            <button
-                              type="button"
-                              onClick={() => adjustScore(contestant.codeLetter, criterion.id, value - 1, criterion.maxMarks)}
-                              disabled={value <= 0 || savingDraft || submitting}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Decrease ${criterion.name} for contestant ${contestant.codeLetter}`}
-                            ><Minus className="h-4 w-4" /></button>
-                            <input
-                              type="range"
-                              min={0}
-                              max={criterion.maxMarks}
-                              step={1}
-                              value={value}
-                              onChange={event => adjustScore(contestant.codeLetter, criterion.id, Number(event.target.value), criterion.maxMarks)}
-                              disabled={savingDraft || submitting}
-                              aria-label={`${criterion.name} score for contestant ${contestant.codeLetter}`}
-                              className="h-8 min-w-0 flex-1 cursor-pointer accent-blue-600 disabled:cursor-not-allowed"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => adjustScore(contestant.codeLetter, criterion.id, value + 1, criterion.maxMarks)}
-                              disabled={value >= criterion.maxMarks || savingDraft || submitting}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Increase ${criterion.name} for contestant ${contestant.codeLetter}`}
-                            ><Plus className="h-4 w-4" /></button>
-                            <output className="w-9 shrink-0 text-right font-mono text-sm font-extrabold tabular-nums text-slate-950">{value}</output>
+                          <div className="flex items-center gap-3">
+                            <label
+                              htmlFor={`score-${contestant.codeLetter}-${criterion.id}`}
+                              className="shrink-0 text-xs font-bold text-slate-600"
+                            >
+                              Marks
+                            </label>
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <input
+                                id={`score-${contestant.codeLetter}-${criterion.id}`}
+                                type="number"
+                                min={0}
+                                max={criterion.maxMarks}
+                                step={1}
+                                inputMode="numeric"
+                                value={value}
+                                onChange={event => adjustScore(contestant.codeLetter, criterion.id, event.target.value)}
+                                disabled={savingDraft || submitting}
+                                aria-label={`Enter ${criterion.name} mark for Code ${contestant.codeLetter}, from 0 to ${criterion.maxMarks}`}
+                                className="h-12 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-center font-mono text-lg font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+                              />
+                              <span className="shrink-0 text-xs font-bold text-slate-500">/ {criterion.maxMarks}</span>
+                            </div>
                           </div>
                         </section>
                       );
