@@ -220,7 +220,7 @@ export class JudgeService {
       );
     }
     const registrationById = new Map(
-      regsSnap.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      regsSnap.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
     );
     for (const entry of roster.entries) {
       if (!approvedRegistrationIds.has(entry.registrationId)) {
@@ -451,7 +451,7 @@ export class JudgeService {
           .map(doc => doc.id)
       );
       const currentRegistrationById = new Map(
-        currentRegistrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of currentRoster.entries) {
         if (!approvedIds.has(entry.registrationId)) {
@@ -547,7 +547,7 @@ export class JudgeService {
         .map(doc => doc.id)
     );
     const finalRegistrationById = new Map(
-      registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      registrationSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
     );
     for (const entry of finalRoster.entries) {
       if (!approvedRegistrationIds.has(entry.registrationId)) {
@@ -893,7 +893,7 @@ export class JudgeService {
           .map(doc => doc.id)
       );
       const currentRegistrationById = new Map(
-        currentRegistrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
       );
       for (const entry of currentRoster.entries) {
         if (!approvedIds.has(entry.registrationId)) {
