@@ -14,6 +14,7 @@ import {
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
 import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
+import { buildGreenRoomRosterSnapshot, GreenRoomRosterEntry } from '@/domain/greenRoomRoster';
 
 export class JudgeService {
   /**
@@ -96,196 +97,208 @@ export class JudgeService {
   private static async validateScoresPayload(
     db: FirebaseFirestore.Firestore,
     competitionId: string,
-    scores: Record<string, Record<string, number> | number>
-  ): Promise<{ resolvedRegistrations: Map<string, string> }> {
-    if (!scores || typeof scores !== 'object' || Object.keys(scores).length === 0) {
+    scores: Record<string, Record<string, number> | number>,
+    expectedRosterVersion: string
+  ): Promise<{
+    resolvedRegistrations: Map<string, string>;
+    rosterEntries: GreenRoomRosterEntry[];
+    rosterVersion: string;
+  }> {
+    if (!scores || typeof scores !== 'object' || Array.isArray(scores) || Object.keys(scores).length === 0) {
       throw new Error('Validation Error: At least one participant score must be provided.');
     }
+    if (!/^[a-f0-9]{64}$/.test(expectedRosterVersion || '')) {
+      throw new Error('Stale Mapping Error: The judging screen has no valid Green Room roster version. Refresh the judge session.');
+    }
 
-    // 1. Fetch competition document to inspect specific judging rubric & maxMarks
-    const compDoc = await db.collection('competitions').doc(competitionId).get();
-    const compData = compDoc.exists ? compDoc.data() : null;
-    const criteriaList = (compData?.criteria as Array<{ id: string; name: string; maxMarks: number }>) || [];
-    const compMaxMarks = compData?.maxMarks || (criteriaList.length > 0 ? criteriaList.reduce((acc, c) => acc + (c.maxMarks || 0), 0) : 100);
+    const [compDoc, regsSnap, grSnap] = await Promise.all([
+      db.collection('competitions').doc(competitionId).get(),
+      db.collection('registrations').where('competitionId', '==', competitionId).get(),
+      db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
+    ]);
 
-    // 2. Fetch ALL registrations for this competition
-    const regsSnap = await db.collection('registrations')
-      .where('competitionId', '==', competitionId)
-      .get();
-
-    // Invariant 1: Fail closed if the competition has zero registrations in Firestore
+    if (!compDoc.exists) {
+      throw new Error(`Validation Error: Competition "${competitionId}" no longer exists.`);
+    }
     if (regsSnap.empty) {
-      throw new Error(
-        `Validation Error: Competition "${competitionId}" has zero registrations. Scoring cannot proceed.`
-      );
+      throw new Error(`Validation Error: Competition "${competitionId}" has zero registrations. Scoring cannot proceed.`);
     }
-
-    // Invariant 2 & 3: Filter for ELIGIBLE registrations only (strictly status === 'APPROVED')
-    // Fail-closed: missing, null, empty, PENDING, CANCELLED, WITHDRAWN, or REJECTED registrations are strictly ineligible.
-    const isExplicitlyApproved = (rawStatus: unknown): boolean => {
-      return typeof rawStatus === 'string' && rawStatus.trim().toUpperCase() === 'APPROVED';
-    };
-
-    const eligibleRegs = regsSnap.docs.filter(doc => {
-      return isExplicitlyApproved(doc.data().status);
-    });
-
-    if (eligibleRegs.length === 0) {
-      throw new Error(
-        `Validation Error: Competition "${competitionId}" has zero eligible approved registrations. Scoring cannot proceed.`
-      );
-    }
-
-    // Invariant 4: Detect direct contestant identifiers and map ineligible keys
-    const ineligibleKeys = new Map<string, string>(); // key -> ineligible reason
-    const directContestantIdentifiers = new Set<string>();
-    const eligibleRegIds = new Set<string>(eligibleRegs.map(doc => doc.id));
-
-    // Collect all ineligible keys and direct contestant identifiers
-    regsSnap.docs.forEach(doc => {
-      const data = doc.data();
-      const rawStatus = data.status;
-      const regId = doc.id.trim();
-
-      directContestantIdentifiers.add(regId);
-      if (data.participantId) directContestantIdentifiers.add(data.participantId.toString().trim());
-      if (data.bib) {
-        directContestantIdentifiers.add(data.bib.toString().trim());
-        directContestantIdentifiers.add(data.bib.toString().trim().toUpperCase());
-      }
-      if (data.chestNumber) {
-        directContestantIdentifiers.add(data.chestNumber.toString().trim());
-        directContestantIdentifiers.add(data.chestNumber.toString().trim().toUpperCase());
-      }
-      if (data.code) {
-        directContestantIdentifiers.add(data.code.toString().trim());
-        directContestantIdentifiers.add(data.code.toString().trim().toUpperCase());
-      }
-
-      if (!isExplicitlyApproved(rawStatus)) {
-        const displayStatus = (typeof rawStatus === 'string' && rawStatus.trim() !== '')
-          ? rawStatus.trim().toUpperCase()
-          : (rawStatus === null ? 'NULL' : rawStatus === undefined ? 'MISSING' : 'EMPTY');
-        const reason = `ineligible registration (status: ${displayStatus})`;
-        ineligibleKeys.set(doc.id, reason);
-        if (data.participantId) ineligibleKeys.set(data.participantId, reason);
-        if (data.bib) ineligibleKeys.set(data.bib, reason);
-        if (data.chestNumber) ineligibleKeys.set(data.chestNumber, reason);
-        if (data.code) ineligibleKeys.set(data.code, reason);
-      }
-    });
-
-    // Invariant 4B: Prioritize rejecting ineligible registrations and direct contestant identifiers
-    for (const [scoreKey] of Object.entries(scores)) {
-      if (ineligibleKeys.has(scoreKey)) {
-        throw new Error(
-          `Validation Error: Participant or registration "${scoreKey}" is an ${ineligibleKeys.get(scoreKey)}. Only APPROVED registrations can be scored.`
-        );
-      }
-
-      const cleanKey = scoreKey.trim();
-      const cleanUpperKey = cleanKey.toUpperCase();
-      if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
-        throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number). Direct contestant identifiers are strictly rejected. Judges must submit scores using ONLY assigned Green Room Code Letters (e.g. "A", "B", "C").`
-        );
-      }
-    }
-
-    // Invariant 4C: Query Green Room assignments to map anonymous Code Letters (A..Z, AA..ZZ)
-    // Judges are strictly required to score ONLY by actual assigned Code Letters.
-    const grSnap = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', competitionId)
-      .get();
-
     if (grSnap.empty) {
       throw new Error(
         `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". Scoring cannot proceed until contestants are checked in.`
       );
     }
 
-    const assignedCodeToRegId = new Map<string, string>();
-    grSnap.docs.forEach(grDoc => {
-      const grData = grDoc.data();
-      if (grData.codeLetter && grData.registrationId) {
-        const cleanCode = grData.codeLetter.trim().toUpperCase();
-        assignedCodeToRegId.set(cleanCode, grData.registrationId);
+    const compData = compDoc.data() || {};
+    const criteriaList = (compData.criteria as Array<{ id: string; name: string; maxMarks: number }>) || [];
+    const compMaxMarks = Number(compData.maxMarks) ||
+      (criteriaList.length > 0 ? criteriaList.reduce((acc, criterion) => acc + (criterion.maxMarks || 0), 0) : 100);
+
+    // Validate the entire Code Letter <-> registration roster before resolving
+    // even one score. A duplicate or malformed assignment blocks all judging.
+    const roster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      grSnap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    if (roster.version !== expectedRosterVersion) {
+      throw new Error(
+        'Stale Mapping Error: The Green Room Code Letter roster changed after this judge opened the scorecard. No marks were saved. Refresh the roster and verify every Code Letter again.'
+      );
+    }
+
+    const approvedRegistrationIds = new Set(
+      regsSnap.docs
+        .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+        .map(doc => doc.id)
+    );
+    if (approvedRegistrationIds.size === 0) {
+      throw new Error(
+        `Validation Error: Competition "${competitionId}" has zero eligible approved registrations. Scoring cannot proceed.`
+      );
+    }
+
+    for (const entry of roster.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is not currently approved. Judging has been blocked.`
+        );
+      }
+    }
+
+    const ineligibleKeys = new Map<string, string>();
+    const directContestantIdentifiers = new Set<string>();
+    regsSnap.docs.forEach(doc => {
+      const data = doc.data();
+      const regId = doc.id.trim();
+      directContestantIdentifiers.add(regId);
+      if (data.participantId) directContestantIdentifiers.add(String(data.participantId).trim());
+      if (data.bib) {
+        directContestantIdentifiers.add(String(data.bib).trim());
+        directContestantIdentifiers.add(String(data.bib).trim().toUpperCase());
+      }
+      if (data.chestNumber) {
+        directContestantIdentifiers.add(String(data.chestNumber).trim());
+        directContestantIdentifiers.add(String(data.chestNumber).trim().toUpperCase());
+      }
+      if (data.code) {
+        directContestantIdentifiers.add(String(data.code).trim());
+        directContestantIdentifiers.add(String(data.code).trim().toUpperCase());
+      }
+      if (!approvedRegistrationIds.has(doc.id)) {
+        const rawStatus = data.status;
+        const displayStatus = typeof rawStatus === 'string' && rawStatus.trim()
+          ? rawStatus.trim().toUpperCase()
+          : rawStatus === null ? 'NULL' : rawStatus === undefined ? 'MISSING' : 'EMPTY';
+        const reason = `ineligible registration (status: ${displayStatus})`;
+        ineligibleKeys.set(doc.id, reason);
+        if (data.participantId) ineligibleKeys.set(String(data.participantId), reason);
+        if (data.bib) ineligibleKeys.set(String(data.bib), reason);
+        if (data.chestNumber) ineligibleKeys.set(String(data.chestNumber), reason);
+        if (data.code) ineligibleKeys.set(String(data.code), reason);
       }
     });
 
-    // Invariant 5: Verify every score key corresponds to an eligible registration via assigned Code Letter,
-    // and no registration is scored multiple times under different aliases.
-    const scoredRegistrationIds = new Set<string>();
-    const resolvedRegistrations = new Map<string, string>(); // scoreKey -> regId
-
-    for (const [scoreKey, scoreVal] of Object.entries(scores)) {
+    const normalizedScoreKeys = new Map<string, string>();
+    for (const scoreKey of Object.keys(scores)) {
       const cleanKey = scoreKey.trim();
       const cleanUpperKey = cleanKey.toUpperCase();
+      if (ineligibleKeys.has(scoreKey) || ineligibleKeys.has(cleanKey)) {
+        throw new Error(
+          `Validation Error: Participant or registration "${scoreKey}" is an ${ineligibleKeys.get(scoreKey) || ineligibleKeys.get(cleanKey)}. Only APPROVED registrations can be scored.`
+        );
+      }
+      if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
+        throw new Error(
+          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number). Judges must submit scores using ONLY assigned Green Room Code Letters.`
+        );
+      }
+      if (!cleanUpperKey) {
+        throw new Error('Validation Error: Empty Code Letter score keys are not allowed.');
+      }
+      if (normalizedScoreKeys.has(cleanUpperKey)) {
+        throw new Error(
+          `Validation Error: Duplicate Code Letter key "${cleanUpperKey}" was supplied more than once.`
+        );
+      }
+      normalizedScoreKeys.set(cleanUpperKey, scoreKey);
+    }
 
-      // 3. Verify key is an actual Code Letter assigned in greenRoomAssignments for this competition
-      const resolvedRegId = assignedCodeToRegId.get(cleanUpperKey);
+    // The submitted scorecard must cover the exact roster shown to the judge.
+    // Missing or unexpected codes are never silently omitted from a final mark set.
+    const missingCodes = roster.entries
+      .map(entry => entry.codeLetter)
+      .filter(codeLetter => !normalizedScoreKeys.has(codeLetter));
+    const unexpectedCodes = Array.from(normalizedScoreKeys.keys())
+      .filter(codeLetter => !roster.codeToRegistration.has(codeLetter));
+    if (unexpectedCodes.length > 0) {
+      throw new Error(
+        `Validation Error: Code Letter "${unexpectedCodes[0]}" is not assigned in the current Green Room roster.`
+      );
+    }
+    if (missingCodes.length > 0 || normalizedScoreKeys.size !== roster.entries.length) {
+      throw new Error(
+        `Validation Error: Marks are required for every checked-in Code Letter. Missing: ${missingCodes.join(', ') || 'roster count mismatch'}.`
+      );
+    }
+
+    const scoredRegistrationIds = new Set<string>();
+    const resolvedRegistrations = new Map<string, string>();
+
+    for (const [cleanUpperKey, originalScoreKey] of normalizedScoreKeys.entries()) {
+      const resolvedRegId = roster.codeToRegistration.get(cleanUpperKey);
       if (!resolvedRegId) {
         throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is not a valid assigned Green Room Code Letter (not assigned to an eligible registration) for competition "${competitionId}". Judges must score ONLY actual Code Letters assigned to checked-in contestants.`
+          `Validation Error: Code Letter "${cleanUpperKey}" is not a valid assigned Green Room code for competition "${competitionId}".`
         );
       }
-
-      // 4. Verify resolved registration is approved
-      if (!eligibleRegIds.has(resolvedRegId)) {
+      if (!approvedRegistrationIds.has(resolvedRegId)) {
         throw new Error(
-          `Validation Error: Contestant with Code Letter "${cleanUpperKey}" is not assigned to an eligible APPROVED registration for competition "${competitionId}".`
+          `Validation Error: Code Letter "${cleanUpperKey}" is not assigned to an approved registration.`
         );
       }
-
-      // 5. Check duplicate scoring: ensuring every score key resolves to exactly one distinct eligible registration
       if (scoredRegistrationIds.has(resolvedRegId)) {
         throw new Error(
-          `Validation Error: Duplicate score entry detected. Score key "${scoreKey}" resolves to registration "${resolvedRegId}", which has already been scored in this scorecard.`
+          `Validation Error: More than one Code Letter resolves to the same registration for "${originalScoreKey}".`
         );
       }
       scoredRegistrationIds.add(resolvedRegId);
-      resolvedRegistrations.set(scoreKey, resolvedRegId);
+      resolvedRegistrations.set(originalScoreKey, resolvedRegId);
 
-      // Validate numeric score values and criteria against competition rubric
+      const scoreVal = scores[originalScoreKey];
       if (typeof scoreVal === 'number') {
         if (!Number.isInteger(scoreVal) || scoreVal < 0 || scoreVal > 100) {
           throw new Error(
-            `Validation Error: Total mark for Code Letter "${scoreKey}" (${scoreVal}) must be a whole number from 0 to 100.`
+            `Validation Error: Total mark for Code Letter "${cleanUpperKey}" (${scoreVal}) must be a whole number from 0 to 100.`
           );
         }
-      } else if (typeof scoreVal === 'object' && scoreVal !== null) {
+      } else if (typeof scoreVal === 'object' && scoreVal !== null && !Array.isArray(scoreVal)) {
+        // Backward compatibility for scorecards created by the previous criterion-wise UI.
         const critEntries = Object.entries(scoreVal);
         if (critEntries.length === 0) {
-          throw new Error(`Validation Error: Criteria marks for participant "${scoreKey}" cannot be empty.`);
+          throw new Error(`Validation Error: Criteria marks for Code Letter "${cleanUpperKey}" cannot be empty.`);
         }
 
         let participantTotal = 0;
         const seenCriterionIds = new Set<string>();
         for (const [critKey, critMark] of critEntries) {
-          if (typeof critMark !== 'number' || isNaN(critMark) || critMark < 0) {
-            throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be a non-negative number.`);
+          if (typeof critMark !== 'number' || !Number.isFinite(critMark) || critMark < 0) {
+            throw new Error(`Validation Error: Criterion "${critKey}" score for Code "${cleanUpperKey}" must be a non-negative number.`);
           }
-
-          // Rubric limit check: cross-reference against specific criterion maxMarks
           if (criteriaList.length > 0) {
             const rubricCriterion = criteriaList.find(
-              c => c.id === critKey || c.name.toLowerCase() === critKey.toLowerCase()
+              criterion => criterion.id === critKey || criterion.name.toLowerCase() === critKey.toLowerCase()
             );
             if (!rubricCriterion) {
-              throw new Error(
-                `Validation Error: Criterion "${critKey}" is not part of the competition rubric for participant "${scoreKey}".`
-              );
+              throw new Error(`Validation Error: Criterion "${critKey}" is not part of the competition rubric.`);
             }
             seenCriterionIds.add(rubricCriterion.id);
             if (critMark > rubricCriterion.maxMarks) {
               throw new Error(
-                `Validation Error: Criterion "${critKey}" score (${critMark}) for participant "${scoreKey}" exceeds specific rubric limit of ${rubricCriterion.maxMarks}.`
+                `Validation Error: Criterion "${critKey}" score (${critMark}) exceeds its maximum of ${rubricCriterion.maxMarks}.`
               );
             }
-          } else {
-            if (critMark > 100) {
-              throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be between 0 and 100.`);
-            }
+          } else if (critMark > 100) {
+            throw new Error(`Validation Error: Criterion "${critKey}" must be between 0 and 100.`);
           }
           participantTotal += critMark;
         }
@@ -294,22 +307,27 @@ export class JudgeService {
           const missingCriteria = criteriaList.filter(criterion => !seenCriterionIds.has(criterion.id));
           if (missingCriteria.length > 0) {
             throw new Error(
-              `Validation Error: Participant "${scoreKey}" is missing marks for required criteria: ${missingCriteria.map(criterion => criterion.name || criterion.id).join(', ')}.`
+              `Validation Error: Code "${cleanUpperKey}" is missing criterion marks: ${missingCriteria.map(criterion => criterion.name || criterion.id).join(', ')}.`
             );
           }
         }
-
         if (participantTotal > compMaxMarks) {
           throw new Error(
-            `Validation Error: Sum of criteria marks (${participantTotal}) for participant "${scoreKey}" exceeds competition total maximum of ${compMaxMarks}.`
+            `Validation Error: Criteria total for Code "${cleanUpperKey}" exceeds the competition maximum.`
           );
         }
       } else {
-        throw new Error(`Validation Error: Invalid score data type for participant "${scoreKey}". Must be numeric or criteria map.`);
+        throw new Error(
+          `Validation Error: Invalid score format for Code Letter "${cleanUpperKey}".`
+        );
       }
     }
 
-    return { resolvedRegistrations };
+    return {
+      resolvedRegistrations,
+      rosterEntries: roster.entries,
+      rosterVersion: roster.version
+    };
   }
 
   /**
