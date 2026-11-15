@@ -57,7 +57,7 @@ export async function POST(
           !rank.registrationId ||
           seen.has(rank.registrationId) ||
           typeof rank.score !== 'number' ||
-          !Number.isInteger(rank.score) ||
+          !Number.isFinite(rank.score) ||
           rank.score < 0 ||
           rank.score > maxMarks ||
           !([1, 2, 3, null].includes(rank.rank as number | null))
