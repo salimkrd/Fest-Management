@@ -37,19 +37,19 @@ function DirectoryContent() {
   });
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="public-page-stack space-y-7 max-w-6xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-black text-[#111111] tracking-tight">
+        <h1 className="public-page-title font-cinematic-editorial text-xl sm:text-2xl font-bold tracking-[0.1em]">
           Public Results Directory &amp; Archive
         </h1>
-        <p className="text-xs sm:text-sm text-[#526070] mt-1">
+        <p className="public-page-description text-xs sm:text-sm mt-1">
           Search published competition results and download a poster template
         </p>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E1E7EF] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="public-filter-panel p-3.5 sm:p-4 rounded-xl border shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative flex-1 w-full md:max-w-md">
           <Search className="w-4 h-4 text-[#526070] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -57,7 +57,7 @@ function DirectoryContent() {
             placeholder="Search candidate name, Bib #, or competition..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E1E7EF] rounded-xl text-[#111111] placeholder:text-[#8E9CAE] focus:outline-none focus:bg-white focus:border-[#2563EB]"
+            className="public-control w-full text-xs pl-10 pr-4 py-2.5 rounded-lg focus:outline-none"
           />
         </div>
 
@@ -66,7 +66,7 @@ function DirectoryContent() {
             aria-label="Filter by Category"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none"
+            className="public-control text-xs font-semibold py-2 px-3 rounded-lg focus:outline-none"
           >
             <option value="ALL">All Categories</option>
             {categories.map(c => (
@@ -88,12 +88,12 @@ function DirectoryContent() {
       </div>
 
       {/* Results Count */}
-      <div className="flex items-center justify-between text-xs text-[#526070]">
+      <div className="public-results-count flex items-center justify-between text-xs">
         <span>Showing {filtered.length} of {publishedResults.length} officially published events</span>
         {search && (
           <button
             onClick={() => setSearch('')}
-            className="text-[#2563EB] hover:underline font-semibold"
+            className="public-inline-link hover:underline font-semibold"
           >
             Clear Search
           </button>
@@ -101,12 +101,12 @@ function DirectoryContent() {
       </div>
 
       {/* Results Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="public-results-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {filtered.length === 0 ? (
-          <div className="col-span-full bg-white p-12 text-center rounded-2xl border border-[#E1E7EF]">
-            <Sparkles className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-            <h4 className="text-sm font-bold text-[#111111]">No Results Found</h4>
-            <p className="text-xs text-[#526070] mt-1">
+          <div className="public-empty-state col-span-full p-8 sm:p-10 text-center rounded-xl border">
+            <Sparkles className="w-7 h-7 text-[#FDBF0F] mx-auto mb-2" />
+            <h4 className="public-card-title text-sm font-bold">No Results Found</h4>
+            <p className="public-muted text-xs mt-1">
               No published competition matches &ldquo;{search}&rdquo;. Try another search keyword.
             </p>
           </div>
@@ -118,46 +118,46 @@ function DirectoryContent() {
             return (
               <div
                 key={res.id}
-                className="bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs hover:shadow-md hover:border-neutral-300 transition-all flex flex-col justify-between"
+                className="public-result-card rounded-xl border p-4 sm:p-5 shadow-xs transition-all flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
+                    <span className="public-code-badge font-mono text-[11px] font-bold px-2.5 py-1 rounded border">
                       {res.competitionCode}
                     </span>
-                    <span className="text-[10px] font-bold uppercase text-[#526070]">
+                    <span className="public-muted text-[10px] font-bold uppercase">
                       {res.categoryName} · {res.type}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-[#111111] leading-snug">
+                  <h3 className="public-card-title text-sm sm:text-base font-bold leading-snug">
                     {res.competitionName}
                   </h3>
-                  <span className="text-xs text-[#526070] block mt-0.5">
+                  <span className="public-muted text-[11px] block mt-0.5">
                     Stage: {res.stageName}
                   </span>
 
                   {/* Laureates summary */}
-                  <div className="mt-5 space-y-2">
+                  <div className="mt-4 space-y-2">
                     {rank1 && (
-                      <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between text-xs">
+                      <div className="public-winner-row public-winner-first p-2 rounded-lg border flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-amber-400 text-neutral-900 font-black text-[10px] flex items-center justify-center shrink-0">
+                          <span className="public-rank-dot public-rank-first w-5 h-5 rounded-full font-black text-[10px] flex items-center justify-center shrink-0">
                             1
                           </span>
-                          <span className="font-bold text-[#111111] line-clamp-1">{rank1.candidateName}</span>
+                          <span className="public-winner-name font-bold line-clamp-1">{rank1.candidateName}</span>
                         </div>
-                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank1.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts</span></span>
+                        <span className="shrink-0 text-right"><span className="public-grade-text block text-[10px] font-bold">Grade {rank1.grade || '—'}</span><span className="public-points-text block text-[10px] font-extrabold">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts</span></span>
                       </div>
                     )}
 
                     {rank2 && (
-                      <div className="p-2 rounded-xl bg-[#F8FAFC] border border-[#E1E7EF] flex items-center justify-between text-xs">
+                      <div className="public-winner-row public-winner-secondary p-2 rounded-lg border flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                          <span className="public-rank-dot public-rank-secondary w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0">
                             2
                           </span>
-                          <span className="font-medium text-[#111111] line-clamp-1">{rank2.candidateName}</span>
+                          <span className="public-winner-name font-medium line-clamp-1">{rank2.candidateName}</span>
                         </div>
                         <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank2.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
                       </div>
@@ -165,11 +165,11 @@ function DirectoryContent() {
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-[10px] text-[#526070]">{res.publishedDate}</span>
+                <div className="public-card-footer mt-4 pt-3 border-t flex flex-wrap items-center justify-between gap-3">
+                  <span className="public-muted text-[10px]">{res.publishedDate}</span>
                   <div className="flex items-center gap-3">
                     <PosterDownloadDialog result={res} theme={theme} />
-                    <Link href={`/public/competition/${res.competitionId}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] group">
+                    <Link href={`/public/competition/${res.competitionId}`} className="public-inline-link flex items-center gap-1 text-xs font-bold group">
                       View Result <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </div>
@@ -186,7 +186,7 @@ function DirectoryContent() {
 export default function PublicResultsDirectoryPage() {
   return (
     <PublicLayout>
-      <Suspense fallback={<div className="p-12 text-center text-xs text-[#526070]">Loading results directory...</div>}>
+      <Suspense fallback={<div className="public-empty-state p-10 text-center text-xs">Loading results directory...</div>}>
         <DirectoryContent />
       </Suspense>
     </PublicLayout>
