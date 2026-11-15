@@ -31,7 +31,7 @@ export default function PublicChampionshipPage() {
             Team Championship Standings
           </h1>
           <p className="public-page-description mt-2 text-xs sm:text-sm">
-            Live accumulated points table across all solo, group, stage, and literary competitions
+            Live accumulated points table across all individual, group, stage, and literary competitions
           </p>
         </div>
 
@@ -52,14 +52,14 @@ export default function PublicChampionshipPage() {
             <table className="public-table w-full min-w-[900px] text-left text-xs">
               <thead>
                 <tr className="public-table-head border-b font-bold uppercase text-[10px]">
-                  <th className="py-3.5 px-6">Rank</th>
-                  <th className="py-3.5 px-6">Contingent House &amp; Insignia</th>
-                  <th className="py-3.5 px-6 text-center">Solo Pts</th>
-                  <th className="py-3.5 px-6 text-center">Group Pts</th>
-                  <th className="py-3.5 px-6 text-center">Laureate Medals (1 / 2 / 3)</th>
-                  <th className="py-3.5 px-6 text-center">Total Points</th>
-                  <th className="py-3.5 px-6 w-36">Point Share %</th>
-                  <th className="py-3.5 px-6 text-right">Detail</th>
+                  <th className="py-3 px-4">Rank</th>
+                  <th className="py-3 px-4">Contingent House &amp; Insignia</th>
+                  <th className="py-3 px-4 text-center">Individual Pts</th>
+                  <th className="py-3 px-4 text-center">Group Pts</th>
+                  <th className="py-3 px-4 text-center">Laureate Medals (1 / 2 / 3)</th>
+                  <th className="py-3 px-4 text-center">Total Points</th>
+                  <th className="py-3 px-4 w-36">Point Share %</th>
+                  <th className="py-3 px-4 text-right">Detail</th>
                 </tr>
               </thead>
               <tbody className="public-table-body divide-y">
@@ -72,10 +72,10 @@ export default function PublicChampionshipPage() {
                       <tr className="public-table-row transition-colors">
                         <td className="py-3 px-4 font-black text-xs">
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                            idx === 0 ? 'bg-amber-400 text-neutral-900 font-black' :
-                            idx === 1 ? 'bg-slate-300 text-neutral-900 font-bold' :
-                            idx === 2 ? 'bg-amber-700 text-white font-bold' :
-                            'bg-neutral-100 text-neutral-700'
+                            idx === 0 ? 'bg-[#FDBF0F] text-[#1A080B] font-black' :
+                            idx === 1 ? 'bg-[#D8C4A6] text-[#1A080B] font-bold' :
+                            idx === 2 ? 'bg-[#86152C] text-white font-bold' :
+                            'bg-[#F5E6D0] text-[#4A0A1C]'
                           }`}>
                             {idx + 1}
                           </span>
@@ -97,7 +97,7 @@ export default function PublicChampionshipPage() {
                         <td className="py-3 px-4 text-center font-bold">
                           {team.soloPoints}
                         </td>
-                        <td className="py-4 px-6 text-center font-bold text-[#111111]">
+                        <td className="py-3 px-4 text-center font-bold text-[#111111]">
                           {team.groupPoints}
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -107,11 +107,11 @@ export default function PublicChampionshipPage() {
                             <span className="text-[#86152C]">🥉 {team.thirdCount}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6 text-center">
+                        <td className="py-3 px-4 text-center">
                           <span className="public-points-total text-lg font-black">{team.totalPoints}</span>
                           <span className="text-[10px] text-[#526070] block">pts</span>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-3 px-4">
                           <div className="space-y-1">
                             <div className="flex justify-between text-[10px] font-bold text-[#526070]">
                               <span>{sharePercent}%</span>
