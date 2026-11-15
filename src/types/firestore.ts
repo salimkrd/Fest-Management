@@ -389,6 +389,8 @@ export interface FirestoreGreenRoomAssignment {
   chestNumber: string;
   type: CompetitionType;
   groupMembers?: string[];
+  groupLeaderId?: string;
+  groupSize?: number;
   codeLetter: string; // A..Z, AA..ZZ
   codeIndex: number; // 0..701
   status: GreenRoomContestantStatus;
