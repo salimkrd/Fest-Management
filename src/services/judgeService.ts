@@ -14,7 +14,11 @@ import {
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
 import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
-import { buildGreenRoomRosterSnapshot, GreenRoomRosterEntry } from '@/domain/greenRoomRoster';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration,
+  GreenRoomRosterEntry
+} from '@/domain/greenRoomRoster';
 
 export class JudgeService {
   /**
@@ -215,12 +219,20 @@ export class JudgeService {
         'Stale Mapping Error: The Green Room Code Letter roster changed after this judge opened the scorecard. No marks were saved. Refresh the roster and verify every Code Letter again.'
       );
     }
+    const registrationById = new Map(
+      regsSnap.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+    );
     for (const entry of roster.entries) {
       if (!approvedRegistrationIds.has(entry.registrationId)) {
         throw new Error(
           `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is not currently approved. Judging has been blocked.`
         );
       }
+      const liveRegistration = registrationById.get(entry.registrationId);
+      if (!liveRegistration) {
+        throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record.');
+      }
+      assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
     }
 
     // The submitted scorecard must cover the exact roster shown to the judge.
@@ -438,12 +450,20 @@ export class JudgeService {
           .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
           .map(doc => doc.id)
       );
+      const currentRegistrationById = new Map(
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
       for (const entry of currentRoster.entries) {
         if (!approvedIds.has(entry.registrationId)) {
           throw new Error(
             `Roster Integrity Error: Code Letter "${entry.codeLetter}" no longer points to an approved registration. No marks were saved.`
           );
         }
+        const liveRegistration = currentRegistrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record. No marks were saved.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       transaction.set(lockRef, {
@@ -526,12 +546,20 @@ export class JudgeService {
         .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
         .map(doc => doc.id)
     );
+    const finalRegistrationById = new Map(
+      registrationSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+    );
     for (const entry of finalRoster.entries) {
       if (!approvedRegistrationIds.has(entry.registrationId)) {
         throw new Error(
           `Roster Integrity Error: Final result generation blocked because Code Letter "${entry.codeLetter}" no longer points to an approved registration.`
         );
       }
+      const liveRegistration = finalRegistrationById.get(entry.registrationId);
+      if (!liveRegistration) {
+        throw new Error('Roster Integrity Error: Final result generation blocked because a Code Letter has no live registration identity record.');
+      }
+      assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
     }
     const expectedRegistrationIds = finalRoster.entries
       .map(entry => entry.registrationId)
@@ -864,12 +892,20 @@ export class JudgeService {
           .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
           .map(doc => doc.id)
       );
+      const currentRegistrationById = new Map(
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, doc.data() as Record<string, unknown>])
+      );
       for (const entry of currentRoster.entries) {
         if (!approvedIds.has(entry.registrationId)) {
           throw new Error(
             `Roster Integrity Error: Code Letter "${entry.codeLetter}" no longer points to an approved registration. Submission was blocked.`
           );
         }
+        const liveRegistration = currentRegistrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record. Submission was blocked.');
+        }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       transaction.set(lockRef, {
