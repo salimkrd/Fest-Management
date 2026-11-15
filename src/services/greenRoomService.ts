@@ -22,6 +22,7 @@ import {
 import { QrSignerService } from './qrSignerService';
 import { GreenRoomContestantStatus } from '@/types/fest';
 import { FirestoreGreenRoomAssignment, FirestoreAuditLog } from '@/types/firestore';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 export interface CheckInContestantParams {
   competitionId: string;
@@ -116,12 +117,12 @@ export class GreenRoomService {
       }
     }
 
-    const candidateIdentifiers = [
+    const candidateIdentifiers = Array.from(new Set([
       parsedQr.participantId,
       parsedQr.bib,
       participantIdentifier.trim(),
       participantIdentifier.trim().toUpperCase()
-    ].filter(Boolean) as string[];
+    ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)));
 
     // 3. Find matching registration for this competition
     const regsSnap = await db.collection('registrations')
@@ -132,18 +133,20 @@ export class GreenRoomService {
       throw new Error(`Validation Error: No registrations found for competition "${compData.name}".`);
     }
 
-    const matchingRegDoc = regsSnap.docs.find(doc => {
+    const matchingRegDocs = regsSnap.docs.filter(doc => {
       const data = doc.data();
-      const cleanChest = (data.chestNumber || '').toString().trim().toUpperCase();
-      const cleanBib = (data.bib || '').toString().trim().toUpperCase();
-      const cleanPartId = (data.participantId || '').toString().trim();
-      const cleanCode = (data.code || '').toString().trim().toUpperCase();
+      const cleanChest = String(data.chestNumber || '').trim().toUpperCase();
+      const cleanBib = String(data.bib || '').trim().toUpperCase();
+      const cleanPartId = String(data.participantId || '').trim();
+      const cleanCode = String(data.code || '').trim().toUpperCase();
       const cleanDocId = doc.id.trim();
 
-      // Check group members if applicable
-      const inGroup = Array.isArray(data.groupMembers) && candidateIdentifiers.some(cid =>
-        data.groupMembers.includes(cid)
-      );
+      // Check group members if applicable. A scan must resolve to one
+      // registration only; never pick the first match from an ambiguous roster.
+      const groupMembers = Array.isArray(data.groupMembers)
+        ? data.groupMembers.map((member: unknown) => String(member).trim())
+        : [];
+      const inGroup = candidateIdentifiers.some(cid => groupMembers.includes(cid));
 
       return (
         candidateIdentifiers.includes(cleanDocId) ||
@@ -154,6 +157,14 @@ export class GreenRoomService {
         inGroup
       );
     });
+
+    if (matchingRegDocs.length > 1) {
+      throw new Error(
+        `Validation Error: Identifier "${participantIdentifier}" matches more than one registration in this competition. Check-in has been blocked to prevent assigning a Code Letter to the wrong contestant.`
+      );
+    }
+
+    const matchingRegDoc = matchingRegDocs[0];
 
     if (!matchingRegDoc) {
       // Check if participant is registered for a DIFFERENT competition to give a helpful diagnostic
@@ -187,16 +198,15 @@ export class GreenRoomService {
       );
     }
 
-    // The code pool has exactly one letter per APPROVED competition entry.
-    // A group counts once, regardless of how many members it contains.
-    const eligibleCount = regsSnap.docs.filter(doc =>
-      String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
-    ).length;
-
     // 5. Transactional Code Letter Assignment
     const assignmentDocId = `${competitionId}_${registrationId}`;
     const assignmentRef = db.collection('greenRoomAssignments').doc(assignmentDocId);
     const counterRef = db.collection('greenRoomCounters').doc(competitionId);
+    const lockRef = db.collection('competitionMarkingLocks').doc(competitionId);
+    const assignmentQuery = db.collection('greenRoomAssignments')
+      .where('competitionId', '==', competitionId);
+    const registrationQuery = db.collection('registrations')
+      .where('competitionId', '==', competitionId);
     const auditLogRef = db.collection('auditLogs').doc(`audit-${randomUUID()}`);
 
     let assignedCode = '';
@@ -204,20 +214,84 @@ export class GreenRoomService {
     let finalAssignment: FirestoreGreenRoomAssignment | null = null;
 
     await db.runTransaction(async (transaction) => {
-      // Read 1: Check existing assignment
+      // All roster/counter/lock reads occur before writes so Firestore can
+      // serialize check-in against judge marking and Code Letter reassignment.
       const existingDoc = await transaction.get(assignmentRef);
+      const lockDoc = await transaction.get(lockRef);
+      const counterDoc = await transaction.get(counterRef);
+      const assignmentSnapshot = await transaction.get(assignmentQuery);
+      const registrationSnapshot = await transaction.get(registrationQuery);
+
+      const roster = buildGreenRoomRosterSnapshot(
+        competitionId,
+        assignmentSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
+      const approvedRegistrationIds = new Set(
+        registrationSnapshot.docs
+          .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+          .map(doc => doc.id)
+      );
+
+      for (const entry of roster.entries) {
+        if (!approvedRegistrationIds.has(entry.registrationId)) {
+          throw new Error(
+            `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is no longer approved.`
+          );
+        }
+      }
+
+      const currentRegistration = registrationSnapshot.docs.find(doc => doc.id === registrationId);
+      if (
+        !currentRegistration ||
+        String(currentRegistration.data().status || '').trim().toUpperCase() !== 'APPROVED'
+      ) {
+        throw new Error('Eligibility Error: Registration is no longer approved for this competition. Refresh the Green Room roster.');
+      }
+
+      const lockData = lockDoc.exists ? lockDoc.data() || {} : {};
+      const assignedCodes = roster.entries.map(entry => entry.codeLetter);
+      const eligibleCount = approvedRegistrationIds.size;
+
       if (existingDoc.exists) {
+        const existing = existingDoc.data() as FirestoreGreenRoomAssignment;
+        const mapped = roster.registrationToCode.get(registrationId);
+        if (!mapped || mapped.codeLetter !== String(existing.codeLetter || '').trim().toUpperCase()) {
+          throw new Error('Roster Integrity Error: Existing check-in record does not match the canonical Green Room roster.');
+        }
+
         isExisting = true;
-        finalAssignment = existingDoc.data() as FirestoreGreenRoomAssignment;
-        assignedCode = finalAssignment.codeLetter;
+        finalAssignment = existing;
+        assignedCode = mapped.codeLetter;
+
+        // Repair a stale counter from the authoritative assignment documents.
+        const sortedCodes = [...assignedCodes].sort((a, b) => codeLetterToIndex(a) - codeLetterToIndex(b));
+        const counterCodes = Array.isArray(counterDoc.data()?.assignedCodes)
+          ? (counterDoc.data()!.assignedCodes as string[]).map(code => String(code).trim().toUpperCase())
+          : [];
+        if (JSON.stringify(counterCodes) !== JSON.stringify(sortedCodes)) {
+          transaction.set(counterRef, {
+            competitionId,
+            assignedCodes: sortedCodes,
+            totalCheckedIn: sortedCodes.length,
+            lastAssignedCode: sortedCodes[sortedCodes.length - 1] || '',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
         return;
       }
 
-      // Read 2: Counter / assigned codes set for this competition
-      const counterDoc = await transaction.get(counterRef);
-      const assignedCodes: string[] = counterDoc.exists ? (counterDoc.data()?.assignedCodes || []) : [];
+      if (lockData.locked || lockData.markingStarted || lockData.finalized || lockData.reassignmentInProgress) {
+        throw new Error(
+          'Lock Error: Green Room check-in is locked because judge marking has started. New contestants cannot be added after the judging roster is frozen.'
+        );
+      }
 
-      // Determine Code Letter
+      if (roster.entries.length >= eligibleCount) {
+        throw new Error('Conflict Error: Every approved registration already has a Green Room Code Letter.');
+      }
+
+      // Determine Code Letter from the authoritative assignment documents, not
+      // the denormalized counter, which may be stale or incomplete.
       if (manualCodeLetter) {
         const cleanManual = manualCodeLetter.trim().toUpperCase();
         if (!isValidCodeLetter(cleanManual)) {
@@ -226,14 +300,13 @@ export class GreenRoomService {
         if (codeLetterToIndex(cleanManual) >= eligibleCount) {
           throw new Error(`Validation Error: Code Letter "${cleanManual}" is outside the A..N range for ${eligibleCount} approved entries.`);
         }
-        if (assignedCodes.includes(cleanManual)) {
+        if (roster.codeToRegistration.has(cleanManual)) {
           throw new Error(
             `Conflict Error: Code Letter "${cleanManual}" has already been assigned in competition "${compData.name}". Choose another code or use automatic assignment.`
           );
         }
         assignedCode = cleanManual;
       } else {
-        // Crypto-secure random selection, transactionally reserving the chosen code.
         assignedCode = getRandomAvailableCodeLetter(assignedCodes, eligibleCount);
       }
 
@@ -275,13 +348,23 @@ export class GreenRoomService {
       // Write 1: Green Room Assignment
       transaction.set(assignmentRef, finalAssignment);
 
-      // Write 2: Counter update
-      const updatedCodes = [...assignedCodes, assignedCode];
+      // Write 2: Reconcile the counter from the authoritative roster.
+      const updatedCodes = [...assignedCodes, assignedCode]
+        .sort((a, b) => codeLetterToIndex(a) - codeLetterToIndex(b));
       transaction.set(counterRef, {
         competitionId,
         assignedCodes: updatedCodes,
         totalCheckedIn: updatedCodes.length,
         lastAssignedCode: assignedCode,
+        updatedAt: now
+      }, { merge: true });
+
+      // Update the same lock document used by judge saves and reassignments.
+      // This makes roster changes serialize against the first mark save.
+      transaction.set(lockRef, {
+        competitionId,
+        rosterRevision: Number(lockData.rosterRevision || 0) + 1,
+        rosterUpdatedAt: now,
         updatedAt: now
       }, { merge: true });
 
