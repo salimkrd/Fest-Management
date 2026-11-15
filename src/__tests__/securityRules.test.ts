@@ -924,6 +924,14 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     const salt = 'salt-service-8822';
     const hashedSecret = await hashSecret(pin, salt);
 
+    await adminDb.collection('competitions').doc(compId).set({
+      id: compId,
+      code: 'CMP-SERVICE',
+      name: 'Test Competition',
+      status: 'IN_PROGRESS',
+      maxMarks: 100
+    });
+
     await adminDb.collection('registrations').doc('reg-service-1').set({
       id: 'reg-service-1',
       competitionId: compId,
