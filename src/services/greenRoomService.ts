@@ -338,6 +338,7 @@ export class GreenRoomService {
         registrationCode: transactionRegData.code ? String(transactionRegData.code) : '',
         participantId: transactionRegData.participantId ? String(transactionRegData.participantId) : undefined,
         participantName: transactionRegData.participantName ? String(transactionRegData.participantName) : 'Contestant',
+        participantNameSnapshot: transactionRegData.participantName ? String(transactionRegData.participantName) : '',
         teamId: transactionRegData.teamId ? String(transactionRegData.teamId) : '',
         teamCode: transactionRegData.teamCode ? String(transactionRegData.teamCode) : '',
         teamName: transactionRegData.teamName ? String(transactionRegData.teamName) : '',
