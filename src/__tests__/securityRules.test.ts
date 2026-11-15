@@ -937,6 +937,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       code: 'CMP-SERVICE',
       name: 'Test Competition',
       status: 'IN_PROGRESS',
+      type: 'SOLO',
       maxMarks: 100,
       criteria: [
         { id: 'content', name: 'Content', maxMarks: 50 },
@@ -1090,7 +1091,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
           'fake-invented-participant-999': 95
         }
       })
-    ).rejects.toThrow(/no contestants have checked in|not assigned to an eligible registration/i);
+    ).rejects.toThrow(/not a valid assigned Green Room Code Letter/i);
   });
 
   it('33. Criteria marks exceeding specific competition rubric limits are strictly rejected by JudgeService', async () => {
@@ -1158,7 +1159,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
           }
         }
       })
-    ).rejects.toThrow(/exceeds specific rubric limit/i);
+    ).rejects.toThrow(/exceeds its maximum/i);
   });
 
   it('34. Seeded assignments verification (future valid asg-02 read access vs expired lockout asg-expired-demo)', async () => {
@@ -1566,6 +1567,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-submit-service-test',
         competitionId: 'cmp-service-test',
         secret: 'WRONG-PIN',
+        rosterVersion: 'a'.repeat(64),
         scores: { 'A': 90 }
       })
     });
@@ -1580,6 +1582,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-draft-service-test',
         competitionId: 'comp-1',
         secret: '9911',
+        rosterVersion: await getTestRosterVersion('comp-1'),
         scores: { 'A': 92 },
         remarks: 'API draft test'
       })
