@@ -347,7 +347,11 @@ export class GreenRoomService {
           ? transactionRegData.groupMembers.map((value: unknown) => String(value))
           : undefined,
         groupLeaderId: transactionRegData.groupLeaderId ? String(transactionRegData.groupLeaderId) : undefined,
-        groupSize: Number.isInteger(Number(transactionRegData.groupSize)) && transactionRegData.groupSize !== null && transactionRegData.groupSize !== undefined
+        groupSize: transactionRegData.groupSize !== '' &&
+          transactionRegData.groupSize !== null &&
+          transactionRegData.groupSize !== undefined &&
+          Number.isInteger(Number(transactionRegData.groupSize)) &&
+          Number(transactionRegData.groupSize) >= 0
           ? Number(transactionRegData.groupSize)
           : undefined,
         codeLetter: assignedCode,
