@@ -777,11 +777,18 @@ export class JudgeService {
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key)!, value])
     );
 
-    // Freeze the validated, anonymous mapping into the immutable receipt.
+    // Freeze both the anonymous roster and the internal Code Letter-to-registration
+    // mapping into the immutable, server-only receipt. Only anonymousRoster is
+    // returned to the judge; codeRegistrationSnapshot remains private to Admin SDK.
     const anonymousRoster = rosterEntries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
+    const codeRegistrationSnapshot = rosterEntries.map(({ registrationId, codeLetter, codeIndex }) => ({
+      registrationId,
+      codeLetter,
+      codeIndex
+    }));
 
     const submittedAt = new Date().toISOString();
-    const hashPayload = `${params.assignmentId}:${params.competitionId}:${rosterVersion}:${submittedAt}:${JSON.stringify(normalizedScores)}:${JSON.stringify(anonymousRoster)}`;
+    const hashPayload = `${params.assignmentId}:${params.competitionId}:${rosterVersion}:${submittedAt}:${JSON.stringify(normalizedScores)}:${JSON.stringify(codeRegistrationSnapshot)}`;
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
     const markEntryId = `me-${params.assignmentId}`;
 
@@ -854,6 +861,7 @@ export class JudgeService {
         isFinal: true,
         scores: normalizedScores,
         anonymousRoster,
+        codeRegistrationSnapshot,
         rosterVersion,
         submittedAt,
         verificationHash
