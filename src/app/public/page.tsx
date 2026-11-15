@@ -356,7 +356,7 @@ export default function InspirathPublicHomePage() {
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
                       <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
-                        Ma'din Suffa Campus
+                        {"Ma'din Suffa Campus"}
                       </span>
                       <span className="text-xs text-[#FFF8EE]/80 mt-0.5 whitespace-nowrap">
                         Vavoor, Malappuram

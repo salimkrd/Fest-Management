@@ -3,11 +3,21 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Download, ImageIcon, LoaderCircle, Palette } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  ImageIcon,
+  LoaderCircle,
+  Palette,
+  ShieldCheck,
+  Smartphone,
+  Square,
+  FileText
+} from 'lucide-react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { ResultPosterPreview } from '@/components/domain/ResultPosterPreview';
-import { Button } from '@/components/ui/Button';
 import type { PosterTemplate } from '@/types/fest';
 import { exportPosterAsPng } from '@/utils/canvasExport';
 
@@ -26,9 +36,11 @@ function PublicPosterGalleryContent() {
   const publishedResults = results
     .filter(result => result.resultStatus === 'PUBLISHED')
     .sort((a, b) => a.competitionName.localeCompare(b.competitionName));
-  const selectedResult = publishedResults.find(result => result.id === selectedResultId)
-    || publishedResults.find(result => result.competitionId === selectedResultId)
-    || publishedResults[0];
+
+  const selectedResult =
+    publishedResults.find(result => result.id === selectedResultId) ||
+    publishedResults.find(result => result.competitionId === selectedResultId) ||
+    publishedResults[0];
 
   useEffect(() => {
     setSelectedResultId(requestedResultId);
@@ -42,7 +54,7 @@ function PublicPosterGalleryContent() {
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Could not load released poster templates.');
-        return Array.isArray(payload.templates) ? payload.templates as PosterTemplate[] : [];
+        return Array.isArray(payload.templates) ? (payload.templates as PosterTemplate[]) : [];
       })
       .then(items => {
         if (active) setTemplates(items.filter(template => template.released === true));
@@ -53,7 +65,9 @@ function PublicPosterGalleryContent() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleDownload(template: PosterTemplate) {
@@ -73,128 +87,223 @@ function PublicPosterGalleryContent() {
 
   return (
     <PublicLayout>
-      <div className="public-page-stack mx-auto max-w-6xl space-y-6">
-        <div>
-          <Link href="/public" className="public-inline-link mb-4 inline-flex items-center gap-2 text-xs font-semibold hover:underline">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to published results
-          </Link>
-          <div className="flex items-start gap-3">
-            <div className="public-page-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-              <Palette className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="public-eyebrow text-[10px] font-bold uppercase tracking-[.16em]">Official Media Studio</p>
-              <h1 className="public-page-title mt-1 font-cinematic-editorial text-xl sm:text-2xl font-bold tracking-[0.1em]">Choose a Result Poster</h1>
-              <p className="public-page-description mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed">
-                Select a published competition, preview the templates released by the festival, and download your favourite design. Every released template works with every published result.
+      <div className="public-page-stack mx-auto max-w-7xl space-y-8">
+        {/* EDITORIAL HERO BANNER */}
+        <section className="relative w-full rounded-2xl bg-gradient-to-b from-[#230D0F] via-[#1B090B] to-[#120507] p-6 sm:p-10 border border-[#BA1912]/30 shadow-2xl overflow-hidden">
+          <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[280px] bg-[#BA1912]/20 blur-[100px] rounded-full" />
+          <div className="pointer-events-none absolute top-10 right-10 w-64 h-64 bg-[#FDBF0F]/10 blur-[80px] rounded-full" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-3 max-w-3xl">
+              <Link
+                href="/public/directory"
+                className="inline-flex items-center gap-1.5 text-xs text-[#FDBF0F] hover:underline font-semibold"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Ratified Results Directory</span>
+              </Link>
+
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-[#FDBF0F]" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#FDBF0F]">
+                  Official Media Studio &amp; Folio Hub
+                </span>
+              </div>
+
+              <h1
+                className="text-2xl sm:text-4xl font-extrabold uppercase tracking-wide text-[#F2F3E6]"
+                style={{ fontFamily: "'Cinzel', serif" }}
+              >
+                Commemorative Result Posters
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[#F2F3E6]/75 max-w-2xl leading-relaxed">
+                Choose any officially ratified competition result, preview released design templates, and export high-resolution assets suitable for print gazettes, status stories, and social circulation.
               </p>
             </div>
-          </div>
-        </div>
 
-        <section className="public-filter-panel rounded-xl border p-4 sm:p-5">
-          <label htmlFor="poster-result-select" className="public-card-title mb-2 block text-xs font-bold">Competition result</label>
-          <select
-            id="poster-result-select"
-            value={selectedResult?.id || ''}
-            onChange={event => {
-              setSelectedResultId(event.target.value);
-              setDownloadedId(null);
-              setDownloadError('');
-            }}
-            disabled={publishedResults.length === 0}
-            className="public-control w-full max-w-2xl rounded-lg px-3 py-2.5 text-xs outline-none"
-          >
-            {publishedResults.length === 0 ? (
-              <option value="">No published results available yet</option>
-            ) : publishedResults.map(result => (
-              <option key={result.id} value={result.id}>
-                {result.competitionCode} · {result.competitionName} · {result.categoryName}
-              </option>
-            ))}
-          </select>
+            <div className="flex items-center gap-2 self-start md:self-auto px-4 py-2 rounded-xl bg-[#1B090B] border border-[#FDBF0F]/30 text-[#FDBF0F] text-xs font-mono">
+              <ShieldCheck className="w-4 h-4 text-[#FDBF0F]" />
+              <span>Lossless PNG Generation</span>
+            </div>
+          </div>
+        </section>
+
+        {/* COMPETITION RESULT SELECTOR PANEL */}
+        <section className="w-full bg-[#230D0F] rounded-2xl border border-[#BA1912]/30 p-5 sm:p-6 shadow-xl space-y-3">
+          <label htmlFor="poster-result-select" className="text-xs uppercase tracking-wider font-bold text-[#FDBF0F] block">
+            Select Competition Result to Render
+          </label>
+          <div className="relative max-w-3xl">
+            <select
+              id="poster-result-select"
+              value={selectedResult?.id || ''}
+              onChange={event => {
+                setSelectedResultId(event.target.value);
+                setDownloadedId(null);
+                setDownloadError('');
+              }}
+              disabled={publishedResults.length === 0}
+              className="w-full rounded-xl bg-[#1B090B] px-4 py-3 text-xs sm:text-sm text-[#F2F3E6] border border-[#BA1912]/40 focus:border-[#FDBF0F] focus:outline-none appearance-none cursor-pointer"
+            >
+              {publishedResults.length === 0 ? (
+                <option value="">No published results available yet</option>
+              ) : (
+                publishedResults.map(result => (
+                  <option key={result.id} value={result.id}>
+                    #{result.competitionCode} · {result.competitionName} ({result.categoryName} Division)
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
           {selectedResult && (
-            <p className="public-muted mt-2 text-[11px]">
-              Posters will use the published winners for <strong className="public-card-title">{selectedResult.competitionName}</strong>. Raw scores, grades and points are not shown on posters.
+            <p className="text-[11px] text-[#F2F3E6]/70 leading-relaxed">
+              Active Selection: <strong className="text-[#FDBF0F]">{selectedResult.competitionName}</strong> (#{selectedResult.competitionCode}). Laureates are dynamically populated onto templates. Raw scores and marks are never exposed on public posters.
             </p>
           )}
         </section>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        {/* TEMPLATES GRID HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h2 className="public-section-title font-cinematic-editorial text-base sm:text-lg font-bold">Released poster templates</h2>
-            <p className="public-muted mt-1 text-[11px]">Only templates publicly released from Media Studio appear here.</p>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#FDBF0F]">
+                Design Folio Catalog
+              </span>
+            </div>
+            <h2
+              className="text-lg sm:text-xl font-bold uppercase text-[#F2F3E6] mt-0.5"
+              style={{ fontFamily: "'Cinzel', serif" }}
+            >
+              Released Poster Templates
+            </h2>
           </div>
-          <span className="public-muted text-[10px] sm:text-xs font-semibold">
-            {loading ? 'Loading templates…' : `${templates.length} ${templates.length === 1 ? 'template' : 'templates'} available`}
+          <span className="text-xs text-[#F2F3E6]/70 font-mono bg-[#230D0F] px-3 py-1.5 rounded-lg border border-white/5">
+            {loading ? 'Scanning catalog…' : `${templates.length} ${templates.length === 1 ? 'Design' : 'Designs'} Available`}
           </span>
         </div>
 
+        {/* TEMPLATES CONTENT */}
         {loading ? (
-          <div className="public-empty-state flex items-center justify-center gap-2 rounded-xl border py-14 text-xs">
-            <LoaderCircle className="h-4 w-4 animate-spin" /> Loading released poster templates…
+          <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 text-xs text-[#F2F3E6]/70">
+            <LoaderCircle className="w-6 h-6 text-[#FDBF0F] animate-spin mx-auto mb-2" />
+            Loading released poster templates…
           </div>
         ) : loadError ? (
-          <div role="alert" className="public-alert rounded-xl border p-4 text-xs">{loadError}</div>
+          <div role="alert" className="p-4 rounded-xl bg-[#2D1217] border border-red-500/40 text-xs text-red-200">
+            {loadError}
+          </div>
         ) : templates.length === 0 ? (
-          <div className="public-empty-state rounded-xl border border-dashed px-6 py-12 text-center">
-            <ImageIcon className="mx-auto mb-3 h-8 w-8 text-[#C58B00]" />
-            <h3 className="public-card-title text-sm font-bold">No templates released yet</h3>
-            <p className="public-muted mx-auto mt-2 max-w-md text-xs leading-relaxed">
-              The festival team has not released a reusable poster template yet. Please check again after a template is released from Media Studio.
+          <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-dashed border-[#BA1912]/40">
+            <ImageIcon className="w-10 h-10 text-[#FDBF0F]/50 mx-auto mb-3" />
+            <h3
+              className="text-base font-bold uppercase text-[#F2F3E6]"
+              style={{ fontFamily: "'Cinzel', serif" }}
+            >
+              No Templates Released Yet
+            </h3>
+            <p className="mt-2 text-xs text-[#F2F3E6]/70 max-w-md mx-auto leading-relaxed">
+              The festival media team has not released any reusable poster templates yet. Please check again after a template is released in Media Studio.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {templates.map(template => (
-              <article key={template.id} className="public-template-card flex min-w-0 flex-col overflow-hidden rounded-xl border p-3.5 sm:p-4 shadow-xs">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="public-card-title break-words text-[13px] font-bold">{template.name}</h3>
-                    <p className="public-muted mt-1 text-[10px]">{template.config.aspectRatio} · {template.config.elements?.length ?? 0} design layers</p>
+              <article
+                key={template.id}
+                className="flex flex-col bg-[#230D0F] hover:bg-[#281014] rounded-2xl border border-[#BA1912]/30 hover:border-[#BA1912]/60 p-4 sm:p-5 shadow-xl transition-all justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-[#F2F3E6] truncate">{template.name}</h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-[#F2F3E6]/60 mt-0.5">
+                        {template.config.aspectRatio === '9:16' ? (
+                          <Smartphone className="w-3 h-3 text-[#FDBF0F]" />
+                        ) : template.config.aspectRatio === '4:5' ? (
+                          <FileText className="w-3 h-3 text-[#FDBF0F]" />
+                        ) : (
+                          <Square className="w-3 h-3 text-[#FDBF0F]" />
+                        )}
+                        <span className="font-mono">{template.config.aspectRatio} Ratio</span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#1B090B] text-[#FDBF0F] border border-[#FDBF0F]/30 shrink-0">
+                      Released
+                    </span>
                   </div>
-                  <span className="public-released-badge shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase">Released</span>
+
+                  {selectedResult && (
+                    <div className="rounded-xl overflow-hidden border border-white/10 bg-[#120507] p-2 shadow-inner">
+                      <ResultPosterPreview
+                        result={selectedResult}
+                        theme={theme}
+                        config={template.config}
+                        className="w-full overflow-hidden rounded-lg shadow-md"
+                      />
+                    </div>
+                  )}
                 </div>
-                {selectedResult ? (
-                  <ResultPosterPreview
-                    result={selectedResult}
-                    theme={theme}
-                    config={template.config}
-                    className="public-poster-preview w-full overflow-hidden rounded-xl border"
-                  />
-                ) : (
-                  <div className="public-empty-state flex aspect-[4/5] items-center justify-center rounded-xl border border-dashed p-5 text-center text-xs">
-                    Publish a competition result to preview this template.
-                  </div>
-                )}
-                <div className="mt-4">
-                  <Button
+
+                <div className="mt-4 pt-3 border-t border-[#BA1912]/20 space-y-2">
+                  <button
                     type="button"
-                    variant="primary"
-                    className="public-primary-button w-full"
-                    disabled={!selectedResult || Boolean(downloadingId)}
-                    isLoading={downloadingId === template.id}
-                    leftIcon={<Download className="h-4 w-4" />}
+                    disabled={Boolean(downloadingId) || !selectedResult}
                     onClick={() => void handleDownload(template)}
+                    className="w-full py-2.5 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {downloadingId === template.id ? 'Preparing PNG…' : 'Download This Poster (PNG)'}
-                  </Button>
+                    {downloadingId === template.id ? (
+                      <>
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin text-[#FDBF0F]" />
+                        <span>Generating PNG…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-3.5 w-3.5 text-[#FDBF0F]" />
+                        <span>Download PNG</span>
+                      </>
+                    )}
+                  </button>
+
+                  {downloadedId === template.id && (
+                    <div
+                      role="status"
+                      className="flex items-center justify-center gap-1.5 p-1.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Poster saved to downloads</span>
+                    </div>
+                  )}
                 </div>
-                {downloadedId === template.id && (
-                  <p role="status" className="public-success-note mt-2 flex items-center justify-center gap-1.5 text-[11px]">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Your poster download has started.
-                  </p>
-                )}
               </article>
             ))}
           </div>
         )}
-        {downloadError && <p role="alert" className="public-alert rounded-xl border p-3 text-xs">{downloadError}</p>}
+
+        {downloadError && (
+          <div role="alert" className="p-3 rounded-xl bg-[#2D1217] border border-red-500/40 text-red-200 text-xs">
+            {downloadError}
+          </div>
+        )}
       </div>
     </PublicLayout>
   );
 }
 
-export default function PublicPosterGalleryPage() {
-  return <Suspense fallback={<div className="public-empty-state p-10 text-center text-xs">Loading poster gallery…</div>}><PublicPosterGalleryContent /></Suspense>;
+export default function PublicPostersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#1B090B] flex items-center justify-center text-xs text-[#F2F3E6]/70">
+          <LoaderCircle className="h-6 w-6 animate-spin text-[#FDBF0F] mr-2" />
+          Loading poster studio…
+        </div>
+      }
+    >
+      <PublicPosterGalleryContent />
+    </Suspense>
+  );
 }
