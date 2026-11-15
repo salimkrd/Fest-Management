@@ -494,6 +494,7 @@ export class JudgeService {
     });
 
     const criterionMarksByRegistration = new Map<string, Map<string, number[]>>();
+    const criterionScorecardTotalsByRegistration = new Map<string, number[]>();
     const legacyTotalsByRegistration = new Map<string, number[]>();
 
     submittedMarks.forEach(mark => {
@@ -507,32 +508,44 @@ export class JudgeService {
         }
 
         const byCriterion = criterionMarksByRegistration.get(registrationId) || new Map<string, number[]>();
+        let scorecardTotal = 0;
         Object.entries(value).forEach(([criterionKey, rawScore]) => {
           const criterionId = criterionLookup.get(criterionKey.trim().toLowerCase());
           if (!criterionId) {
             throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in a submitted scorecard for registration "${registrationId}".`);
           }
+          const markValue = Number(rawScore);
+          if (!Number.isFinite(markValue)) {
+            throw new Error(`Validation Error: Invalid mark for criterion "${criterionKey}" in scorecard for registration "${registrationId}".`);
+          }
+          scorecardTotal += markValue;
           const values = byCriterion.get(criterionId) || [];
-          values.push(Number(rawScore));
+          values.push(markValue);
           byCriterion.set(criterionId, values);
         });
         criterionMarksByRegistration.set(registrationId, byCriterion);
+
+        const scorecardTotals = criterionScorecardTotalsByRegistration.get(registrationId) || [];
+        scorecardTotals.push(scorecardTotal);
+        criterionScorecardTotalsByRegistration.set(registrationId, scorecardTotals);
       });
     });
 
     const registrations = registrationSnapshot.docs.filter(doc => doc.data().status === 'APPROVED');
     const evaluated = registrations.flatMap(doc => {
       const criterionMap = criterionMarksByRegistration.get(doc.id);
+      const criterionScorecardTotals = criterionScorecardTotalsByRegistration.get(doc.id) || [];
       const legacyTotals = legacyTotalsByRegistration.get(doc.id) || [];
-      if (criterionMap && legacyTotals.length > 0) {
-        throw new Error(`Validation Error: Registration "${doc.id}" has a mixture of legacy total scores and criterion scores. Re-submit using one consistent score format.`);
-      }
 
       let score: number;
-      if (criterionMap && criterionMap.size > 0) {
-        // Each criterion has its own denominator: only judges who supplied that
-        // criterion contribute to its average. A complete rubric is validated at
-        // submission time; this also safely supports older partial scorecards.
+      if (legacyTotals.length > 0 && criterionScorecardTotals.length > 0) {
+        // New total-mark scorecards can coexist with earlier criterion-wise submissions.
+        // Averaging each judge's total is equivalent to summing criterion averages for
+        // complete rubrics, while keeping older drafts/submissions compatible.
+        const allJudgeTotals = [...legacyTotals, ...criterionScorecardTotals];
+        score = Number((allJudgeTotals.reduce((sum, value) => sum + value, 0) / allJudgeTotals.length).toFixed(2));
+      } else if (criterionMap && criterionMap.size > 0) {
+        // Preserve the previous criterion-wise averaging behaviour for existing scorecards.
         const criterionAverages = criterionDefinitions.map(criterion => {
           const marks = criterionMap.get(criterion.id) || [];
           return marks.length ? marks.reduce((sum, mark) => sum + mark, 0) / marks.length : 0;
