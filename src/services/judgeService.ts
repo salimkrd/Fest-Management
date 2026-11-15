@@ -656,6 +656,7 @@ export class JudgeService {
     assignmentId: string;
     competitionId: string;
     secret: string;
+    rosterVersion: string;
     scores: Record<string, Record<string, number> | number>;
   }): Promise<{
     success: boolean;
@@ -699,71 +700,68 @@ export class JudgeService {
       throw new Error(`Unauthorized: Judge authentication failed (${authResult.reason}).`);
     }
 
-    const { resolvedRegistrations } = await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const { resolvedRegistrations, rosterEntries, rosterVersion } = await this.validateScoresPayload(
+      db,
+      params.competitionId,
+      params.scores,
+      params.rosterVersion
+    );
     const normalizedScores = Object.fromEntries(
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key)!, value])
     );
 
-    // Freeze the anonymous code-letter mapping into the immutable receipt so a later
-    // Green Room roster change cannot alter what this judge actually evaluated.
-    const greenRoomSnapshot = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', params.competitionId)
-      .get();
-    const rosterByRegistration = new Map<string, { codeLetter: string; codeIndex: number }>();
-    greenRoomSnapshot.docs.forEach((doc, index) => {
-      const item = doc.data();
-      if (typeof item.registrationId === 'string' && typeof item.codeLetter === 'string') {
-        rosterByRegistration.set(item.registrationId, {
-          codeLetter: item.codeLetter.trim().toUpperCase(),
-          codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : index
-        });
-      }
-    });
-    const anonymousRoster = Array.from(resolvedRegistrations.values())
-      .map(registrationId => rosterByRegistration.get(registrationId))
-      .filter((item): item is { codeLetter: string; codeIndex: number } => Boolean(item))
-      .sort((a, b) => a.codeIndex - b.codeIndex);
-    if (anonymousRoster.length !== Object.keys(normalizedScores).length) {
-      throw new Error('Stale Mapping Error: The anonymous Green Room roster changed. Refresh the roster and verify each score before submitting.');
-    }
+    // Freeze the validated, anonymous mapping into the immutable receipt.
+    const anonymousRoster = rosterEntries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
 
     const submittedAt = new Date().toISOString();
-    const hashPayload = `${params.assignmentId}:${params.competitionId}:${submittedAt}:${JSON.stringify(normalizedScores)}`;
+    const hashPayload = `${params.assignmentId}:${params.competitionId}:${rosterVersion}:${submittedAt}:${JSON.stringify(normalizedScores)}:${JSON.stringify(anonymousRoster)}`;
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
     const markEntryId = `me-${params.assignmentId}`;
 
     const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
     const markEntryRef = db.collection('markEntries').doc(markEntryId);
     const assignRef = db.collection('judgeAssignments').doc(params.assignmentId);
+    const assignmentQuery = db.collection('greenRoomAssignments')
+      .where('competitionId', '==', params.competitionId);
+    const registrationQuery = db.collection('registrations')
+      .where('competitionId', '==', params.competitionId);
 
-    // Atomically persist finalized scorecard, update assignment status, and lock reassignment
+    // Atomically persist the scorecard only if the complete mapping still
+    // matches the exact roster the judge saw when the session loaded.
     await db.runTransaction(async (transaction) => {
       const lockDoc = await transaction.get(lockRef);
+      const currentRosterSnapshot = await transaction.get(assignmentQuery);
+      const currentRegistrationsSnapshot = await transaction.get(registrationQuery);
       if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
       }
 
       const assignDoc = await transaction.get(assignRef);
-      if (assignDoc.exists && assignDoc.data()?.status === 'SUBMITTED') {
+      if (!assignDoc.exists || assignDoc.data()?.competitionId !== params.competitionId) {
+        throw new Error('Unauthorized: Judge assignment could not be verified for this competition.');
+      }
+      if (assignDoc.data()?.status === 'SUBMITTED') {
         throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
       }
 
-      // Concurrency check: Ensure Code Letter-to-registration mapping has not changed or become stale
-      for (const [codeLetterKey, expectedRegId] of resolvedRegistrations.entries()) {
-        const cleanCode = codeLetterKey.trim().toUpperCase();
-        const asgnRef = db.collection('greenRoomAssignments').doc(`${params.competitionId}_${expectedRegId}`);
-        const asgnDoc = await transaction.get(asgnRef);
-
-        if (!asgnDoc.exists) {
+      const currentRoster = buildGreenRoomRosterSnapshot(
+        params.competitionId,
+        currentRosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
+      if (currentRoster.version !== rosterVersion) {
+        throw new Error(
+          'Stale Mapping Error: The Green Room roster changed while the scorecard was being finalized. Nothing was submitted; refresh the judge session.'
+        );
+      }
+      const approvedIds = new Set(
+        currentRegistrationsSnapshot.docs
+          .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+          .map(doc => doc.id)
+      );
+      for (const entry of currentRoster.entries) {
+        if (!approvedIds.has(entry.registrationId)) {
           throw new Error(
-            `Stale Mapping Error: Contestant registration "${expectedRegId}" is no longer checked in for competition "${params.competitionId}". The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
-          );
-        }
-
-        const currentCode = (asgnDoc.data()?.codeLetter || '').trim().toUpperCase();
-        if (currentCode !== cleanCode) {
-          throw new Error(
-            `Stale Mapping Error: Code Letter "${cleanCode}" is no longer mapped to registration "${expectedRegId}" (currently mapped to "${currentCode}"). The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+            `Roster Integrity Error: Code Letter "${entry.codeLetter}" no longer points to an approved registration. Submission was blocked.`
           );
         }
       }
@@ -789,6 +787,7 @@ export class JudgeService {
         isFinal: true,
         scores: normalizedScores,
         anonymousRoster,
+        rosterVersion,
         submittedAt,
         verificationHash
       });
