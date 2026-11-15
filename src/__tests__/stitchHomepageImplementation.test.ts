@@ -130,7 +130,7 @@ describe('INSPIRAATH 2026 Stitch Approved Homepage Implementation', () => {
       expect(pageSrc).toContain('aria-expanded={mobileMenuOpen}');
     });
   });
-}
+
   describe('6. Final regression corrections', () => {
     it('keeps the transparent Header inside the Hero section', () => {
       expect(pageSrc.indexOf('id="home"')).toBeLessThan(pageSrc.indexOf('HEADER: Deep Ruby-Espresso'));
