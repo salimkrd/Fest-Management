@@ -66,10 +66,6 @@ export function CompetitionSearchSelect({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [isOpen]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
   const closeDropdown = () => {
     setIsOpen(false);
     setQuery('');
@@ -147,7 +143,10 @@ export function CompetitionSearchSelect({
                 aria-controls={listboxId}
                 aria-activedescendant={activeOptionId}
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setActiveIndex(0);
+                }}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search by competition, code or category..."
                 className="min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
@@ -158,6 +157,7 @@ export function CompetitionSearchSelect({
                   aria-label="Clear competition search"
                   onClick={() => {
                     setQuery('');
+                    setActiveIndex(0);
                     searchInputRef.current?.focus();
                   }}
                   className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700"
