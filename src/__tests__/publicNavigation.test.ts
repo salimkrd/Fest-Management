@@ -219,3 +219,30 @@ describe('Participant portal access in the public header', () => {
     expect(publicLayout).toContain('aria-label="Mobile Navigation"');
   });
 });
+
+
+describe('Public homepage uses the same shared navigation as all public pages', () => {
+  const homePage = readProjectFile('src/app/public/page.tsx');
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+
+  it('wraps the homepage in the shared PublicLayout instead of rendering a separate header', () => {
+    expect(homePage).toContain('<PublicLayout>');
+    expect(homePage).toContain('</PublicLayout>');
+    expect(homePage).not.toContain('Toggle navigation menu');
+    expect(homePage).not.toContain('mobile-navigation');
+    expect(homePage).not.toContain('Desktop Navigation');
+  });
+
+  it('does not duplicate the footer or mobile bottom navigation on the homepage', () => {
+    expect(homePage).not.toContain('<PublicFooter');
+    expect(homePage).not.toContain('Mobile Fixed Bottom Navigation Bar');
+    expect(publicLayout).toContain('<MobileBottomNav />');
+    expect(publicLayout).toContain('<PublicFooter />');
+  });
+
+  it('uses the same participant login header action and shared desktop/mobile navigation', () => {
+    expect(publicLayout).toContain('href="/participant/login"');
+    expect(publicLayout).toContain('<PublicNavLinks />');
+    expect(publicLayout).toContain('<MobileBottomNav />');
+  });
+});
