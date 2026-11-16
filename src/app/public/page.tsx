@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFest } from '@/context/FestContext';
@@ -178,17 +178,14 @@ export default function InspirathPublicHomePage() {
     return start.getTime() === end.getTime() ? startDay : `${startDay} & ${endDay}`;
   }, [theme.festivalStartDate, theme.festivalEndDate]);
 
-  // Displayed institution and venue
-  const institutionName = theme.institutionName || "Ma'din Suffa Campus";
-  const venueLocation = 'Vavoor, Malappuram';
   const festivalTitle = theme.festivalName || 'INSPIRAATH';
 
   return (
-    <PublicLayout>
-      <div className="bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
+    <PublicLayout fullBleed>
+      <div className="bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] w-full">
 
 
-      <main className="w-full">
+      <div className="w-full">
         {/* HERO SECTION: Vibrant Rich Ruby-Crimson (#4A0A1C -> #86152C -> #A91D3A), theme.png as primary title, solo glowing lamp */}
         <section
           className="relative w-full hero-ruby-bg crimson-hero-gradient text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
@@ -936,7 +933,7 @@ export default function InspirathPublicHomePage() {
             </div>
           </div>
         </section>
-      </main>
+      </div>
 
       </div>
     </PublicLayout>
