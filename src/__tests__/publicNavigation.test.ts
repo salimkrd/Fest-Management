@@ -246,3 +246,30 @@ describe('Public homepage uses the same shared navigation as all public pages', 
     expect(publicLayout).toContain('<MobileBottomNav />');
   });
 });
+
+
+describe('Public homepage shared shell build regression', () => {
+  const homePage = readProjectFile('src/app/public/page.tsx');
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+
+  it('imports useState for homepage tabs and the quick result finder', () => {
+    expect(homePage).toContain("import React, { useMemo, useState } from 'react'");
+    expect(homePage).toContain("useState<string>('ALL')");
+    expect(homePage).toContain('setFinderHasSearched');
+  });
+
+  it('uses the shared PublicLayout in full-bleed mode without nesting main elements', () => {
+    expect(homePage).toContain('<PublicLayout fullBleed>');
+    expect(homePage).toContain('<div className="w-full">');
+    expect(homePage).not.toContain('<main className="w-full">');
+    expect(publicLayout).toContain('fullBleed?: boolean');
+    expect(publicLayout).toContain("fullBleed\n            ? 'pb-24 lg:pb-0'");
+  });
+
+  it('keeps the homepage hero date and venue details while removing its duplicate header', () => {
+    expect(homePage).toContain('{formattedDates}');
+    expect(homePage).toContain('{formattedDays}');
+    expect(homePage).not.toContain('Toggle navigation menu');
+    expect(homePage).not.toContain('Mobile Fixed Bottom Navigation Bar');
+  });
+});
