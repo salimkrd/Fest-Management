@@ -773,3 +773,145 @@
     margin-top: 12px;
   }
 }
+
+
+/* Reference-aligned staff login header and mobile content order. */
+.staff-login__home-link {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid rgba(253, 191, 15, 0.3);
+  border-radius: 9px;
+  background: rgba(27, 9, 11, 0.48);
+  color: var(--staff-ivory);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.staff-login__home-link svg {
+  flex: 0 0 auto;
+  color: var(--staff-gold);
+}
+
+.staff-login__home-link:hover {
+  border-color: rgba(253, 191, 15, 0.7);
+  background: rgba(186, 25, 18, 0.35);
+  color: var(--staff-gold);
+}
+
+.staff-login__home-link:focus-visible {
+  outline: 2px solid var(--staff-gold);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .staff-login__topbar {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+
+  .staff-login__home-link {
+    min-height: 32px;
+    gap: 5px;
+    padding: 7px 8px;
+    font-size: 9px;
+  }
+
+  .staff-login .staff-login__status {
+    max-width: 40%;
+    flex: 0 1 auto;
+    overflow: hidden;
+    font-size: 8px !important;
+    letter-spacing: 0.045em !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .staff-login__layout {
+    gap: 22px;
+  }
+
+  .staff-login__intro {
+    order: 1;
+    padding: 0;
+    text-align: left;
+  }
+
+  .staff-login__card {
+    order: 2;
+  }
+
+  .staff-login__identity {
+    justify-content: flex-start;
+    flex-direction: row;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .staff-login__identity-copy {
+    text-align: left;
+  }
+
+  .staff-login__welcome-copy {
+    margin: 19px 0 0;
+    text-align: left;
+  }
+
+  .staff-login__welcome-copy h1 {
+    max-width: 100%;
+    margin: 7px 0 8px;
+    font-size: clamp(22px, 6.2vw, 27px);
+    line-height: 1.18;
+    text-align: left;
+  }
+
+  .staff-login__welcome-copy p {
+    max-width: 100%;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: left;
+  }
+
+  /* The reference layout keeps the header focused on branding and the sign-in form. */
+  .staff-login__badges {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .staff-login__topbar {
+    gap: 6px;
+    margin-bottom: 19px;
+  }
+
+  .staff-login__home-link {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 8px;
+  }
+
+  .staff-login .staff-login__status {
+    max-width: 37%;
+    font-size: 7px !important;
+  }
+
+  .staff-login__welcome-copy {
+    margin-top: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .staff-login__home-link {
+    transition: none !important;
+  }
+}
