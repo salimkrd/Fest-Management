@@ -495,87 +495,139 @@
   background: var(--participant-gold);
 }
 
-@media (max-width: 900px) {
+/* Tablet: stack the content and form before either column gets cramped. */
+@media (max-width: 960px) {
+  .participant-login {
+    align-items: flex-start;
+    overflow-x: clip;
+    overflow-y: visible;
+    padding: clamp(22px, 4vw, 36px);
+  }
+
+  .participant-login__shell {
+    width: 100%;
+  }
+
+  .participant-login__topbar {
+    margin-bottom: clamp(24px, 4vw, 36px);
+  }
+
   .participant-login__layout {
-    grid-template-columns: minmax(0, 1fr) minmax(330px, 420px);
-    gap: 28px;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(24px, 4vw, 36px);
+  }
+
+  .participant-login__intro {
+    width: 100%;
+    padding: 0;
   }
 
   .participant-login__welcome-copy {
-    margin-top: 42px;
+    margin-top: clamp(24px, 4vw, 42px);
   }
 
   .participant-login__feature-list {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    max-width: none;
     margin-top: 26px;
   }
 
   .participant-login__feature {
     align-items: center;
-    padding: 9px 10px;
+    padding: 10px;
+  }
+
+  .participant-login__card {
+    width: 100%;
+    max-width: 560px;
+    justify-self: center;
   }
 }
 
+/* Phones: compact the intro and keep the complete form comfortably scrollable. */
 @media (max-width: 720px) {
   .participant-login {
-    align-items: flex-start;
+    min-height: 100vh;
     min-height: 100svh;
-    padding: 18px 16px 24px;
+    align-items: flex-start;
+    padding: 16px 14px calc(24px + env(safe-area-inset-bottom));
   }
 
   .participant-login__topbar {
-    margin-bottom: 25px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+
+  .participant-login__back-link {
+    min-width: 0;
+    min-height: 40px;
+    flex: 0 1 auto;
+    gap: 7px;
+    padding: 7px 9px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .participant-login .participant-login__status {
+    min-width: 0;
+    max-width: 48%;
+    flex: 0 1 auto;
+    padding: 6px 9px !important;
+    font-size: 8px !important;
   }
 
   .participant-login__layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-  }
-
-  .participant-login__intro {
-    padding: 0;
+    gap: 20px;
   }
 
   .participant-login__identity {
-    gap: 13px;
+    gap: 12px;
   }
 
   .participant-login .participant-login__festival-logo {
-    width: 52px !important;
-    height: 52px !important;
-    flex-basis: 52px;
-    border-radius: 13px !important;
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+    border-radius: 12px !important;
   }
 
   .participant-login__eyebrow {
+    gap: 5px;
     font-size: 8px;
-    letter-spacing: 0.13em;
+    letter-spacing: 0.1em;
   }
 
   .participant-login__festival-name {
-    font-size: clamp(20px, 6vw, 27px);
+    margin-top: 4px;
+    font-size: clamp(19px, 5.8vw, 26px);
+    line-height: 1.18;
   }
 
   .participant-login__institution {
+    margin-top: 4px;
     font-size: 10px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
 
   .participant-login__welcome-copy {
-    margin-top: 20px;
+    margin-top: 17px;
   }
 
   .participant-login__welcome-copy h2 {
-    max-width: 500px;
-    margin: 7px 0 7px;
-    font-size: clamp(23px, 6.2vw, 30px);
+    margin: 6px 0 7px;
+    font-size: clamp(22px, 6vw, 29px);
     letter-spacing: -0.035em;
+    line-height: 1.16;
   }
 
   .participant-login__welcome-copy p {
     max-width: 560px;
     font-size: 11px;
-    line-height: 1.65;
+    line-height: 1.6;
   }
 
   .participant-login__feature-list {
@@ -583,65 +635,109 @@
   }
 
   .participant-login__card {
-    border-radius: 18px;
+    width: 100%;
+    max-width: 560px;
+    border-radius: 17px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26), 0 0 0 4px rgba(253, 191, 15, 0.04);
   }
 
   .participant-login__card-header {
-    padding: 21px 20px 18px;
+    padding: 20px 18px 17px;
   }
 
   .participant-login__card-header h2 {
-    font-size: 23px;
+    font-size: 22px;
+  }
+
+  .participant-login__card-header p {
+    font-size: 11px;
   }
 
   .participant-login__form {
-    gap: 18px;
-    padding: 20px;
+    gap: 17px;
+    padding: 19px 18px 20px;
+  }
+
+  .participant-login__field label {
+    margin-bottom: 8px;
+    font-size: 10px;
   }
 
   .participant-login__input-wrap input {
+    width: 100%;
+    min-width: 0;
     min-height: 52px;
+    padding-right: 12px;
     font-size: 16px;
+  }
+
+  .participant-login__field-help {
+    font-size: 10px;
+    line-height: 1.55;
   }
 
   .participant-login__submit {
     min-height: 52px;
+    font-size: 12px;
+  }
+
+  .participant-login__security-note {
+    gap: 9px;
+    padding: 11px 12px;
+  }
+
+  .participant-login__security-note p {
+    font-size: 9px;
+    line-height: 1.6;
   }
 
   .participant-login__footer {
     flex-wrap: wrap;
-    margin-top: 22px;
-    font-size: 9px;
+    gap: 7px;
+    margin-top: 20px;
+    font-size: 8px;
+    line-height: 1.5;
   }
 }
 
-@media (max-width: 360px) {
+/* Narrow phones: protect the topbar and form from horizontal overflow. */
+@media (max-width: 380px) {
   .participant-login {
-    padding-right: 12px;
-    padding-left: 12px;
+    padding-right: 11px;
+    padding-left: 11px;
   }
 
   .participant-login__topbar {
-    gap: 8px;
+    gap: 6px;
   }
 
   .participant-login__back-link {
-    gap: 6px;
-    padding-right: 8px;
-    font-size: 10px;
+    gap: 5px;
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 9px;
   }
 
   .participant-login .participant-login__status {
-    max-width: 46%;
-    padding-right: 8px !important;
-    padding-left: 8px !important;
-    font-size: 8px !important;
+    max-width: 45%;
+    padding-right: 7px !important;
+    padding-left: 7px !important;
+    font-size: 7px !important;
+    letter-spacing: 0.045em !important;
   }
 
   .participant-login__card-header,
   .participant-login__form {
-    padding-right: 16px;
-    padding-left: 16px;
+    padding-right: 15px;
+    padding-left: 15px;
+  }
+
+  .participant-login__input-wrap input {
+    padding-left: 42px;
+  }
+
+  .participant-login__input-icon {
+    left: 13px;
   }
 }
 

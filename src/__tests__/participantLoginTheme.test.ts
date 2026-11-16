@@ -39,6 +39,20 @@ describe('Participant login public-theme redesign', () => {
     expect(page).toContain('role="alert"');
   });
 
+  it('stacks the intro and login card on tablet widths before the content becomes cramped', () => {
+    expect(styles).toContain('@media (max-width: 960px)');
+    expect(styles).toContain('grid-template-columns: minmax(0, 1fr)');
+    expect(styles).toContain('max-width: 560px');
+  });
+
+  it('keeps phone layouts scrollable, safe-area aware, and free of fixed-height clipping', () => {
+    expect(styles).toContain('overflow-y: visible');
+    expect(styles).toContain('env(safe-area-inset-bottom)');
+    expect(styles).toContain('@media (max-width: 380px)');
+    expect(styles).toContain('min-width: 0');
+    expect(styles).toContain('font-size: 16px');
+  });
+
   it('includes a single-column mobile layout and accessible reduced-motion support', () => {
     expect(styles).toContain('@media (max-width: 720px)');
     expect(styles).toContain('grid-template-columns: minmax(0, 1fr)');
