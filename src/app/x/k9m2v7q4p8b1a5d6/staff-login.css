@@ -915,3 +915,12 @@
     transition: none !important;
   }
 }
+
+
+@media (max-width: 640px) {
+  /* Let the full sign-in page scroll on phones when the form exceeds viewport height. */
+  .staff-login {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+}
