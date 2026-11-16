@@ -39,10 +39,6 @@
 .public-experience .crimson-hero-gradient{
   background: radial-gradient(circle at 50% 30%, #BA1912 0%, #9B120C 58%, #720b07 82%, #1B090B 100%);
 }
-.public-experience .theme-glow{
-  filter: drop-shadow(0 4px 14px rgba(27, 9, 11, 0.5));
-}
-
 /* Semantic Theme Color Utilities */
 .public-experience .bg-crimson{ background-color: #BA1912; }
 .public-experience .text-crimson{ color: #BA1912; }

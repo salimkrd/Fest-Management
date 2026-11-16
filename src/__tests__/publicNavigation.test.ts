@@ -330,3 +330,24 @@ describe('Public icon, typography, and configured identity', () => {
     expect(readProjectFile('src/components/layout/PublicLayout.tsx')).toContain('theme.festivalStartDate');
   });
 });
+
+
+describe('Public homepage institution identity, venue, and theme artwork', () => {
+  const homePage = readProjectFile('src/app/public/page.tsx');
+  const publicCss = readProjectFile('src/app/public/public.css');
+
+  it('shows the configured institution name in the box above the theme title', () => {
+    expect(homePage).toContain("{theme.institutionName?.trim() || 'Institution details to be announced'}");
+    expect(homePage).not.toContain("{theme.festivalName?.trim() || 'Official Festival'}");
+  });
+
+  it('shows the requested campus location beneath the theme title', () => {
+    expect(homePage).toContain('Madin Suffa Campus<br />Vavoor Edavannapara');
+  });
+
+  it('removes the shadow from the theme title PNG', () => {
+    expect(homePage).not.toContain('theme-glow');
+    expect(homePage).not.toContain("filter: 'drop-shadow");
+    expect(publicCss).not.toContain('.theme-glow');
+  });
+});

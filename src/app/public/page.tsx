@@ -169,7 +169,7 @@ export default function InspirathPublicHomePage() {
               <div className="lg:col-span-7 flex flex-col items-start">
                 {/* Festival Badge */}
                 <div
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded bg-[#4A0A1C]/90 border border-[#FDBF0F]/50 shadow-sm mb-8"
+                  className="inline-flex items-center gap-2 max-w-full px-3.5 py-1.5 rounded bg-[#4A0A1C]/90 border border-[#FDBF0F]/50 shadow-sm mb-8"
                   style={{
                     background:
                       'linear-gradient(135deg, rgba(74, 10, 28, 0.95) 0%, rgba(189, 16, 1, 0.85) 100%)',
@@ -177,13 +177,13 @@ export default function InspirathPublicHomePage() {
                   }}
                 >
                   <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
-                  <span className="font-body festival-name text-sm font-semibold uppercase tracking-[0.2em] text-[#FFF8EE]">
-                    {theme.festivalName?.trim() || 'Official Festival'}
+                  <span className="font-body text-sm sm:text-base font-semibold tracking-[0.06em] leading-snug text-[#FFF8EE]">
+                    {theme.institutionName?.trim() || 'Institution details to be announced'}
                   </span>
                 </div>
 
                 {/* PRIMARY HERO TITLE: Exact Theme PNG asset (theme.png) */}
-                <div className="w-full max-w-3xl mb-10 theme-glow">
+                <div className="w-full max-w-3xl mb-10">
                   <Image
                     src="/images/theme.png"
                     alt="Proactive Paradigms"
@@ -191,7 +191,6 @@ export default function InspirathPublicHomePage() {
                     height={179}
                     priority
                     className="w-full h-auto object-contain select-none"
-                    style={{ filter: 'drop-shadow(rgba(0, 0, 0, 0.25) 0px 2px 8px)' }}
                   />
                 </div>
 
@@ -214,7 +213,7 @@ export default function InspirathPublicHomePage() {
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
                       <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-normal break-words">
-                        {theme.institutionName?.trim() || 'Institution details to be announced'}
+                        Madin Suffa Campus<br />Vavoor Edavannapara
                       </span>
                     </div>
                   </div>
