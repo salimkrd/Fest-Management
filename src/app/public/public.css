@@ -1,0 +1,943 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap");
+/* Public-only theme stylesheet. Custom selectors are scoped beneath .public-experience. */
+/* =========================================================================
+   INSPIRAATH 2026 Stitch Approved Theme Styles
+   ========================================================================= */
+
+.public-experience .font-brand{
+  font-family: var(--festival-name-font, 'Sora'), sans-serif !important;
+}
+.public-experience .font-cinematic-editorial{
+  font-family: 'Sora', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.public-experience .font-editorial-drama{
+  font-family: 'Sora', sans-serif;
+  letter-spacing: 0.04em;
+}
+.public-experience .font-editorial{
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .font-body{
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .font-bruno{
+  font-family: var(--festival-name-font, 'Sora'), sans-serif !important;
+}
+.public-experience .font-sora{
+  font-family: 'Sora', sans-serif;
+}
+
+/* Mobile Safe Area & Theme Classes */
+.public-experience .pb-safe{
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+}
+.public-experience .pt-safe{
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.public-experience .crimson-hero-gradient{
+  background: radial-gradient(circle at 50% 30%, #BA1912 0%, #9B120C 58%, #720b07 82%, #1B090B 100%);
+}
+/* Semantic Theme Color Utilities */
+.public-experience .bg-crimson{ background-color: #BA1912; }
+.public-experience .text-crimson{ color: #BA1912; }
+.public-experience .border-crimson{ border-color: #BA1912; }
+
+.public-experience .bg-gold{ background-color: #FDBF0F; }
+.public-experience .text-gold{ color: #FDBF0F; }
+.public-experience .border-gold{ border-color: #FDBF0F; }
+
+.public-experience .bg-espresso{ background-color: #1B090B; }
+.public-experience .text-espresso{ color: #1B090B; }
+.public-experience .border-espresso{ border-color: #1B090B; }
+
+.public-experience .bg-ivory{ background-color: #F2F3E6; }
+.public-experience .text-ivory{ color: #F2F3E6; }
+.public-experience .border-ivory{ border-color: #F2F3E6; }
+
+/* Rich Ruby-Crimson Depth Gradient with subtle lighting */
+.public-experience .hero-ruby-bg{
+  background-color: #4A0A1C;
+  background: radial-gradient(circle at 75% 45%, rgba(253, 191, 15, 0.22) 0%, transparent 55%),
+              radial-gradient(circle at 20% 80%, rgba(169, 29, 58, 0.4) 0%, transparent 60%),
+              linear-gradient(145deg, #4A0A1C 0%, #86152C 52%, #A91D3A 100%);
+}
+
+.public-experience .banner-ruby-bg{
+  background-color: #4A0A1C;
+  background: radial-gradient(circle at 50% 50%, rgba(253, 191, 15, 0.18) 0%, transparent 65%),
+              linear-gradient(135deg, #4A0A1C 0%, #86152C 50%, #A91D3A 100%);
+}
+
+/* Dark Ruby-Espresso atmosphere backdrop for Results & Standings Console (#2D1217 to #4A0A1C) */
+.public-experience .console-dark-bg{
+  background-color: #2D1217;
+  background: radial-gradient(circle at 15% 20%, rgba(253, 191, 15, 0.12) 0%, transparent 45%),
+              radial-gradient(circle at 85% 80%, rgba(169, 29, 58, 0.28) 0%, transparent 50%),
+              linear-gradient(135deg, #2D1217 0%, #3B161E 45%, #4A0A1C 100%);
+}
+
+/* Organic flame flicker & golden halo */
+@keyframes lampFlicker {
+  0%, 100% {
+    filter: drop-shadow(0 0 28px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 65px rgba(253, 191, 15, 0.35));
+    transform: scale(1);
+  }
+  32% {
+    filter: drop-shadow(0 0 40px rgba(253, 191, 15, 0.8)) drop-shadow(0 0 85px rgba(253, 191, 15, 0.45));
+    transform: scale(1.008);
+  }
+  70% {
+    filter: drop-shadow(0 0 26px rgba(253, 191, 15, 0.55)) drop-shadow(0 0 55px rgba(253, 191, 15, 0.28));
+    transform: scale(0.995);
+  }
+}
+
+@keyframes ambientGlowPulse {
+  0%, 100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes lampSwing {
+  0% { transform: rotate(-4.5deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(4.5deg); }
+}
+
+@keyframes lampFlameGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 24px rgba(253, 191, 15, 0.7)) drop-shadow(0 0 60px rgba(253, 191, 15, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 42px rgba(253, 191, 15, 0.9)) drop-shadow(0 0 85px rgba(253, 191, 15, 0.55));
+  }
+}
+
+.public-experience .lamp-glow{
+  animation: lampFlicker 4.8s ease-in-out infinite;
+  will-change: filter, transform;
+}
+
+.public-experience .ambient-glow{
+  animation: ambientGlowPulse 6s ease-in-out infinite;
+}
+
+/* Enhanced Button Glow & Hover Micro-interactions */
+.public-experience .btn-hero-primary{
+  background-color: #FDBF0F;
+  color: #1A080B;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.public-experience .btn-hero-primary:hover{
+  background-color: #f0b200;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 30px rgba(253, 191, 15, 0.75), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.public-experience .btn-hero-primary:active{
+  transform: scale(0.98);
+}
+
+.public-experience .btn-hero-secondary{
+  border: 2px solid rgba(253, 191, 15, 0.8);
+  background-color: rgba(74, 10, 28, 0.9);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.public-experience .btn-hero-secondary:hover{
+  border-color: #FDBF0F;
+  background-color: rgba(253, 191, 15, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(253, 191, 15, 0.4);
+}
+.public-experience .btn-hero-secondary:active{
+  transform: scale(0.98);
+}
+
+.public-experience .btn-lookup{
+  background-color: #FDBF0F;
+  color: #1A080B;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.public-experience .btn-lookup:hover{
+  background-color: #f0b200;
+  filter: brightness(1.05);
+  box-shadow: 0 0 22px rgba(253, 191, 15, 0.7);
+  transform: translateY(-1px);
+}
+.public-experience .btn-lookup:active{
+  transform: scale(0.97);
+}
+
+.public-experience .btn-verify{
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.public-experience .btn-verify:hover{
+  border-color: #FDBF0F;
+  color: #FDBF0F;
+  box-shadow: 0 0 25px rgba(253, 191, 15, 0.5);
+  transform: translateY(-2px);
+}
+.public-experience .btn-verify:active{
+  transform: scale(0.98);
+}
+
+/* Lantern Floating & Flickering Flame Glow Animations */
+@keyframes lampFloatFlicker {
+  0%, 100% {
+    transform: translateY(0px);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35)) brightness(1);
+  }
+  25% {
+    transform: translateY(-2.5px);
+    filter: drop-shadow(0 0 26px rgba(253, 191, 15, 0.8)) drop-shadow(0 0 48px rgba(253, 191, 15, 0.45)) brightness(1.08);
+  }
+  50% {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 0 22px rgba(253, 191, 15, 0.6)) drop-shadow(0 0 42px rgba(253, 191, 15, 0.3)) brightness(0.98);
+  }
+  75% {
+    transform: translateY(-2.8px);
+    filter: drop-shadow(0 0 28px rgba(253, 191, 15, 0.85)) drop-shadow(0 0 52px rgba(253, 191, 15, 0.5)) brightness(1.1);
+  }
+  88% {
+    transform: translateY(-1.2px);
+    filter: drop-shadow(0 0 19px rgba(253, 191, 15, 0.58)) drop-shadow(0 0 36px rgba(253, 191, 15, 0.32)) brightness(0.95);
+  }
+}
+
+@keyframes haloPulse {
+  0%, 100% {
+    transform: scale(0.75);
+    opacity: 0.35;
+  }
+  35% {
+    transform: scale(0.88);
+    opacity: 0.55;
+  }
+  65% {
+    transform: scale(0.78);
+    opacity: 0.38;
+  }
+  80% {
+    transform: scale(0.92);
+    opacity: 0.6;
+  }
+}
+
+.public-experience .animated-lamp{
+  animation: lampFloatFlicker 4s ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+.public-experience .animated-halo{
+  animation: haloPulse 4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes lampSway {
+  0% {
+    transform: rotate(-5deg);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35));
+  }
+  50% {
+    transform: rotate(5deg);
+    filter: drop-shadow(0 0 28px rgba(253, 191, 15, 0.85)) drop-shadow(0 0 50px rgba(253, 191, 15, 0.5));
+  }
+  100% {
+    transform: rotate(-5deg);
+    filter: drop-shadow(0 0 20px rgba(253, 191, 15, 0.65)) drop-shadow(0 0 38px rgba(253, 191, 15, 0.35));
+  }
+}
+
+.public-experience .pendulum-lamp{
+  transform-origin: top center;
+  animation: lampSway 3.5s ease-in-out infinite;
+  will-change: transform, filter;
+  display: block;
+  margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-experience .lamp-glow,
+.public-experience .ambient-glow,
+.public-experience .animated-lamp,
+.public-experience .animated-halo,
+.public-experience .pendulum-lamp,
+.public-experience .btn-hero-primary,
+.public-experience .btn-hero-secondary,
+.public-experience .btn-lookup,
+.public-experience .btn-verify{
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+
+/* =========================================================================
+   INSPIRATH Public Experience — shared visual system for all public routes
+   Scoped to PublicLayout; poster dialogs also use the standalone public-* classes.
+   ========================================================================= */
+.public-experience{
+  --public-ruby: #4A0A1C;
+  --public-ruby-mid: #86152C;
+  --public-crimson: #BA1912;
+  --public-gold: #FDBF0F;
+  --public-ivory: #F2F3E6;
+  --public-espresso: #1B090B;
+  --public-surface: #230D0F;
+  --public-surface-low: #1B090B;
+  --public-surface-high: #341317;
+  --public-muted: rgba(242, 243, 230, 0.72);
+  min-height: 100vh;
+  color: #F2F3E6;
+  background-color: #1B090B;
+  background-image:
+    radial-gradient(circle at 80% 12%, rgba(186, 25, 18, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 18% 75%, rgba(253, 191, 15, 0.08) 0%, transparent 45%);
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .festival-name{
+  font-family: var(--festival-name-font, 'Sora'), sans-serif !important;
+}
+.public-experience .public-announcement{
+  background: linear-gradient(90deg, #1A080B 0%, #4A0A1C 48%, #86152C 100%);
+  border-bottom: 1px solid rgba(253, 191, 15, 0.35);
+  letter-spacing: 0.025em;
+}
+.public-experience .public-status-strip{
+  background: #1B090B;
+  border-bottom: 1px solid rgba(186, 25, 18, 0.25);
+}
+.public-experience .public-festival-status{
+  border-color: rgba(253, 191, 15, 0.65) !important;
+  background: rgba(253, 191, 15, 0.12) !important;
+  color: #FDBF0F !important;
+  font-size: 9px !important;
+  letter-spacing: 0.11em !important;
+}
+.public-experience .public-festival-status span{
+  background-color: #FDBF0F !important;
+}
+.public-experience .public-site-header{
+  background: rgba(27, 9, 11, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(186, 25, 18, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.public-experience .public-logo{
+  border: 1px solid rgba(253, 191, 15, 0.55);
+  background: #230D0F !important;
+  color: #FDBF0F !important;
+  border-radius: 10px;
+}
+.public-experience .public-brand-title{
+  color: #F2F3E6;
+  font-family: 'Sora', sans-serif;
+  letter-spacing: 0.035em;
+}
+.public-experience .public-brand-subtitle{
+  color: rgba(242, 243, 230, 0.7);
+}
+.public-experience .public-nav-link{
+  color: rgba(242, 243, 230, 0.78);
+  border: 1px solid transparent;
+}
+.public-experience .public-nav-link:hover{
+  color: #FDBF0F;
+  background: rgba(253, 191, 15, 0.08);
+}
+.public-experience .public-nav-link.is-active{
+  color: #F2F3E6 !important;
+  background: #BA1912 !important;
+  border-color: #BA1912;
+}
+.public-experience .public-nav-link svg{
+  color: currentColor !important;
+}
+.public-experience .public-search-input{
+  color: #F2F3E6 !important;
+  background: #1B090B !important;
+  border: 1px solid rgba(186, 25, 18, 0.38) !important;
+}
+.public-experience .public-search-input::placeholder{
+  color: rgba(242, 243, 230, 0.45) !important;
+}
+.public-experience .public-search-input:focus{
+  border-color: #FDBF0F !important;
+  box-shadow: 0 0 0 2px rgba(253, 191, 15, 0.16);
+}
+.public-experience .public-mobile-toggle{
+  color: #FDBF0F !important;
+  border: 1px solid rgba(253, 191, 15, 0.45);
+  background: rgba(27, 9, 11, 0.85);
+}
+.public-experience .public-mobile-toggle:hover{
+  background: rgba(253, 191, 15, 0.12);
+}
+.public-experience .public-mobile-drawer{
+  background: #1B090B;
+  border-color: rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-mobile-link{
+  color: #F2F3E6;
+  border: 1px solid rgba(186, 25, 18, 0.25);
+}
+.public-experience .public-mobile-link:hover{
+  color: #FDBF0F;
+  background: rgba(253, 191, 15, 0.09);
+}
+.public-experience .public-main{
+  padding-top: clamp(1.25rem, 3vw, 2rem);
+  padding-bottom: clamp(4rem, 6vw, 6rem);
+}
+.public-experience .public-site-footer{
+  color: rgba(242, 243, 230, 0.78);
+  background: #1B090B;
+  border-top: 1px solid rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-site-footer .font-bold,
+.public-experience .public-site-footer .festival-name{
+  color: #FDBF0F !important;
+}
+.public-experience .public-footer-note{
+  color: rgba(242, 243, 230, 0.58);
+}
+.public-experience .public-page-stack{
+  color: #F2F3E6;
+}
+.public-experience .public-page-title{
+  color: #F2F3E6;
+  font-family: 'Sora', sans-serif;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+.public-experience .public-page-description,
+.public-experience .public-muted{
+  color: rgba(242, 243, 230, 0.72);
+}
+.public-experience .public-eyebrow,
+.public-experience .public-page-eyebrow{
+  color: #FDBF0F;
+  background: rgba(186, 25, 18, 0.25);
+  border: 1px solid rgba(253, 191, 15, 0.35);
+}
+.public-experience .public-page-icon{
+  color: #FDBF0F;
+  background: #230D0F;
+  border: 1px solid rgba(253, 191, 15, 0.45);
+}
+.public-experience .public-section-title{
+  color: #F2F3E6;
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .public-card-title{
+  color: #F2F3E6;
+}
+.public-experience .public-filter-panel{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.public-experience .public-control{
+  color: #F2F3E6 !important;
+  background: #1B090B !important;
+  border: 1px solid rgba(186, 25, 18, 0.45) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.public-experience .public-control::placeholder{
+  color: rgba(242, 243, 230, 0.45) !important;
+}
+.public-experience .public-control:focus{
+  outline: none;
+  border-color: #FDBF0F !important;
+  box-shadow: 0 0 0 2px rgba(253, 191, 15, 0.25) !important;
+}
+.public-experience .public-results-count{
+  color: rgba(242, 243, 230, 0.72);
+}
+.public-experience .public-results-grid{
+  align-items: stretch;
+}
+.public-experience .public-result-card,
+.public-experience .public-template-card,
+.public-experience .public-table-card,
+.public-experience .public-podium-card{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.public-experience .public-result-card{
+  min-width: 0;
+  border-radius: 15px;
+}
+.public-experience .public-result-card:hover{
+  border-color: rgba(253, 191, 15, 0.5);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.7);
+  transform: translateY(-2px);
+}
+.public-experience .public-code-badge{
+  color: #FDBF0F;
+  background: #1B090B;
+  border-color: rgba(253, 191, 15, 0.42);
+}
+.public-experience .public-winner-row{
+  min-width: 0;
+  border-color: rgba(186, 25, 18, 0.3);
+}
+.public-experience .public-winner-first{
+  background: rgba(253, 191, 15, 0.12);
+  border-color: rgba(253, 191, 15, 0.35);
+}
+.public-experience .public-winner-secondary{
+  background: #1B090B;
+  border-color: rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-rank-dot{
+  color: #1B090B;
+}
+.public-experience .public-rank-first{
+  color: #1B090B;
+  background: #FDBF0F;
+}
+.public-experience .public-rank-secondary{
+  color: #F2F3E6;
+  background: #341317;
+  border: 1px solid rgba(186, 25, 18, 0.5);
+}
+.public-experience .public-winner-name{
+  color: #F2F3E6;
+}
+.public-experience .public-grade-text,
+.public-experience .public-accent-text{
+  color: #FDBF0F !important;
+}
+.public-experience .public-points-text{
+  color: #FDBF0F !important;
+}
+.public-experience .public-card-footer{
+  border-color: rgba(186, 25, 18, 0.32);
+}
+.public-experience .public-inline-link{
+  color: #FDBF0F !important;
+}
+.public-experience .public-inline-link:hover{
+  color: #FFF8EE !important;
+  text-decoration: underline;
+}
+.public-experience .public-empty-state{
+  color: rgba(242, 243, 230, 0.72);
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-empty-state .public-card-title{
+  color: #F2F3E6;
+}
+.public-experience .public-table-card{
+  border-radius: 16px;
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-card-header{
+  background: #1B090B;
+  border-color: rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-card-header .public-card-title{
+  color: #F2F3E6;
+}
+.public-experience .public-card-header .public-muted{
+  color: rgba(242, 243, 230, 0.7);
+}
+.public-experience .public-table{
+  color: #F2F3E6;
+}
+.public-experience .public-table-head{
+  color: #FDBF0F;
+  background: #1B090B;
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-table-head th{
+  white-space: nowrap;
+}
+.public-experience .public-table-body{
+  border-color: rgba(186, 25, 18, 0.25);
+}
+.public-experience .public-table-row{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.25);
+}
+.public-experience .public-table-row:nth-child(even){
+  background: #1B090B;
+}
+.public-experience .public-table-row:hover{
+  background: rgba(186, 25, 18, 0.25);
+}
+.public-experience .public-table-row td{
+  color: #F2F3E6;
+}
+.public-experience .public-table-row .public-muted{
+  color: rgba(242, 243, 230, 0.7);
+}
+.public-experience .public-points-total{
+  color: #FDBF0F;
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .public-expand-button{
+  color: #FDBF0F;
+  border: 1px solid rgba(253, 191, 15, 0.35);
+  background: #1B090B;
+}
+.public-experience .public-expand-button:hover{
+  color: #1B090B;
+  background: #FDBF0F;
+}
+.public-experience .public-expanded-row{
+  background: #1B090B;
+}
+.public-experience .public-expanded-panel{
+  color: #F2F3E6;
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-expanded-value{
+  color: #FDBF0F;
+}
+.public-experience .public-podium-card{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.45);
+}
+.public-experience .public-podium-base{
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-podium-second{
+  background: linear-gradient(180deg, #2A1618, #1B090B);
+  border-color: rgba(242, 243, 230, 0.35);
+}
+.public-experience .public-podium-first{
+  background: linear-gradient(180deg, #341317, #230D0F);
+  border-color: #FDBF0F;
+}
+.public-experience .public-podium-third{
+  background: linear-gradient(180deg, #2A1618, #1B090B);
+  border-color: rgba(253, 191, 15, 0.3);
+}
+.public-experience .public-event-header{
+  color: #F2F3E6;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(253, 191, 15, 0.15), transparent 45%),
+    linear-gradient(135deg, #1B090B 0%, #230D0F 55%, #341317 100%);
+  border-color: rgba(186, 25, 18, 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.public-experience .public-event-header .public-page-title{
+  color: #F2F3E6;
+}
+.public-experience .public-event-header .public-muted{
+  color: rgba(242, 243, 230, 0.76);
+}
+.public-experience .public-winner-card{
+  min-width: 0;
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.4);
+}
+.public-experience .public-winner-card.public-winner-first{
+  background: #230D0F;
+  border-color: #FDBF0F;
+  box-shadow: 0 0 25px rgba(253, 191, 15, 0.15);
+}
+.public-experience .public-winner-card.public-winner-second{
+  background: #230D0F;
+  border-color: rgba(242, 243, 230, 0.35);
+}
+.public-experience .public-winner-card.public-winner-third{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.5);
+}
+.public-experience .public-winner-label-first{
+  background: #FDBF0F;
+  color: #1B090B;
+  font-weight: 800;
+}
+.public-experience .public-winner-label-second{
+  background: #1B090B;
+  color: #F2F3E6;
+  border: 1px solid rgba(242, 243, 230, 0.4);
+}
+.public-experience .public-winner-label-third{
+  background: #1B090B;
+  color: #FDBF0F;
+  border: 1px solid rgba(253, 191, 15, 0.4);
+}
+.public-experience .public-winner-stats{
+  border-color: rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-table-card .public-table-head{
+  background: #1B090B;
+}
+.public-experience .public-poster-cta{
+  background: #230D0F;
+  border-color: rgba(186, 25, 18, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.public-experience .public-primary-button{
+  color: #F2F3E6 !important;
+  background: #BA1912 !important;
+  border: 1px solid #BA1912 !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.public-experience .public-primary-button:hover:not(:disabled){
+  background: #A91D3A !important;
+  box-shadow: 0 5px 16px rgba(186, 25, 18, 0.35);
+  transform: translateY(-1px);
+}
+.public-experience .public-action-button{
+  color: #F2F3E6 !important;
+  background: #230D0F !important;
+  border: 1px solid rgba(186, 25, 18, 0.45) !important;
+  box-shadow: none !important;
+}
+.public-experience .public-action-button:hover:not(:disabled){
+  color: #FDBF0F !important;
+  background: #341317 !important;
+  border-color: #FDBF0F !important;
+}
+.public-experience .public-action-button-secondary{
+  color: #1B090B !important;
+  background: #FDBF0F !important;
+  border: 1px solid #FDBF0F !important;
+  font-weight: bold !important;
+}
+.public-experience .public-action-button-secondary:hover:not(:disabled){
+  color: #1B090B !important;
+  background: #FFC82E !important;
+}
+.public-experience .public-dialog-overlay{
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+}
+.public-experience .public-dialog{
+  background: #1B090B;
+  border: 1px solid rgba(253, 191, 15, 0.3);
+  color: #F2F3E6;
+}
+.public-experience .public-dialog-header{
+  background: #240D10;
+  border-color: rgba(186, 25, 18, 0.3);
+  color: #F2F3E6;
+}
+.public-experience .public-dialog-title{
+  color: #F2F3E6;
+  font-family: 'Sora', sans-serif;
+}
+.public-experience .public-released-badge{
+  color: #FDBF0F;
+  background: rgba(186, 25, 18, 0.3);
+  border: 1px solid rgba(253, 191, 15, 0.35);
+}
+.public-experience .public-poster-preview{
+  background: #1B090B;
+  border-color: rgba(186, 25, 18, 0.35);
+}
+.public-experience .public-success-note{
+  color: #FDBF0F;
+}
+.public-experience .public-alert{
+  background: rgba(186, 25, 18, 0.25);
+  border-color: rgba(186, 25, 18, 0.6);
+  color: #F2F3E6;
+}
+.public-experience .public-published-badge{
+  color: #4A0A1C !important;
+  background: rgba(253, 191, 15, 0.22) !important;
+  border-color: rgba(197, 139, 0, 0.45) !important;
+}
+.public-experience .public-released-badge{
+  color: #4A0A1C;
+  background: rgba(253, 191, 15, 0.25);
+  border: 1px solid rgba(197, 139, 0, 0.35);
+}
+.public-experience .public-success-note{
+  color: #795126;
+}
+.public-experience .public-alert{
+  color: #86152C;
+  background: #F8E8E8;
+  border-color: #D8A6A9;
+}
+.public-experience .public-template-card{
+  min-width: 0;
+}
+.public-experience .public-dialog-overlay{
+  background: rgba(26, 8, 11, 0.78);
+}
+.public-experience .public-dialog{
+  color: #1A080B;
+  background: #FFF8EE;
+  border: 1px solid rgba(253, 191, 15, 0.55);
+  box-shadow: 0 24px 80px rgba(26, 8, 11, 0.38);
+}
+.public-experience .public-dialog-header,
+.public-experience .public-dialog-footer{
+  background: linear-gradient(100deg, #4A0A1C, #2D1217);
+  border-color: rgba(253, 191, 15, 0.35);
+}
+.public-experience .public-dialog-header .public-dialog-title{
+  color: #FFF8EE;
+}
+.public-experience .public-dialog-header .public-muted{
+  color: rgba(255, 248, 238, 0.72);
+}
+.public-experience .public-dialog-body{
+  background:
+    radial-gradient(circle at 100% 0%, rgba(253, 191, 15, 0.1), transparent 18rem),
+    #FFF8EE;
+}
+.public-experience .public-dialog-close{
+  color: #FDBF0F !important;
+  background: rgba(26, 8, 11, 0.75) !important;
+  border-color: rgba(253, 191, 15, 0.5) !important;
+}
+.public-experience .public-dialog-close:hover{
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+.public-experience .public-dialog-template-card{
+  background: #FFFCF5;
+  border-color: rgba(197, 139, 0, 0.4);
+}
+.public-experience .public-poster-preview{
+  border-color: rgba(197, 139, 0, 0.35) !important;
+  background: #F5EBDD !important;
+}
+.public-experience .public-dialog-footer .public-dialog-close{
+  background: #4A0A1C !important;
+}
+.public-experience .public-dialog-footer .public-dialog-close:hover{
+  color: #1A080B !important;
+  background: #FDBF0F !important;
+}
+@media (max-width: 640px) {
+  .public-experience .public-page-stack{
+    width: 100%;
+  }
+  .public-experience .public-main{
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .public-experience .public-result-card,
+.public-experience .public-template-card,
+.public-experience .public-podium-card{
+    border-radius: 13px;
+  }
+  .public-experience .public-table-card{
+    border-radius: 13px;
+  }
+  .public-experience .public-dialog{
+    max-height: 94dvh;
+    border-radius: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-experience .public-primary-button,
+.public-experience .public-result-card{
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+
+/* Finish normalising retained utility markup inside the public experience. */
+.public-experience h1,
+.public-experience h2,
+.public-experience .public-section-title{
+  font-family: 'Sora', sans-serif;
+}
+.public-experience [class*="text-[#526070]"],
+.public-experience [class*="text-[#64748B]"],
+.public-experience [class*="text-slate-500"],
+.public-experience [class*="text-slate-600"]{
+  color: #765F57 !important;
+}
+.public-experience [class*="text-[#2563EB]"],
+.public-experience [class*="text-[#1D4ED8]"],
+.public-experience [class*="text-blue-"],
+.public-experience [class*="text-emerald-"]{
+  color: #86152C !important;
+}
+.public-experience [class*="bg-blue-50"],
+.public-experience [class*="bg-emerald-50"],
+.public-experience [class*="bg-amber-50"],
+.public-experience [class*="bg-slate-50"],
+.public-experience [class*="bg-[#F8FAFC]"]{
+  background-color: #F5EBDD !important;
+}
+.public-experience [class*="border-blue-"],
+.public-experience [class*="border-emerald-"],
+.public-experience [class*="border-[#E1E7EF]"]{
+  border-color: rgba(197, 139, 0, 0.35) !important;
+}
+.public-experience [class*="bg-[#2563EB]"]{
+  background-color: #4A0A1C !important;
+}
+.public-experience .public-grade-pill{
+  color: #4A0A1C !important;
+  background: rgba(253, 191, 15, 0.2) !important;
+  border-color: rgba(197, 139, 0, 0.42) !important;
+}
+.public-experience .public-points-text{
+  color: #8A641C !important;
+}
+.public-experience .public-site-header .public-nav-link.is-active{
+  color: #1A080B !important;
+}
+
+
+.public-experience .public-announcement > div{
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+.public-experience .public-festival-status{
+  background: rgba(253, 191, 15, 0.12) !important;
+  border-color: rgba(253, 191, 15, 0.65) !important;
+  color: #FDBF0F !important;
+}
+.public-experience .public-published-badge{
+  background: rgba(253, 191, 15, 0.22) !important;
+  border-color: rgba(197, 139, 0, 0.45) !important;
+  color: #4A0A1C !important;
+}
+
+
+
+/* Consistent public typography and responsive spacing. */
+.public-experience, .public-experience * { font-family: 'Sora', sans-serif !important; }
+.public-experience .font-brand, .public-experience .font-bruno, .public-experience .festival-name {
+  font-family: var(--festival-name-font, 'Sora'), sans-serif !important;
+}
+.public-experience :is(h1,h2,h3,h4,h5,h6) {
+  font-family: 'Sora', sans-serif !important; text-wrap: balance; line-height: 1.2;
+}
+.public-experience :is(p,li,label,td,th) { line-height: 1.55; }
+.public-experience :is(button,input,select,textarea) { font-family: 'Sora',sans-serif !important; font-size: .875rem; }
+.public-experience main { min-width: 0; }
+@media (max-width:639px) {
+  .public-experience h1 { font-size: clamp(1.5rem,7vw,2rem) !important; }
+  .public-experience h2 { font-size: clamp(1.2rem,5.8vw,1.55rem) !important; }
+  .public-experience h3 { font-size: clamp(1rem,4.8vw,1.25rem) !important; }
+  .public-experience :is(section,article).rounded-2xl { border-radius: 1rem; }
+  .public-experience .public-main { padding-left:1rem; padding-right:1rem; }
+  .public-experience [class*="text-[9px]"], .public-experience [class*="text-[10px]"] { font-size:.6875rem !important; }
+  .public-experience [class*="text-[11px]"] { font-size:.75rem !important; }
+  .public-experience :is(input,select,textarea) { min-height:2.75rem; }
+}
+@media (min-width:640px) and (max-width:1023px) {
+  .public-experience h1 { font-size:clamp(1.9rem,4vw,2.5rem) !important; }
+  .public-experience h2 { font-size:clamp(1.45rem,3vw,2rem) !important; }
+}

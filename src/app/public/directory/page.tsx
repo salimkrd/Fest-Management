@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { useFest } from '@/context/FestContext';
-import { Search, ArrowRight, Sparkles } from 'lucide-react';
+import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
-  const { results, categories, theme } = useFest();
+  const { results, categories, competitions, competitionsSyncState, theme, resultsSyncState } = useFest();
+  const festivalYear = theme.year?.trim() || theme.festivalStartDate?.slice(0, 4) || '';
 
   const [search, setSearch] = useState(initialQuery);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
@@ -22,163 +23,449 @@ function DirectoryContent() {
     setSearch(initialQuery);
   }
 
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [selectedType, setSelectedType] = useState('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedType, setSelectedType] = useState<string>('ALL');
 
-  const publishedResults = results.filter(r => r.resultStatus === 'PUBLISHED');
+  // Filter ratified published results only
+  const publishedResults = useMemo(() => {
+    return results.filter(r => r.resultStatus === 'PUBLISHED');
+  }, [results]);
 
-  const filtered = publishedResults.filter(res => {
-    const matchesSearch = res.competitionName.toLowerCase().includes(search.toLowerCase()) ||
-                          res.competitionCode.toLowerCase().includes(search.toLowerCase()) ||
-                          res.ranks.some(rk => rk.candidateName.toLowerCase().includes(search.toLowerCase()) || rk.bib.toLowerCase().includes(search.toLowerCase()));
-    const matchesCat = selectedCategory === 'ALL' || res.categoryName === selectedCategory;
-    const matchesType = selectedType === 'ALL' || res.type === selectedType;
-    return matchesSearch && matchesCat && matchesType;
-  });
+  // Compute category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: publishedResults.length };
+    for (const res of publishedResults) {
+      counts[res.categoryName] = (counts[res.categoryName] || 0) + 1;
+    }
+    return counts;
+  }, [publishedResults]);
+
+  // Filtered results list
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return publishedResults.filter(res => {
+      const matchesSearch =
+        !query ||
+        res.competitionName.toLowerCase().includes(query) ||
+        res.competitionCode.toLowerCase().includes(query) ||
+        res.stageName.toLowerCase().includes(query) ||
+        res.ranks.some(
+          rk =>
+            rk.candidateName.toLowerCase().includes(query) ||
+            rk.bib.toLowerCase().includes(query) ||
+            (`#${rk.bib.toLowerCase()}`).includes(query) ||
+            rk.teamName.toLowerCase().includes(query) ||
+            rk.teamCode.toLowerCase().includes(query)
+        );
+
+      const matchesCat = selectedCategory === 'ALL' || res.categoryName === selectedCategory;
+      const matchesType = selectedType === 'ALL' || res.type === selectedType;
+
+      return matchesSearch && matchesCat && matchesType;
+    });
+  }, [publishedResults, search, selectedCategory, selectedType]);
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedCategory('ALL');
+    setSelectedType('ALL');
+  };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-black text-[#111111] tracking-tight">
-          Public Results Directory &amp; Archive
-        </h1>
-        <p className="text-xs sm:text-sm text-[#526070] mt-1">
-          Search published competition results and download a poster template
-        </p>
-      </div>
+    <div className="public-page-stack space-y-6 sm:space-y-8 max-w-7xl mx-auto w-full">
+      {/* EDITORIAL HEADER BANNER (MATCHING STITCH) */}
+      <section className="relative w-full rounded-2xl bg-gradient-to-b from-[#230D0F] via-[#1B090B] to-[#120507] p-6 sm:p-10 border border-[#BA1912]/30 shadow-2xl overflow-hidden text-center">
+        {/* Ambient Ruby & Gold Radial Overlays */}
+        <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[760px] h-[340px] bg-[#BA1912]/20 blur-[120px] rounded-full" />
+        <div className="pointer-events-none absolute top-12 right-12 w-80 h-80 bg-[#FDBF0F]/10 blur-[90px] rounded-full" />
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E1E7EF] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 w-full md:max-w-md">
-          <Search className="w-4 h-4 text-[#526070] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search candidate name, Bib #, or competition..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E1E7EF] rounded-xl text-[#111111] placeholder:text-[#8E9CAE] focus:outline-none focus:bg-white focus:border-[#2563EB]"
-          />
-        </div>
+        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
+          {/* Eyebrow Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1B090B] border border-[#FDBF0F]/40 text-[#FDBF0F] text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] shadow-sm mb-4">
+            <PublicIcon name="verified" className="text-[15px] text-[#FDBF0F]" />
+            <span>Ratified Tabulation Directory{festivalYear ? ` • ${festivalYear}` : ""}</span>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <select
-            aria-label="Filter by Category"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none"
+          {/* Main Editorial Title */}
+          <h1
+            className="text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase tracking-wide text-[#F2F3E6] mb-3"
           >
-            <option value="ALL">All Categories</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
+            Public Results Directory
+          </h1>
 
-          <select
-            aria-label="Filter by Competition Format"
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="text-xs font-semibold py-2 px-3 rounded-lg border border-[#E1E7EF] bg-[#F8FAFC] text-[#111111] focus:outline-none"
-          >
-            <option value="ALL">All Formats</option>
-            <option value="SOLO">Solo Items</option>
-            <option value="GROUP">Group Ensembles</option>
-          </select>
+          {/* Symmetrical Gold Flourish Divider */}
+          <div className="flex items-center justify-center gap-3 w-48 mx-auto my-3 opacity-80">
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-[#FDBF0F]" />
+            <span className="text-[#FDBF0F] text-xs">❖</span>
+            <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-[#FDBF0F]" />
+          </div>
+
+          {/* Subtitle Description */}
+          <p className="text-xs sm:text-sm text-[#F2F3E6]/75 max-w-2xl leading-relaxed mb-6">
+            Official merit ledger, ratified scorecards, and commemorative gazette records across all individual items and group ensembles.
+          </p>
+
+          {/* Live Results Counter & Metadata Ribbon */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#230D0F] border border-[#FDBF0F]/40 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FDBF0F] font-mono">
+                {competitionsSyncState === 'loading'
+                  ? 'Loading event total…'
+                  : competitionsSyncState === 'ready'
+                  ? `${publishedResults.length} / ${competitions.length} Events Ratified`
+                  : `${publishedResults.length} Published Results`}
+              </span>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B090B] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs">
+              <PublicIcon name="gavel" className="text-[16px] text-[#FDBF0F]" />
+              <span className="uppercase tracking-wider text-[11px] font-medium">Official Published Results</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B090B] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs">
+              <PublicIcon name="schedule" className="text-[16px] text-[#FDBF0F]" />
+              <span className="uppercase tracking-wider text-[11px] font-medium font-mono">
+                {resultsSyncState === 'ready' ? 'Live Sync Active' : resultsSyncState === 'loading' ? 'Syncing...' : 'Official Ledger'}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between text-xs text-[#526070]">
-        <span>Showing {filtered.length} of {publishedResults.length} officially published events</span>
+      {/* SEARCH, DIVISION TABS & ADVANCED FILTER SUITE (MATCHING STITCH) */}
+      <section className="w-full bg-[#230D0F] rounded-2xl border border-[#BA1912]/30 p-4 sm:p-6 shadow-xl">
+        <div className="flex flex-col gap-4 sm:gap-5">
+          {/* Instant Lookup Bar */}
+          <div className="relative w-full flex flex-col md:flex-row items-stretch gap-2 bg-[#1B090B] p-1.5 sm:p-2 rounded-xl border border-[#BA1912]/30 shadow-inner">
+            <div className="relative flex-1 flex items-center">
+              <PublicIcon name="search" className="absolute left-3.5 text-[#F2F3E6]/50 text-[20px] pointer-events-none" />
+              <input
+                id="searchDirectory"
+                type="text"
+                placeholder="Search candidate name, Bib # (e.g. #112), competition title, or guild..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-11 pl-11 pr-10 bg-[#1B090B] text-[#F2F3E6] placeholder:text-[#F2F3E6]/40 text-xs sm:text-sm font-medium rounded-lg focus:outline-none focus:bg-[#281014] transition-all"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#F2F3E6]/60 hover:text-[#FDBF0F] p-1"
+                  aria-label="Clear search input"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className="w-full md:w-auto h-11 px-5 sm:px-6 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] font-bold text-xs uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
+              >
+                <PublicIcon name="manage_search" className="text-[18px]" />
+                <span className="hidden sm:inline">Lookup Records</span>
+                <span className="sm:hidden">Lookup</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Division Category Tabs & Format Dropdown */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
+            {/* Scrollable Division Pills on mobile, flex-wrap on desktop */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('ALL')}
+                className={`shrink-0 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+                  selectedCategory === 'ALL'
+                    ? 'bg-[#FDBF0F] text-[#1B090B] font-bold shadow-md'
+                    : 'bg-[#1B090B] border border-[#BA1912]/30 text-[#F2F3E6]/80 hover:text-[#F2F3E6] hover:border-[#FDBF0F]'
+                }`}
+              >
+                <span>All Divisions</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${selectedCategory === 'ALL' ? 'bg-[#1B090B] text-[#FDBF0F]' : 'bg-[#230D0F] text-[#F2F3E6]/80'}`}>
+                  {categoryCounts['ALL'] || 0}
+                </span>
+              </button>
+
+              {categories.map(cat => {
+                const count = categoryCounts[cat.name] || 0;
+                const isSelected = selectedCategory === cat.name;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className={`shrink-0 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-[#BA1912] text-[#F2F3E6] font-bold shadow-md border border-[#BA1912]'
+                        : 'bg-[#1B090B] border border-[#BA1912]/30 text-[#F2F3E6]/80 hover:text-[#F2F3E6] hover:border-[#FDBF0F]'
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isSelected ? 'bg-[#FDBF0F] text-[#1B090B] font-bold' : 'bg-[#230D0F] text-[#F2F3E6]/80'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <div className="shrink-0 hidden sm:flex items-center gap-1 h-8 px-2.5 rounded bg-[#BA1912]/20 border border-[#BA1912]/50 text-[#FDBF0F] text-[11px] font-bold uppercase tracking-wider">
+                <PublicIcon name="verified" className="text-[15px]" />
+                <span>Ratified</span>
+              </div>
+            </div>
+
+            {/* Format Filter & Reset Button */}
+            <div className="flex items-center gap-2 self-start lg:self-auto shrink-0">
+              <div className="relative">
+                <select
+                  aria-label="Filter by Competition Format"
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="bg-[#1B090B] hover:bg-[#281014] text-[#F2F3E6] text-xs font-medium py-2 pl-3 pr-8 rounded-lg border border-[#BA1912]/40 focus:border-[#FDBF0F] focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="ALL">All Formats (Stage &amp; Non-Stage)</option>
+                  <option value="SOLO">Individual Items (Solo)</option>
+                  <option value="GROUP">Group Ensembles</option>
+                </select>
+                <PublicIcon name="expand_more" className="text-[18px] text-[#FDBF0F] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {(search || selectedCategory !== 'ALL' || selectedType !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] text-xs font-semibold border border-[#FDBF0F]/30 transition-colors"
+                >
+                  <PublicIcon name="restart_alt" className="text-[16px]" />
+                  <span className="hidden sm:inline">Reset</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Active Filter Pill Tags */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#BA1912]/20 text-[11px] text-[#F2F3E6]/70">
+            <span className="uppercase tracking-widest text-[#FDBF0F]/80 font-bold">Active Filters:</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1B090B] text-[#F2F3E6] rounded border border-white/5">
+              Festival Dates: {formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate)}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1B090B] text-[#F2F3E6] rounded border border-white/5">
+              Status: Ratified Scorecards Only
+            </span>
+            {selectedCategory !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#BA1912]/30 text-[#FDBF0F] rounded border border-[#BA1912]/60 font-semibold">
+                Division: {selectedCategory}
+                <button onClick={() => setSelectedCategory('ALL')} className="hover:text-white ml-0.5" aria-label="Clear division filter">✕</button>
+              </span>
+            )}
+            {search && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#BA1912]/30 text-[#FDBF0F] rounded border border-[#BA1912]/60 font-semibold">
+                Search: &ldquo;{search}&rdquo;
+                <button onClick={() => setSearch('')} className="hover:text-white ml-0.5" aria-label="Clear search query">✕</button>
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* RESULTS COUNT & STATUS STRIP */}
+      <div className="flex items-center justify-between text-xs text-[#F2F3E6]/75 px-1">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#FDBF0F]" />
+          <span>
+            Showing <strong className="text-[#FDBF0F] font-bold">{filtered.length}</strong> of{' '}
+            <strong className="text-[#F2F3E6]">{publishedResults.length}</strong> Ratified Events
+          </span>
+        </div>
         {search && (
           <button
             onClick={() => setSearch('')}
-            className="text-[#2563EB] hover:underline font-semibold"
+            className="text-[#FDBF0F] hover:underline font-semibold text-xs"
           >
-            Clear Search
+            Clear Search Filter
           </button>
         )}
       </div>
 
-      {/* Results Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.length === 0 ? (
-          <div className="col-span-full bg-white p-12 text-center rounded-2xl border border-[#E1E7EF]">
-            <Sparkles className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-            <h4 className="text-sm font-bold text-[#111111]">No Results Found</h4>
-            <p className="text-xs text-[#526070] mt-1">
-              No published competition matches &ldquo;{search}&rdquo;. Try another search keyword.
+      {/* FIRESTORE LOADING STATE */}
+      {resultsSyncState === 'loading' && publishedResults.length === 0 && (
+        <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30">
+          <div className="w-8 h-8 rounded-full border-2 border-[#FDBF0F] border-t-transparent animate-spin mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-[#F2F3E6]">Loading Ratified Results Directory…</h3>
+          <p className="text-xs text-[#F2F3E6]/60 mt-1">Connecting to official Firestore event tabulation</p>
+        </div>
+      )}
+
+      {/* FIRESTORE ERROR STATE */}
+      {resultsSyncState === 'error' && (
+        <div role="alert" className="p-6 rounded-2xl bg-[#2D1217] border border-red-500/40 text-center">
+          <PublicIcon name="error" className="text-[28px] text-red-400 mx-auto mb-2 block" />
+          <h3 className="text-sm font-bold text-red-200">Unable to synchronize results live</h3>
+          <p className="text-xs text-[#F2F3E6]/70 mt-1">
+            Displaying cached festival records. Real-time updates will resume once connected.
+          </p>
+        </div>
+      )}
+
+      {/* OFFICIAL COMPETITION RESULTS GRID (3 COLUMNS DESKTOP, 1 COLUMN MOBILE) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+        {filtered.length === 0 && resultsSyncState !== 'loading' ? (
+          <div className="col-span-full p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30">
+            <PublicIcon name="search_off" className="text-[36px] text-[#FDBF0F] mx-auto mb-3 block" />
+            <h3 className="text-base font-bold text-[#F2F3E6]">No Results Found</h3>
+            <p className="text-xs text-[#F2F3E6]/70 max-w-md mx-auto mt-1 leading-relaxed">
+              {search
+                ? `No published competition matches "${search}". Try searching by another candidate name, Bib #, or division.`
+                : 'No published results found for the selected division or format.'}
             </p>
+            {(search || selectedCategory !== 'ALL' || selectedType !== 'ALL') && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="mt-4 px-4 py-2 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold transition-colors"
+              >
+                Reset All Filters
+              </button>
+            )}
           </div>
         ) : (
           filtered.map(res => {
             const rank1 = res.ranks.find(r => r.rank === 1);
             const rank2 = res.ranks.find(r => r.rank === 2);
+            const rank3 = res.ranks.find(r => r.rank === 3);
 
             return (
-              <div
+              <article
                 key={res.id}
-                className="bg-white rounded-2xl border border-[#E1E7EF] p-6 shadow-xs hover:shadow-md hover:border-neutral-300 transition-all flex flex-col justify-between"
+                className="flex flex-col bg-[#230D0F] hover:bg-[#281014] rounded-2xl p-4 sm:p-5 border border-[#BA1912]/30 hover:border-[#BA1912]/60 shadow-lg hover:shadow-2xl transition-all justify-between group"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono text-xs font-bold text-[#2563EB] bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
-                      {res.competitionCode}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase text-[#526070]">
-                      {res.categoryName} · {res.type}
+                  {/* Card Header & Metadata */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-[#BA1912] text-[#F2F3E6] font-mono text-[11px] font-bold uppercase rounded shadow-xs">
+                        #{res.competitionCode}
+                      </span>
+                      <span className="px-2 py-0.5 bg-[#1B090B] text-[#F2F3E6]/85 text-[11px] font-medium uppercase rounded border border-white/5">
+                        {res.categoryName} Division
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 bg-[#1B090B] text-[#FDBF0F] text-[10px] font-semibold uppercase rounded flex items-center gap-1 border border-[#FDBF0F]/20 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block" />
+                      Stage: {res.stageName}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-[#111111] leading-snug">
+                  {/* Competition Title */}
+                  <h3
+                    className="text-base font-bold text-[#F2F3E6] group-hover:text-[#FDBF0F] uppercase line-clamp-1 transition-colors"
+                  >
                     {res.competitionName}
                   </h3>
-                  <span className="text-xs text-[#526070] block mt-0.5">
-                    Stage: {res.stageName}
-                  </span>
 
-                  {/* Laureates summary */}
-                  <div className="mt-5 space-y-2">
+                  {/* Grand Jury Certified Strip */}
+                  <div className="flex items-center gap-1.5 text-[#F2F3E6]/75 text-[10px] uppercase tracking-wider my-3 py-1.5 px-2.5 rounded bg-[#1B090B]/60 border border-[#BA1912]/20">
+                    <PublicIcon name="verified_user" className="text-[15px] text-[#FDBF0F] shrink-0" />
+                    <span className="truncate">Grand Jury Certified • {res.publishedDate}</span>
+                  </div>
+
+                  {/* Laureates Roster (Grade Only) */}
+                  <div className="flex flex-col gap-2 my-3">
+                    {/* 1st Place Champion */}
                     {rank1 && (
-                      <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-amber-400 text-neutral-900 font-black text-[10px] flex items-center justify-center shrink-0">
+                      <div className="flex items-center justify-between p-2.5 bg-[#1B090B] rounded-xl border border-[#FDBF0F]/30 shadow-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-6 h-6 rounded bg-[#FDBF0F] text-[#1B090B] font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                             1
                           </span>
-                          <span className="font-bold text-[#111111] line-clamp-1">{rank1.candidateName}</span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-[#F2F3E6] truncate">{rank1.candidateName}</h4>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#F2F3E6]/60">
+                              <span className="font-mono text-[#FDBF0F] font-bold">Bib #{rank1.bib}</span>
+                              <span>•</span>
+                              <span className="truncate">{rank1.teamName}</span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank1.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 0} pts</span></span>
+                        <div className="text-right shrink-0">
+                          <span className="px-2 py-0.5 rounded bg-[#2D1217] text-[#FDBF0F] text-[10px] font-bold uppercase block border border-[#FDBF0F]/30">
+                            Grade {rank1.grade || '—'}
+                          </span>
+                        </div>
                       </div>
                     )}
 
+                    {/* 2nd Place Silver */}
                     {rank2 && (
-                      <div className="p-2 rounded-xl bg-[#F8FAFC] border border-[#E1E7EF] flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                      <div className="flex items-center justify-between p-2 bg-[#1B090B]/60 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded bg-[#D8C8B7] text-[#1B090B] font-bold text-[11px] flex items-center justify-center shrink-0">
                             2
                           </span>
-                          <span className="font-medium text-[#111111] line-clamp-1">{rank2.candidateName}</span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-semibold text-[#F2F3E6] truncate">{rank2.candidateName}</h4>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#F2F3E6]/60">
+                              <span className="font-mono text-[#D8C8B7]">Bib #{rank2.bib}</span>
+                              <span>•</span>
+                              <span className="truncate">{rank2.teamName}</span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="shrink-0 text-right"><span className="block text-[10px] font-bold text-[#2563EB]">Grade {rank2.grade || '—'}</span><span className="block text-[11px] font-extrabold text-emerald-700">+{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 0} pts</span></span>
+                        <div className="text-right shrink-0">
+                          <span className="px-2 py-0.5 rounded bg-[#230D0F] text-[#F2F3E6]/80 text-[10px] font-semibold uppercase block">
+                            Grade {rank2.grade || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3rd Place Bronze */}
+                    {rank3 && (
+                      <div className="flex items-center justify-between p-2 bg-[#1B090B]/60 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded bg-[#86152C] text-[#FFF8EE] font-bold text-[11px] flex items-center justify-center shrink-0">
+                            3
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-semibold text-[#F2F3E6] truncate">{rank3.candidateName}</h4>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#F2F3E6]/60">
+                              <span className="font-mono text-[#FDBF0F]/80">Bib #{rank3.bib}</span>
+                              <span>•</span>
+                              <span className="truncate">{rank3.teamName}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="px-2 py-0.5 rounded bg-[#230D0F] text-[#F2F3E6]/80 text-[10px] font-semibold uppercase block">
+                            Grade {rank3.grade || '—'}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-[#E1E7EF] flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-[10px] text-[#526070]">{res.publishedDate}</span>
-                  <div className="flex items-center gap-3">
-                    <PosterDownloadDialog result={res} theme={theme} />
-                    <Link href={`/public/competition/${res.competitionId}`} className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] group">
-                      View Result <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  </div>
+                {/* Card Actions Footer matching Stitch (Poster & Tabulation) */}
+                <div className="grid grid-cols-2 gap-2 pt-3 mt-2 border-t border-[#BA1912]/20">
+                  <PosterDownloadDialog result={res} theme={theme} />
+                  <Link
+                    href={`/public/competition/${res.competitionId}`}
+                    className="px-3 py-2 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <span>Tabulation</span>
+                    <PublicIcon name="arrow_forward" className="text-[16px]" />
+                  </Link>
                 </div>
-              </div>
+              </article>
             );
           })
         )}
       </div>
+
     </div>
   );
 }
@@ -186,7 +473,14 @@ function DirectoryContent() {
 export default function PublicResultsDirectoryPage() {
   return (
     <PublicLayout>
-      <Suspense fallback={<div className="p-12 text-center text-xs text-[#526070]">Loading results directory...</div>}>
+      <Suspense
+        fallback={
+          <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto text-xs text-[#F2F3E6]/70">
+            <div className="w-6 h-6 rounded-full border-2 border-[#FDBF0F] border-t-transparent animate-spin mx-auto mb-2" />
+            Loading ratified results directory…
+          </div>
+        }
+      >
         <DirectoryContent />
       </Suspense>
     </PublicLayout>
