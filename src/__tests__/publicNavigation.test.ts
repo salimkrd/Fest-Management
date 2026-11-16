@@ -351,3 +351,25 @@ describe('Public homepage institution identity, venue, and theme artwork', () =>
     expect(publicCss).not.toContain('.theme-glow');
   });
 });
+
+
+describe('Homepage championship standings mobile score visibility', () => {
+  const homePage = readProjectFile('src/app/public/page.tsx');
+
+  it('does not render a separate LEADER badge beside the first-place team name', () => {
+    expect(homePage).not.toContain('bg-[#FDBF0F] text-[#1A080B] text-xs uppercase font-extrabold tracking-wider');
+    expect(homePage).not.toContain('>\n                                  Leader\n');
+  });
+
+  it('reserves a dedicated score column and truncates team details at narrow widths', () => {
+    expect(homePage).toContain('grid-cols-[3.5rem_minmax(0,1fr)_max-content]');
+    expect(homePage).toContain('grid-cols-[3rem_minmax(0,1fr)_max-content]');
+    expect(homePage).toContain('tabular-nums whitespace-nowrap');
+    expect(homePage).toContain('min-w-0 truncate');
+  });
+
+  it('keeps the points label visible below the complete numeric score on both card types', () => {
+    expect(homePage).toContain('text-xl sm:text-3xl leading-none font-extrabold text-[#FDBF0F] whitespace-nowrap');
+    expect(homePage).toContain('text-xl sm:text-2xl leading-none font-extrabold text-[#FFF8EE] whitespace-nowrap');
+  });
+});

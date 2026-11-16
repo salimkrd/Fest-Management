@@ -360,7 +360,7 @@ export default function InspirathPublicHomePage() {
                       return (
                         <div
                           key={team.id}
-                          className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-4 sm:p-5 border-2 border-[#FDBF0F] shadow-lg flex items-center justify-between relative overflow-hidden"
+                          className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-3 sm:p-5 border-2 border-[#FDBF0F] shadow-lg grid grid-cols-[3.5rem_minmax(0,1fr)_max-content] sm:flex sm:items-center sm:justify-between items-center gap-2 sm:gap-4 relative overflow-hidden"
                           style={{
                             background:
                               'linear-gradient(135deg, rgba(74, 10, 28, 0.95) 0%, rgba(189, 16, 1, 0.65) 55%, rgba(45, 18, 23, 0.95) 100%)',
@@ -369,28 +369,25 @@ export default function InspirathPublicHomePage() {
                           }}
                         >
                           <div className="absolute top-0 right-0 w-24 h-24 bg-[#FDBF0F]/15 rounded-bl-full pointer-events-none" />
-                          <div className="flex items-center gap-4">
+                          <div className="flex min-w-0 items-center gap-2 sm:gap-4 sm:flex-1">
                             <div className="w-14 h-14 rounded-lg bg-[#FDBF0F] text-[#1A080B] flex flex-col items-center justify-center font-bold shadow-md">
                               <span className="text-xs uppercase leading-none font-bold">Rank</span>
                               <span className="text-xl font-extrabold leading-none mt-1">01</span>
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-cinematic-editorial text-lg sm:text-xl font-extrabold text-[#FFF8EE] tracking-[0.1em] uppercase">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <h4 className="min-w-0 truncate font-cinematic-editorial text-sm sm:text-xl font-extrabold text-[#FFF8EE] tracking-[0.1em] uppercase">
                                   {team.name}
                                 </h4>
-                                <span className="px-2.5 py-0.5 rounded bg-[#FDBF0F] text-[#1A080B] text-xs uppercase font-extrabold tracking-wider">
-                                  Leader
-                                </span>
                               </div>
-                              <p className="text-[13px] text-[#FFF8EE]/90 mt-1 font-medium">
+                              <p className="min-w-0 truncate text-[10px] sm:text-[13px] text-[#FFF8EE]/90 mt-1 font-medium">
                                 {team.zone || team.code || 'House Guild'} • {leaderMargin > 0 ? `+${leaderMargin} pt margin` : 'Current Leader'}
                               </p>
                             </div>
                           </div>
-                          <div className="text-right z-10">
-                            <span className="text-3xl font-extrabold text-[#FDBF0F]">{team.totalPoints || 0}</span>
-                            <span className="block text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
+                          <div className="relative z-10 min-w-[3rem] shrink-0 text-right tabular-nums whitespace-nowrap">
+                            <span className="block text-xl sm:text-3xl leading-none font-extrabold text-[#FDBF0F] whitespace-nowrap">{team.totalPoints || 0}</span>
+                            <span className="block text-[10px] sm:text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
                           </div>
                         </div>
                       );
@@ -399,30 +396,30 @@ export default function InspirathPublicHomePage() {
                     return (
                       <div
                         key={team.id}
-                        className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-3.5 sm:p-4 border border-[#FDBF0F]/30 shadow-sm flex items-center justify-between"
+                        className="bg-[#4A0A1C]/90 text-[#FFF8EE] rounded-lg p-3 sm:p-4 border border-[#FDBF0F]/30 shadow-sm grid grid-cols-[3rem_minmax(0,1fr)_max-content] items-center gap-2 sm:gap-4"
                         style={{
                           background:
                             'linear-gradient(135deg, rgba(74, 10, 28, 0.9) 0%, rgba(189, 16, 1, 0.3) 100%)',
                           borderColor: 'rgba(189, 16, 1, 0.5)',
                         }}
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-md bg-[#2D1217] text-[#FDBF0F] border border-[#FDBF0F]/40 flex flex-col items-center justify-center font-bold">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+                          <div className="w-12 h-12 shrink-0 rounded-md bg-[#2D1217] text-[#FDBF0F] border border-[#FDBF0F]/40 flex flex-col items-center justify-center font-bold">
                             <span className="text-xs uppercase leading-none font-bold">Rank</span>
                             <span className="text-lg font-bold leading-none mt-1">
                               {String(idx + 1).padStart(2, '0')}
                             </span>
                           </div>
-                          <div>
-                            <h4 className="text-lg font-bold text-[#FFF8EE]">{team.name}</h4>
-                            <p className="text-[13px] text-[#FFF8EE]/80 mt-0.5 font-medium">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="min-w-0 truncate text-sm sm:text-lg font-bold text-[#FFF8EE]">{team.name}</h4>
+                            <p className="min-w-0 truncate text-[10px] sm:text-[13px] text-[#FFF8EE]/80 mt-0.5 font-medium">
                               {team.zone || team.code || 'House Guild'}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-2xl font-extrabold text-[#FFF8EE]">{team.totalPoints || 0}</span>
-                          <span className="block text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
+                        <div className="min-w-[2.75rem] shrink-0 text-right tabular-nums whitespace-nowrap">
+                          <span className="block text-xl sm:text-2xl leading-none font-extrabold text-[#FFF8EE] whitespace-nowrap">{team.totalPoints || 0}</span>
+                          <span className="block text-[10px] sm:text-xs text-[#FFF8EE] uppercase tracking-wider font-bold">Points</span>
                         </div>
                       </div>
                     );
