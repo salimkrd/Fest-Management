@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
 
 const parseFestivalCalendarDate = (value?: string): Date | null => {
@@ -1028,75 +1029,7 @@ export default function InspirathPublicHomePage() {
         </section>
       </main>
 
-      {/* OFFICIAL SECRETARIAT FOOTER: Deep Ruby-Espresso base with Bruno Ace mark */}
-      <footer className="w-full bg-[#1A080B] text-[#FFF8EE] border-t border-[#FDBF0F]/30 py-10 pb-safe md:pb-10">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 font-body">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-[#FDBF0F]/20">
-            {/* Brand Info */}
-            <div className="md:col-span-6 flex flex-col">
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="font-brand font-bruno tracking-wider text-[#FFF8EE] uppercase leading-none text-2xl sm:text-4xl md:text-5xl font-extrabold whitespace-nowrap">
-                  {festivalTitle}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F]" />
-              </div>
-              <p className="text-[13px] text-[#FFF8EE]/80 max-w-md mt-2 leading-relaxed">
-                The biennial academic, literary, and classical arts convocation hosted exclusively for Huffazul
-                Qur&apos;an at {institutionName}, {venueLocation}, Edavannappara, Malappuram, Kerala.
-              </p>
-              <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm font-semibold text-[#FDBF0F]">Theme:</span>
-                <span className="text-sm text-[#FFF8EE]">Proactive Paradigms</span>
-              </div>
-            </div>
-
-            {/* Navigation Links */}
-            <div className="md:col-span-3 flex flex-col gap-2.5">
-              <span className="text-sm uppercase tracking-wider text-[#FDBF0F] font-bold mb-1">
-                Festival Navigation
-              </span>
-              <Link
-                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
-                data-path="home"
-                href="#home"
-              >
-                Home
-              </Link>
-              <Link
-                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
-                data-path="results-directory"
-                href="/public/directory"
-              >
-                Results Directory
-              </Link>
-              <Link
-                className="text-[13px] text-[#FFF8EE]/90 hover:text-[#FDBF0F] font-medium transition-colors"
-                data-path="team-championship"
-                href="/public/championship"
-              >
-                Team Championship
-              </Link>
-            </div>
-
-            {/* Campus Contact Details */}
-            <div className="md:col-span-3 flex flex-col gap-1.5">
-              <span className="text-sm uppercase tracking-wider text-[#FDBF0F] font-bold mb-1">
-                Convocation Secretariat
-              </span>
-              <p className="text-[13px] text-[#FFF8EE]/80 leading-relaxed">
-                {institutionName}
-                <br />
-                Vavoor, Edavannappara
-                <br />
-                Malappuram, Kerala — 673645
-              </p>
-              <p className="text-xs text-[#FDBF0F] mt-2 font-semibold">
-                Official Dates: {formattedDates}
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav

@@ -4,7 +4,8 @@ import React, { useState, Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
-import { Trophy, Search, Sparkles, FileText, Menu, X, Calendar } from 'lucide-react';
+import { PublicFooter } from '@/components/layout/PublicFooter';
+import { Trophy, Search, Sparkles, FileText, Menu, X } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -253,79 +254,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
       {/* Mobile Fixed Bottom Nav */}
       <MobileBottomNav />
 
-      {/* Public Footer matching Stitch 3-Column Design */}
-      <footer className="public-site-footer mt-auto bg-[#120507] text-[#F2F3E6] border-t border-[#BA1912]/30 mb-16 lg:mb-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-8">
-            {/* Column 1: Festival Convocation Summary */}
-            <div className="md:col-span-5 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <span className="font-brand text-lg font-bold tracking-wider text-[#F2F3E6] uppercase">
-                  {theme.festivalName || 'INSPIRAATH'}
-                </span>
-                <span className="w-2 h-2 rounded-full bg-[#FDBF0F]" />
-                <span className="text-xs text-[#FDBF0F] uppercase px-2 py-0.5 rounded bg-[#230D0F] border border-[#FDBF0F]/30 font-mono font-bold">
-                  2026
-                </span>
-              </div>
-              <p className="text-xs text-[#F2F3E6]/75 leading-relaxed max-w-md">
-                Biennial Academic &amp; Cultural Convocation for Huffazul Qur&apos;an, convening sacred scholasticism, competitive qira&apos;at, and sublime Islamic literary arts at {theme.institutionName || "Ma'din Suffa Campus, Vavoor, Malappuram"}.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-2 text-[10px] uppercase font-bold tracking-widest text-[#FDBF0F]">
-                <span>◆ SOLEMNITY</span>
-                <span className="text-[#F2F3E6]/40">—</span>
-                <span>DISCIPLINE</span>
-                <span className="text-[#F2F3E6]/40">—</span>
-                <span>EXCELLENCE ◆</span>
-              </div>
-            </div>
-
-            {/* Column 2: Festival Folio Navigation */}
-            <div className="md:col-span-3 flex flex-col gap-2">
-              <span className="text-xs uppercase tracking-widest text-[#FDBF0F] font-bold mb-1">
-                Festival Folio
-              </span>
-              <Link href="/" className="text-xs text-[#F2F3E6]/75 hover:text-[#FDBF0F] transition-colors py-1">
-                Conclave Overview
-              </Link>
-              <Link href="/public/directory" className="text-xs text-[#F2F3E6]/75 hover:text-[#FDBF0F] transition-colors py-1">
-                Official Merit Ledger
-              </Link>
-              <Link href="/public/championship" className="text-xs text-[#F2F3E6]/75 hover:text-[#FDBF0F] transition-colors py-1">
-                Championship Points Tally
-              </Link>
-            </div>
-
-            {/* Column 3: Convocation Secretariat */}
-            <div className="md:col-span-4 flex flex-col gap-2">
-              <span className="text-xs uppercase tracking-widest text-[#FDBF0F] font-bold mb-1">
-                Convocation Secretariat
-              </span>
-              <p className="text-xs text-[#F2F3E6]/75 leading-relaxed">
-                Central Directorate of Examination &amp; Literary Arts<br />
-                {theme.institutionName || "Ma'din Suffa Campus, Vavoor"}<br />
-                Malappuram District, Kerala — 673645
-              </p>
-              <div className="flex items-center gap-2 pt-2 text-xs text-[#FDBF0F]">
-                <Calendar className="w-3.5 h-3.5 text-[#FDBF0F]" />
-                <span className="font-mono uppercase font-bold tracking-wider">{formattedDates}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="pt-6 border-t border-[#BA1912]/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-[#F2F3E6]/60">
-            <span>
-              &copy; 2026 {theme.festivalName?.toUpperCase() || 'INSPIRAATH'} FESTIVAL COMMITTEE • {theme.institutionName?.toUpperCase() || "MA'DIN SUFFA CAMPUS VAVOOR"}. ALL RIGHTS RESERVED.
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="uppercase tracking-widest text-[#FDBF0F] font-semibold text-[10px]">
-                SANCTIFIED UNDER CENTRAL DIRECTIVE
-              </span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 };

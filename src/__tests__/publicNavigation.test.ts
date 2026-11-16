@@ -95,3 +95,33 @@ describe('Public Results Directory bottom action strip removal', () => {
     expect(directoryPage).toContain('/public/competition/');
   });
 });
+
+
+describe('Shared compact footer across primary public pages', () => {
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+  const publicHome = readProjectFile('src/app/public/page.tsx');
+  const sharedFooter = readProjectFile('src/components/layout/PublicFooter.tsx');
+
+  it('uses one shared footer on Home, Results Directory, and Team Championship layouts', () => {
+    expect(publicHome).toContain('<PublicFooter />');
+    expect(publicLayout).toContain('<PublicFooter />');
+    expect(publicHome).toContain("import { PublicFooter } from '@/components/layout/PublicFooter'");
+    expect(publicLayout).toContain("import { PublicFooter } from '@/components/layout/PublicFooter'");
+  });
+
+  it('keeps only the festival identity, institution, and the three primary public links', () => {
+    expect(sharedFooter).toContain('theme.festivalName');
+    expect(sharedFooter).toContain('theme.institutionName');
+    expect(sharedFooter).toContain('Results Directory');
+    expect(sharedFooter).toContain('Team Championship');
+    expect(sharedFooter).toContain('Public footer navigation');
+  });
+
+  it('removes the old verbose and duplicated footer descriptions', () => {
+    expect(publicHome).not.toContain('OFFICIAL SECRETARIAT FOOTER');
+    expect(publicHome).not.toContain('Campus Contact Details');
+    expect(publicLayout).not.toContain('Biennial Academic &amp; Cultural Convocation');
+    expect(publicLayout).not.toContain('Central Directorate of Examination');
+    expect(publicLayout).not.toContain('SANCTIFIED UNDER CENTRAL DIRECTIVE');
+  });
+});
