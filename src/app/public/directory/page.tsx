@@ -6,12 +6,14 @@ import { useSearchParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { useFest } from '@/context/FestContext';
+import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
   const { results, categories, competitions, competitionsSyncState, theme, resultsSyncState } = useFest();
+  const festivalYear = theme.year?.trim() || theme.festivalStartDate?.slice(0, 4) || '';
 
   const [search, setSearch] = useState(initialQuery);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
@@ -80,14 +82,13 @@ function DirectoryContent() {
         <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
           {/* Eyebrow Badge */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1B090B] border border-[#FDBF0F]/40 text-[#FDBF0F] text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] shadow-sm mb-4">
-            <span className="material-symbols-outlined text-[15px] text-[#FDBF0F]">verified</span>
-            <span>Ratified Tabulation Directory • Cycle 2026</span>
+            <PublicIcon name="verified" className="text-[15px] text-[#FDBF0F]" />
+            <span>Ratified Tabulation Directory{festivalYear ? ` • ${festivalYear}` : ""}</span>
           </div>
 
           {/* Main Editorial Title */}
           <h1
             className="text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase tracking-wide text-[#F2F3E6] mb-3"
-            style={{ fontFamily: "'Cinzel', serif" }}
           >
             Public Results Directory
           </h1>
@@ -118,12 +119,12 @@ function DirectoryContent() {
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B090B] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">gavel</span>
-              <span className="uppercase tracking-wider text-[11px] font-medium">Grand Jury Authentication: Pass 03</span>
+              <PublicIcon name="gavel" className="text-[16px] text-[#FDBF0F]" />
+              <span className="uppercase tracking-wider text-[11px] font-medium">Official Published Results</span>
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B090B] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">schedule</span>
+              <PublicIcon name="schedule" className="text-[16px] text-[#FDBF0F]" />
               <span className="uppercase tracking-wider text-[11px] font-medium font-mono">
                 {resultsSyncState === 'ready' ? 'Live Sync Active' : resultsSyncState === 'loading' ? 'Syncing...' : 'Official Ledger'}
               </span>
@@ -138,7 +139,7 @@ function DirectoryContent() {
           {/* Instant Lookup Bar */}
           <div className="relative w-full flex flex-col md:flex-row items-stretch gap-2 bg-[#1B090B] p-1.5 sm:p-2 rounded-xl border border-[#BA1912]/30 shadow-inner">
             <div className="relative flex-1 flex items-center">
-              <span className="material-symbols-outlined absolute left-3.5 text-[#F2F3E6]/50 text-[20px] pointer-events-none">search</span>
+              <PublicIcon name="search" className="absolute left-3.5 text-[#F2F3E6]/50 text-[20px] pointer-events-none" />
               <input
                 id="searchDirectory"
                 type="text"
@@ -163,7 +164,7 @@ function DirectoryContent() {
                 type="button"
                 className="w-full md:w-auto h-11 px-5 sm:px-6 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] font-bold text-xs uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
               >
-                <span className="material-symbols-outlined text-[18px]">manage_search</span>
+                <PublicIcon name="manage_search" className="text-[18px]" />
                 <span className="hidden sm:inline">Lookup Records</span>
                 <span className="sm:hidden">Lookup</span>
               </button>
@@ -212,7 +213,7 @@ function DirectoryContent() {
               })}
 
               <div className="shrink-0 hidden sm:flex items-center gap-1 h-8 px-2.5 rounded bg-[#BA1912]/20 border border-[#BA1912]/50 text-[#FDBF0F] text-[11px] font-bold uppercase tracking-wider">
-                <span className="material-symbols-outlined text-[15px]">verified</span>
+                <PublicIcon name="verified" className="text-[15px]" />
                 <span>Ratified</span>
               </div>
             </div>
@@ -230,7 +231,7 @@ function DirectoryContent() {
                   <option value="SOLO">Individual Items (Solo)</option>
                   <option value="GROUP">Group Ensembles</option>
                 </select>
-                <span className="material-symbols-outlined text-[18px] text-[#FDBF0F] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
+                <PublicIcon name="expand_more" className="text-[18px] text-[#FDBF0F] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
               {(search || selectedCategory !== 'ALL' || selectedType !== 'ALL') && (
@@ -239,7 +240,7 @@ function DirectoryContent() {
                   onClick={handleResetFilters}
                   className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] text-xs font-semibold border border-[#FDBF0F]/30 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                  <PublicIcon name="restart_alt" className="text-[16px]" />
                   <span className="hidden sm:inline">Reset</span>
                 </button>
               )}
@@ -250,7 +251,7 @@ function DirectoryContent() {
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#BA1912]/20 text-[11px] text-[#F2F3E6]/70">
             <span className="uppercase tracking-widest text-[#FDBF0F]/80 font-bold">Active Filters:</span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1B090B] text-[#F2F3E6] rounded border border-white/5">
-              Cycle: 2026 Academic Biennial
+              Festival Dates: {formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate)}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1B090B] text-[#F2F3E6] rounded border border-white/5">
               Status: Ratified Scorecards Only
@@ -302,7 +303,7 @@ function DirectoryContent() {
       {/* FIRESTORE ERROR STATE */}
       {resultsSyncState === 'error' && (
         <div role="alert" className="p-6 rounded-2xl bg-[#2D1217] border border-red-500/40 text-center">
-          <span className="material-symbols-outlined text-[28px] text-red-400 mx-auto mb-2 block">error</span>
+          <PublicIcon name="error" className="text-[28px] text-red-400 mx-auto mb-2 block" />
           <h3 className="text-sm font-bold text-red-200">Unable to synchronize results live</h3>
           <p className="text-xs text-[#F2F3E6]/70 mt-1">
             Displaying cached festival records. Real-time updates will resume once connected.
@@ -314,7 +315,7 @@ function DirectoryContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
         {filtered.length === 0 && resultsSyncState !== 'loading' ? (
           <div className="col-span-full p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30">
-            <span className="material-symbols-outlined text-[36px] text-[#FDBF0F] mx-auto mb-3 block">search_off</span>
+            <PublicIcon name="search_off" className="text-[36px] text-[#FDBF0F] mx-auto mb-3 block" />
             <h3 className="text-base font-bold text-[#F2F3E6]">No Results Found</h3>
             <p className="text-xs text-[#F2F3E6]/70 max-w-md mx-auto mt-1 leading-relaxed">
               {search
@@ -362,14 +363,13 @@ function DirectoryContent() {
                   {/* Competition Title */}
                   <h3
                     className="text-base font-bold text-[#F2F3E6] group-hover:text-[#FDBF0F] uppercase line-clamp-1 transition-colors"
-                    style={{ fontFamily: "'Cinzel', serif" }}
                   >
                     {res.competitionName}
                   </h3>
 
                   {/* Grand Jury Certified Strip */}
                   <div className="flex items-center gap-1.5 text-[#F2F3E6]/75 text-[10px] uppercase tracking-wider my-3 py-1.5 px-2.5 rounded bg-[#1B090B]/60 border border-[#BA1912]/20">
-                    <span className="material-symbols-outlined text-[15px] text-[#FDBF0F] shrink-0">verified_user</span>
+                    <PublicIcon name="verified_user" className="text-[15px] text-[#FDBF0F] shrink-0" />
                     <span className="truncate">Grand Jury Certified • {res.publishedDate}</span>
                   </div>
 
@@ -457,7 +457,7 @@ function DirectoryContent() {
                     className="px-3 py-2 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                   >
                     <span>Tabulation</span>
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    <PublicIcon name="arrow_forward" className="text-[16px]" />
                   </Link>
                 </div>
               </article>

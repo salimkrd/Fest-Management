@@ -3,6 +3,7 @@
 import React from 'react';
 import { Team } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
+import { PublicIcon } from '@/components/layout/PublicIcon';
 
 interface ChampionshipPodiumProps {
   teams: Team[];
@@ -37,16 +38,15 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
           </span>
           <h2
             className="text-xl sm:text-2xl lg:text-3xl font-extrabold uppercase tracking-wide text-[#F2F3E6] mt-0.5"
-            style={{ fontFamily: "'Cinzel', serif" }}
           >
             GRAND CONVOCATION PODIUM
           </h2>
         </div>
 
         <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#230D0F] border border-[#FDBF0F]/30 text-[#FDBF0F] text-xs font-semibold shadow-xs">
-          <span className="material-symbols-outlined text-[18px] text-[#FDBF0F]">military_tech</span>
+          <PublicIcon name="military_tech" className="text-[18px] text-[#FDBF0F]" />
           <span className="tracking-wider uppercase text-[11px] font-mono">
-            {theme.festivalName || 'INSPIRAATH'} LAUREL CUP
+            {theme.festivalName?.trim() || 'Festival'} LAUREL CUP
           </span>
         </div>
       </div>
@@ -80,7 +80,6 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
               </span>
               <h3
                 className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide mt-1 text-center truncate max-w-full"
-                style={{ fontFamily: "'Cinzel', serif" }}
               >
                 {second.name}
               </h3>
@@ -118,7 +117,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
 
             {/* Physical Podium Pedestal Block (Silver - Medium Height) */}
             <div className="w-full h-24 bg-gradient-to-b from-[#2A1618] to-[#1B090B] border-t-2 border-[#D8C8B7]/80 rounded-b-xl flex flex-col items-center justify-center shadow-inner">
-              <span className="text-3xl font-extrabold text-[#D8C8B7]/40 font-serif leading-none" style={{ fontFamily: "'Cinzel', serif" }}>
+              <span className="text-3xl font-extrabold text-[#D8C8B7]/40 font-serif leading-none">
                 II
               </span>
               <span className="text-[9px] uppercase tracking-widest text-[#D8C8B7]/70 font-bold mt-1">
@@ -133,7 +132,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
           <div className="col-span-4 order-2 flex flex-col items-center -mt-6">
             {/* Crown Header Banner */}
             <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-t-lg bg-[#FDBF0F] text-[#1B090B] text-[10px] font-black uppercase tracking-widest shadow-lg">
-              <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+              <PublicIcon name="workspace_premium" className="text-[16px]" />
               <span>DEFENDING PREMIER LEADER</span>
             </div>
 
@@ -164,7 +163,6 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
               </span>
               <h3
                 className="text-xl font-extrabold text-[#F2F3E6] uppercase tracking-wide mt-1 text-center truncate max-w-full"
-                style={{ fontFamily: "'Cinzel', serif" }}
               >
                 {first.name}
               </h3>
@@ -204,7 +202,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
 
             {/* Physical Podium Pedestal Block (Gold - Highest) */}
             <div className="w-full h-32 bg-gradient-to-b from-[#281014] to-[#120507] border-2 border-t-0 border-[#FDBF0F] rounded-b-xl flex flex-col items-center justify-center shadow-inner">
-              <span className="text-4xl font-black text-[#FDBF0F]/40 font-serif leading-none" style={{ fontFamily: "'Cinzel', serif" }}>
+              <span className="text-4xl font-black text-[#FDBF0F]/40 font-serif leading-none">
                 I
               </span>
               <span className="text-[9px] uppercase tracking-widest text-[#FDBF0F] font-extrabold mt-1">
@@ -239,7 +237,6 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
               </span>
               <h3
                 className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide mt-1 text-center truncate max-w-full"
-                style={{ fontFamily: "'Cinzel', serif" }}
               >
                 {third.name}
               </h3>
@@ -277,7 +274,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
 
             {/* Physical Podium Pedestal Block (Bronze - Lowest Height) */}
             <div className="w-full h-16 bg-gradient-to-b from-[#2A1618] to-[#1B090B] border-t-2 border-[#BA1912] rounded-b-xl flex flex-col items-center justify-center shadow-inner">
-              <span className="text-2xl font-extrabold text-[#BA1912]/50 font-serif leading-none" style={{ fontFamily: "'Cinzel', serif" }}>
+              <span className="text-2xl font-extrabold text-[#BA1912]/50 font-serif leading-none">
                 III
               </span>
               <span className="text-[9px] uppercase tracking-widest text-[#BA1912]/80 font-bold mt-1">
@@ -297,7 +294,7 @@ export const ChampionshipPodium: React.FC<ChampionshipPodiumProps> = ({ teams })
           <div className="rounded-xl p-4 bg-[#230D0F] border-2 border-[#FDBF0F] shadow-lg relative overflow-hidden">
             {/* Faint Watermark Insignia */}
             <div className="absolute -right-3 -bottom-3 opacity-10 pointer-events-none">
-              <span className="material-symbols-outlined text-[100px] text-[#FDBF0F]">workspace_premium</span>
+              <PublicIcon name="workspace_premium" className="text-[100px] text-[#FDBF0F]" />
             </div>
 
             <div className="flex items-start justify-between gap-3 relative z-10">

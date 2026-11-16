@@ -5,40 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { PublicFooter } from '@/components/layout/PublicFooter';
+import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 import { Trophy, Sparkles, FileText, UserRound } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
   fullBleed?: boolean;
 }
-
-const parseFestivalDate = (value?: string): Date | null => {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) return null;
-  return parsed;
-};
-
-const formatFestivalDateSpan = (startDate?: string, endDate?: string) => {
-  const start = parseFestivalDate(startDate);
-  const end = parseFestivalDate(endDate);
-
-  if (!start && !endDate) return 'Official Convocation';
-  if (start && end) {
-    const startDay = start.getUTCDate();
-    const endDay = end.getUTCDate();
-    const month = start.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
-    const year = start.getUTCFullYear();
-    if (start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear()) {
-      return `${startDay}–${endDay} ${month} ${year}`;
-    }
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`;
-  }
-  if (start) {
-    return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  }
-  return endDate || 'Official Convocation';
-};
 
 function PublicNavLinks() {
   const pathname = usePathname();
@@ -102,7 +75,7 @@ function MobileBottomNav() {
               }`}
             >
               <div className="relative">
-                <span className="material-symbols-outlined text-[22px]">{tab.icon}</span>
+                <PublicIcon name={tab.icon} className="text-[#FDBF0F]" size={22} />
                 {isActive && (
                   <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#FDBF0F] shadow-[0_0_8px_#FDBF0F]" />
                 )}
@@ -117,11 +90,14 @@ function MobileBottomNav() {
 }
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, fullBleed = false }) => {
-  const { theme } = useFest();
+  const { theme, themeSyncState } = useFest();
 
-  const formattedDates = useMemo(() => {
-    return formatFestivalDateSpan(theme.festivalStartDate, theme.festivalEndDate);
-  }, [theme.festivalStartDate, theme.festivalEndDate]);
+  const formattedDates = useMemo(
+    () => formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate),
+    [theme.festivalStartDate, theme.festivalEndDate]
+  );
+  const festivalDisplayName = theme.festivalName?.trim()
+    || (themeSyncState === 'loading' ? 'Loading festival' : 'Festival');
 
   return (
     <div 
@@ -136,12 +112,15 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, fullBleed 
       {/* Main Navbar */}
       <header className="sticky top-0 z-40 bg-[#1B090B]/90 backdrop-blur-md border-b border-[#BA1912]/30 shadow-[0_4px_24px_rgba(0,0,0,0.45)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-18">
+          <div className="flex items-center justify-between gap-3 min-h-[4.5rem] py-2 lg:h-[4.5rem]">
             {/* Brand Logo & Title */}
-            <Link href="/" className="flex items-center gap-2 min-w-0 group" aria-label={theme.festivalName || 'Festival'} title={theme.festivalName || 'Festival'}>
-              <span className="public-brand-title font-brand font-bruno text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase whitespace-nowrap max-w-[55vw] lg:max-w-[24vw] truncate">
-                <span className="festival-name">{theme.festivalName || 'INSPIRATH'}</span>
-              </span>
+            <Link href="/" className="flex items-center gap-2 min-w-0 group" aria-label={festivalDisplayName} title={festivalDisplayName}>
+              <div className="min-w-0 max-w-[55vw] lg:max-w-[24vw]">
+                <span className="public-brand-title font-brand font-bruno block text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase truncate">
+                  <span className="festival-name">{festivalDisplayName}</span>
+                </span>
+                <span className="lg:hidden mt-0.5 block truncate text-[10px] sm:text-xs font-medium tracking-wide text-[#FDBF0F]/90">{formattedDates}</span>
+              </div>
               <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F] shrink-0" />
             </Link>
 

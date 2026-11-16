@@ -3,12 +3,14 @@
 import React, { useState, useMemo } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
+import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 import { ChampionshipPodium } from '@/components/domain/ChampionshipPodium';
 import { buildDivisionTeamStandings } from '@/domain/publicChampionship';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function PublicChampionshipPage() {
   const { teams, results, theme, teamsSyncState, resultsSyncState } = useFest();
+  const festivalYear = theme.year?.trim() || theme.festivalStartDate?.slice(0, 4) || '';
 
   const [selectedDivision, setSelectedDivision] = useState<'ALL' | 'SENIOR' | 'GENERAL' | 'SUB_JUNIOR'>('ALL');
 
@@ -55,7 +57,7 @@ export default function PublicChampionshipPage() {
               </div>
 
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#230D0F] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-[10px] sm:text-xs">
-                <span className="material-symbols-outlined text-[15px] text-[#FDBF0F]">verified_user</span>
+                <PublicIcon name="verified_user" className="text-[15px] text-[#FDBF0F]" />
                 <span className="font-mono uppercase tracking-wider">
                   {teamsSyncState === 'ready'
                     ? 'Firestore Real-time Synced'
@@ -71,7 +73,6 @@ export default function PublicChampionshipPage() {
               <span className="text-[#FDBF0F] select-none text-base sm:text-xl">❖</span>
               <h1
                 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase tracking-wide text-[#F2F3E6]"
-                style={{ fontFamily: "'Cinzel', serif" }}
               >
                 TEAM CHAMPIONSHIP
               </h1>
@@ -80,9 +81,9 @@ export default function PublicChampionshipPage() {
 
             {/* Festival & Campus Subtitle */}
             <div className="flex items-center gap-2 text-[#FDBF0F] text-[11px] sm:text-xs tracking-[0.25em] uppercase font-semibold my-1 font-mono">
-              <span>{theme.institutionName || "MA'DIN SUFFA CAMPUS VAVOOR"}</span>
-              <span>•</span>
-              <span>ACADEMIC CYCLE {theme.year || '2026'}</span>
+              {theme.institutionName?.trim() && <span>{theme.institutionName}</span>}
+              {theme.institutionName?.trim() && <span aria-hidden="true">•</span>}
+              <span>FESTIVAL DATES {formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate)}</span>
             </div>
 
             {/* Symmetrical Flourish Divider */}
@@ -111,7 +112,7 @@ export default function PublicChampionshipPage() {
               </div>
 
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#230D0F] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs font-mono">
-                <span className="material-symbols-outlined text-[15px] text-[#FDBF0F]">balance</span>
+                <PublicIcon name="balance" className="text-[15px] text-[#FDBF0F]" />
                 <span className="uppercase text-[11px]">Audit Ratified</span>
               </div>
             </div>
@@ -177,11 +178,10 @@ export default function PublicChampionshipPage() {
               <div className="flex items-center gap-2 text-[#FDBF0F] text-[10px] font-bold uppercase tracking-widest mb-1 font-mono">
                 <span>AUDITED TABULATION LEDGER</span>
                 <span>—</span>
-                <span>RECORD NO. SCV-2026-CH</span>
+                <span>RECORD NO. PUBLIC-{festivalYear || 'UNSET'}-CH</span>
               </div>
               <h2
                 className="text-lg sm:text-2xl font-bold uppercase text-[#F2F3E6]"
-                style={{ fontFamily: "'Cinzel', serif" }}
               >
                 OFFICIAL GUILD RATIFICATION TABLE
               </h2>
@@ -328,7 +328,6 @@ export default function PublicChampionshipPage() {
                       <td className="py-4 px-4 text-center">
                         <span
                           className="text-lg font-black text-[#FDBF0F] font-mono block leading-none"
-                          style={{ fontFamily: "'Cinzel', serif" }}
                         >
                           {team.pointsComplete ? (team.totalPoints || 0) : '—'}
                         </span>

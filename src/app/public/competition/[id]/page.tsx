@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import type { ResultRank } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
+import { PublicIcon } from '@/components/layout/PublicIcon';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { getPublishedOfficialPoints } from '@/domain/publicChampionship';
 import { Loader2 } from 'lucide-react';
@@ -120,7 +121,7 @@ function CompetitionDetailContent() {
   const handleWhatsAppShare = () => {
     if (typeof window !== 'undefined') {
       const text = encodeURIComponent(
-        `*${theme.festivalName || 'INSPIRAATH'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n🥇 1st Place: ${rank1?.candidateName || 'N/A'} (${rank1?.teamCode || ''})\n\nView full official scorecard: ${window.location.href}`
+        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n🥇 1st Place: ${rank1?.candidateName || 'N/A'} (${rank1?.teamCode || ''})\n\nView full official scorecard: ${window.location.href}`
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     }
@@ -145,12 +146,9 @@ function CompetitionDetailContent() {
   if (!result) {
     return (
       <div className="p-10 sm:p-14 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-2xl mx-auto my-8 shadow-2xl">
-        <span className="material-symbols-outlined text-[48px] text-[#FDBF0F]/60 mx-auto mb-3 block">
-          military_tech
-        </span>
+        <PublicIcon name="military_tech" className="text-[48px] text-[#FDBF0F]/60 mx-auto mb-3 block" />
         <h2
           className="text-lg sm:text-2xl font-bold uppercase text-[#F2F3E6]"
-          style={{ fontFamily: "'Cinzel', serif" }}
         >
           Competition Result Not Found
         </h2>
@@ -162,7 +160,7 @@ function CompetitionDetailContent() {
             href="/public/directory"
             className="px-4 py-2.5 rounded-lg bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-mono font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors shadow-md"
           >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            <PublicIcon name="arrow_back" className="text-[16px]" />
             <span>Return to Results Directory</span>
           </Link>
         </div>
@@ -180,7 +178,7 @@ function CompetitionDetailContent() {
           {/* Breadcrumb Hierarchy */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#F2F3E6]/60 flex-wrap">
             <Link href="/" className="hover:text-[#FDBF0F] transition-colors flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">home</span>
+              <PublicIcon name="home" className="text-[14px]" />
               <span>Home</span>
             </Link>
             <span className="text-[#FDBF0F]/60">/</span>
@@ -204,7 +202,7 @@ function CompetitionDetailContent() {
             <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-[#F2F3E6]/70">
               <span className="text-[#F2F3E6]/40">Tab Hash:</span>
               <code className="bg-[#230D0F] px-1.5 py-0.5 rounded text-[#FDBF0F] border border-white/5">
-                #8F9D-{result.competitionCode}-2026
+                #8F9D-{result.competitionCode}-{theme.year || theme.festivalStartDate?.slice(0, 4) || 'UNSET'}
               </code>
             </div>
           </div>
@@ -230,15 +228,14 @@ function CompetitionDetailContent() {
                 {result.stageName || 'Main Stage'}
               </span>
               <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#F2F3E6]/80 text-xs font-medium uppercase border border-white/5 flex items-center gap-1 font-mono">
-                <span className="material-symbols-outlined text-[14px] text-[#FDBF0F]">event_available</span>
-                <span>Published {result.publishedDate || '2026 Nov 24'}</span>
+                <PublicIcon name="event_available" className="text-[14px] text-[#FDBF0F]" />
+                <span>Published {result.publishedDate || 'Date unavailable'}</span>
               </span>
             </div>
 
             {/* Event Title */}
             <h1
               className="text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-wide text-[#F2F3E6]"
-              style={{ fontFamily: "'Cinzel', serif" }}
             >
               {result.competitionName}
             </h1>
@@ -255,9 +252,7 @@ function CompetitionDetailContent() {
               onClick={handleShare}
               className="flex items-center gap-1.5 bg-[#1B090B] hover:bg-[#281014] text-[#F2F3E6] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors border border-white/10 shadow-md"
             >
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">
-                {copied ? 'check' : 'content_copy'}
-              </span>
+              <PublicIcon name={copied ? 'check' : 'content_copy'} className="text-[16px] text-[#FDBF0F]" />
               <span>{copied ? 'Link Copied' : 'Copy Link'}</span>
             </button>
 
@@ -266,7 +261,7 @@ function CompetitionDetailContent() {
               onClick={handleWhatsAppShare}
               className="flex items-center gap-1.5 bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors border border-[#FDBF0F]/30 shadow-md"
             >
-              <span className="material-symbols-outlined text-[16px]">share</span>
+              <PublicIcon name="share" className="text-[16px]" />
               <span>Circulate</span>
             </button>
 
@@ -275,7 +270,7 @@ function CompetitionDetailContent() {
               onClick={handlePrintGazette}
               className="flex items-center gap-1.5 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors shadow-md"
             >
-              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+              <PublicIcon name="picture_as_pdf" className="text-[16px]" />
               <span>Official Gazette PDF</span>
             </button>
           </div>
@@ -292,7 +287,7 @@ function CompetitionDetailContent() {
           <div className="space-y-1">
             <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Cadre &amp; Tier</span>
             <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">school</span>
+              <PublicIcon name="school" className="text-[16px] text-[#FDBF0F]" />
               <span>{result.categoryName} Division</span>
             </span>
           </div>
@@ -300,15 +295,15 @@ function CompetitionDetailContent() {
           <div className="space-y-1">
             <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Convocation Sanctum</span>
             <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">temple_buddhist</span>
-              <span className="truncate">{result.stageName || 'Main Stage Sanctum'}</span>
+              <PublicIcon name="temple_buddhist" className="text-[16px] text-[#FDBF0F]" />
+              <span className="truncate">{result.stageName || 'Stage not specified'}</span>
             </span>
           </div>
 
           <div className="space-y-1">
             <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Tribunal Quorum</span>
             <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">balance</span>
+              <PublicIcon name="balance" className="text-[16px] text-[#FDBF0F]" />
               <span>Chief Evaluator + Jury</span>
             </span>
           </div>
@@ -316,7 +311,7 @@ function CompetitionDetailContent() {
           <div className="space-y-1">
             <span className="text-[10px] text-[#F2F3E6]/60 uppercase tracking-widest block">Finalists &amp; Status</span>
             <span className="text-sm text-[#F2F3E6] font-bold flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-[#FDBF0F]">verified</span>
+              <PublicIcon name="verified" className="text-[16px] text-[#FDBF0F]" />
               <span>{result.ranks.length} Evaluated • Ratified</span>
             </span>
           </div>
@@ -346,7 +341,7 @@ function CompetitionDetailContent() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#D8C8B7] text-[#1B090B] font-bold flex items-center gap-1 shadow-xs">
-                  <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                  <PublicIcon name="workspace_premium" className="text-[14px]" />
                   <span>Rank 02 • Silver Laureate</span>
                 </span>
                 <span className="text-xs font-mono text-[#D8C8B7] font-bold uppercase tracking-wider">
@@ -376,7 +371,6 @@ function CompetitionDetailContent() {
                 </span>
                 <h3
                   className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                  style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank2.candidateName}
                 </h3>
@@ -406,7 +400,7 @@ function CompetitionDetailContent() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-[#FDBF0F] text-[#1B090B] font-black flex items-center gap-1 shadow-md">
-                  <span className="material-symbols-outlined text-[15px]">stars</span>
+                  <PublicIcon name="stars" className="text-[15px]" />
                   <span>Rank 01 • Gold Champion</span>
                 </span>
                 <span className="text-xs font-mono text-[#FDBF0F] font-bold uppercase tracking-wider">
@@ -435,12 +429,11 @@ function CompetitionDetailContent() {
 
               <div className="space-y-1">
                 <span className="text-[10px] font-mono text-[#FDBF0F] uppercase tracking-widest font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">military_tech</span>
+                  <PublicIcon name="military_tech" className="text-[14px]" />
                   <span>Festival Grand Laureate</span>
                 </span>
                 <h3
                   className="text-xl font-extrabold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                  style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank1.candidateName}
                 </h3>
@@ -470,7 +463,7 @@ function CompetitionDetailContent() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#BA1912] text-[#F2F3E6] font-bold flex items-center gap-1 shadow-xs">
-                  <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                  <PublicIcon name="workspace_premium" className="text-[14px]" />
                   <span>Rank 03 • Bronze Laureate</span>
                 </span>
                 <span className="text-xs font-mono text-[#BA1912] font-bold uppercase tracking-wider">
@@ -500,7 +493,6 @@ function CompetitionDetailContent() {
                 </span>
                 <h3
                   className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                  style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {rank3.candidateName}
                 </h3>
@@ -529,14 +521,13 @@ function CompetitionDetailContent() {
       <section className="rounded-2xl bg-gradient-to-r from-[#230D0F] via-[#2D1217] to-[#230D0F] border border-[#BA1912]/40 p-5 sm:p-7 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="space-y-1.5 max-w-xl">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px] text-[#FDBF0F]">download</span>
+            <PublicIcon name="download" className="text-[18px] text-[#FDBF0F]" />
             <span className="text-[10px] uppercase tracking-widest text-[#FDBF0F] font-bold font-mono">
               OFFICIAL RESULT POSTER
             </span>
           </div>
           <h3
             className="text-base sm:text-xl font-bold uppercase text-[#F2F3E6]"
-            style={{ fontFamily: "'Cinzel', serif" }}
           >
             Download Official Result Poster
           </h3>
@@ -563,7 +554,6 @@ function CompetitionDetailContent() {
             </div>
             <h3
               className="text-lg sm:text-xl font-bold uppercase text-[#F2F3E6] mt-0.5"
-              style={{ fontFamily: "'Cinzel', serif" }}
             >
               Certified Contestant Tabulation Ledger
             </h3>
@@ -708,12 +698,11 @@ function CompetitionDetailContent() {
       <section className="rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#1B090B] border border-[#FDBF0F]/30 flex items-center justify-center shrink-0 text-[#FDBF0F]">
-            <span className="material-symbols-outlined text-[20px]">verified_user</span>
+            <PublicIcon name="verified_user" className="text-[20px]" />
           </div>
           <div>
             <h4
               className="text-sm sm:text-base font-bold uppercase text-[#F2F3E6]"
-              style={{ fontFamily: "'Cinzel', serif" }}
             >
               Jury Bench Ratification &amp; Validation
             </h4>
@@ -724,7 +713,7 @@ function CompetitionDetailContent() {
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto text-xs font-mono text-[#FDBF0F] bg-[#1B090B] px-3.5 py-2 rounded-xl border border-[#FDBF0F]/30">
-          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+          <PublicIcon name="check_circle" className="text-[16px]" />
           <span>Verification Pass Confirmed</span>
         </div>
       </section>

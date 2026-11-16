@@ -3,10 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { useFest } from '@/context/FestContext';
+import { formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 
 export const PublicFooter: React.FC = () => {
   const { theme } = useFest();
-  const festivalName = theme.festivalName?.trim() || 'INSPIRATH';
+  const festivalName = theme.festivalName?.trim() || 'Festival';
+  const festivalDates = formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate);
+  const copyrightYear = theme.year?.trim() || theme.festivalStartDate?.slice(0, 4) || String(new Date().getFullYear());
   const institutionName = theme.institutionName?.trim();
 
   return (
@@ -15,7 +18,7 @@ export const PublicFooter: React.FC = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <Link href="/" className="inline-flex items-center gap-2">
-              <span className="font-brand text-base font-bold tracking-wider text-[#F2F3E6] uppercase">
+              <span className="font-brand festival-name text-base font-bold tracking-wider text-[#F2F3E6] uppercase">
                 {festivalName}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F]" />
@@ -23,6 +26,7 @@ export const PublicFooter: React.FC = () => {
             {institutionName && (
               <p className="mt-1 text-xs text-[#F2F3E6]/65">{institutionName}</p>
             )}
+            <p className="mt-1 text-xs text-[#F2F3E6]/65">{festivalDates}</p>
           </div>
 
           <nav
@@ -42,7 +46,7 @@ export const PublicFooter: React.FC = () => {
         </div>
 
         <div className="mt-5 border-t border-[#BA1912]/20 pt-4 text-[10px] text-[#F2F3E6]/50">
-          © {new Date().getFullYear()} {festivalName}. All rights reserved.
+          © {copyrightYear} {festivalName}. All rights reserved.
         </div>
       </div>
     </footer>

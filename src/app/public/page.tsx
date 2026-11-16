@@ -6,14 +6,8 @@ import Image from 'next/image';
 import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { PublicLayout } from '@/components/layout/PublicLayout';
+import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
-
-const parseFestivalCalendarDate = (value?: string): Date | null => {
-  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) return null;
-  return parsed;
-};
 
 export default function InspirathPublicHomePage() {
   const { theme, teams, results, categories, competitions, teamsSyncState, resultsSyncState } = useFest();
@@ -133,52 +127,12 @@ export default function InspirathPublicHomePage() {
   }, [publishedResults, activeDivisionTab]);
 
   // Format only verified Festival Settings dates; never invent a fallback date.
-  const formattedDates = useMemo(() => {
-    const start = parseFestivalCalendarDate(theme.festivalStartDate);
-    const end = parseFestivalCalendarDate(theme.festivalEndDate);
-    if (!start || !end || end.getTime() < start.getTime()) return 'Dates to be announced';
+  const formattedDates = useMemo(
+    () => formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate),
+    [theme.festivalStartDate, theme.festivalEndDate]
+  );
 
-    const startYear = start.getUTCFullYear();
-    const endYear = end.getUTCFullYear();
-    const startMonth = start.getUTCMonth();
-    const endMonth = end.getUTCMonth();
-    const startDay = start.getUTCDate();
-    const endDay = end.getUTCDate();
-
-    if (start.getTime() === end.getTime()) {
-      return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }).format(start);
-    }
-
-    if (startYear === endYear && startMonth === endMonth) {
-      const month = start.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
-      return `${startYear} ${month} ${startDay} & ${endDay}`;
-    }
-
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-    return `${formatter.format(start)} – ${formatter.format(end)}`;
-  }, [theme.festivalStartDate, theme.festivalEndDate]);
-
-  const formattedDays = useMemo(() => {
-    const start = parseFestivalCalendarDate(theme.festivalStartDate);
-    const end = parseFestivalCalendarDate(theme.festivalEndDate);
-    if (!start || !end || end.getTime() < start.getTime()) return 'Dates to be announced';
-
-    const startDay = start.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-    const endDay = end.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-    return start.getTime() === end.getTime() ? startDay : `${startDay} & ${endDay}`;
-  }, [theme.festivalStartDate, theme.festivalEndDate]);
-
-  const festivalTitle = theme.festivalName || 'INSPIRAATH';
+  const festivalTitle = theme.festivalName?.trim() || 'Festival';
 
   return (
     <PublicLayout fullBleed>
@@ -223,8 +177,8 @@ export default function InspirathPublicHomePage() {
                   }}
                 >
                   <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
-                  <span className="font-body text-sm font-semibold uppercase tracking-[0.2em] text-[#FFF8EE]">
-                    Suffa Campus Vavoor Art Fest {theme.year ? theme.year.slice(-2) : '26'}
+                  <span className="font-body festival-name text-sm font-semibold uppercase tracking-[0.2em] text-[#FFF8EE]">
+                    {theme.festivalName?.trim() || 'Official Festival'}
                   </span>
                 </div>
 
@@ -245,28 +199,22 @@ export default function InspirathPublicHomePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-lg w-full mb-10">
                   <div className="flex items-center gap-3.5 py-3 px-4 rounded-xl bg-[#1A080B]/80 border border-[#FDBF0F]/30 backdrop-blur-md shadow-md min-w-0 w-full">
                     <div className="w-10 h-10 rounded-lg bg-[#FDBF0F]/15 border border-[#FDBF0F]/40 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">calendar_month</span>
+                      <PublicIcon name="calendar_month" className="text-[#FDBF0F] text-[22px]" />
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
                       <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
                         {formattedDates}
-                      </span>
-                      <span className="text-xs text-[#FFF8EE]/80 mt-0.5 whitespace-nowrap">
-                        {formattedDays}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3.5 py-3 px-4 rounded-xl bg-[#1A080B]/80 border border-[#FDBF0F]/30 backdrop-blur-md shadow-md min-w-0 w-full">
                     <div className="w-10 h-10 rounded-lg bg-[#FDBF0F]/15 border border-[#FDBF0F]/40 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">location_on</span>
+                      <PublicIcon name="location_on" className="text-[#FDBF0F] text-[22px]" />
                     </div>
                     <div className="flex flex-col min-w-0 justify-center">
-                      <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-nowrap">
-                        {"Ma'din Suffa Campus"}
-                      </span>
-                      <span className="text-xs text-[#FFF8EE]/80 mt-0.5 whitespace-nowrap">
-                        Vavoor, Malappuram
+                      <span className="text-xs sm:text-[13px] font-bold text-[#FFF8EE] tracking-tight leading-snug whitespace-normal break-words">
+                        {theme.institutionName?.trim() || 'Institution details to be announced'}
                       </span>
                     </div>
                   </div>
@@ -279,9 +227,7 @@ export default function InspirathPublicHomePage() {
                     data-path="results-directory"
                     href="#results-directory"
                   >
-                    <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform text-[#1A080B]">
-                      verified
-                    </span>
+                    <PublicIcon name="verified" className="text-[20px] group-hover:scale-110 transition-transform text-[#1A080B]" />
                     <span className="tracking-wide">Explore Results</span>
                   </Link>
 
@@ -290,9 +236,7 @@ export default function InspirathPublicHomePage() {
                     data-path="team-championship"
                     href="#team-championship"
                   >
-                    <span className="material-symbols-outlined text-[20px] group-hover:translate-x-0.5 transition-transform text-[#FDBF0F]">
-                      leaderboard
-                    </span>
+                    <PublicIcon name="leaderboard" className="text-[20px] group-hover:translate-x-0.5 transition-transform text-[#FDBF0F]" />
                     <span className="tracking-wide">Team Championship</span>
                   </Link>
                 </div>
@@ -372,7 +316,7 @@ export default function InspirathPublicHomePage() {
               </div>
               <div className="hidden sm:flex items-center gap-2 text-[13px] text-[#FFF8EE]/80 font-medium">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span>Official Live Standing • Cycle {theme.year || '2026'}</span>
+                <span>Official Live Standing • {theme.year || theme.festivalStartDate?.slice(0, 4) || 'Festival year not configured'}</span>
               </div>
             </div>
 
@@ -381,7 +325,7 @@ export default function InspirathPublicHomePage() {
               <div className="lg:col-span-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
-                    <span className="material-symbols-outlined text-[#FDBF0F] text-[24px]">trophy</span>
+                    <PublicIcon name="trophy" className="text-[#FDBF0F] text-[24px]" />
                     <span>House Championship Standings</span>
                   </h3>
                   <Link
@@ -403,9 +347,7 @@ export default function InspirathPublicHomePage() {
                   </div>
                 ) : sortedTeams.length === 0 ? (
                   <div className="p-5 sm:p-6 rounded-lg bg-[#4A0A1C]/60 border border-[#FDBF0F]/20 text-center">
-                    <span className="material-symbols-outlined text-[#FDBF0F] text-[36px] mb-2 inline-block">
-                      leaderboard
-                    </span>
+                    <PublicIcon name="leaderboard" className="text-[#FDBF0F] text-[36px] mb-2 inline-block" />
                     <h4 className="text-base font-bold text-[#FFF8EE]">Championship Standings Awaiting Tabulation</h4>
                     <p className="text-xs text-[#FFF8EE]/70 mt-1">
                       House points will be ratified and updated live as official results are published.
@@ -493,7 +435,7 @@ export default function InspirathPublicHomePage() {
               <div className="lg:col-span-6 flex flex-col">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
-                    <span className="material-symbols-outlined text-[#FDBF0F] text-[24px]">manage_search</span>
+                    <PublicIcon name="manage_search" className="text-[#FDBF0F] text-[24px]" />
                     <span>Quick Competition Result Finder</span>
                   </h3>
                   <span className="text-sm text-[#FDBF0F] font-bold">Instant Tabulation</span>
@@ -580,7 +522,7 @@ export default function InspirathPublicHomePage() {
                         className="btn-lookup px-5 sm:px-7 py-3 border border-[#FDBF0F] rounded font-body text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer text-[#1A080B] whitespace-nowrap"
                         type="submit"
                       >
-                        <span className="material-symbols-outlined text-[20px] text-[#1A080B]">search</span>
+                        <PublicIcon name="search" className="text-[20px] text-[#1A080B]" />
                         <span>Lookup</span>
                       </button>
                     </div>
@@ -620,9 +562,7 @@ export default function InspirathPublicHomePage() {
                       </div>
                     ) : finderHasSearched && (finderInput.trim() || finderCategory !== 'all' || finderEvent !== 'all') ? (
                       <div className="text-center py-4">
-                        <span className="material-symbols-outlined text-[#FDBF0F]/60 text-[32px] block mb-1">
-                          search_off
-                        </span>
+                        <PublicIcon name="search_off" className="text-[#FDBF0F]/60 text-[32px] block mb-1" />
                         <p className="text-[13px] font-bold text-[#FFF8EE]">No Matching Ratified Record Found</p>
                         <p className="text-xs text-[#FFF8EE]/70 mt-1">
                           Check the bib number or candidate name spelling, or ensure the event result is published.
@@ -630,9 +570,7 @@ export default function InspirathPublicHomePage() {
                       </div>
                     ) : (
                       <div className="text-center py-4">
-                        <span className="material-symbols-outlined text-[#FDBF0F]/50 text-[30px] block mb-1">
-                          manage_search
-                        </span>
+                        <PublicIcon name="manage_search" className="text-[#FDBF0F]/50 text-[30px] block mb-1" />
                         <p className="text-xs text-[#FFF8EE]/80 font-medium">
                           Enter candidate name or bib above, or select a category and event to lookup ratified records.
                         </p>
@@ -746,9 +684,7 @@ export default function InspirathPublicHomePage() {
               </div>
             ) : filteredLatestResults.length === 0 ? (
               <div className="max-w-md mx-auto text-center py-12 px-6 rounded-xl bg-[#F5B300]/60 border border-[#D69700]">
-                <span className="material-symbols-outlined text-[#4A0A1C] text-[40px] block mb-2">
-                  rate_review
-                </span>
+                <PublicIcon name="rate_review" className="text-[#4A0A1C] text-[40px] block mb-2" />
                 <h4 className="text-lg font-bold text-[#1A080B]">No Ratified Results Published Yet</h4>
                 <p className="text-sm text-[#2D1217] mt-1 font-medium">
                   {activeDivisionTab === 'ALL'
@@ -867,9 +803,7 @@ export default function InspirathPublicHomePage() {
                             className="text-xs font-bold text-[#FDBF0F] hover:text-[#FFF8EE] flex items-center gap-1 group transition-colors"
                           >
                             <span>Full Result</span>
-                            <span className="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">
-                              arrow_forward
-                            </span>
+                            <PublicIcon name="arrow_forward" className="text-[16px] group-hover:translate-x-1 transition-transform" />
                           </Link>
                         </div>
                       </div>
@@ -884,7 +818,7 @@ export default function InspirathPublicHomePage() {
                 className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded bg-[#4A0A1C] hover:bg-[#2D1217] text-[#FDBF0F] border-2 border-[#FDBF0F] font-body text-xs sm:text-sm font-bold uppercase tracking-wider shadow-lg transition-colors cursor-pointer max-w-full"
                 href="/public/directory"
               >
-                <span className="material-symbols-outlined text-[20px] shrink-0">menu_book</span>
+                <PublicIcon name="menu_book" className="text-[20px] shrink-0" />
                 <span className="whitespace-nowrap">View All Published Results ({publishedResults.length} Events)</span>
               </Link>
             </div>
@@ -906,7 +840,7 @@ export default function InspirathPublicHomePage() {
             >
               <div>
                 <div className="inline-flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-[#FDBF0F] text-[22px]">badge</span>
+                  <PublicIcon name="badge" className="text-[#FDBF0F] text-[22px]" />
                   <span className="text-sm uppercase tracking-widest text-[#FDBF0F] font-bold">
                     Official Published Results
                   </span>
@@ -925,9 +859,7 @@ export default function InspirathPublicHomePage() {
                 data-path="results-directory"
                 href="/public/directory"
               >
-                <span className="material-symbols-outlined text-[20px] text-[#FDBF0F] group-hover:text-[#1A080B] group-hover:scale-110 transition-transform">
-                  verified
-                </span>
+                <PublicIcon name="verified" className="text-[20px] text-[#FDBF0F] group-hover:text-[#1A080B] group-hover:scale-110 transition-transform" />
                 <span>Open Results Directory</span>
               </Link>
             </div>
