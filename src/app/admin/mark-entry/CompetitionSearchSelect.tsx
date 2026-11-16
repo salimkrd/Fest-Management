@@ -102,7 +102,7 @@ export function CompetitionSearchSelect({
 
   return (
     <div ref={rootRef} className="relative w-full">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#111111]">
+      <label id={`${listboxId}-label`} className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#111111]">
         Select Competition
       </label>
 
@@ -112,6 +112,7 @@ export function CompetitionSearchSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
+        aria-labelledby={`${listboxId}-label ${listboxId}-value`}
         onClick={() => {
           if (isOpen) {
             closeDropdown();
@@ -123,7 +124,7 @@ export function CompetitionSearchSelect({
         }}
         className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg border border-[#E1E7EF] bg-white px-3.5 py-2.5 text-left text-sm text-[#111111] transition-colors hover:border-slate-300 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
       >
-        <span className="min-w-0 flex-1 truncate">
+        <span id={`${listboxId}-value`} className="min-w-0 flex-1 truncate">
           {selectedCompetition
             ? `${selectedCompetition.name} (${selectedCompetition.code} - ${selectedCompetition.categoryName})`
             : 'Choose a competition'}
