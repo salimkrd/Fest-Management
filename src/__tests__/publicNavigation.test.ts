@@ -273,3 +273,22 @@ describe('Public homepage shared shell build regression', () => {
     expect(homePage).not.toContain('Mobile Fixed Bottom Navigation Bar');
   });
 });
+
+
+describe('Public header brand typography', () => {
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+
+  it('shows only the festival title in the public header, without institution details', () => {
+    expect(publicLayout).toContain('{theme.festivalName || \'INSPIRATH\'}');
+    expect(publicLayout).not.toContain('theme.institutionName');
+    expect(publicLayout).not.toContain('public-brand-subtitle');
+    expect(publicLayout).not.toContain('Institution unavailable');
+  });
+
+  it('uses larger responsive festival title typography while preserving the Participant Login action', () => {
+    expect(publicLayout).toContain('text-xl sm:text-2xl lg:text-3xl');
+    expect(publicLayout).toContain('max-w-[55vw] lg:max-w-[24vw] truncate');
+    expect(publicLayout).toContain('href="/participant/login"');
+    expect(publicLayout).toContain('<UserRound');
+  });
+});
