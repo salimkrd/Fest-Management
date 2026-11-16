@@ -160,20 +160,6 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         fontFamily: "'Sora', sans-serif"
       } as React.CSSProperties}
     >
-      {/* Top Festival Announcement Bar */}
-      <div className="public-announcement bg-gradient-to-r from-[#4A0A1C] via-[#86152C] to-[#4A0A1C] text-[#FFF8EE] text-[11px] sm:text-xs py-2 px-4 text-center font-medium border-b border-[#BA1912]/40 shadow-xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
-          <span className="font-bold tracking-wider uppercase text-[#FDBF0F]">
-            <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
-          </span>
-          <span className="text-[#FDBF0F]/60">·</span>
-          <span className="hidden sm:inline">Official Real-Time Results &amp; Championship Tabulation Center</span>
-          <span className="sm:hidden">Official Tabulation Center</span>
-          <span className="hidden md:inline text-[#FDBF0F]/60">·</span>
-          <span className="hidden md:inline text-white/80">{theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}</span>
-        </div>
-      </div>
-
       {/* Main Navbar */}
       <header className="sticky top-0 z-40 bg-[#1B090B]/90 backdrop-blur-md border-b border-[#BA1912]/30 shadow-[0_4px_24px_rgba(0,0,0,0.45)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
