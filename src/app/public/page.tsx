@@ -140,29 +140,11 @@ export default function InspirathPublicHomePage() {
 
 
       <div className="w-full">
-        {/* HERO SECTION: Vibrant Rich Ruby-Crimson (#4A0A1C -> #86152C -> #A91D3A), theme.png as primary title, solo glowing lamp */}
+        {/* HERO SECTION: Red-orange halftone background texture with the existing theme artwork and lamp */}
         <section
-          className="relative w-full hero-ruby-bg crimson-hero-gradient text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
+          className="relative w-full inspirath-halftone-hero text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
           id="home"
         >
-          {/* Ambient Glows */}
-          <div
-            className="ambient-glow absolute top-1/2 right-[14%] -translate-y-1/2 w-[520px] h-[520px] rounded-full pointer-events-none"
-            style={{
-              background:
-                'radial-gradient(circle, rgba(253, 191, 15, 0.38) 0%, rgba(189, 16, 1, 0.45) 45%, rgba(74, 10, 28, 0.2) 75%, transparent 100%)',
-              filter: 'blur(100px)',
-            }}
-          />
-          <div
-            className="absolute -top-24 left-10 w-[460px] h-[460px] rounded-full pointer-events-none"
-            style={{
-              background:
-                'radial-gradient(circle, rgba(189, 16, 1, 0.5) 0%, rgba(74, 10, 28, 0.4) 50%, transparent 75%)',
-              filter: 'blur(120px)',
-            }}
-          />
-
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-24">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
               {/* Left Hero Identity Column */}

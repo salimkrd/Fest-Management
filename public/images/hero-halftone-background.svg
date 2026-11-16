@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1440" viewBox="0 0 1080 1440" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#f13a16"/>
+      <stop offset="0.38" stop-color="#df2b11"/>
+      <stop offset="0.72" stop-color="#c91e0d"/>
+      <stop offset="1" stop-color="#a9180b"/>
+    </linearGradient>
+    <radialGradient id="warmth" cx="52%" cy="35%" r="76%">
+      <stop offset="0" stop-color="#ff4218" stop-opacity=".48"/>
+      <stop offset=".52" stop-color="#ed2a10" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#620b06" stop-opacity=".3"/>
+    </radialGradient>
+    <linearGradient id="edgeShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a0905" stop-opacity=".2"/>
+      <stop offset=".18" stop-color="#4a0905" stop-opacity="0"/>
+      <stop offset=".82" stop-color="#4a0905" stop-opacity="0"/>
+      <stop offset="1" stop-color="#4a0905" stop-opacity=".2"/>
+    </linearGradient>
+    <pattern id="halftone" width="6.4" height="6.4" patternUnits="userSpaceOnUse">
+      <circle cx="2.1" cy="2.1" r="1.18" fill="#160706" fill-opacity=".68"/>
+    </pattern>
+  </defs>
+  <rect width="1080" height="1440" fill="url(#base)"/>
+  <rect width="1080" height="1440" fill="url(#warmth)"/>
+  <rect width="1080" height="1440" fill="url(#edgeShade)"/>
+  <rect width="1080" height="1440" fill="url(#halftone)"/>
+</svg>
