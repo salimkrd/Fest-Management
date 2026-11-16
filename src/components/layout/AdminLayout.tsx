@@ -30,6 +30,7 @@ import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalB
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { UNIFIED_STAFF_LOGIN_ROUTE } from '@/lib/authRoutes';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -85,7 +86,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!auth) {
       setAuthChecking(false);
-      router.replace('/admin/login');
+      router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
       return;
     }
 
@@ -94,7 +95,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         setAuthorizedUser(null);
         setUserRole(null);
         setAuthChecking(false);
-        router.replace('/admin/login');
+        router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
         return;
       }
 
@@ -123,7 +124,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           setAuthorizedUser(null);
           setUserRole(null);
           setAuthChecking(false);
-          router.replace('/admin/login');
+          router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
           return;
         }
 
@@ -136,7 +137,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
-            router.replace('/admin/login');
+            router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
             return;
           }
 
@@ -152,7 +153,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             setAuthorizedUser(null);
             setUserRole(null);
             setAuthChecking(false);
-            router.replace('/admin/login');
+            router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
             return;
           }
         }
@@ -172,7 +173,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         setAuthorizedUser(null);
         setUserRole(null);
         setAuthChecking(false);
-        router.replace('/admin/login');
+        router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
       }
     });
 
@@ -210,7 +211,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       if (auth) await signOut(auth);
       setAuthorizedUser(null);
       setMobileMenuOpen(false);
-      router.replace('/admin/login');
+      router.replace(UNIFIED_STAFF_LOGIN_ROUTE);
       router.refresh();
     } catch (err) {
       console.warn('[AdminLayout] Sign out error:', err);

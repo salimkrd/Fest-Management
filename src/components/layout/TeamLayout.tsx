@@ -16,6 +16,7 @@ import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import { auth } from '@/lib/firebase/client';
 import { signOut } from 'firebase/auth';
+import { UNIFIED_STAFF_LOGIN_ROUTE, buildStaffLoginUrl } from '@/lib/authRoutes';
 
 interface TeamLayoutProps {
   children: React.ReactNode;
@@ -33,11 +34,11 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
 
   React.useEffect(() => {
     if (!currentTeamUser) {
-      router.push('/team/login');
+      router.push(UNIFIED_STAFF_LOGIN_ROUTE);
       return;
     }
     if (currentTeamUser.portalAccess === false || (currentTeamUser as { status?: string }).status === 'DISABLED') {
-      router.push('/team/login?error=disabled');
+      router.push(buildStaffLoginUrl({ error: 'disabled' }));
     }
   }, [currentTeamUser, router]);
 
@@ -47,7 +48,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
     const unsubscribe = clientAuth.onAuthStateChanged(async (user) => {
       if (!user) {
         setCurrentTeamUser(null);
-        router.push('/team/login');
+        router.push(UNIFIED_STAFF_LOGIN_ROUTE);
         return;
       }
       try {
@@ -57,14 +58,14 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
         if (role !== 'TEAM_MANAGER' && role !== 'ADMIN') {
           await signOut(clientAuth);
           setCurrentTeamUser(null);
-          router.push('/team/login');
+          router.push(UNIFIED_STAFF_LOGIN_ROUTE);
           return;
         }
         if (currentTeamUser && currentTeamUser.id !== teamId && role !== 'ADMIN') {
           // Cross-team access denied
           await signOut(clientAuth);
           setCurrentTeamUser(null);
-          router.push('/team/login');
+          router.push(UNIFIED_STAFF_LOGIN_ROUTE);
           return;
         }
       } catch (err) {
@@ -158,7 +159,7 @@ export const TeamLayout: React.FC<TeamLayoutProps> = ({ children }) => {
                     }
                   }
                   setCurrentTeamUser(null);
-                  router.push('/team/login');
+                  router.push(UNIFIED_STAFF_LOGIN_ROUTE);
                 }}
                 aria-label="Sign out of Team Workspace"
                 title="Sign out of Team Workspace"
