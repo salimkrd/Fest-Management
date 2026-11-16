@@ -127,12 +127,6 @@ function CompetitionDetailContent() {
     }
   };
 
-  const handlePrintGazette = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
-  };
-
   if (resultsSyncState === 'loading' && !result) {
     return (
       <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto my-8">
@@ -265,14 +259,6 @@ function CompetitionDetailContent() {
               <span>Circulate</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handlePrintGazette}
-              className="flex items-center gap-1.5 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors shadow-md"
-            >
-              <PublicIcon name="picture_as_pdf" className="text-[16px]" />
-              <span>Official Gazette PDF</span>
-            </button>
           </div>
         </div>
 
