@@ -117,7 +117,7 @@ function MobileBottomNav() {
 }
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, fullBleed = false }) => {
-  const { theme, themeSyncState } = useFest();
+  const { theme } = useFest();
 
   const formattedDates = useMemo(() => {
     return formatFestivalDateSpan(theme.festivalStartDate, theme.festivalEndDate);
@@ -138,18 +138,11 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, fullBleed 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-18">
             {/* Brand Logo & Title */}
-            <Link href="/" className="flex items-center gap-0 group">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="public-brand-title font-brand font-bruno text-base sm:text-xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase whitespace-nowrap">
-                    <span className="festival-name">{theme.festivalName || (themeSyncState === 'loading' ? 'Loading festival…' : 'Festival name unavailable')}</span>
-                  </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F] shrink-0" />
-                </div>
-                <span className="public-brand-subtitle text-[10px] text-[#F2F3E6]/70 uppercase tracking-widest font-medium block">
-                  {theme.institutionName || (themeSyncState === 'loading' ? 'Loading institution…' : 'Institution unavailable')}
-                </span>
-              </div>
+            <Link href="/" className="flex items-center gap-2 min-w-0 group" aria-label={theme.festivalName || 'Festival'} title={theme.festivalName || 'Festival'}>
+              <span className="public-brand-title font-brand font-bruno text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase whitespace-nowrap max-w-[55vw] lg:max-w-[24vw] truncate">
+                <span className="festival-name">{theme.festivalName || 'INSPIRATH'}</span>
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_6px_#FDBF0F] shrink-0" />
             </Link>
 
             {/* Desktop Navigation */}
