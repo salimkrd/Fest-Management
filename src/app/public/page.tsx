@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
-import { PublicFooter } from '@/components/layout/PublicFooter';
+import { PublicLayout } from '@/components/layout/PublicLayout';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
 
 const parseFestivalCalendarDate = (value?: string): Date | null => {
@@ -17,9 +17,6 @@ const parseFestivalCalendarDate = (value?: string): Date | null => {
 
 export default function InspirathPublicHomePage() {
   const { theme, teams, results, categories, competitions, teamsSyncState, resultsSyncState } = useFest();
-
-  // Mobile navigation drawer toggle
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Active Division Tab for Latest Results Gazette
   const [activeDivisionTab, setActiveDivisionTab] = useState<string>('ALL');
@@ -187,7 +184,8 @@ export default function InspirathPublicHomePage() {
   const festivalTitle = theme.festivalName || 'INSPIRAATH';
 
   return (
-    <div className="public-experience bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
+    <PublicLayout>
+      <div className="bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
 
 
       <main className="w-full">
@@ -196,95 +194,6 @@ export default function InspirathPublicHomePage() {
           className="relative w-full hero-ruby-bg crimson-hero-gradient text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
           id="home"
         >
-          {/* HEADER: Deep Ruby-Espresso Header strictly matching approved branding */}
-          <header className="absolute top-0 left-0 right-0 z-50 bg-transparent">
-            <div className="max-w-[1440px] mx-auto flex items-center justify-between py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
-              <Link
-                className="flex items-center gap-2 group"
-                data-path="home"
-                href="#home"
-                id="brand-logo"
-                aria-label={`${festivalTitle} Home`}
-              >
-                <span className="font-brand font-bruno text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-wider text-[#FFF8EE] group-hover:text-[#FDBF0F] transition-colors uppercase leading-none whitespace-nowrap">
-                  {festivalTitle}
-                </span>
-                <span className="w-2 h-2 rounded-full bg-[#FDBF0F] inline-block shadow-[0_0_8px_rgba(253,191,15,0.9)] shrink-0" />
-              </Link>
-
-              {/* Desktop Navigation */}
-              <nav className="hidden md:flex items-center font-body gap-8">
-                <Link
-                  aria-current="page"
-                  className="px-4 py-2 text-base uppercase tracking-wider font-bold text-[#FDBF0F] border-b-2 border-[#FDBF0F] transition-colors"
-                  data-path="home"
-                  href="#home"
-                >
-                  Home
-                </Link>
-                <Link
-                  className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
-                  data-path="results-directory"
-                  href="/public/directory"
-                >
-                  Results Directory
-                </Link>
-                <Link
-                  className="px-4 py-2 text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold transition-colors"
-                  data-path="team-championship"
-                  href="/public/championship"
-                >
-                  Team Championship
-                </Link>
-              </nav>
-
-              {/* Mobile Hamburger Button */}
-              <div className="md:hidden flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="p-2.5 rounded-lg bg-[#4A0A1C]/90 text-[#FDBF0F] border border-[#FDBF0F]/40 hover:bg-[#86152C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#FDBF0F]"
-                  aria-label="Toggle navigation menu"
-                  aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-navigation"
-                >
-                  {mobileMenuOpen ? (
-                    <span className="material-symbols-outlined text-[28px] block leading-none">close</span>
-                  ) : (
-                    <span className="material-symbols-outlined text-[28px] block leading-none">menu</span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Navigation Drawer */}
-            {mobileMenuOpen && (
-              <div id="mobile-navigation" className="md:hidden bg-[#1A080B]/95 border-b border-[#FDBF0F]/40 px-5 py-4 backdrop-blur-lg space-y-4 shadow-2xl">
-                <Link
-                  href="#home"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-base uppercase tracking-wider font-bold text-[#FDBF0F] py-2 border-b border-[#FDBF0F]/20"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/public/directory"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2 border-b border-[#FDBF0F]/20"
-                >
-                  Results Directory
-                </Link>
-                <Link
-                  href="/public/championship"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-base uppercase tracking-wider text-[#FFF8EE] hover:text-[#FDBF0F] font-semibold py-2"
-                >
-                  Team Championship
-                </Link>
-              </div>
-            )}
-          </header>
-
           {/* Ambient Glows */}
           <div
             className="ambient-glow absolute top-1/2 right-[14%] -translate-y-1/2 w-[520px] h-[520px] rounded-full pointer-events-none"
@@ -303,7 +212,7 @@ export default function InspirathPublicHomePage() {
             }}
           />
 
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-32 pb-24">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-24">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
               {/* Left Hero Identity Column */}
               <div className="lg:col-span-7 flex flex-col items-start">
@@ -1029,33 +938,7 @@ export default function InspirathPublicHomePage() {
         </section>
       </main>
 
-      <PublicFooter />
-
-      {/* Mobile Fixed Bottom Navigation Bar */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#1B090B]/95 backdrop-blur-md border-t border-[#FDBF0F]/30 px-4 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.6)]"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
-        aria-label="Mobile Bottom Navigation"
-      >
-        <div className="max-w-md mx-auto flex items-center justify-around">
-          <Link href="#home" className="flex flex-col items-center gap-1 text-[#FDBF0F] py-1">
-            <span className="material-symbols-outlined text-[22px]">home</span>
-            <span className="text-[10px] font-bold tracking-wider uppercase font-sora">Home</span>
-          </Link>
-          <Link href="#results-directory" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
-            <span className="material-symbols-outlined text-[22px]">menu_book</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Results</span>
-          </Link>
-          <Link href="#team-championship" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
-            <span className="material-symbols-outlined text-[22px]">trophy</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Points</span>
-          </Link>
-          <Link href="/public/directory" className="flex flex-col items-center gap-1 text-[#FFF8EE]/60 hover:text-[#FDBF0F] py-1 transition-colors">
-            <span className="material-symbols-outlined text-[22px]">search</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase font-sora">Lookup</span>
-          </Link>
-        </div>
-      </nav>
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
