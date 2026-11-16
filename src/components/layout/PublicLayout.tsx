@@ -176,6 +176,8 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
           </div>
         </div>
 
+      </header>
+
       {/* Main Content Area - padded at bottom for mobile nav bar */}
       <main className="public-main min-w-0 flex-1 max-w-7xl mx-auto w-full overflow-x-clip px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
         {children}
