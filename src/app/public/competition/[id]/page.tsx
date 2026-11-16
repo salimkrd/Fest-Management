@@ -521,38 +521,28 @@ function CompetitionDetailContent() {
         )}
       </section>
 
-      {/* ========================================================= */}
-      {/* COMMEMORATIVE POSTER FOLIO CTA BANNER                     */}
-      {/* ========================================================= */}
+      {/* OFFICIAL RESULT POSTER DOWNLOAD */}
       <section className="rounded-2xl bg-gradient-to-r from-[#230D0F] via-[#2D1217] to-[#230D0F] border border-[#BA1912]/40 p-5 sm:p-7 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="space-y-1.5 max-w-xl">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px] text-[#FDBF0F]">download</span>
             <span className="text-[10px] uppercase tracking-widest text-[#FDBF0F] font-bold font-mono">
-              Digital Media Repository
+              OFFICIAL RESULT POSTER
             </span>
           </div>
           <h3
             className="text-base sm:text-xl font-bold uppercase text-[#F2F3E6]"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
-            Download Official Ratified Event Posters
+            Download Official Result Poster
           </h3>
           <p className="text-xs text-[#F2F3E6]/70 leading-relaxed font-sora">
-            Authentic archival folios formatted for high-definition digital dissemination, architectural display screens, and social archives. Pre-rendered with Grand Secretariat seals.
+            Choose from the released poster designs for this published competition and download a high-resolution image.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="shrink-0">
           <PosterDownloadDialog result={result} theme={theme} />
-
-          <Link
-            href={`/public/posters?resultId=${encodeURIComponent(result.id)}`}
-            className="px-4 py-2.5 rounded-lg bg-[#1B090B] hover:bg-[#281014] text-[#FDBF0F] text-xs font-mono font-bold uppercase tracking-wider inline-flex items-center gap-2 transition-colors border border-[#FDBF0F]/30 shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[16px]">palette</span>
-            <span>View All Templates</span>
-          </Link>
         </div>
       </section>
 

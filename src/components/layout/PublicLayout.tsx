@@ -4,8 +4,7 @@ import React, { useState, Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
-import { FestivalLogo } from '@/components/domain/FestivalBrand';
-import { Trophy, Search, Sparkles, FileText, Menu, X, Image as ImageIcon, Calendar } from 'lucide-react';
+import { Trophy, Search, Sparkles, FileText, Menu, X, Calendar } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -46,7 +45,6 @@ function PublicNavLinks() {
     { name: 'Latest Results', href: '/', icon: Sparkles, label: 'HOME' },
     { name: 'Results Directory', href: '/public/directory', icon: FileText, label: 'RESULTS DIRECTORY' },
     { name: 'Team Championship', href: '/public/championship', icon: Trophy, label: 'TEAM CHAMPIONSHIP' },
-    { name: 'Media Studio', href: '/public/posters', icon: ImageIcon, label: 'MEDIA STUDIO' },
   ];
 
   return (
@@ -106,7 +104,6 @@ function MobileBottomNav() {
     { name: 'Home', href: '/', icon: 'home' },
     { name: 'Results', href: '/public/directory', icon: 'menu_book' },
     { name: 'Teams', href: '/public/championship', icon: 'military_tech' },
-    { name: 'Media', href: '/public/posters', icon: 'image' },
   ];
 
   return (
@@ -165,8 +162,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-18">
             {/* Brand Logo & Title */}
-            <Link href="/" className="flex items-center gap-3 group">
-              <FestivalLogo size={40} className="public-logo ring-1 ring-[#FDBF0F]/30 rounded-full" />
+            <Link href="/" className="flex items-center gap-0 group">
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="public-brand-title font-brand font-bruno text-base sm:text-xl font-extrabold tracking-wider text-[#F2F3E6] group-hover:text-[#FDBF0F] transition-colors uppercase whitespace-nowrap">
@@ -244,14 +240,6 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                 <Trophy className="w-4 h-4 text-[#FDBF0F]" />
                 <span>Team Championship</span>
               </Link>
-              <Link
-                href="/public/posters"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#F2F3E6] hover:bg-[#230D0F] transition-colors"
-              >
-                <ImageIcon className="w-4 h-4 text-[#FDBF0F]" />
-                <span>Media Studio Posters</span>
-              </Link>
             </nav>
           </div>
         )}
@@ -305,9 +293,6 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               </Link>
               <Link href="/public/championship" className="text-xs text-[#F2F3E6]/75 hover:text-[#FDBF0F] transition-colors py-1">
                 Championship Points Tally
-              </Link>
-              <Link href="/public/posters" className="text-xs text-[#F2F3E6]/75 hover:text-[#FDBF0F] transition-colors py-1">
-                Gazette &amp; Visual Studio
               </Link>
             </div>
 

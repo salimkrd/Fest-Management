@@ -98,7 +98,7 @@ export function PosterDownloadDialog({ result, theme }: PosterDownloadDialogProp
     if (typeof window !== 'undefined') {
       const rank1 = result.ranks.find(r => r.rank === 1);
       const text = encodeURIComponent(
-        `*${theme.festivalName || 'INSPIRAATH'} — Official Event Poster*\n🏆 *${result.competitionName}* (${result.categoryName})\n🥇 1st Place: ${rank1?.candidateName || 'N/A'}\n\nDownload high-res commemorative poster: ${window.location.origin}/public/posters?resultId=${encodeURIComponent(result.id)}`
+        `*${theme.festivalName || 'INSPIRAATH'} — Official Event Poster*\n🏆 *${result.competitionName}* (${result.categoryName})\n🥇 1st Place: ${rank1?.candidateName || 'N/A'}\n\nDownload high-res commemorative poster: ${window.location.origin}/public/competition/${encodeURIComponent(result.competitionId)}`
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     }
