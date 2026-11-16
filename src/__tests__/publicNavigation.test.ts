@@ -41,3 +41,33 @@ describe('Public navigation and retired media gallery', () => {
     expect(posterDialog).not.toContain('/public/posters');
   });
 });
+
+
+describe('Public championship page simplification', () => {
+  const championshipPage = readProjectFile('src/app/public/championship/page.tsx');
+
+  it('removes the guild dossier, division cards, and victor laureates block', () => {
+    expect(championshipPage).not.toContain('GUILD DOSSIER BREAKDOWN');
+    expect(championshipPage).not.toContain('Senior Division');
+    expect(championshipPage).not.toContain('General Division');
+    expect(championshipPage).not.toContain('Sub-Junior Division');
+    expect(championshipPage).not.toContain('Key Victor Laureates');
+    expect(championshipPage).not.toContain('teamLaureates');
+  });
+
+  it('removes the point allocation rubric and authentication seal panels', () => {
+    expect(championshipPage).not.toContain('Championship Point Allocation Framework');
+    expect(championshipPage).not.toContain('Authentication Seal');
+    expect(championshipPage).not.toContain('Central Tabulation Directorate');
+    expect(championshipPage).not.toContain('Download Certified Ledger (PDF)');
+    expect(championshipPage).not.toContain('handlePrintLedger');
+  });
+
+  it('removes dossier inspection actions but preserves the podium and main team ledger', () => {
+    expect(championshipPage).not.toContain('Inspect Guild Dossier');
+    expect(championshipPage).not.toContain('Audit Dossier');
+    expect(championshipPage).toContain('<ChampionshipPodium teams={teams} />');
+    expect(championshipPage).toContain('OFFICIAL GUILD RATIFICATION TABLE');
+    expect(championshipPage).toContain('Cumulative Aggregate');
+  });
+});
