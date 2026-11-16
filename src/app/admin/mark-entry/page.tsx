@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import { CompetitionSearchSelect } from './CompetitionSearchSelect';
 import { WhatsAppDispatchModal } from '@/components/domain/WhatsAppDispatchModal';
 import {
   MessageSquare,
@@ -395,11 +395,10 @@ export default function MarkEntryPage() {
             {competitions.length === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">No competitions are available. Add a competition before assigning a judge.</p>}
             {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{error}</p>}
 
-            <Select
-              label="Select Competition"
+            <CompetitionSearchSelect
+              competitions={competitions}
               value={competitionId}
-              onChange={(e) => setCompetitionId(e.target.value)}
-              options={competitions.map(c => ({ value: c.id, label: `${c.name} (${c.code} - ${c.categoryName})` }))}
+              onChange={setCompetitionId}
             />
 
             <Input
