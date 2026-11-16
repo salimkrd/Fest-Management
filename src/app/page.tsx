@@ -2,8 +2,8 @@ import './public/public.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "INSPIRAATH 2026 — Ma'din Suffa Campus, Vavoor",
-  description: "Official public festival results, ratified scorecards, and team championship standings for INSPIRAATH 2026 at Ma'din Suffa Campus, Vavoor.",
+  title: 'Official Festival Results & Championship',
+  description: 'Official published festival results, competition scorecards, and team championship standings.',
 };
 
 // The public results homepage now owns the canonical root URL.

@@ -21,7 +21,7 @@ describe('Public navigation and retired media gallery', () => {
   it('removes the round festival logo image from the shared public header', () => {
     expect(publicLayout).not.toContain('FestivalLogo');
     expect(publicLayout).toContain('theme.festivalName');
-    expect(publicLayout).toContain('theme.institutionName');
+    expect(publicLayout).not.toContain('theme.institutionName');
     expect(publicLayout).toContain('sticky top-0 z-40');
   });
 
@@ -183,7 +183,8 @@ describe('Public-only stylesheet isolation', () => {
     expect(rootPage).toContain("import './public/public.css'");
     expect(publicRouteLayout).toContain("import './public.css'");
     expect(publicCss).toContain('.public-experience .font-brand');
-    expect(publicCss).toContain('.public-experience .material-symbols-outlined');
+    expect(publicCss).not.toContain('material-symbols-outlined');
+    expect(publicCss).toContain('var(--festival-name-font');
   });
 
   it('scopes the public theme inside public wrappers and keeps root portal typography unchanged', () => {
@@ -279,7 +280,7 @@ describe('Public header brand typography', () => {
   const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
 
   it('shows only the festival title in the public header, without institution details', () => {
-    expect(publicLayout).toContain('{theme.festivalName || \'INSPIRATH\'}');
+    expect(publicLayout).toContain('festivalDisplayName');
     expect(publicLayout).not.toContain('theme.institutionName');
     expect(publicLayout).not.toContain('public-brand-subtitle');
     expect(publicLayout).not.toContain('Institution unavailable');
@@ -290,5 +291,42 @@ describe('Public header brand typography', () => {
     expect(publicLayout).toContain('max-w-[55vw] lg:max-w-[24vw] truncate');
     expect(publicLayout).toContain('href="/participant/login"');
     expect(publicLayout).toContain('<UserRound');
+  });
+});
+
+
+describe('Public icon, typography, and configured identity', () => {
+  const iconFile = readProjectFile('src/components/layout/PublicIcon.tsx');
+  const publicCss = readProjectFile('src/app/public/public.css');
+  const publicFiles = [
+    'src/app/public/page.tsx',
+    'src/app/public/directory/page.tsx',
+    'src/app/public/championship/page.tsx',
+    'src/app/public/competition/[id]/page.tsx',
+    'src/components/layout/PublicLayout.tsx',
+    'src/components/domain/ChampionshipPodium.tsx',
+  ];
+
+  it('renders public icons through Lucide SVG components, not font ligatures', () => {
+    expect(iconFile).toContain("from 'lucide-react'");
+    for (const path of publicFiles) {
+      expect(readProjectFile(path)).not.toContain('material-symbols-outlined');
+    }
+    expect(publicCss).not.toContain('Material Symbols Outlined');
+  });
+
+  it('uses Sora for public text and retains the Admin-selected festival-name font', () => {
+    expect(publicCss).toContain("font-family: 'Sora', sans-serif !important");
+    expect(publicCss).toContain('var(--festival-name-font');
+    expect(publicCss).not.toContain('Cinzel');
+    expect(publicCss).not.toContain('Playfair Display');
+  });
+
+  it('formats the Festival Settings date range without a hardcoded default', () => {
+    expect(iconFile).toContain('formatPublicFestivalDates');
+    expect(iconFile).toContain('Dates to be announced');
+    expect(readProjectFile('src/app/public/page.tsx')).toContain('theme.institutionName');
+    expect(readProjectFile('src/app/public/championship/page.tsx')).toContain('theme.institutionName');
+    expect(readProjectFile('src/components/layout/PublicLayout.tsx')).toContain('theme.festivalStartDate');
   });
 });

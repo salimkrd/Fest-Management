@@ -7,19 +7,17 @@ const readProjectFile = (relativePath: string) =>
 
 describe('INSPIRAATH 2026 Stitch Approved Homepage Implementation', () => {
   const pageSrc = readProjectFile('src/app/public/page.tsx');
-  const cssSrc = readProjectFile('src/app/globals.css');
-  const layoutSrc = readProjectFile('src/app/layout.tsx');
+  const cssSrc = readProjectFile('src/app/public/public.css');
+  const layoutSrc = readProjectFile('src/components/layout/PublicLayout.tsx');
 
   describe('1. Approved Visual Reference & Styles', () => {
-    it('declares the approved font families in globals.css', () => {
+    it('uses Sora for public text and the Admin-selected face for festival-name text', () => {
       expect(cssSrc).toContain('.font-brand');
-      expect(cssSrc).toContain('Bruno Ace');
-      expect(cssSrc).toContain('.font-cinematic-editorial');
-      expect(cssSrc).toContain('Cinzel');
-      expect(cssSrc).toContain('.font-editorial');
-      expect(cssSrc).toContain('Playfair Display');
-      expect(cssSrc).toContain('.font-body');
-      expect(cssSrc).toContain('Sora');
+      expect(cssSrc).toContain("font-family: 'Sora', sans-serif !important");
+      expect(cssSrc).toContain('var(--festival-name-font');
+      expect(cssSrc).not.toContain('Cinzel');
+      expect(cssSrc).not.toContain('Playfair Display');
+      expect(cssSrc).not.toContain('Material Symbols Outlined');
     });
 
     it('contains the approved ruby and espresso background gradients', () => {
@@ -43,12 +41,10 @@ describe('INSPIRAATH 2026 Stitch Approved Homepage Implementation', () => {
       expect(cssSrc).toContain('@media (prefers-reduced-motion: reduce)');
     });
 
-    it('loads the required Google Fonts in layout.tsx', () => {
-      expect(layoutSrc).toContain('family=Bruno+Ace');
-      expect(layoutSrc).toContain('family=Cinzel');
-      expect(layoutSrc).toContain('family=Playfair+Display');
-      expect(layoutSrc).toContain('family=Sora');
-      expect(layoutSrc).toContain('family=Material+Symbols+Outlined');
+    it('loads Sora for the public experience and the festival-name font dynamically', () => {
+      expect(cssSrc).toContain('family=Sora');
+      expect(cssSrc).toContain('var(--festival-name-font');
+      expect(cssSrc).not.toContain('Material Symbols Outlined');
     });
   });
 
@@ -124,10 +120,11 @@ describe('INSPIRAATH 2026 Stitch Approved Homepage Implementation', () => {
       expect(pageSrc).toContain('theme.institutionName');
     });
 
-    it('implements responsive mobile navigation drawer with accessible attributes', () => {
-      expect(pageSrc).toContain('mobileMenuOpen');
-      expect(pageSrc).toContain('aria-label="Toggle navigation menu"');
-      expect(pageSrc).toContain('aria-expanded={mobileMenuOpen}');
+    it('uses the shared responsive desktop and mobile public navigation shell', () => {
+      expect(layoutSrc).toContain('<PublicNavLinks />');
+      expect(layoutSrc).toContain('<MobileBottomNav />');
+      expect(layoutSrc).toContain('aria-label="Mobile Navigation"');
+      expect(layoutSrc).toContain('lg:hidden');
     });
   });
 
