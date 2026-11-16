@@ -194,3 +194,28 @@ describe('Public-only stylesheet isolation', () => {
     expect(publicCss).toContain('.public-experience .public-main');
   });
 });
+
+
+describe('Participant portal access in the public header', () => {
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+
+  it('shows an accessible Participant Login icon link in the top-right header', () => {
+    expect(publicLayout).toContain('href="/participant/login"');
+    expect(publicLayout).toContain('aria-label="Participant Login"');
+    expect(publicLayout).toContain('<UserRound');
+  });
+
+  it('removes the header search field and mobile header navigation drawer', () => {
+    expect(publicLayout).not.toContain('Search Bib, Candidate, Event');
+    expect(publicLayout).not.toContain('PublicSearchBar');
+    expect(publicLayout).not.toContain('public-mobile-navigation');
+    expect(publicLayout).not.toContain('Toggle navigation');
+    expect(publicLayout).not.toContain('useRouter');
+  });
+
+  it('retains desktop public navigation and the mobile bottom navigation', () => {
+    expect(publicLayout).toContain('<PublicNavLinks />');
+    expect(publicLayout).toContain('<MobileBottomNav />');
+    expect(publicLayout).toContain('aria-label="Mobile Navigation"');
+  });
+});
