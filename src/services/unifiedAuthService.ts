@@ -8,14 +8,14 @@
  * 4. Automatic safe synchronization of custom claims when mismatch is detected.
  * 5. Strict role gating:
  *    - ADMIN -> /admin
- *    - TEAM_MANAGER -> /team (verified against assigned teamId, active status, portalAccess !== false)
  *    - GREEN_ROOM_STAFF -> /admin/green-room
+ *    - TEAM_MANAGER -> /team (verified against public /teams/{teamId} AND private /teams/{teamId}/private/managerInfo)
  *    - JUDGE -> REJECTED (must use dedicated juror PIN portal)
  *    - PUBLIC / PARTICIPANT / unknown -> REJECTED
  */
 
 import { getAdminAuth, getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
-import { FirestoreUser } from '@/types/firestore';
+import { FirestoreUser, FirestoreTeam, FirestoreTeamPrivate } from '@/types/firestore';
 import { Team } from '@/types/fest';
 
 export type StaffRole = 'ADMIN' | 'TEAM_MANAGER' | 'GREEN_ROOM_STAFF';
@@ -44,7 +44,8 @@ export class UnifiedAuthError extends Error {
 export class UnifiedAuthService {
   /**
    * Cryptographically verifies staff session token, syncs claims if needed,
-   * checks authoritative user profile & team status, and returns verified routing context.
+   * checks authoritative user profile, public team status, and private manager record,
+   * returning verified routing context.
    */
   static async verifyStaffLogin(idToken: string): Promise<UnifiedStaffAuthResult> {
     if (!idToken || typeof idToken !== 'string') {
@@ -73,7 +74,7 @@ export class UnifiedAuthService {
 
     const uid = decoded.uid;
 
-    // 2. Authoritative profile lookup from Firestore
+    // 2. Authoritative profile lookup from Firestore (/users/{uid})
     let userDocSnap;
     try {
       userDocSnap = await adminDb.collection('users').doc(uid).get();
@@ -172,53 +173,95 @@ export class UnifiedAuthService {
         throw new UnifiedAuthError('Security violation: Token team assignment does not match authoritative profile.', 403);
       }
 
-      // Authoritative Team Contingent verification
-      let teamDocSnap;
+      // Step A: Authoritative Public Team Record verification (/teams/{teamId})
+      let publicTeamDocSnap;
       try {
-        teamDocSnap = await adminDb.collection('teams').doc(assignedTeamId).get();
+        publicTeamDocSnap = await adminDb.collection('teams').doc(assignedTeamId).get();
       } catch (teamFsErr) {
-        console.error('[UnifiedAuthService] Firestore team lookup failed:', teamFsErr);
+        console.error('[UnifiedAuthService] Firestore public team lookup failed:', teamFsErr);
         throw new UnifiedAuthError('Database lookup failed. Unable to verify team status.', 503);
       }
 
-      if (!teamDocSnap.exists) {
+      if (!publicTeamDocSnap.exists) {
         throw new UnifiedAuthError(`Access denied: Assigned team contingent record not found (${assignedTeamId}).`, 403);
       }
 
-      const teamData = teamDocSnap.data() as Partial<Team> | undefined;
-      if (!teamData) {
+      const publicTeamData = publicTeamDocSnap.data() as Partial<FirestoreTeam> | undefined;
+      if (!publicTeamData) {
         throw new UnifiedAuthError('Access denied: Team contingent record is corrupt or empty.', 403);
       }
 
-      if (teamData.status === 'DISABLED') {
-        throw new UnifiedAuthError('Access denied: Team contingent is currently disabled by fest administration.', 403);
+      // Public team status must equal exactly 'ACTIVE' (fail-closed if missing, disabled, or anything else)
+      if (publicTeamData.status !== 'ACTIVE') {
+        throw new UnifiedAuthError('Access denied: Team contingent is not currently active.', 403);
       }
 
-      if (teamData.portalAccess === false) {
+      // Step B: Authoritative Private Team Manager verification (/teams/{teamId}/private/managerInfo)
+      let privateDocSnap;
+      try {
+        privateDocSnap = await adminDb
+          .collection('teams')
+          .doc(assignedTeamId)
+          .collection('private')
+          .doc('managerInfo')
+          .get();
+      } catch (privFsErr) {
+        console.error('[UnifiedAuthService] Firestore private manager lookup failed:', privFsErr);
+        throw new UnifiedAuthError('Database lookup failed. Unable to verify private manager authorization.', 503);
+      }
+
+      if (!privateDocSnap.exists) {
+        throw new UnifiedAuthError('Access denied: Authoritative team manager onboarding record not found.', 403);
+      }
+
+      const privateManagerData = privateDocSnap.data() as Partial<FirestoreTeamPrivate> | undefined;
+      if (!privateManagerData) {
+        throw new UnifiedAuthError('Access denied: Team manager private record is corrupt or empty.', 403);
+      }
+
+      // Private teamId must match assignedTeamId exactly
+      if (privateManagerData.teamId !== assignedTeamId) {
+        throw new UnifiedAuthError('Security violation: Private manager record team assignment mismatch.', 403);
+      }
+
+      // Private managerUid must match authenticated Firebase UID exactly
+      if (!privateManagerData.managerUid || privateManagerData.managerUid !== uid) {
+        throw new UnifiedAuthError(
+          'Security violation: You are not the officially assigned manager in the authoritative team record.',
+          403
+        );
+      }
+
+      // Private portalAccess must equal exactly true
+      if (privateManagerData.portalAccess !== true) {
         throw new UnifiedAuthError('Access denied: Team contingent portal access has been disabled.', 403);
       }
 
+      // Step C: Build verified Team Manager context exclusively from authoritative data
       const verifiedTeam: Team = {
-        id: teamDocSnap.id,
-        name: teamData.name || 'Delegation Team',
-        code: teamData.code || 'TM',
-        color: teamData.color || '#2563EB',
-        managerName: teamData.managerName || '',
-        managerEmail: teamData.managerEmail || userData.email || decoded.email || '',
-        managerPhone: teamData.managerPhone || '',
-        managerUid: uid,
-        zone: teamData.zone || '',
-        contestantsCount: teamData.contestantsCount || 0,
-        eventsCount: teamData.eventsCount || 0,
-        totalPoints: teamData.totalPoints || 0,
-        soloPoints: teamData.soloPoints || 0,
-        groupPoints: teamData.groupPoints || 0,
-        rank: teamData.rank || 1,
-        firstCount: teamData.firstCount || 0,
-        secondCount: teamData.secondCount || 0,
-        thirdCount: teamData.thirdCount || 0,
-        portalAccess: true,
-        status: teamData.status || 'ACTIVE'
+        id: publicTeamDocSnap.id,
+        name: publicTeamData.name || 'Delegation Team',
+        code: publicTeamData.code || 'TM',
+        color: publicTeamData.color || '#2563EB',
+        managerName: privateManagerData.managerName || '',
+        managerEmail: privateManagerData.managerEmail || userData.email || decoded.email || '',
+        managerPhone: privateManagerData.managerPhone || '',
+        managerUid: privateManagerData.managerUid,
+        zone: publicTeamData.zone || '',
+        contestantsCount: 0,
+        eventsCount: 0,
+        totalPoints: 0,
+        soloPoints: 0,
+        groupPoints: 0,
+        rank: 1,
+        firstCount: 0,
+        secondCount: 0,
+        thirdCount: 0,
+        portalAccess: privateManagerData.portalAccess,
+        status: publicTeamData.status,
+        provisioningStatus: privateManagerData.provisioningStatus,
+        invitationStatus: privateManagerData.invitationStatus,
+        invitationExpiresAt: privateManagerData.invitationExpiresAt
       };
 
       return {

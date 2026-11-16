@@ -13,6 +13,38 @@ const source = (relPath: string) => readFileSync(resolve(process.cwd(), relPath)
 // In-memory mock database and mock auth for high-speed, isolated unit verification
 const store = new Map<string, Record<string, unknown>>();
 const mockCustomClaims = new Map<string, Record<string, unknown>>();
+let throwOnPrivateDoc = false;
+let throwOnPublicTeamDoc = false;
+
+const createDocRef = (docPath: string, docId: string) => ({
+  id: docId,
+  get: async () => {
+    if (throwOnPrivateDoc && docPath.includes('private/managerInfo')) {
+      throw new Error('Simulated Firestore private manager lookup failure');
+    }
+    if (throwOnPublicTeamDoc && docPath.startsWith('teams/') && !docPath.includes('private')) {
+      throw new Error('Simulated Firestore public team lookup failure');
+    }
+    const data = store.get(docPath);
+    return {
+      id: docId,
+      exists: !!data,
+      data: () => data,
+    };
+  },
+  set: async (val: Record<string, unknown>) => {
+    store.set(docPath, val);
+  },
+  collection: (subCol: string) => ({
+    doc: (subDocId: string) => createDocRef(`${docPath}/${subCol}/${subDocId}`, subDocId),
+  }),
+});
+
+const mockAdminDb = {
+  collection: (col: string) => ({
+    doc: (docId: string) => createDocRef(`${col}/${docId}`, docId),
+  }),
+};
 
 const mockAdminAuth = {
   verifyIdToken: vi.fn(async (token: string) => {
@@ -35,25 +67,6 @@ const mockAdminAuth = {
   }),
 };
 
-const mockAdminDb = {
-  collection: (col: string) => ({
-    doc: (docId: string) => ({
-      get: async () => {
-        const key = `${col}/${docId}`;
-        const data = store.get(key);
-        return {
-          id: docId,
-          exists: !!data,
-          data: () => data,
-        };
-      },
-      set: async (val: Record<string, unknown>) => {
-        store.set(`${col}/${docId}`, val);
-      },
-    }),
-  }),
-};
-
 vi.mock('@/lib/firebase/admin', () => ({
   getAdminAuth: () => mockAdminAuth,
   getAdminDb: () => mockAdminDb,
@@ -64,6 +77,8 @@ describe('Unified Staff Login System', () => {
   beforeEach(() => {
     store.clear();
     mockCustomClaims.clear();
+    throwOnPrivateDoc = false;
+    throwOnPublicTeamDoc = false;
     vi.clearAllMocks();
   });
 
@@ -113,10 +128,11 @@ describe('Unified Staff Login System', () => {
       }
     });
 
-    it('authenticates TEAM_MANAGER with verified assigned team and routes to /team', async () => {
+    it('authenticates TEAM_MANAGER verifying BOTH public team and private managerInfo documents', async () => {
       const uid = 'manager-uid-1';
       const teamId = 'team-alpha';
 
+      // 1. Authoritative user record
       store.set(`users/${uid}`, {
         uid,
         email: 'manager.alpha@fest.org',
@@ -126,13 +142,26 @@ describe('Unified Staff Login System', () => {
         disabled: false,
       });
 
+      // 2. Public team record (/teams/{teamId})
       store.set(`teams/${teamId}`, {
+        id: teamId,
         name: 'House Alpha',
         code: 'HA',
         color: '#DC2626',
+        zone: 'Zone 1',
         status: 'ACTIVE',
-        portalAccess: true,
+      });
+
+      // 3. Private manager record (/teams/{teamId}/private/managerInfo)
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: uid,
+        managerName: 'Alpha Manager',
         managerEmail: 'manager.alpha@fest.org',
+        managerPhone: '+919876543210',
+        portalAccess: true,
+        provisioningStatus: 'PROVISIONED',
+        invitationStatus: 'ACTIVATED',
       });
 
       mockCustomClaims.set(uid, { role: 'TEAM_MANAGER', teamId });
@@ -147,7 +176,11 @@ describe('Unified Staff Login System', () => {
         expect(result.team).toBeDefined();
         expect(result.team?.id).toBe(teamId);
         expect(result.team?.name).toBe('House Alpha');
+        expect(result.team?.managerUid).toBe(uid);
         expect(result.team?.portalAccess).toBe(true);
+        expect(result.team?.status).toBe('ACTIVE');
+        expect(result.team?.managerName).toBe('Alpha Manager');
+        expect(result.team?.managerEmail).toBe('manager.alpha@fest.org');
       }
     });
 
@@ -265,69 +298,6 @@ describe('Unified Staff Login System', () => {
       );
     });
 
-    it('rejects TEAM_MANAGER when assigned team contingent does not exist in Firestore', async () => {
-      const uid = 'manager-missing-team';
-      store.set(`users/${uid}`, {
-        uid,
-        role: 'TEAM_MANAGER',
-        teamId: 'non-existent-team',
-        status: 'ACTIVE',
-        disabled: false,
-      });
-      mockCustomClaims.set(uid, { role: 'TEAM_MANAGER', teamId: 'non-existent-team' });
-
-      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId: 'non-existent-team' });
-      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
-        /Assigned team contingent record not found/i
-      );
-    });
-
-    it('rejects TEAM_MANAGER when assigned team status is DISABLED', async () => {
-      const uid = 'manager-disabled-team';
-      const teamId = 'team-disabled';
-      store.set(`users/${uid}`, {
-        uid,
-        role: 'TEAM_MANAGER',
-        teamId,
-        status: 'ACTIVE',
-        disabled: false,
-      });
-      store.set(`teams/${teamId}`, {
-        name: 'House Omega',
-        status: 'DISABLED',
-        portalAccess: true,
-      });
-      mockCustomClaims.set(uid, { role: 'TEAM_MANAGER', teamId });
-
-      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
-      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
-        /Team contingent is currently disabled/i
-      );
-    });
-
-    it('rejects TEAM_MANAGER when assigned team portalAccess is false', async () => {
-      const uid = 'manager-no-portal';
-      const teamId = 'team-noportal';
-      store.set(`users/${uid}`, {
-        uid,
-        role: 'TEAM_MANAGER',
-        teamId,
-        status: 'ACTIVE',
-        disabled: false,
-      });
-      store.set(`teams/${teamId}`, {
-        name: 'House Gamma',
-        status: 'ACTIVE',
-        portalAccess: false,
-      });
-      mockCustomClaims.set(uid, { role: 'TEAM_MANAGER', teamId });
-
-      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
-      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
-        /portal access has been disabled/i
-      );
-    });
-
     it('fails closed when token verification throws (expired/malformed token)', async () => {
       await expect(UnifiedAuthService.verifyStaffLogin('invalid-token')).rejects.toThrow(
         /Invalid or expired authentication session/i
@@ -341,7 +311,207 @@ describe('Unified Staff Login System', () => {
     });
   });
 
-  describe('3. Staff Login API Endpoint (/api/auth/staff-login)', () => {
+  describe('3. Team Manager Private Record & Dual-Document Security Gating', () => {
+    const uid = 'manager-audit-uid';
+    const teamId = 'team-audit-1';
+
+    const setupBaseTeamManager = () => {
+      store.set(`users/${uid}`, {
+        uid,
+        email: 'manager.audit@fest.org',
+        role: 'TEAM_MANAGER',
+        teamId,
+        status: 'ACTIVE',
+        disabled: false,
+      });
+      mockCustomClaims.set(uid, { role: 'TEAM_MANAGER', teamId });
+    };
+
+    it('fails closed when public team record does not exist in Firestore', async () => {
+      setupBaseTeamManager();
+      // Neither public nor private document exists
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Assigned team contingent record not found/i
+      );
+    });
+
+    it('fails closed when public team status is DISABLED', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'DISABLED',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: uid,
+        portalAccess: true,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Team contingent is not currently active/i
+      );
+    });
+
+    it('fails closed when public team status is missing or anything other than ACTIVE', async () => {
+      setupBaseTeamManager();
+      // Status is PENDING instead of ACTIVE
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'PENDING',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: uid,
+        portalAccess: true,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Team contingent is not currently active/i
+      );
+
+      // Status completely missing
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+      });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Team contingent is not currently active/i
+      );
+    });
+
+    it('fails closed when private managerInfo document is completely missing', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      // Do NOT set teams/{teamId}/private/managerInfo
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Authoritative team manager onboarding record not found/i
+      );
+    });
+
+    it('fails closed when private managerInfo is missing managerUid', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        // managerUid omitted
+        portalAccess: true,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /You are not the officially assigned manager/i
+      );
+    });
+
+    it('fails closed when managerUid belongs to another user (replaced/previous manager lockout)', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      // A replaced manager: private record points to 'outgoing-manager-uid' instead of 'manager-audit-uid'
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: 'different-manager-uid',
+        portalAccess: true,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /You are not the officially assigned manager/i
+      );
+    });
+
+    it('fails closed when private managerInfo teamId mismatches assigned teamId', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId: 'wrong-team-id',
+        managerUid: uid,
+        portalAccess: true,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Private manager record team assignment mismatch/i
+      );
+    });
+
+    it('fails closed when private managerInfo portalAccess is false', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: uid,
+        portalAccess: false,
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /portal access has been disabled/i
+      );
+    });
+
+    it('fails closed when private managerInfo portalAccess is missing/undefined', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      store.set(`teams/${teamId}/private/managerInfo`, {
+        teamId,
+        managerUid: uid,
+        // portalAccess omitted
+      });
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /portal access has been disabled/i
+      );
+    });
+
+    it('fails closed when private Firestore lookup throws a system or network error', async () => {
+      setupBaseTeamManager();
+      store.set(`teams/${teamId}`, {
+        name: 'Audit House',
+        status: 'ACTIVE',
+      });
+      throwOnPrivateDoc = true;
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Unable to verify private manager authorization/i
+      );
+    });
+
+    it('fails closed when public team Firestore lookup throws a system or network error', async () => {
+      setupBaseTeamManager();
+      throwOnPublicTeamDoc = true;
+
+      const token = JSON.stringify({ uid, role: 'TEAM_MANAGER', teamId });
+      await expect(UnifiedAuthService.verifyStaffLogin(token)).rejects.toThrow(
+        /Unable to verify team status/i
+      );
+    });
+  });
+
+  describe('4. Staff Login API Endpoint (/api/auth/staff-login)', () => {
     it('returns 401 when Authorization header is missing', async () => {
       const req = new NextRequest('http://localhost:3000/api/auth/staff-login', {
         method: 'POST',
@@ -397,7 +567,7 @@ describe('Unified Staff Login System', () => {
     });
   });
 
-  describe('4. Legacy Route Retirement & Safe Redirections', () => {
+  describe('5. Legacy Route Retirement & Safe Redirections', () => {
     it('configures next.config.ts to redirect /admin/login to unified staff login', async () => {
       const redirects = await nextConfig.redirects?.();
       expect(redirects).toContainEqual({
@@ -468,7 +638,7 @@ describe('Unified Staff Login System', () => {
     });
   });
 
-  describe('5. Design System & UI Architecture Compliance', () => {
+  describe('6. Design System & UI Architecture Compliance', () => {
     it('uses the public Ruby/Crimson/Gold/Espresso/Ivory palette in staff-login.css', () => {
       const styles = source(`src/app/x/${UNIFIED_STAFF_LOGIN_ROUTE.split('/')[2]}/staff-login.css`);
       expect(styles).toContain('#4A0A1C'); // Ruby
@@ -505,7 +675,7 @@ describe('Unified Staff Login System', () => {
     });
   });
 
-  describe('6. Regression & Cross-System Protection', () => {
+  describe('7. Regression & Cross-System Protection', () => {
     it('preserves dedicated Judge login route and juror credential architecture', () => {
       const judgePageSource = source('src/app/judge/login/page.tsx');
       expect(judgePageSource).toContain('Juror Access Code');
