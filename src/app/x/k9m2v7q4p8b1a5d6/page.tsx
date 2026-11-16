@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Lock,
@@ -11,7 +12,7 @@ import {
   AlertCircle,
   Info,
   Loader2,
-  Sparkles,
+  ArrowLeft,
   LogIn,
   Users,
   Compass
@@ -219,10 +220,10 @@ function StaffLoginForm() {
 
       <div className="staff-login__shell">
         <header className="staff-login__topbar" aria-label="Staff login header">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-[#FDBF0F]">
-            <Sparkles size={14} aria-hidden="true" />
-            <span>Authorized Operations Center</span>
-          </div>
+          <Link href="/" className="staff-login__home-link">
+            <ArrowLeft size={14} aria-hidden="true" />
+            <span>Back to Festival Home</span>
+          </Link>
           <FestivalStatusBadge className="staff-login__status" />
         </header>
 
@@ -245,10 +246,10 @@ function StaffLoginForm() {
 
             <div className="staff-login__welcome-copy">
               <span className="staff-login__section-kicker">Unified Staff Access</span>
-              <h1>Festival Control &amp; Delegation Management</h1>
+              <h1>Everything about your festival operations, in one place.</h1>
               <p>
-                Secure portal for festival administrators, team contingent managers, and green room staff.
-                Sign in with your verified credentials to access your designated operational workspace.
+                Sign in to access festival administration, team management, and green room operations.
+                Your verified account will take you directly to its designated workspace.
               </p>
             </div>
 
@@ -271,9 +272,9 @@ function StaffLoginForm() {
           {/* Secure Login Form Card */}
           <section className="staff-login__card" aria-label="Staff Login Form">
             <header className="staff-login__card-header">
-              <span className="staff-login__section-kicker">Unified Credential Entry</span>
-              <h2>Staff Sign In</h2>
-              <p>Enter your official email and password to automatically route to your assigned portal.</p>
+              <span className="staff-login__section-kicker">Official Staff Access</span>
+              <h2>Welcome back</h2>
+              <p>Enter your work email and password to access your staff portal.</p>
             </header>
 
             <form className="staff-login__form" onSubmit={handleSubmit} noValidate>
