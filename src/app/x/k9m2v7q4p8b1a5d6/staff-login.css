@@ -505,3 +505,271 @@
     transition: none !important;
   }
 }
+
+
+/*
+ * Mobile-first refinements for compact phones.
+ * Keep the existing desktop composition and the shared login behavior unchanged.
+ */
+@media (max-width: 640px) {
+  .staff-login {
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100svh;
+    align-items: flex-start;
+    padding:
+      max(14px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(18px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+  }
+
+  .staff-login__shell {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .staff-login__topbar {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-bottom: 20px;
+  }
+
+  .staff-login__topbar > div:first-child {
+    min-width: 0;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  .staff-login .staff-login__status {
+    max-width: 100%;
+    font-size: 9px !important;
+    letter-spacing: 0.05em !important;
+    line-height: 1.4;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .staff-login__layout {
+    display: flex;
+    width: 100%;
+    max-width: 460px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
+  }
+
+  /* Put the credential form first on phones so it is immediately accessible. */
+  .staff-login__card {
+    order: 1;
+    width: 100%;
+    border-radius: 18px;
+  }
+
+  .staff-login__intro {
+    order: 2;
+    width: 100%;
+    padding: 0 4px 8px;
+    text-align: center;
+  }
+
+  .staff-login__identity {
+    flex-direction: row;
+    justify-content: center;
+    gap: 12px;
+    text-align: left;
+  }
+
+  .staff-login .staff-login__festival-logo {
+    width: 52px !important;
+    height: 52px !important;
+    flex: 0 0 52px;
+    border-radius: 14px !important;
+  }
+
+  .staff-login__identity-copy {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .staff-login__eyebrow {
+    gap: 5px;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+
+  .staff-login__festival-name {
+    margin-top: 3px;
+    font-size: clamp(20px, 5.8vw, 27px);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+
+  .staff-login__institution {
+    margin-top: 3px;
+    font-size: 10px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .staff-login__welcome-copy {
+    max-width: 420px;
+    margin: 17px auto 0;
+    text-align: center;
+  }
+
+  .staff-login__welcome-copy h1 {
+    margin: 7px 0 8px;
+    font-size: clamp(21px, 6vw, 26px);
+    line-height: 1.18;
+    letter-spacing: -0.035em;
+  }
+
+  .staff-login__welcome-copy p {
+    max-width: 390px;
+    margin: 0 auto;
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .staff-login__badges {
+    justify-content: center;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .staff-login__badge-item {
+    gap: 5px;
+    padding: 5px 9px;
+    font-size: 9px;
+    letter-spacing: 0.015em;
+  }
+
+  .staff-login__card-header {
+    padding: 21px 18px 17px;
+  }
+
+  .staff-login__card-header::after {
+    right: 18px;
+    width: 52px;
+  }
+
+  .staff-login__card-header h2 {
+    margin-top: 7px;
+    font-size: 22px;
+  }
+
+  .staff-login__card-header p {
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .staff-login__form {
+    gap: 16px;
+    padding: 19px 18px 21px;
+  }
+
+  .staff-login__notice {
+    gap: 8px;
+    padding: 10px 11px;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .staff-login__field label {
+    margin-bottom: 7px;
+    font-size: 10px;
+  }
+
+  .staff-login__input-wrap input {
+    min-height: 50px;
+    padding: 12px 48px 12px 42px;
+    /* Prevents automatic zoom on focus in mobile Safari. */
+    font-size: 16px;
+  }
+
+  .staff-login__input-icon {
+    left: 13px;
+    width: 17px;
+    height: 17px;
+  }
+
+  .staff-login__toggle-pw {
+    right: 7px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .staff-login__submit {
+    min-height: 50px;
+    padding: 12px 15px;
+    font-size: 11px;
+    letter-spacing: 0.045em;
+  }
+
+  .staff-login__card-footer {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 14px;
+    font-size: 9px;
+    line-height: 1.45;
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .staff-login__topbar {
+    margin-bottom: 16px;
+  }
+
+  .staff-login__identity {
+    gap: 9px;
+  }
+
+  .staff-login .staff-login__festival-logo {
+    width: 46px !important;
+    height: 46px !important;
+    flex-basis: 46px;
+    border-radius: 12px !important;
+  }
+
+  .staff-login__festival-name {
+    font-size: 20px;
+  }
+
+  .staff-login__card-header {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .staff-login__form {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .staff-login__badge-item {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 640px) and (max-height: 560px) {
+  .staff-login {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .staff-login__topbar {
+    margin-bottom: 14px;
+  }
+
+  .staff-login__layout {
+    gap: 16px;
+  }
+
+  .staff-login__welcome-copy {
+    margin-top: 12px;
+  }
+}
