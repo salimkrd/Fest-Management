@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, Suspense, useMemo } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { Trophy, Search, Sparkles, FileText, Menu, X } from 'lucide-react';
+import { Trophy, Sparkles, FileText, UserRound } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -73,31 +73,6 @@ function PublicNavLinks() {
   );
 }
 
-function PublicSearchBar() {
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/public/directory?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-60 lg:w-64">
-      <Search className="w-3.5 h-3.5 text-[#FDBF0F] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-      <input
-        type="text"
-        placeholder="Search Bib, Candidate, Event..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full text-xs pl-8 pr-3 py-2 rounded-lg bg-[#1B090B] text-[#F2F3E6] placeholder-[#F2F3E6]/40 border border-[#BA1912]/30 focus:border-[#FDBF0F] focus:outline-none focus:ring-1 focus:ring-[#FDBF0F]/50 transition-all"
-      />
-    </form>
-  );
-}
-
 function MobileBottomNav() {
   const pathname = usePathname();
 
@@ -142,7 +117,6 @@ function MobileBottomNav() {
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
   const { theme, themeSyncState } = useFest();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const formattedDates = useMemo(() => {
     return formatFestivalDateSpan(theme.festivalStartDate, theme.festivalEndDate);
@@ -182,69 +156,25 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
               <PublicNavLinks />
             </Suspense>
 
-            {/* Date Badge & Search Input */}
-            <div className="hidden lg:flex items-center gap-3">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#230D0F] border border-[#FDBF0F]/30 text-[#FDBF0F] shadow-xs">
+            {/* Desktop festival date and Participant Portal; mobile keeps only the portal icon. */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#230D0F] border border-[#FDBF0F]/30 text-[#FDBF0F] shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
                 <span className="text-[10px] uppercase font-bold tracking-widest font-mono">
                   {formattedDates}
                 </span>
               </div>
-              <Suspense fallback={<div className="h-8 w-48 bg-[#230D0F] rounded animate-pulse" />}>
-                <PublicSearchBar />
-              </Suspense>
-            </div>
-
-            {/* Mobile menu trigger */}
-            <div className="flex lg:hidden items-center gap-2">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-lg text-[#F2F3E6] hover:bg-[#230D0F] border border-[#BA1912]/40 transition-colors"
-                aria-label="Toggle navigation"
-                aria-expanded={mobileMenuOpen}
-                aria-controls="public-mobile-navigation"
+              <Link
+                href="/participant/login"
+                aria-label="Participant Login"
+                title="Participant Login"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[#FDBF0F]/50 bg-[#230D0F] text-[#FDBF0F] hover:bg-[#FDBF0F] hover:text-[#1B090B] hover:border-[#FDBF0F] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FDBF0F] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1B090B]"
               >
-                {mobileMenuOpen ? <X className="w-5 h-5 text-[#FDBF0F]" /> : <Menu className="w-5 h-5" />}
-              </button>
+                <UserRound className="w-5 h-5" aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </div>
-
-        {/* Mobile Navigation Drawer */}
-        {mobileMenuOpen && (
-          <div id="public-mobile-navigation" className="lg:hidden border-t border-[#BA1912]/30 bg-[#1B090B]/98 px-4 pt-3 pb-5 space-y-3 shadow-2xl">
-            <Suspense fallback={null}>
-              <PublicSearchBar />
-            </Suspense>
-            <nav className="space-y-1 pt-2">
-              <Link
-                href="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#F2F3E6] hover:bg-[#230D0F] transition-colors"
-              >
-                <Sparkles className="w-4 h-4 text-[#FDBF0F]" />
-                <span>Latest Results</span>
-              </Link>
-              <Link
-                href="/public/directory"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#F2F3E6] hover:bg-[#230D0F] transition-colors"
-              >
-                <FileText className="w-4 h-4 text-[#FDBF0F]" />
-                <span>Results Directory</span>
-              </Link>
-              <Link
-                href="/public/championship"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-bold text-[#F2F3E6] hover:bg-[#230D0F] transition-colors"
-              >
-                <Trophy className="w-4 h-4 text-[#FDBF0F]" />
-                <span>Team Championship</span>
-              </Link>
-            </nav>
-          </div>
-        )}
-      </header>
 
       {/* Main Content Area - padded at bottom for mobile nav bar */}
       <main className="public-main min-w-0 flex-1 max-w-7xl mx-auto w-full overflow-x-clip px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12">
