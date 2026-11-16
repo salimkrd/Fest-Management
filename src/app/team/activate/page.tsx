@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
+import { UNIFIED_STAFF_LOGIN_ROUTE, buildStaffLoginUrl } from '@/lib/authRoutes';
 
 function TeamActivateForm() {
   const { theme } = useFest();
@@ -121,7 +122,7 @@ function TeamActivateForm() {
                 <Button
                   variant="primary"
                   className="w-full justify-center gap-2 py-3 shadow-md shadow-blue-600/20"
-                  onClick={() => router.push('/team/login')}
+                  onClick={() => router.push(buildStaffLoginUrl({ email: activatedTeam.email, onboarding: 'complete' }))}
                 >
                   <span>Proceed to Manager Login</span>
                   <ArrowRight className="w-4 h-4" />
@@ -211,7 +212,7 @@ function TeamActivateForm() {
               <div className="pt-4 text-center">
                 <p className="text-xs text-slate-500">
                   Already activated your account?{' '}
-                  <Link href="/team/login" className="text-blue-600 font-bold hover:underline">
+                  <Link href={UNIFIED_STAFF_LOGIN_ROUTE} className="text-blue-600 font-bold hover:underline">
                     Sign in here
                   </Link>
                 </p>

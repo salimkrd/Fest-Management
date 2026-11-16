@@ -20,6 +20,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { FirestoreTeam, FirestoreTeamPrivate, CombinedTeam, FirestoreUser, InvitationStatus } from '@/types/firestore';
 import { AuthService } from './authService';
 import { InvitationService } from './invitationService';
+import { UNIFIED_STAFF_LOGIN_ROUTE } from '@/lib/authRoutes';
 
 export interface CreateTeamParams {
   name: string;
@@ -908,7 +909,7 @@ export class TeamService {
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
       await auth.generatePasswordResetLink(reservation.managerEmail, {
-        url: `${appUrl}/team/login?onboarding=complete`,
+        url: `${appUrl}${UNIFIED_STAFF_LOGIN_ROUTE}?onboarding=complete`,
         handleCodeInApp: false
       });
     } catch {
