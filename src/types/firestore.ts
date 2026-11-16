@@ -383,12 +383,15 @@ export interface FirestoreGreenRoomAssignment {
   registrationCode: string;
   participantId?: string;
   participantName: string;
+  participantNameSnapshot?: string;
   teamId: string;
   teamCode: string;
   teamName: string;
   chestNumber: string;
   type: CompetitionType;
   groupMembers?: string[];
+  groupLeaderId?: string;
+  groupSize?: number;
   codeLetter: string; // A..Z, AA..ZZ
   codeIndex: number; // 0..701
   status: GreenRoomContestantStatus;

@@ -26,6 +26,19 @@ import {
 import { getAdminDb, getAdminAuth } from '@/lib/firebase/admin';
 import { JudgeService } from '@/services/judgeService';
 import { hashSecret } from '@/domain/judgeAuth';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+
+async function getTestRosterVersion(competitionId: string): Promise<string> {
+  const db = getAdminDb();
+  if (!db) throw new Error('Admin Firestore is unavailable in this test.');
+  const snapshot = await db.collection('greenRoomAssignments')
+    .where('competitionId', '==', competitionId)
+    .get();
+  return buildGreenRoomRosterSnapshot(
+    competitionId,
+    snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+  ).version;
+}
 
 describe('Firestore Security Rules Enforcement via Client SDK', () => {
   let clientApp: FirebaseApp;
@@ -882,11 +895,20 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString()
     });
 
+    const draftRosterSnapshot = await adminDb.collection('greenRoomAssignments')
+      .where('competitionId', '==', 'comp-1')
+      .get();
+    const draftScores = Object.fromEntries(
+      draftRosterSnapshot.docs.map(doc => [String(doc.data().codeLetter).trim().toUpperCase(), 88])
+    );
+    expect(Object.keys(draftScores).length).toBeGreaterThan(0);
+
     const draftResult = await JudgeService.saveDraftMarks({
       assignmentId: 'asgn-draft-service-test',
       competitionId: 'comp-1',
       secret: pin,
-      scores: { 'A': 88 },
+      rosterVersion: await getTestRosterVersion('comp-1'),
+      scores: draftScores,
       remarks: 'Saved draft'
     });
 
@@ -910,9 +932,28 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     const salt = 'salt-service-8822';
     const hashedSecret = await hashSecret(pin, salt);
 
+    await adminDb.collection('competitions').doc(compId).set({
+      id: compId,
+      code: 'CMP-SERVICE',
+      name: 'Test Competition',
+      status: 'IN_PROGRESS',
+      type: 'SOLO',
+      maxMarks: 100,
+      criteria: [
+        { id: 'content', name: 'Content', maxMarks: 50 },
+        { id: 'delivery', name: 'Delivery', maxMarks: 50 }
+      ]
+    });
+
     await adminDb.collection('registrations').doc('reg-service-1').set({
       id: 'reg-service-1',
       competitionId: compId,
+      participantId: 'part-service-1',
+      participantName: 'Service Contestant 1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-1',
       bib: 'bib-service-1',
       status: 'APPROVED'
     });
@@ -920,6 +961,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
     await adminDb.collection('registrations').doc('reg-service-2').set({
       id: 'reg-service-2',
       competitionId: compId,
+      participantId: 'part-service-2',
+      participantName: 'Service Contestant 2',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-2',
       bib: 'bib-service-2',
       status: 'APPROVED'
     });
@@ -942,6 +989,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-1`,
       competitionId: compId,
       registrationId: 'reg-service-1',
+      participantId: 'part-service-1',
+      participantNameSnapshot: 'Service Contestant 1',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-1',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -951,6 +1004,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-service-2`,
       competitionId: compId,
       registrationId: 'reg-service-2',
+      participantId: 'part-service-2',
+      participantNameSnapshot: 'Service Contestant 2',
+      teamId: 'team-1',
+      teamCode: 'SHA',
+      teamName: 'Team Shamama',
+      chestNumber: 'SERVICE-2',
       codeLetter: 'B',
       codeIndex: 1,
       status: 'CHECKED_IN'
@@ -961,6 +1020,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
+      rosterVersion: await getTestRosterVersion(compId),
       scores: {
         'A': 94,
         'B': { content: 45, delivery: 45 }
@@ -1026,11 +1086,12 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: {
           'fake-invented-participant-999': 95
         }
       })
-    ).rejects.toThrow(/not assigned to an eligible registration/i);
+    ).rejects.toThrow(/not a valid assigned Green Room Code Letter/i);
   });
 
   it('33. Criteria marks exceeding specific competition rubric limits are strictly rejected by JudgeService', async () => {
@@ -1077,6 +1138,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-rubric-01`,
       competitionId: compId,
       registrationId: 'reg-rubric-01',
+      participantId: 'part-rubric-01',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -1088,6 +1151,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: {
           'A': {
             'cr-subject': 35, // Exceeds rubric limit of 30!
@@ -1095,7 +1159,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
           }
         }
       })
-    ).rejects.toThrow(/exceeds specific rubric limit/i);
+    ).rejects.toThrow(/exceeds its maximum/i);
   });
 
   it('34. Seeded assignments verification (future valid asg-02 read access vs expired lockout asg-expired-demo)', async () => {
@@ -1199,6 +1263,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: emptyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(emptyCompId),
         scores: { 'any-key': 90 }
       })
     ).rejects.toThrow(/zero registrations/i);
@@ -1209,6 +1274,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: emptyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(emptyCompId),
         scores: { 'any-key': 90 }
       })
     ).rejects.toThrow(/zero registrations/i);
@@ -1303,6 +1369,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-missing-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: MISSING\)/i);
@@ -1313,6 +1380,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-null-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: NULL\)/i);
@@ -1323,6 +1391,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-empty-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: EMPTY\)/i);
@@ -1333,6 +1402,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-pending-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: PENDING\)/i);
@@ -1343,6 +1413,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-cancelled-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: CANCELLED\)/i);
@@ -1353,6 +1424,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: { 'reg-withdrawn-status': 85 }
       })
     ).rejects.toThrow(/ineligible registration \(status: WITHDRAWN\)/i);
@@ -1362,6 +1434,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-approved-1`,
       competitionId: compId,
       registrationId: 'reg-approved-1',
+      participantId: 'part-approved-1',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -1371,6 +1445,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       assignmentId: asgnId,
       competitionId: compId,
       secret: pin,
+      rosterVersion: await getTestRosterVersion(compId),
       scores: { 'A': 92 }
     });
     expect(approvedDraft.success).toBe(true);
@@ -1405,9 +1480,10 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: pendingOnlyAsgnId,
         competitionId: pendingOnlyCompId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(pendingOnlyCompId),
         scores: { 'reg-only-pending': 75 }
       })
-    ).rejects.toThrow(/zero eligible approved registrations/i);
+    ).rejects.toThrow(/ineligible registration \(status: PENDING\)|zero eligible approved registrations/i);
   }, 60000);
 
   it('37. Duplicate or ambiguous registration scoring in a single scorecard is strictly rejected', async () => {
@@ -1449,6 +1525,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
       id: `${compId}_reg-dupe-1`,
       competitionId: compId,
       registrationId: 'reg-dupe-1',
+      participantId: 'part-dupe-1',
+      participantNameSnapshot: '',
       codeLetter: 'A',
       codeIndex: 0,
       status: 'CHECKED_IN'
@@ -1460,6 +1538,7 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: asgnId,
         competitionId: compId,
         secret: pin,
+        rosterVersion: await getTestRosterVersion(compId),
         scores: {
           'A': 85,
           'reg-dupe-1': 90
@@ -1488,13 +1567,23 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-submit-service-test',
         competitionId: 'cmp-service-test',
         secret: 'WRONG-PIN',
+        rosterVersion: 'a'.repeat(64),
         scores: { 'A': 90 }
       })
     });
     const unauthRes = await marksApiHandler(unauthReq);
     expect(unauthRes.status).toBe(401);
 
-    // 3. Valid draft request -> 200 OK
+    // 3. Valid draft request -> 200 OK. Score the complete current Green Room
+    // roster exactly as the Judge Portal does, never a hard-coded single Code A.
+    const apiRosterSnapshot = await getAdminDb()!.collection('greenRoomAssignments')
+      .where('competitionId', '==', 'comp-1')
+      .get();
+    const apiDraftScores = Object.fromEntries(
+      apiRosterSnapshot.docs.map(doc => [String(doc.data().codeLetter).trim().toUpperCase(), 92])
+    );
+    expect(Object.keys(apiDraftScores).length).toBeGreaterThan(0);
+
     const validDraftReq = new NextRequest('http://localhost:3000/api/judge/marks', {
       method: 'POST',
       body: JSON.stringify({
@@ -1502,7 +1591,8 @@ describe('Firestore Security Rules Enforcement via Client SDK', () => {
         assignmentId: 'asgn-draft-service-test',
         competitionId: 'comp-1',
         secret: '9911',
-        scores: { 'A': 92 },
+        rosterVersion: await getTestRosterVersion('comp-1'),
+        scores: apiDraftScores,
         remarks: 'API draft test'
       })
     });

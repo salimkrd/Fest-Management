@@ -48,15 +48,7 @@ export async function POST(
       if (!competitionSnapshot.exists) {
         return NextResponse.json({ error: 'Validation Error: Competition no longer exists.' }, { status: 400 });
       }
-      const competition = competitionSnapshot.data();
-      const criteria = Array.isArray(competition?.criteria) ? competition.criteria : [];
-      const maxMarks = Number(competition?.maxMarks) ||
-        (criteria.length
-          ? criteria.reduce((total: number, criterion: { maxMarks?: number }) => total + Number(criterion.maxMarks || 0), 0)
-          : 100);
-      if (maxMarks <= 0) {
-        return NextResponse.json({ error: 'Validation Error: Competition maximum marks must be positive.' }, { status: 400 });
-      }
+      const maxMarks = 100;
 
       const seen = new Set<string>();
       const ranks = await Promise.all(body.ranks.map(async (rank: Record<string, unknown>) => {
@@ -66,6 +58,8 @@ export async function POST(
           seen.has(rank.registrationId) ||
           typeof rank.score !== 'number' ||
           !Number.isFinite(rank.score) ||
+          rank.score < 0 ||
+          rank.score > maxMarks ||
           !([1, 2, 3, null].includes(rank.rank as number | null))
         ) {
           throw new Error('Validation Error: Result ranks contain invalid or duplicate entries.');

@@ -14,6 +14,11 @@ import {
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
 import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
+import {
+  buildGreenRoomRosterSnapshot,
+  assertGreenRoomEntryMatchesRegistration,
+  GreenRoomRosterEntry
+} from '@/domain/greenRoomRoster';
 
 export class JudgeService {
   /**
@@ -96,196 +101,216 @@ export class JudgeService {
   private static async validateScoresPayload(
     db: FirebaseFirestore.Firestore,
     competitionId: string,
-    scores: Record<string, Record<string, number> | number>
-  ): Promise<{ resolvedRegistrations: Map<string, string> }> {
-    if (!scores || typeof scores !== 'object' || Object.keys(scores).length === 0) {
+    scores: Record<string, Record<string, number> | number>,
+    expectedRosterVersion: string
+  ): Promise<{
+    resolvedRegistrations: Map<string, string>;
+    rosterEntries: GreenRoomRosterEntry[];
+    rosterVersion: string;
+  }> {
+    if (!scores || typeof scores !== 'object' || Array.isArray(scores) || Object.keys(scores).length === 0) {
       throw new Error('Validation Error: At least one participant score must be provided.');
     }
-
-    // 1. Fetch competition document to inspect specific judging rubric & maxMarks
-    const compDoc = await db.collection('competitions').doc(competitionId).get();
-    const compData = compDoc.exists ? compDoc.data() : null;
-    const criteriaList = (compData?.criteria as Array<{ id: string; name: string; maxMarks: number }>) || [];
-    const compMaxMarks = compData?.maxMarks || (criteriaList.length > 0 ? criteriaList.reduce((acc, c) => acc + (c.maxMarks || 0), 0) : 100);
-
-    // 2. Fetch ALL registrations for this competition
-    const regsSnap = await db.collection('registrations')
-      .where('competitionId', '==', competitionId)
-      .get();
-
-    // Invariant 1: Fail closed if the competition has zero registrations in Firestore
-    if (regsSnap.empty) {
-      throw new Error(
-        `Validation Error: Competition "${competitionId}" has zero registrations. Scoring cannot proceed.`
-      );
+    if (!/^[a-f0-9]{64}$/.test(expectedRosterVersion || '')) {
+      throw new Error('Stale Mapping Error: The judging screen has no valid Green Room roster version. Refresh the judge session.');
     }
 
-    // Invariant 2 & 3: Filter for ELIGIBLE registrations only (strictly status === 'APPROVED')
-    // Fail-closed: missing, null, empty, PENDING, CANCELLED, WITHDRAWN, or REJECTED registrations are strictly ineligible.
-    const isExplicitlyApproved = (rawStatus: unknown): boolean => {
-      return typeof rawStatus === 'string' && rawStatus.trim().toUpperCase() === 'APPROVED';
-    };
+    const [compDoc, regsSnap, grSnap] = await Promise.all([
+      db.collection('competitions').doc(competitionId).get(),
+      db.collection('registrations').where('competitionId', '==', competitionId).get(),
+      db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
+    ]);
 
-    const eligibleRegs = regsSnap.docs.filter(doc => {
-      return isExplicitlyApproved(doc.data().status);
+    if (!compDoc.exists) {
+      throw new Error(`Validation Error: Competition "${competitionId}" no longer exists.`);
+    }
+    if (regsSnap.empty) {
+      throw new Error(`Validation Error: Competition "${competitionId}" has zero registrations. Scoring cannot proceed.`);
+    }
+    const compData = compDoc.data() || {};
+    const criteriaList = (compData.criteria as Array<{ id: string; name: string; maxMarks: number }>) || [];
+    const compMaxMarks = Number(compData.maxMarks) ||
+      (criteriaList.length > 0 ? criteriaList.reduce((acc, criterion) => acc + (criterion.maxMarks || 0), 0) : 100);
+
+    const approvedRegistrationIds = new Set(
+      regsSnap.docs
+        .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+        .map(doc => doc.id)
+    );
+
+    const ineligibleKeys = new Map<string, string>();
+    const directContestantIdentifiers = new Set<string>();
+    regsSnap.docs.forEach(doc => {
+      const data = doc.data();
+      const regId = doc.id.trim();
+      directContestantIdentifiers.add(regId);
+      if (data.participantId) directContestantIdentifiers.add(String(data.participantId).trim());
+      if (data.bib) {
+        directContestantIdentifiers.add(String(data.bib).trim());
+        directContestantIdentifiers.add(String(data.bib).trim().toUpperCase());
+      }
+      if (data.chestNumber) {
+        directContestantIdentifiers.add(String(data.chestNumber).trim());
+        directContestantIdentifiers.add(String(data.chestNumber).trim().toUpperCase());
+      }
+      if (data.code) {
+        directContestantIdentifiers.add(String(data.code).trim());
+        directContestantIdentifiers.add(String(data.code).trim().toUpperCase());
+      }
+      if (!approvedRegistrationIds.has(doc.id)) {
+        const rawStatus = data.status;
+        const displayStatus = typeof rawStatus === 'string' && rawStatus.trim()
+          ? rawStatus.trim().toUpperCase()
+          : rawStatus === null ? 'NULL' : rawStatus === undefined ? 'MISSING' : 'EMPTY';
+        const reason = `ineligible registration (status: ${displayStatus})`;
+        ineligibleKeys.set(doc.id, reason);
+        if (data.participantId) ineligibleKeys.set(String(data.participantId), reason);
+        if (data.bib) ineligibleKeys.set(String(data.bib), reason);
+        if (data.chestNumber) ineligibleKeys.set(String(data.chestNumber), reason);
+        if (data.code) ineligibleKeys.set(String(data.code), reason);
+      }
     });
 
-    if (eligibleRegs.length === 0) {
+    const normalizedScoreKeys = new Map<string, string>();
+    for (const scoreKey of Object.keys(scores)) {
+      const cleanKey = scoreKey.trim();
+      const cleanUpperKey = cleanKey.toUpperCase();
+      if (ineligibleKeys.has(scoreKey) || ineligibleKeys.has(cleanKey)) {
+        throw new Error(
+          `Validation Error: This score key resolves to an ${ineligibleKeys.get(scoreKey) || ineligibleKeys.get(cleanKey)}. Only Code Letters assigned to approved registrations can be scored.`
+        );
+      }
+      if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
+        throw new Error(
+          'Validation Error: Direct contestant identifiers are not accepted. Judges must submit scores using only assigned anonymous Green Room Code Letters.'
+        );
+      }
+      if (!cleanUpperKey) {
+        throw new Error('Validation Error: Empty Code Letter score keys are not allowed.');
+      }
+      if (normalizedScoreKeys.has(cleanUpperKey)) {
+        throw new Error(
+          `Validation Error: Duplicate Code Letter key "${cleanUpperKey}" was supplied more than once.`
+        );
+      }
+      normalizedScoreKeys.set(cleanUpperKey, scoreKey);
+    }
+
+    if (approvedRegistrationIds.size === 0) {
       throw new Error(
         `Validation Error: Competition "${competitionId}" has zero eligible approved registrations. Scoring cannot proceed.`
       );
     }
-
-    // Invariant 4: Detect direct contestant identifiers and map ineligible keys
-    const ineligibleKeys = new Map<string, string>(); // key -> ineligible reason
-    const directContestantIdentifiers = new Set<string>();
-    const eligibleRegIds = new Set<string>(eligibleRegs.map(doc => doc.id));
-
-    // Collect all ineligible keys and direct contestant identifiers
-    regsSnap.docs.forEach(doc => {
-      const data = doc.data();
-      const rawStatus = data.status;
-      const regId = doc.id.trim();
-
-      directContestantIdentifiers.add(regId);
-      if (data.participantId) directContestantIdentifiers.add(data.participantId.toString().trim());
-      if (data.bib) {
-        directContestantIdentifiers.add(data.bib.toString().trim());
-        directContestantIdentifiers.add(data.bib.toString().trim().toUpperCase());
-      }
-      if (data.chestNumber) {
-        directContestantIdentifiers.add(data.chestNumber.toString().trim());
-        directContestantIdentifiers.add(data.chestNumber.toString().trim().toUpperCase());
-      }
-      if (data.code) {
-        directContestantIdentifiers.add(data.code.toString().trim());
-        directContestantIdentifiers.add(data.code.toString().trim().toUpperCase());
-      }
-
-      if (!isExplicitlyApproved(rawStatus)) {
-        const displayStatus = (typeof rawStatus === 'string' && rawStatus.trim() !== '')
-          ? rawStatus.trim().toUpperCase()
-          : (rawStatus === null ? 'NULL' : rawStatus === undefined ? 'MISSING' : 'EMPTY');
-        const reason = `ineligible registration (status: ${displayStatus})`;
-        ineligibleKeys.set(doc.id, reason);
-        if (data.participantId) ineligibleKeys.set(data.participantId, reason);
-        if (data.bib) ineligibleKeys.set(data.bib, reason);
-        if (data.chestNumber) ineligibleKeys.set(data.chestNumber, reason);
-        if (data.code) ineligibleKeys.set(data.code, reason);
-      }
-    });
-
-    // Invariant 4B: Prioritize rejecting ineligible registrations and direct contestant identifiers
-    for (const [scoreKey] of Object.entries(scores)) {
-      if (ineligibleKeys.has(scoreKey)) {
-        throw new Error(
-          `Validation Error: Participant or registration "${scoreKey}" is an ${ineligibleKeys.get(scoreKey)}. Only APPROVED registrations can be scored.`
-        );
-      }
-
-      const cleanKey = scoreKey.trim();
-      const cleanUpperKey = cleanKey.toUpperCase();
-      if (directContestantIdentifiers.has(cleanKey) || directContestantIdentifiers.has(cleanUpperKey)) {
-        throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is a direct contestant identifier (participant ID, registration ID, bib, or chest number). Direct contestant identifiers are strictly rejected. Judges must submit scores using ONLY assigned Green Room Code Letters (e.g. "A", "B", "C").`
-        );
-      }
-    }
-
-    // Invariant 4C: Query Green Room assignments to map anonymous Code Letters (A..Z, AA..ZZ)
-    // Judges are strictly required to score ONLY by actual assigned Code Letters.
-    const grSnap = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', competitionId)
-      .get();
-
     if (grSnap.empty) {
       throw new Error(
-        `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". Scoring cannot proceed until contestants are checked in.`
+        `Validation Error: No contestants have checked in to the Green Room for competition "${competitionId}". No Code Letter is assigned to an eligible registration, so scoring cannot proceed.`
       );
     }
 
-    const assignedCodeToRegId = new Map<string, string>();
-    grSnap.docs.forEach(grDoc => {
-      const grData = grDoc.data();
-      if (grData.codeLetter && grData.registrationId) {
-        const cleanCode = grData.codeLetter.trim().toUpperCase();
-        assignedCodeToRegId.set(cleanCode, grData.registrationId);
+    // Validate the entire Code Letter <-> registration roster before resolving
+    // any mark. Duplicate, stale, malformed, or ineligible assignments block
+    // the complete scorecard rather than allowing a partial mapping.
+    const roster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      grSnap.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    if (roster.version !== expectedRosterVersion) {
+      throw new Error(
+        'Stale Mapping Error: The Green Room Code Letter roster changed after this judge opened the scorecard. No marks were saved. Refresh the roster and verify every Code Letter again.'
+      );
+    }
+    const registrationById = new Map(
+      regsSnap.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
+    );
+    for (const entry of roster.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Code Letter "${entry.codeLetter}" points to a registration that is not currently approved. Judging has been blocked.`
+        );
       }
-    });
+      const liveRegistration = registrationById.get(entry.registrationId);
+      if (!liveRegistration) {
+        throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record.');
+      }
+      assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
+    }
 
-    // Invariant 5: Verify every score key corresponds to an eligible registration via assigned Code Letter,
-    // and no registration is scored multiple times under different aliases.
+    // The submitted scorecard must cover the exact roster shown to the judge.
+    // Missing or unexpected codes are never silently omitted from a final mark set.
+    const missingCodes = roster.entries
+      .map(entry => entry.codeLetter)
+      .filter(codeLetter => !normalizedScoreKeys.has(codeLetter));
+    const unexpectedCodes = Array.from(normalizedScoreKeys.keys())
+      .filter(codeLetter => !roster.codeToRegistration.has(codeLetter));
+    if (unexpectedCodes.length > 0) {
+      throw new Error(
+        `Validation Error: Code Letter "${unexpectedCodes[0]}" is not a valid assigned Green Room Code Letter in the current roster.`
+      );
+    }
+    if (missingCodes.length > 0 || normalizedScoreKeys.size !== roster.entries.length) {
+      throw new Error(
+        `Validation Error: Marks are required for every checked-in Code Letter. Missing: ${missingCodes.join(', ') || 'roster count mismatch'}.`
+      );
+    }
+
     const scoredRegistrationIds = new Set<string>();
-    const resolvedRegistrations = new Map<string, string>(); // scoreKey -> regId
+    const resolvedRegistrations = new Map<string, string>();
 
-    for (const [scoreKey, scoreVal] of Object.entries(scores)) {
-      const cleanKey = scoreKey.trim();
-      const cleanUpperKey = cleanKey.toUpperCase();
-
-      // 3. Verify key is an actual Code Letter assigned in greenRoomAssignments for this competition
-      const resolvedRegId = assignedCodeToRegId.get(cleanUpperKey);
+    for (const [cleanUpperKey, originalScoreKey] of normalizedScoreKeys.entries()) {
+      const resolvedRegId = roster.codeToRegistration.get(cleanUpperKey);
       if (!resolvedRegId) {
         throw new Error(
-          `Validation Error: Identifier "${scoreKey}" is not a valid assigned Green Room Code Letter (not assigned to an eligible registration) for competition "${competitionId}". Judges must score ONLY actual Code Letters assigned to checked-in contestants.`
+          `Validation Error: Code Letter "${cleanUpperKey}" is not a valid assigned Green Room code for competition "${competitionId}".`
         );
       }
-
-      // 4. Verify resolved registration is approved
-      if (!eligibleRegIds.has(resolvedRegId)) {
+      if (!approvedRegistrationIds.has(resolvedRegId)) {
         throw new Error(
-          `Validation Error: Contestant with Code Letter "${cleanUpperKey}" is not assigned to an eligible APPROVED registration for competition "${competitionId}".`
+          `Validation Error: Code Letter "${cleanUpperKey}" is not assigned to an approved registration.`
         );
       }
-
-      // 5. Check duplicate scoring: ensuring every score key resolves to exactly one distinct eligible registration
       if (scoredRegistrationIds.has(resolvedRegId)) {
         throw new Error(
-          `Validation Error: Duplicate score entry detected. Score key "${scoreKey}" resolves to registration "${resolvedRegId}", which has already been scored in this scorecard.`
+          `Validation Error: More than one Code Letter resolves to the same registration for "${originalScoreKey}".`
         );
       }
       scoredRegistrationIds.add(resolvedRegId);
-      resolvedRegistrations.set(scoreKey, resolvedRegId);
+      resolvedRegistrations.set(originalScoreKey, resolvedRegId);
 
-      // Validate numeric score values and criteria against competition rubric
+      const scoreVal = scores[originalScoreKey];
       if (typeof scoreVal === 'number') {
-        if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > compMaxMarks) {
+        if (!Number.isInteger(scoreVal) || scoreVal < 0 || scoreVal > 100) {
           throw new Error(
-            `Validation Error: Score for participant "${scoreKey}" (${scoreVal}) exceeds permitted competition limit [0 to ${compMaxMarks}].`
+            `Validation Error: Total mark for Code Letter "${cleanUpperKey}" (${scoreVal}) must be a whole number from 0 to 100.`
           );
         }
-      } else if (typeof scoreVal === 'object' && scoreVal !== null) {
+      } else if (typeof scoreVal === 'object' && scoreVal !== null && !Array.isArray(scoreVal)) {
+        // Backward compatibility for scorecards created by the previous criterion-wise UI.
         const critEntries = Object.entries(scoreVal);
         if (critEntries.length === 0) {
-          throw new Error(`Validation Error: Criteria marks for participant "${scoreKey}" cannot be empty.`);
+          throw new Error(`Validation Error: Criteria marks for Code Letter "${cleanUpperKey}" cannot be empty.`);
         }
 
         let participantTotal = 0;
         const seenCriterionIds = new Set<string>();
         for (const [critKey, critMark] of critEntries) {
-          if (typeof critMark !== 'number' || isNaN(critMark) || critMark < 0) {
-            throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be a non-negative number.`);
+          if (typeof critMark !== 'number' || !Number.isFinite(critMark) || critMark < 0) {
+            throw new Error(`Validation Error: Criterion "${critKey}" score for Code "${cleanUpperKey}" must be a non-negative number.`);
           }
-
-          // Rubric limit check: cross-reference against specific criterion maxMarks
           if (criteriaList.length > 0) {
             const rubricCriterion = criteriaList.find(
-              c => c.id === critKey || c.name.toLowerCase() === critKey.toLowerCase()
+              criterion => criterion.id === critKey || criterion.name.toLowerCase() === critKey.toLowerCase()
             );
             if (!rubricCriterion) {
-              throw new Error(
-                `Validation Error: Criterion "${critKey}" is not part of the competition rubric for participant "${scoreKey}".`
-              );
+              throw new Error(`Validation Error: Criterion "${critKey}" is not part of the competition rubric.`);
             }
             seenCriterionIds.add(rubricCriterion.id);
             if (critMark > rubricCriterion.maxMarks) {
               throw new Error(
-                `Validation Error: Criterion "${critKey}" score (${critMark}) for participant "${scoreKey}" exceeds specific rubric limit of ${rubricCriterion.maxMarks}.`
+                `Validation Error: Criterion "${critKey}" score (${critMark}) exceeds its maximum of ${rubricCriterion.maxMarks}.`
               );
             }
-          } else {
-            if (critMark > 100) {
-              throw new Error(`Validation Error: Criterion "${critKey}" score for participant "${scoreKey}" must be between 0 and 100.`);
-            }
+          } else if (critMark > 100) {
+            throw new Error(`Validation Error: Criterion "${critKey}" must be between 0 and 100.`);
           }
           participantTotal += critMark;
         }
@@ -294,22 +319,27 @@ export class JudgeService {
           const missingCriteria = criteriaList.filter(criterion => !seenCriterionIds.has(criterion.id));
           if (missingCriteria.length > 0) {
             throw new Error(
-              `Validation Error: Participant "${scoreKey}" is missing marks for required criteria: ${missingCriteria.map(criterion => criterion.name || criterion.id).join(', ')}.`
+              `Validation Error: Code "${cleanUpperKey}" is missing criterion marks: ${missingCriteria.map(criterion => criterion.name || criterion.id).join(', ')}.`
             );
           }
         }
-
         if (participantTotal > compMaxMarks) {
           throw new Error(
-            `Validation Error: Sum of criteria marks (${participantTotal}) for participant "${scoreKey}" exceeds competition total maximum of ${compMaxMarks}.`
+            `Validation Error: Criteria total for Code "${cleanUpperKey}" exceeds the competition maximum.`
           );
         }
       } else {
-        throw new Error(`Validation Error: Invalid score data type for participant "${scoreKey}". Must be numeric or criteria map.`);
+        throw new Error(
+          `Validation Error: Invalid score format for Code Letter "${cleanUpperKey}".`
+        );
       }
     }
 
-    return { resolvedRegistrations };
+    return {
+      resolvedRegistrations,
+      rosterEntries: roster.entries,
+      rosterVersion: roster.version
+    };
   }
 
   /**
@@ -320,6 +350,7 @@ export class JudgeService {
     assignmentId: string;
     competitionId: string;
     secret: string;
+    rosterVersion: string;
     scores: Record<string, Record<string, number> | number>;
     remarks?: string;
   }): Promise<{
@@ -362,7 +393,12 @@ export class JudgeService {
       throw new Error(`Unauthorized: Judge authentication failed (${authResult.reason}).`);
     }
 
-    const { resolvedRegistrations } = await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const { resolvedRegistrations, rosterVersion } = await this.validateScoresPayload(
+      db,
+      params.competitionId,
+      params.scores,
+      params.rosterVersion
+    );
     const normalizedScores = Object.fromEntries(
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key) || key, value])
     );
@@ -372,16 +408,26 @@ export class JudgeService {
     const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
     const markEntryRef = db.collection('markEntries').doc(markEntryId);
     const assignRef = db.collection('judgeAssignments').doc(params.assignmentId);
+    const assignmentQuery = db.collection('greenRoomAssignments')
+      .where('competitionId', '==', params.competitionId);
+    const registrationQuery = db.collection('registrations')
+      .where('competitionId', '==', params.competitionId);
 
     await db.runTransaction(async (transaction) => {
       const lockDoc = await transaction.get(lockRef);
       const currentAssignment = await transaction.get(assignRef);
+      const currentRosterSnapshot = await transaction.get(assignmentQuery);
+      const currentRegistrationsSnapshot = await transaction.get(registrationQuery);
       if (!currentAssignment.exists) {
         throw new Error('Unauthorized: Judge assignment not found.');
       }
       const currentAssignmentData = currentAssignment.data()!;
-      if (currentAssignmentData.revoked || currentAssignmentData.status === 'REVOKED') {
-        throw new Error('Unauthorized: Assignment has been revoked.');
+      if (
+        currentAssignmentData.revoked ||
+        currentAssignmentData.status === 'REVOKED' ||
+        currentAssignmentData.competitionId !== params.competitionId
+      ) {
+        throw new Error('Unauthorized: Judge assignment has been revoked or its competition scope changed.');
       }
       if (currentAssignmentData.status === 'SUBMITTED') {
         throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
@@ -390,24 +436,34 @@ export class JudgeService {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
       }
 
-      // Concurrency check: Ensure Code Letter-to-registration mapping has not changed or become stale
-      for (const [codeLetterKey, expectedRegId] of resolvedRegistrations.entries()) {
-        const cleanCode = codeLetterKey.trim().toUpperCase();
-        const asgnRef = db.collection('greenRoomAssignments').doc(`${params.competitionId}_${expectedRegId}`);
-        const asgnDoc = await transaction.get(asgnRef);
-
-        if (!asgnDoc.exists) {
+      const currentRoster = buildGreenRoomRosterSnapshot(
+        params.competitionId,
+        currentRosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
+      if (currentRoster.version !== rosterVersion) {
+        throw new Error(
+          'Stale Mapping Error: The Green Room roster changed while marks were being saved. No marks were saved; refresh the judge session.'
+        );
+      }
+      const approvedIds = new Set(
+        currentRegistrationsSnapshot.docs
+          .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+          .map(doc => doc.id)
+      );
+      const currentRegistrationById = new Map(
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
+      );
+      for (const entry of currentRoster.entries) {
+        if (!approvedIds.has(entry.registrationId)) {
           throw new Error(
-            `Stale Mapping Error: Contestant registration "${expectedRegId}" is no longer checked in for competition "${params.competitionId}". The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+            `Roster Integrity Error: Code Letter "${entry.codeLetter}" no longer points to an approved registration. No marks were saved.`
           );
         }
-
-        const currentCode = (asgnDoc.data()?.codeLetter || '').trim().toUpperCase();
-        if (currentCode !== cleanCode) {
-          throw new Error(
-            `Stale Mapping Error: Code Letter "${cleanCode}" is no longer mapped to registration "${expectedRegId}" (currently mapped to "${currentCode}"). The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
-          );
+        const liveRegistration = currentRegistrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record. No marks were saved.');
         }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       transaction.set(lockRef, {
@@ -430,6 +486,7 @@ export class JudgeService {
         submitted: false,
         isFinal: false,
         scores: normalizedScores,
+        rosterVersion,
         remarks: params.remarks || '',
         updatedAt
       });
@@ -454,10 +511,11 @@ export class JudgeService {
     db: FirebaseFirestore.Firestore,
     competitionId: string
   ): Promise<void> {
-    const [competitionSnapshot, assignmentSnapshot, registrationSnapshot] = await Promise.all([
+    const [competitionSnapshot, assignmentSnapshot, registrationSnapshot, greenRoomSnapshot] = await Promise.all([
       db.collection('competitions').doc(competitionId).get(),
       db.collection('judgeAssignments').where('competitionId', '==', competitionId).get(),
-      db.collection('registrations').where('competitionId', '==', competitionId).get()
+      db.collection('registrations').where('competitionId', '==', competitionId).get(),
+      db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
     ]);
 
     if (!competitionSnapshot.exists) return;
@@ -473,6 +531,101 @@ export class JudgeService {
       return markSnapshot.exists ? markSnapshot.data() : null;
     }));
     if (submittedMarks.some(mark => !mark || mark.status !== 'SUBMITTED')) return;
+
+    // Defense in depth: before generating official ranks, verify that every
+    // archived judge scorecard still belongs to this competition's canonical
+    // Green Room roster. New scorecards must match the exact session fingerprint
+    // and full roster; legacy scorecards may be partial, but every scored
+    // registration must still be present in the canonical roster.
+    const finalRoster = buildGreenRoomRosterSnapshot(
+      competitionId,
+      greenRoomSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    );
+    const approvedRegistrationIds = new Set(
+      registrationSnapshot.docs
+        .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+        .map(doc => doc.id)
+    );
+    const finalRegistrationById = new Map(
+      registrationSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
+    );
+    for (const entry of finalRoster.entries) {
+      if (!approvedRegistrationIds.has(entry.registrationId)) {
+        throw new Error(
+          `Roster Integrity Error: Final result generation blocked because Code Letter "${entry.codeLetter}" no longer points to an approved registration.`
+        );
+      }
+      const liveRegistration = finalRegistrationById.get(entry.registrationId);
+      if (!liveRegistration) {
+        throw new Error('Roster Integrity Error: Final result generation blocked because a Code Letter has no live registration identity record.');
+      }
+      assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
+    }
+    const expectedRegistrationIds = finalRoster.entries
+      .map(entry => entry.registrationId)
+      .sort();
+    for (const mark of submittedMarks) {
+      const markData = mark as Record<string, unknown>;
+      const scoreMap = markData.scores && typeof markData.scores === 'object'
+        ? markData.scores as Record<string, unknown>
+        : {};
+      const submittedRegistrationIds = Object.keys(scoreMap).sort();
+      if (submittedRegistrationIds.some(id => !finalRoster.registrationToCode.has(id))) {
+        throw new Error(
+          'Roster Integrity Error: Final result generation blocked because a submitted score points to a registration outside the current Green Room roster.'
+        );
+      }
+
+      if (typeof markData.rosterVersion === 'string') {
+        if (markData.rosterVersion !== finalRoster.version) {
+          throw new Error(
+            'Stale Mapping Error: Final result generation blocked because a judge scorecard was recorded against a different Green Room roster version.'
+          );
+        }
+        if (JSON.stringify(submittedRegistrationIds) !== JSON.stringify(expectedRegistrationIds)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because a new-format judge scorecard does not cover the exact Green Room roster.'
+          );
+        }
+
+        const archivedRoster = Array.isArray(markData.anonymousRoster)
+          ? markData.anonymousRoster
+              .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+              .map(item => ({
+                codeLetter: String(item.codeLetter || '').trim().toUpperCase(),
+                codeIndex: Number(item.codeIndex)
+              }))
+              .sort((a, b) => a.codeIndex - b.codeIndex)
+          : [];
+        const currentAnonymousRoster = finalRoster.entries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
+        if (JSON.stringify(archivedRoster) !== JSON.stringify(currentAnonymousRoster)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because the archived anonymous roster does not match the official Green Room mapping.'
+          );
+        }
+
+        const archivedMapping = Array.isArray(markData.codeRegistrationSnapshot)
+          ? markData.codeRegistrationSnapshot
+              .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+              .map(item => ({
+                registrationId: String(item.registrationId || ''),
+                codeLetter: String(item.codeLetter || '').trim().toUpperCase(),
+                codeIndex: Number(item.codeIndex)
+              }))
+              .sort((a, b) => a.codeIndex - b.codeIndex)
+          : [];
+        const currentMapping = finalRoster.entries.map(({ registrationId, codeLetter, codeIndex }) => ({
+          registrationId,
+          codeLetter,
+          codeIndex
+        }));
+        if (JSON.stringify(archivedMapping) !== JSON.stringify(currentMapping)) {
+          throw new Error(
+            'Roster Integrity Error: Final result generation blocked because the archived Code Letter-to-registration mapping does not match the official Green Room mapping.'
+          );
+        }
+      }
+    }
 
     const criteria = Array.isArray(competition.criteria) ? competition.criteria : [];
     const maxMarks = Number(competition.maxMarks) ||
@@ -494,50 +647,77 @@ export class JudgeService {
     });
 
     const criterionMarksByRegistration = new Map<string, Map<string, number[]>>();
+    const criterionScorecardTotalsByRegistration = new Map<string, number[]>();
     const legacyTotalsByRegistration = new Map<string, number[]>();
 
     submittedMarks.forEach(mark => {
-      const scorecard = mark!.scores as Record<string, Record<string, number> | number>;
+      const markData = mark as Record<string, unknown>;
+      const scorecard = markData.scores as Record<string, Record<string, number> | number>;
+      const hasVerifiedHundredPointSnapshot = typeof markData.rosterVersion === 'string';
       Object.entries(scorecard).forEach(([registrationId, value]) => {
+        const resultCodeLetter = finalRoster.registrationToCode.get(registrationId)?.codeLetter || 'an unknown Code Letter';
         if (typeof value === 'number') {
+          if (!Number.isFinite(value) || value < 0 || value > (hasVerifiedHundredPointSnapshot ? 100 : maxMarks)) {
+            throw new Error(
+              `Validation Error: Stored total mark for Code "${resultCodeLetter}" is outside the allowed competition range.`
+            );
+          }
           const totals = legacyTotalsByRegistration.get(registrationId) || [];
-          totals.push(value);
+          // The new roster-version scorecards are explicitly out of 100.
+          // Older numeric scorecards used the competition's historical maximum.
+          totals.push(hasVerifiedHundredPointSnapshot ? value : Number(((value / maxMarks) * 100).toFixed(2)));
           legacyTotalsByRegistration.set(registrationId, totals);
           return;
         }
 
         const byCriterion = criterionMarksByRegistration.get(registrationId) || new Map<string, number[]>();
+        let scorecardTotal = 0;
         Object.entries(value).forEach(([criterionKey, rawScore]) => {
           const criterionId = criterionLookup.get(criterionKey.trim().toLowerCase());
           if (!criterionId) {
-            throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in a submitted scorecard for registration "${registrationId}".`);
+            throw new Error(`Validation Error: Unknown criterion "${criterionKey}" found in the submitted scorecard for Code "${resultCodeLetter}".`);
           }
+          const markValue = Number(rawScore);
+          if (!Number.isFinite(markValue)) {
+            throw new Error(`Validation Error: Invalid mark for criterion "${criterionKey}" in the scorecard for Code "${resultCodeLetter}".`);
+          }
+          scorecardTotal += markValue;
           const values = byCriterion.get(criterionId) || [];
-          values.push(Number(rawScore));
+          values.push(markValue);
           byCriterion.set(criterionId, values);
         });
         criterionMarksByRegistration.set(registrationId, byCriterion);
+
+        const scorecardTotals = criterionScorecardTotalsByRegistration.get(registrationId) || [];
+        // Older criterion-wise judge scorecards are converted to the new /100 scale.
+        scorecardTotals.push(Number(((scorecardTotal / maxMarks) * 100).toFixed(2)));
+        criterionScorecardTotalsByRegistration.set(registrationId, scorecardTotals);
       });
     });
 
-    const registrations = registrationSnapshot.docs.filter(doc => doc.data().status === 'APPROVED');
+    const registrations = registrationSnapshot.docs.filter(doc =>
+      String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
+    );
     const evaluated = registrations.flatMap(doc => {
       const criterionMap = criterionMarksByRegistration.get(doc.id);
+      const criterionScorecardTotals = criterionScorecardTotalsByRegistration.get(doc.id) || [];
       const legacyTotals = legacyTotalsByRegistration.get(doc.id) || [];
-      if (criterionMap && legacyTotals.length > 0) {
-        throw new Error(`Validation Error: Registration "${doc.id}" has a mixture of legacy total scores and criterion scores. Re-submit using one consistent score format.`);
-      }
 
       let score: number;
-      if (criterionMap && criterionMap.size > 0) {
-        // Each criterion has its own denominator: only judges who supplied that
-        // criterion contribute to its average. A complete rubric is validated at
-        // submission time; this also safely supports older partial scorecards.
+      if (legacyTotals.length > 0 && criterionScorecardTotals.length > 0) {
+        // New total-mark scorecards can coexist with earlier criterion-wise submissions.
+        // Averaging each judge's total is equivalent to summing criterion averages for
+        // complete rubrics, while keeping older drafts/submissions compatible.
+        const allJudgeTotals = [...legacyTotals, ...criterionScorecardTotals];
+        score = Number((allJudgeTotals.reduce((sum, value) => sum + value, 0) / allJudgeTotals.length).toFixed(2));
+      } else if (criterionMap && criterionMap.size > 0) {
+        // Preserve criterion-wise averaging, then normalize the result to marks out of 100.
         const criterionAverages = criterionDefinitions.map(criterion => {
           const marks = criterionMap.get(criterion.id) || [];
           return marks.length ? marks.reduce((sum, mark) => sum + mark, 0) / marks.length : 0;
         });
-        score = Number(criterionAverages.reduce((sum, average) => sum + average, 0).toFixed(2));
+        const criterionTotal = criterionAverages.reduce((sum, average) => sum + average, 0);
+        score = Number(((criterionTotal / maxMarks) * 100).toFixed(2));
       } else {
         if (legacyTotals.length === 0) return [];
         score = Number((legacyTotals.reduce((sum, value) => sum + value, 0) / legacyTotals.length).toFixed(2));
@@ -553,7 +733,7 @@ export class JudgeService {
         teamName: registration.teamName || '',
         teamColor: '#2563EB',
         score,
-        grade: calculateGrade(score, maxMarks)
+        grade: calculateGrade(score, 100)
       }];
     }).sort((a, b) => b.score - a.score);
 
@@ -604,6 +784,7 @@ export class JudgeService {
     assignmentId: string;
     competitionId: string;
     secret: string;
+    rosterVersion: string;
     scores: Record<string, Record<string, number> | number>;
   }): Promise<{
     success: boolean;
@@ -647,73 +828,85 @@ export class JudgeService {
       throw new Error(`Unauthorized: Judge authentication failed (${authResult.reason}).`);
     }
 
-    const { resolvedRegistrations } = await this.validateScoresPayload(db, params.competitionId, params.scores);
+    const { resolvedRegistrations, rosterEntries, rosterVersion } = await this.validateScoresPayload(
+      db,
+      params.competitionId,
+      params.scores,
+      params.rosterVersion
+    );
     const normalizedScores = Object.fromEntries(
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key)!, value])
     );
 
-    // Freeze the anonymous code-letter mapping into the immutable receipt so a later
-    // Green Room roster change cannot alter what this judge actually evaluated.
-    const greenRoomSnapshot = await db.collection('greenRoomAssignments')
-      .where('competitionId', '==', params.competitionId)
-      .get();
-    const rosterByRegistration = new Map<string, { codeLetter: string; codeIndex: number }>();
-    greenRoomSnapshot.docs.forEach((doc, index) => {
-      const item = doc.data();
-      if (typeof item.registrationId === 'string' && typeof item.codeLetter === 'string') {
-        rosterByRegistration.set(item.registrationId, {
-          codeLetter: item.codeLetter.trim().toUpperCase(),
-          codeIndex: Number.isFinite(Number(item.codeIndex)) ? Number(item.codeIndex) : index
-        });
-      }
-    });
-    const anonymousRoster = Array.from(resolvedRegistrations.values())
-      .map(registrationId => rosterByRegistration.get(registrationId))
-      .filter((item): item is { codeLetter: string; codeIndex: number } => Boolean(item))
-      .sort((a, b) => a.codeIndex - b.codeIndex);
-    if (anonymousRoster.length !== Object.keys(normalizedScores).length) {
-      throw new Error('Stale Mapping Error: The anonymous Green Room roster changed. Refresh the roster and verify each score before submitting.');
-    }
+    // Freeze both the anonymous roster and the internal Code Letter-to-registration
+    // mapping into the immutable, server-only receipt. Only anonymousRoster is
+    // returned to the judge; codeRegistrationSnapshot remains private to Admin SDK.
+    const anonymousRoster = rosterEntries.map(({ codeLetter, codeIndex }) => ({ codeLetter, codeIndex }));
+    const codeRegistrationSnapshot = rosterEntries.map(({ registrationId, codeLetter, codeIndex }) => ({
+      registrationId,
+      codeLetter,
+      codeIndex
+    }));
 
     const submittedAt = new Date().toISOString();
-    const hashPayload = `${params.assignmentId}:${params.competitionId}:${submittedAt}:${JSON.stringify(normalizedScores)}`;
+    const hashPayload = `${params.assignmentId}:${params.competitionId}:${rosterVersion}:${submittedAt}:${JSON.stringify(normalizedScores)}:${JSON.stringify(codeRegistrationSnapshot)}`;
     const verificationHash = 'SHA256:' + createHash('sha256').update(hashPayload).digest('hex');
     const markEntryId = `me-${params.assignmentId}`;
 
     const lockRef = db.collection('competitionMarkingLocks').doc(params.competitionId);
     const markEntryRef = db.collection('markEntries').doc(markEntryId);
     const assignRef = db.collection('judgeAssignments').doc(params.assignmentId);
+    const assignmentQuery = db.collection('greenRoomAssignments')
+      .where('competitionId', '==', params.competitionId);
+    const registrationQuery = db.collection('registrations')
+      .where('competitionId', '==', params.competitionId);
 
-    // Atomically persist finalized scorecard, update assignment status, and lock reassignment
+    // Atomically persist the scorecard only if the complete mapping still
+    // matches the exact roster the judge saw when the session loaded.
     await db.runTransaction(async (transaction) => {
       const lockDoc = await transaction.get(lockRef);
+      const currentRosterSnapshot = await transaction.get(assignmentQuery);
+      const currentRegistrationsSnapshot = await transaction.get(registrationQuery);
       if (lockDoc.exists && lockDoc.data()?.reassignmentInProgress) {
         throw new Error('Lock Conflict: Code Letter reassignment is currently in progress for this competition. Please retry.');
       }
 
       const assignDoc = await transaction.get(assignRef);
-      if (assignDoc.exists && assignDoc.data()?.status === 'SUBMITTED') {
+      if (!assignDoc.exists || assignDoc.data()?.competitionId !== params.competitionId) {
+        throw new Error('Unauthorized: Judge assignment could not be verified for this competition.');
+      }
+      if (assignDoc.data()?.status === 'SUBMITTED') {
         throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
       }
 
-      // Concurrency check: Ensure Code Letter-to-registration mapping has not changed or become stale
-      for (const [codeLetterKey, expectedRegId] of resolvedRegistrations.entries()) {
-        const cleanCode = codeLetterKey.trim().toUpperCase();
-        const asgnRef = db.collection('greenRoomAssignments').doc(`${params.competitionId}_${expectedRegId}`);
-        const asgnDoc = await transaction.get(asgnRef);
-
-        if (!asgnDoc.exists) {
+      const currentRoster = buildGreenRoomRosterSnapshot(
+        params.competitionId,
+        currentRosterSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+      );
+      if (currentRoster.version !== rosterVersion) {
+        throw new Error(
+          'Stale Mapping Error: The Green Room roster changed while the scorecard was being finalized. Nothing was submitted; refresh the judge session.'
+        );
+      }
+      const approvedIds = new Set(
+        currentRegistrationsSnapshot.docs
+          .filter(doc => String(doc.data().status || '').trim().toUpperCase() === 'APPROVED')
+          .map(doc => doc.id)
+      );
+      const currentRegistrationById = new Map(
+        currentRegistrationsSnapshot.docs.map(doc => [doc.id, { ...doc.data(), id: doc.id } as Record<string, unknown>])
+      );
+      for (const entry of currentRoster.entries) {
+        if (!approvedIds.has(entry.registrationId)) {
           throw new Error(
-            `Stale Mapping Error: Contestant registration "${expectedRegId}" is no longer checked in for competition "${params.competitionId}". The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
+            `Roster Integrity Error: Code Letter "${entry.codeLetter}" no longer points to an approved registration. Submission was blocked.`
           );
         }
-
-        const currentCode = (asgnDoc.data()?.codeLetter || '').trim().toUpperCase();
-        if (currentCode !== cleanCode) {
-          throw new Error(
-            `Stale Mapping Error: Code Letter "${cleanCode}" is no longer mapped to registration "${expectedRegId}" (currently mapped to "${currentCode}"). The contestant roster was updated backstage. Please refresh your contestant roster and re-verify your scores before submitting.`
-          );
+        const liveRegistration = currentRegistrationById.get(entry.registrationId);
+        if (!liveRegistration) {
+          throw new Error('Roster Integrity Error: A Code Letter has no live registration identity record. Submission was blocked.');
         }
+        assertGreenRoomEntryMatchesRegistration(entry, liveRegistration);
       }
 
       transaction.set(lockRef, {
@@ -737,6 +930,8 @@ export class JudgeService {
         isFinal: true,
         scores: normalizedScores,
         anonymousRoster,
+        codeRegistrationSnapshot,
+        rosterVersion,
         submittedAt,
         verificationHash
       });

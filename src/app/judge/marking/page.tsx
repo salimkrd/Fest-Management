@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
@@ -12,8 +12,6 @@ import {
   AlertCircle,
   AlertTriangle,
   Gavel,
-  Minus,
-  Plus,
   RefreshCw,
   Save,
   Send,
@@ -49,7 +47,7 @@ interface StoredJudgeSession {
   competition?: CompetitionSession;
 }
 
-type LocalScores = Record<string, Record<string, number>>;
+type LocalScores = Record<string, string>;
 
 function readStoredSession(): StoredJudgeSession | null {
   if (typeof window === 'undefined') return null;
@@ -74,6 +72,7 @@ function JudgeMarkingContent() {
   const [contestants, setContestants] = useState<AnonymousContestant[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [scores, setScores] = useState<LocalScores>({});
+  const [rosterVersion, setRosterVersion] = useState('');
   const [remarks, setRemarks] = useState('');
   const [syncState, setSyncState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [refreshing, setRefreshing] = useState(false);
@@ -120,6 +119,10 @@ function JudgeMarkingContent() {
         return;
       }
 
+      if (typeof result.rosterVersion !== 'string' || !/^[a-f0-9]{64}$/.test(result.rosterVersion)) {
+        throw new Error('The anonymous Green Room roster could not be verified. Refresh the judge session before entering marks.');
+      }
+
       const nextCriteria = Array.isArray(result.competition?.criteria)
         ? result.competition.criteria as Criterion[]
         : [];
@@ -129,24 +132,30 @@ function JudgeMarkingContent() {
       const nextScores: LocalScores = {};
 
       nextContestants.forEach(contestant => {
-        nextScores[contestant.codeLetter] = Object.fromEntries(
-          nextCriteria.map(criterion => [criterion.id, 0])
-        );
+        nextScores[contestant.codeLetter] = '';
       });
 
       if (result.scores && typeof result.scores === 'object') {
         Object.entries(result.scores as Record<string, Record<string, number> | number>).forEach(([codeLetter, rawScore]) => {
-          if (!nextScores[codeLetter]) return;
-          if (typeof rawScore === 'number') return;
-          nextScores[codeLetter] = {
-            ...nextScores[codeLetter],
-            ...Object.fromEntries(
-              Object.entries(rawScore || {}).filter(([criterionId, value]) =>
-                nextCriteria.some(criterion => criterion.id === criterionId) &&
-                typeof value === 'number' && Number.isFinite(value)
-              )
-            )
-          };
+          if (!(codeLetter in nextScores)) return;
+          if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
+            nextScores[codeLetter] = String(rawScore);
+            return;
+          }
+
+          // Convert drafts created by the previous criterion-wise UI into the
+          // equivalent total mark so judges can continue editing without data loss.
+          const restoredRawTotal = Object.entries(rawScore || {}).reduce((sum, [criterionId, value]) => {
+            const isKnownCriterion = nextCriteria.some(criterion => criterion.id === criterionId);
+            return isKnownCriterion && typeof value === 'number' && Number.isFinite(value)
+              ? sum + value
+              : sum;
+          }, 0);
+          const previousCriteriaMaximum = nextCriteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0);
+          const restoredTotal = previousCriteriaMaximum > 0
+            ? Math.round((restoredRawTotal / previousCriteriaMaximum) * 100)
+            : restoredRawTotal;
+          nextScores[codeLetter] = String(restoredTotal);
         });
       }
 
@@ -154,6 +163,7 @@ function JudgeMarkingContent() {
       setCriteria(nextCriteria);
       setContestants(nextContestants);
       setScores(nextScores);
+      setRosterVersion(result.rosterVersion);
       setRemarks(typeof result.draftRemarks === 'string' ? result.draftRemarks : '');
       setDraftSavedAt(typeof result.draftUpdatedAt === 'string' ? result.draftUpdatedAt : '');
       setStaleDraft(Boolean(result.staleDraft));
@@ -171,14 +181,11 @@ function JudgeMarkingContent() {
     void loadSession();
   }, [loadSession]);
 
-  const maxMarksTotal = useMemo(
-    () => criteria.reduce((sum, criterion) => sum + criterion.maxMarks, 0),
-    [criteria]
-  );
+  const maxMarksTotal = 100;
 
   const calculateTotal = (codeLetter: string) => {
-    const contestantScores = scores[codeLetter] || {};
-    return criteria.reduce((sum, criterion) => sum + (contestantScores[criterion.id] || 0), 0);
+    const value = Number(scores[codeLetter] ?? '0');
+    return Number.isFinite(value) ? value : 0;
   };
 
   const getGrade = (total: number) => {
@@ -193,24 +200,33 @@ function JudgeMarkingContent() {
     return { grade, color };
   };
 
-  const adjustScore = (codeLetter: string, criterionId: string, nextValue: number, max: number) => {
+  const adjustScore = (codeLetter: string, nextValue: string) => {
     setScores(previous => ({
       ...previous,
-      [codeLetter]: {
-        ...previous[codeLetter],
-        [criterionId]: Math.max(0, Math.min(max, Math.round(nextValue)))
-      }
+      [codeLetter]: nextValue
     }));
     setIsDirty(true);
     setDraftSavedNotice(false);
   };
 
   const saveMarks = async (action: 'DRAFT' | 'SUBMIT') => {
-    if (!assignmentId || !secret || !competition?.id) {
-      throw new Error('Your secure judge session is missing. Authenticate again before saving.');
+    if (!assignmentId || !secret || !competition?.id || !rosterVersion) {
+      throw new Error('Your verified Green Room roster session is missing. Refresh the judge session before saving.');
     }
-    if (contestants.length === 0 || criteria.length === 0) {
-      throw new Error('The current contestant roster or scoring rubric is empty. Refresh the session or contact the administrator.');
+    if (contestants.length === 0) {
+      throw new Error('The Green Room roster is empty. Refresh the session or contact the administrator.');
+    }
+
+    const validatedScores: Record<string, number> = {};
+    for (const contestant of contestants) {
+      const rawValue = scores[contestant.codeLetter] ?? '';
+      const value = Number(rawValue);
+      if (rawValue.trim() === '' || !Number.isInteger(value) || value < 0 || value > maxMarksTotal) {
+        throw new Error(
+          `Enter a whole-number mark from 0 to ${maxMarksTotal} for Code ${contestant.codeLetter}.`
+        );
+      }
+      validatedScores[contestant.codeLetter] = value;
     }
 
     const response = await fetch('/api/judge/marks', {
@@ -223,7 +239,8 @@ function JudgeMarkingContent() {
         assignmentId,
         competitionId: competition.id,
         secret,
-        scores,
+        rosterVersion,
+        scores: validatedScores,
         remarks
       })
     });
@@ -283,7 +300,7 @@ function JudgeMarkingContent() {
     });
   };
 
-  const isReadyToScore = syncState === 'ready' && contestants.length > 0 && criteria.length > 0 && !submitting;
+  const isReadyToScore = syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && !submitting;
   const statusText = syncState === 'loading'
     ? 'Syncing assignment'
     : syncState === 'error'
@@ -380,14 +397,11 @@ function JudgeMarkingContent() {
             <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">No anonymous contestants are currently assigned to this stage queue. Refresh the roster after the Green Room team checks contestants in.</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={handleRefresh} isLoading={refreshing}>Refresh roster</Button>
           </div>
-        ) : syncState === 'ready' && criteria.length === 0 ? (
-          <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            This competition has no configured marking criteria. Contact the administrator; do not use a sample rubric.
-          </div>
         ) : syncState === 'ready' ? (
           <div className="space-y-4">
             {contestants.map((contestant, index) => {
               const total = calculateTotal(contestant.codeLetter);
+              const hasMark = (scores[contestant.codeLetter] ?? '').trim() !== '';
               const { grade, color: gradeColor } = getGrade(total);
               return (
                 <article key={contestant.codeLetter} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -398,62 +412,39 @@ function JudgeMarkingContent() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-sm font-extrabold text-slate-950">Contestant {contestant.codeLetter}</h2>
+                          <h2 className="text-sm font-extrabold text-slate-950">Code {contestant.codeLetter}</h2>
                           <Badge variant="info" size="sm">ANONYMOUS</Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">Stage entry order #{index + 1}</p>
                         {contestant.status && <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{contestant.status.replaceAll('_', ' ')}</p>}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-2.5 sm:justify-end sm:bg-transparent sm:px-0 sm:py-0">
-                      <div className="sm:text-right">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Total score</span>
-                        <span className="text-2xl font-black tabular-nums text-slate-950">{total}<span className="ml-1 text-xs font-semibold text-slate-400">/ {maxMarksTotal}</span></span>
+                    <div className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3.5 sm:w-64 sm:flex-row sm:items-end sm:justify-end sm:bg-transparent sm:p-0">
+                      <div className="min-w-0 flex-1">
+                        <label htmlFor={`score-${contestant.codeLetter}`} className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Mark out of {maxMarksTotal}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id={`score-${contestant.codeLetter}`}
+                            type="number"
+                            min={0}
+                            max={maxMarksTotal}
+                            step={1}
+                            inputMode="numeric"
+                            value={scores[contestant.codeLetter] ?? ''}
+                            onChange={event => adjustScore(contestant.codeLetter, event.target.value)}
+                            disabled={savingDraft || submitting}
+                            aria-label={`Enter mark for Code ${contestant.codeLetter}, from 0 to ${maxMarksTotal}`}
+                            className="h-12 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-center font-mono text-xl font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+                          />
+                          <span className="shrink-0 text-xs font-bold text-slate-500">/ {maxMarksTotal}</span>
+                        </div>
                       </div>
-                      <span className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${gradeColor}`}>Grade {grade}</span>
+                      <span className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${hasMark ? gradeColor : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                        {hasMark ? `Grade ${grade}` : 'NOT SCORED'}
+                      </span>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 p-3.5 sm:grid-cols-2 sm:gap-4 sm:p-5">
-                    {criteria.map(criterion => {
-                      const value = scores[contestant.codeLetter]?.[criterion.id] ?? 0;
-                      return (
-                        <section key={criterion.id} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 sm:p-4">
-                          <div className="mb-3 flex items-start justify-between gap-3">
-                            <h3 className="min-w-0 break-words text-xs font-bold leading-5 text-slate-900">{criterion.name}</h3>
-                            <span className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-bold text-slate-500">Max {criterion.maxMarks}</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 sm:gap-3">
-                            <button
-                              type="button"
-                              onClick={() => adjustScore(contestant.codeLetter, criterion.id, value - 1, criterion.maxMarks)}
-                              disabled={value <= 0 || savingDraft || submitting}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Decrease ${criterion.name} for contestant ${contestant.codeLetter}`}
-                            ><Minus className="h-4 w-4" /></button>
-                            <input
-                              type="range"
-                              min={0}
-                              max={criterion.maxMarks}
-                              step={1}
-                              value={value}
-                              onChange={event => adjustScore(contestant.codeLetter, criterion.id, Number(event.target.value), criterion.maxMarks)}
-                              disabled={savingDraft || submitting}
-                              aria-label={`${criterion.name} score for contestant ${contestant.codeLetter}`}
-                              className="h-8 min-w-0 flex-1 cursor-pointer accent-blue-600 disabled:cursor-not-allowed"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => adjustScore(contestant.codeLetter, criterion.id, value + 1, criterion.maxMarks)}
-                              disabled={value >= criterion.maxMarks || savingDraft || submitting}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Increase ${criterion.name} for contestant ${contestant.codeLetter}`}
-                            ><Plus className="h-4 w-4" /></button>
-                            <output className="w-9 shrink-0 text-right font-mono text-sm font-extrabold tabular-nums text-slate-950">{value}</output>
-                          </div>
-                        </section>
-                      );
-                    })}
                   </div>
                 </article>
               );
@@ -476,11 +467,11 @@ function JudgeMarkingContent() {
           </div>
         ) : null}
 
-        {syncState === 'ready' && contestants.length > 0 && criteria.length > 0 && (
+        {syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && (
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
               <Gavel className="h-4 w-4 shrink-0 text-blue-600" />
-              <span>{contestants.length} anonymous contestants · {criteria.length} criteria</span>
+              <span>{contestants.length} anonymous codes · Marks out of 100</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
               <Button variant="outline" size="md" className="w-full sm:w-auto" leftIcon={<Save className="h-4 w-4" />} onClick={handleSaveDraft} disabled={savingDraft || submitting} isLoading={savingDraft}>Save draft</Button>
@@ -505,7 +496,7 @@ function JudgeMarkingContent() {
           <div className="space-y-4">
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs leading-5 text-amber-950">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every anonymous code and criterion score. After signing, amendments require administrator authorization.</p></div>
+              <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every Code Letter and its total mark. After signing, amendments require administrator authorization.</p></div>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs">
               <div className="col-span-2"><span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Assigned competition</span><span className="mt-1 block font-bold text-slate-950">{competition?.name}</span></div>

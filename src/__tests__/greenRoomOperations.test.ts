@@ -32,15 +32,19 @@ import { JudgeService } from '@/services/judgeService';
 import {
   encodeParticipantQrPayload,
   parseParticipantQrPayload,
-  generateQrVerificationToken
+  generateQrVerificationToken,
+  codeLetterToIndex
 } from '@/domain/greenRoom';
 import { POST as judgeLoginHandler } from '@/app/api/judge/login/route';
+import { POST as judgeSessionHandler } from '@/app/api/judge/session/route';
+import { POST as judgeConfirmationHandler } from '@/app/api/judge/confirmation/route';
 import { DELETE as deleteCompetitionHandler } from '@/app/api/admin/competitions/[id]/route';
 import { POST as syncClaimsHandler } from '@/app/api/auth/sync-claims/route';
 import { POST as provisionStaffHandler } from '@/app/api/admin/green-room/provision-staff/route';
 import { GET as qrIssuanceHandler } from '@/app/api/participants/[id]/qr/route';
 import { QrSignerService } from '@/services/qrSignerService';
 import { NextRequest } from 'next/server';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
 
 describe('Green Room Management & Anonymous Judging Workflow', () => {
   let adminIdToken = '';
@@ -58,6 +62,16 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
 
   const testCompId = 'cmp-green-room-test';
   const testGroupCompId = 'cmp-group-green-room-test';
+
+  const getRosterVersion = async (competitionId: string): Promise<string> => {
+    const snapshot = await db.collection('greenRoomAssignments')
+      .where('competitionId', '==', competitionId)
+      .get();
+    return buildGreenRoomRosterSnapshot(
+      competitionId,
+      snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }))
+    ).version;
+  };
 
   beforeAll(async () => {
     // 1. Initialize Client Auth connected to local emulator
@@ -729,6 +743,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       expect(data.success).toBe(true);
       expect(data.contestants).toBeDefined();
       expect(data.contestants.length).toBeGreaterThanOrEqual(2);
+      expect(data.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
 
       // Verify zero personal identity leakage in contestants array
       data.contestants.forEach((c: Record<string, unknown>) => {
@@ -743,17 +758,78 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       });
     });
 
+    it('POST /api/judge/session returns a verified anonymous roster and fingerprint only', async () => {
+      const req = new NextRequest('http://localhost:3000/api/judge/session', {
+        method: 'POST',
+        body: JSON.stringify({
+          assignmentId,
+          competitionId: testCompId,
+          secret: judgeSecret
+        })
+      });
+      const res = await judgeSessionHandler(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      const data = await res.json();
+      expect(data.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
+      expect(data.contestants.length).toBeGreaterThanOrEqual(2);
+      for (const contestant of data.contestants) {
+        expect(contestant.codeLetter).toBeDefined();
+        expect(contestant.registrationId).toBeUndefined();
+        expect(contestant.participantName).toBeUndefined();
+        expect(contestant.teamName).toBeUndefined();
+        expect(contestant.chestNumber).toBeUndefined();
+      }
+    });
+
+    it('blocks judge login when the Green Room roster contains a duplicate Code Letter', async () => {
+      const firstRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-01`);
+      const secondRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-02`);
+      const [firstSnapshot, secondSnapshot] = await Promise.all([firstRef.get(), secondRef.get()]);
+      const firstData = firstSnapshot.data()!;
+      const secondData = secondSnapshot.data()!;
+      const originalCode = String(firstData.codeLetter).trim().toUpperCase();
+      const duplicateCode = String(secondData.codeLetter).trim().toUpperCase();
+
+      try {
+        await firstRef.update({
+          codeLetter: duplicateCode,
+          codeIndex: codeLetterToIndex(duplicateCode),
+          updatedAt: new Date().toISOString()
+        });
+
+        const req = new NextRequest('http://localhost:3000/api/judge/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            accessCode: judgeAccessCode,
+            competitionId: testCompId,
+            secret: judgeSecret
+          })
+        });
+        const res = await judgeLoginHandler(req);
+        expect(res.status).toBe(409);
+        expect((await res.json()).code).toBe('ROSTER_INTEGRITY_ERROR');
+      } finally {
+        await firstRef.update({
+          codeLetter: originalCode,
+          codeIndex: codeLetterToIndex(originalCode),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
     it('rejects participant IDs as score submission keys', async () => {
       await expect(
         JudgeService.submitMarks({
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'p-gr-101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects registration IDs as score submission keys', async () => {
@@ -762,11 +838,12 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'reg-gr-solo-01': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects bib numbers as score submission keys', async () => {
@@ -775,6 +852,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             '#101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -788,11 +866,12 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             '101': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
     });
 
     it('rejects unassigned Code Letters as score submission keys', async () => {
@@ -801,6 +880,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'Z': { 'cr-pitch': 30, 'cr-expression': 30, 'cr-diction': 20 }
           }
@@ -814,32 +894,65 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId,
           competitionId: testCompId,
           secret: judgeSecret,
+          rosterVersion: await getRosterVersion(testCompId),
           scores: {
             'p-gr-101': { 'cr-pitch': 30 }
           }
         })
-      ).rejects.toThrow(/direct contestant identifier.*strictly rejected/i);
+      ).rejects.toThrow(/Direct contestant identifiers are not accepted/i);
+    });
+
+    it('blocks judging entirely when two Green Room registrations share the same Code Letter', async () => {
+      const firstRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-01`);
+      const secondRef = db.collection('greenRoomAssignments').doc(`${testCompId}_reg-gr-solo-02`);
+      const [firstSnapshot, secondSnapshot] = await Promise.all([firstRef.get(), secondRef.get()]);
+      const firstData = firstSnapshot.data()!;
+      const secondData = secondSnapshot.data()!;
+      const originalCode = String(firstData.codeLetter).trim().toUpperCase();
+      const duplicateCode = String(secondData.codeLetter).trim().toUpperCase();
+
+      expect(originalCode).not.toBe(duplicateCode);
+
+      try {
+        await firstRef.update({
+          codeLetter: duplicateCode,
+          codeIndex: codeLetterToIndex(duplicateCode),
+          updatedAt: new Date().toISOString()
+        });
+
+        await expect(
+          JudgeService.submitMarks({
+            assignmentId,
+            competitionId: testCompId,
+            secret: judgeSecret,
+            rosterVersion: 'a'.repeat(64),
+            scores: { [duplicateCode]: 91 }
+          })
+        ).rejects.toThrow(/Roster Integrity Error: Code Letter .* assigned to more than one registration/i);
+
+        const markSnap = await db.collection('markEntries').doc(`me-${assignmentId}`).get();
+        expect(markSnap.exists).toBe(false);
+      } finally {
+        await firstRef.update({
+          codeLetter: originalCode,
+          codeIndex: codeLetterToIndex(originalCode),
+          updatedAt: new Date().toISOString()
+        });
+      }
     });
 
     it('Judge submits scores using anonymous Code Letters; server resolves accurately to registrationId', async () => {
       // Judge evaluates Code Letter B (Ahmad Rayan) and Code Letter C (Fathima Zahra)
       const judgeScores = {
-        'B': {
-          'cr-pitch': 38,
-          'cr-expression': 32,
-          'cr-diction': 24
-        }, // Total 94
-        'C': {
-          'cr-pitch': 32,
-          'cr-expression': 30,
-          'cr-diction': 20
-        } // Total 82
+        'B': 94, // Green Room Code B belongs to reg-gr-solo-02
+        'C': 82  // Green Room Code C belongs to reg-gr-solo-01
       };
 
       const result = await JudgeService.submitMarks({
         assignmentId,
         competitionId: testCompId,
         secret: judgeSecret,
+        rosterVersion: await getRosterVersion(testCompId),
         scores: judgeScores
       });
 
@@ -851,8 +964,39 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       const markSnap = await db.collection('markEntries').doc(`me-${assignmentId}`).get();
       const markData = markSnap.data();
       expect(markData?.status).toBe('SUBMITTED');
-      expect(markData?.scores['reg-gr-solo-02']).toBeDefined(); // Code B resolved to reg-gr-solo-02
-      expect(markData?.scores['reg-gr-solo-01']).toBeDefined(); // Code C resolved to reg-gr-solo-01
+      expect(markData?.scores['reg-gr-solo-02']).toBe(94); // Code B -> reg-gr-solo-02
+      expect(markData?.scores['reg-gr-solo-01']).toBe(82); // Code C -> reg-gr-solo-01
+      expect(markData?.anonymousRoster).toEqual([
+        { codeLetter: 'B', codeIndex: 1 },
+        { codeLetter: 'C', codeIndex: 2 }
+      ]);
+      expect(markData?.codeRegistrationSnapshot).toEqual([
+        { registrationId: 'reg-gr-solo-02', codeLetter: 'B', codeIndex: 1 },
+        { registrationId: 'reg-gr-solo-01', codeLetter: 'C', codeIndex: 2 }
+      ]);
+      expect(markData?.rosterVersion).toMatch(/^[a-f0-9]{64}$/);
+
+      // Receipt must prove the same anonymous roster without exposing the
+      // private registration-ID mapping archived on the server.
+      const receiptReq = new NextRequest('http://localhost:3000/api/judge/confirmation', {
+        method: 'POST',
+        body: JSON.stringify({
+          assignmentId,
+          competitionId: testCompId,
+          secret: judgeSecret,
+          verificationHash: result.verificationHash
+        })
+      });
+      const receiptRes = await judgeConfirmationHandler(receiptReq);
+      expect(receiptRes.status).toBe(200);
+      const receiptData = await receiptRes.json();
+      expect(receiptData.contestants).toEqual([
+        { codeLetter: 'B', codeIndex: 1 },
+        { codeLetter: 'C', codeIndex: 2 }
+      ]);
+      expect(JSON.stringify(receiptData)).not.toContain('reg-gr-solo-01');
+      expect(JSON.stringify(receiptData)).not.toContain('reg-gr-solo-02');
+      expect(JSON.stringify(receiptData)).not.toContain('codeRegistrationSnapshot');
 
       // Verify official result calculation in results collection
       const resSnap = await db.collection('results').doc(`res-${testCompId}`).get();
@@ -957,6 +1101,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         assignmentId: draftAsgnId,
         competitionId: draftCompId,
         secret: draftSecret,
+        rosterVersion: await getRosterVersion(draftCompId),
         scores: { 'A': { 'cr-draft-1': 45 } }
       });
       expect(draftResult.success).toBe(true);
@@ -1038,6 +1183,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: concAsgnId,
           competitionId: concCompId,
           secret: concSecret,
+          rosterVersion: await getRosterVersion(concCompId),
           scores: { 'A': { 'cr-race-1': 40 } }
         })
       ).rejects.toThrow(/Lock Conflict: Code Letter reassignment is currently in progress/i);
@@ -1048,6 +1194,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: concAsgnId,
           competitionId: concCompId,
           secret: concSecret,
+          rosterVersion: await getRosterVersion(concCompId),
           scores: { 'A': { 'cr-race-1': 40 } }
         })
       ).rejects.toThrow(/Lock Conflict: Code Letter reassignment is currently in progress/i);
@@ -1062,6 +1209,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         assignmentId: concAsgnId,
         competitionId: concCompId,
         secret: concSecret,
+        rosterVersion: await getRosterVersion(concCompId),
         scores: { 'A': { 'cr-race-1': 42 } }
       });
       expect(finalRes.success).toBe(true);
@@ -1159,6 +1307,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: emptyAsgnId,
           competitionId: emptyCompId,
           secret: emptySecret,
+          rosterVersion: await getRosterVersion(emptyCompId),
           scores: { 'A': { 'cr-1': 85 } }
         })
       ).rejects.toThrow(/Validation Error.*(No contestants have checked in|"A")/i);
@@ -1426,6 +1575,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         db.collection('markEntries').doc('me-' + staleJudgeAssignId).delete(),
         db.collection('registrations').doc('reg-stale-1').delete(),
         db.collection('registrations').doc('reg-stale-2').delete(),
+        db.collection('registrations').doc('reg-stale-3').delete(),
         db.collection('judgeAssignments').doc(staleJudgeAssignId).delete(),
         db.collection('competitions').doc(staleCompId).delete(),
       ]);
@@ -1477,6 +1627,22 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         bib: '#ST-02'
       });
 
+      // A third approved entry leaves Code C available to exercise a real
+      // post-session reassignment without creating a third checked-in code.
+      await db.collection('registrations').doc('reg-stale-3').set({
+        id: 'reg-stale-3',
+        competitionId: staleCompId,
+        participantId: 'part-stale-3',
+        participantName: 'Stale Contestant 3',
+        teamId: 'team-1',
+        teamCode: 'SHA',
+        teamName: 'Team Al-Shabab',
+        status: 'APPROVED',
+        code: 'STALE-REG-3',
+        chestNumber: 'ST-03',
+        bib: '#ST-03'
+      });
+
       // Seed Judge Assignment with hashed secret and salt
       const { hashSecret } = await import('@/domain/judgeAuth');
       const secretHash = await hashSecret('secure_pin_987654', 'salt_stale_race');
@@ -1498,6 +1664,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
       await db.collection('competitions').doc(staleCompId).delete().catch(() => {});
       await db.collection('registrations').doc('reg-stale-1').delete().catch(() => {});
       await db.collection('registrations').doc('reg-stale-2').delete().catch(() => {});
+      await db.collection('registrations').doc('reg-stale-3').delete().catch(() => {});
       await db.collection('judgeAssignments').doc(staleJudgeAssignId).delete().catch(() => {});
       await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).delete().catch(() => {});
       await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).delete().catch(() => {});
@@ -1580,7 +1747,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.success).toBe(true);
         expect(res.qrVerified).toBe(true);
         expect(res.checkInMethod).toBe('QR_SCAN');
-        expect(['A', 'B']).toContain(res.assignment.codeLetter);
+        expect(['A', 'B', 'C']).toContain(res.assignment.codeLetter);
 
         // Verify assignment record in Firestore
         const doc = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
@@ -1610,7 +1777,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(res.qrVerified).toBe(false);
         expect(res.checkInMethod).toBe('MANUAL_LOOKUP');
         const firstAssignment = await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).get();
-        expect(['A', 'B']).toContain(res.assignment.codeLetter);
+        expect(['A', 'B', 'C']).toContain(res.assignment.codeLetter);
         expect(res.assignment.codeLetter).not.toBe(firstAssignment.data()?.codeLetter);
 
         // Verify assignment record in Firestore
@@ -1643,6 +1810,91 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         }
         return { firstCodeLetter, secondCodeLetter };
       };
+
+      it('rejects marks from a judge screen opened before a real Green Room Code Letter reassignment', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
+        const oldSessionRosterVersion = await getRosterVersion(staleCompId);
+        const availableCodeLetter = ['A', 'B', 'C'].find(
+          code => code !== firstCodeLetter && code !== secondCodeLetter
+        );
+        expect(availableCodeLetter).toBeDefined();
+
+        // This is a real service-level reassignment while the judge's old screen
+        // remains open. Use whichever approved-pool code is currently unoccupied.
+        const reassigned = await GreenRoomService.reassignCodeLetter({
+          competitionId: staleCompId,
+          registrationId: 'reg-stale-1',
+          newCodeLetter: availableCodeLetter!,
+          reason: 'Exercise stale judge session protection',
+          operatorIdToken: staffIdToken
+        });
+        expect(reassigned.codeLetter).toBe(availableCodeLetter);
+
+        // A judge still holding the old A/B screen must not be able to save A/B
+        // to the new B/C roster, even though Code A is now free.
+        await expect(
+          JudgeService.saveDraftMarks({
+            assignmentId: staleJudgeAssignId,
+            competitionId: staleCompId,
+            secret: 'secure_pin_987654',
+            rosterVersion: oldSessionRosterVersion,
+            scores: {
+              [firstCodeLetter]: { 'c1': 91, 'c2': 0 },
+              [secondCodeLetter]: { 'c1': 80, 'c2': 0 }
+            }
+          })
+        ).rejects.toThrow(/Stale Mapping Error/);
+
+        // Restore the original identity mapping so the following race tests
+        // start from the known A/B fixture.
+        const restored = await GreenRoomService.reassignCodeLetter({
+          competitionId: staleCompId,
+          registrationId: 'reg-stale-1',
+          newCodeLetter: firstCodeLetter,
+          reason: 'Restore stale session test fixture',
+          operatorIdToken: staffIdToken
+        });
+        expect(restored.codeLetter).toBe(firstCodeLetter);
+      });
+
+      it('rejects marks if the registration ID now refers to a different participant identity', async () => {
+        const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
+        const registrationRef = db.collection('registrations').doc('reg-stale-1');
+        const registrationSnapshot = await registrationRef.get();
+        const originalParticipantId = registrationSnapshot.data()?.participantId;
+
+        try {
+          // Keep the registration document ID and Code Letter unchanged, but
+          // simulate that this registration has been edited/reused for another
+          // participant. The assignment-time identity snapshot must catch it.
+          await registrationRef.update({
+            participantId: 'part-stale-reassigned-person',
+            participantName: 'Different Contestant Identity'
+          });
+
+          await expect(
+            JudgeService.saveDraftMarks({
+              assignmentId: staleJudgeAssignId,
+              competitionId: staleCompId,
+              secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
+              scores: {
+                [firstCodeLetter]: 91,
+                [secondCodeLetter]: 80
+              }
+            })
+          ).rejects.toThrow(/Roster Integrity Error: Code Letter .* participant and group identity snapshot/i);
+
+          const markEntry = await db.collection('markEntries').doc(`me-${staleJudgeAssignId}`).get();
+          expect(markEntry.exists).toBe(false);
+        } finally {
+          await registrationRef.update({
+            participantId: originalParticipantId,
+            participantName: 'Stale Contestant 1'
+          });
+        }
+      });
+
       it('rejects saveDraftMarks with Stale Mapping Error if a Code Letter is reassigned backstage after judge validation', async () => {
         const { firstCodeLetter, secondCodeLetter } = await getAssignedCodeLetters();
         // Spy on validateScoresPayload to simulate a concurrent race condition:
@@ -1654,6 +1906,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
             codeLetter: 'X',
+            codeIndex: codeLetterToIndex('X'),
             updatedAt: new Date().toISOString()
           });
           return res;
@@ -1665,6 +1918,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               assignmentId: staleJudgeAssignId,
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
               scores: {
                 [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
                 [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
@@ -1676,6 +1930,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           // Reset reg-stale-1 back to 'A'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-1`).update({
             codeLetter: firstCodeLetter,
+            codeIndex: codeLetterToIndex(firstCodeLetter),
             updatedAt: new Date().toISOString()
           });
         }
@@ -1690,6 +1945,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           const res = await origValidate.apply(this, args);
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
             codeLetter: 'Z',
+            codeIndex: codeLetterToIndex('Z'),
             updatedAt: new Date().toISOString()
           });
           return res;
@@ -1701,6 +1957,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
               assignmentId: staleJudgeAssignId,
               competitionId: staleCompId,
               secret: 'secure_pin_987654',
+              rosterVersion: await getRosterVersion(staleCompId),
               scores: {
                 [firstCodeLetter]: { 'c1': 45, 'c2': 40 },
                 [secondCodeLetter]: { 'c1': 35, 'c2': 38 }
@@ -1712,6 +1969,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           // Reset reg-stale-2 back to 'B'
           await db.collection('greenRoomAssignments').doc(`${staleCompId}_reg-stale-2`).update({
             codeLetter: secondCodeLetter,
+            codeIndex: codeLetterToIndex(secondCodeLetter),
             updatedAt: new Date().toISOString()
           });
         }
@@ -1724,6 +1982,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: staleJudgeAssignId,
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
+          rosterVersion: await getRosterVersion(staleCompId),
           scores: {
             [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
             [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
@@ -1736,6 +1995,7 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
           assignmentId: staleJudgeAssignId,
           competitionId: staleCompId,
           secret: 'secure_pin_987654',
+          rosterVersion: await getRosterVersion(staleCompId),
           scores: {
             [firstCodeLetter]: { 'c1': 48, 'c2': 45 },
             [secondCodeLetter]: { 'c1': 40, 'c2': 42 }
@@ -1745,6 +2005,207 @@ describe('Green Room Management & Anonymous Judging Workflow', () => {
         expect(submitRes.marksRecorded).toBe(2);
         expect(submitRes.verificationHash).toMatch(/^SHA256:/);
       });
+    });
+  });
+
+  describe('12. Ambiguous registration identity must fail closed', () => {
+    it('does not assign a Code Letter when one identifier matches two registrations', async () => {
+      const compId = 'cmp-gr-ambiguous-ident-test';
+      const registrationIds = ['reg-gr-ambiguous-1', 'reg-gr-ambiguous-2'];
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'AMB-01',
+          name: 'Ambiguous Identity Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'SCHEDULED'
+        });
+
+        await Promise.all(registrationIds.map((id, index) =>
+          db.collection('registrations').doc(id).set({
+            id,
+            competitionId: compId,
+            participantId: `part-gr-ambiguous-${index + 1}`,
+            participantName: `Ambiguous Contestant ${index + 1}`,
+            status: 'APPROVED',
+            chestNumber: 'AMB-01',
+            bib: '#AMB-01'
+          })
+        ));
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'AMB-01',
+            checkInMethod: 'MANUAL_LOOKUP',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/matches more than one registration.*check-in has been blocked/i);
+
+        const assignments = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(assignments.empty).toBe(true);
+      } finally {
+        const batch = db.batch();
+        registrationIds.forEach(id => {
+          batch.delete(db.collection('registrations').doc(id));
+          batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${id}`));
+        });
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
+
+  describe('13. Green Room roster freezes when the first judge draft is saved', () => {
+    it('blocks a new check-in after a judge has started entering marks', async () => {
+      const compId = 'cmp-gr-roster-freeze-test';
+      const judgeAssignmentId = 'asgn-gr-roster-freeze-test';
+      const secret = 'roster_freeze_987';
+      const registrationIds = ['reg-gr-freeze-1', 'reg-gr-freeze-2'];
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'FREEZE-01',
+          name: 'Roster Freeze Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'IN_PROGRESS',
+          maxMarks: 100,
+          criteria: [{ id: 'cr-freeze', name: 'Overall', maxMarks: 100 }]
+        });
+
+        await db.collection('registrations').doc(registrationIds[0]).set({
+          id: registrationIds[0],
+          competitionId: compId,
+          participantId: 'part-gr-freeze-1',
+          participantName: 'Freeze Contestant 1',
+          status: 'APPROVED',
+          chestNumber: 'FRZ-01'
+        });
+        await db.collection('registrations').doc(registrationIds[1]).set({
+          id: registrationIds[1],
+          competitionId: compId,
+          participantId: 'part-gr-freeze-2',
+          participantName: 'Freeze Contestant 2',
+          status: 'APPROVED',
+          chestNumber: 'FRZ-02'
+        });
+
+        const checkedIn = await GreenRoomService.checkInContestant({
+          competitionId: compId,
+          participantIdentifier: 'FRZ-01',
+          operatorIdToken: staffIdToken
+        });
+        const assignedCode = checkedIn.assignment.codeLetter;
+        expect(assignedCode).toMatch(/^[A-Z]{1,2}$/);
+
+        const { hashSecret } = await import('@/domain/judgeAuth');
+        const salt = 'salt_roster_freeze';
+        await db.collection('judgeAssignments').doc(judgeAssignmentId).set({
+          id: judgeAssignmentId,
+          judgeName: 'Roster Freeze Judge',
+          competitionId: compId,
+          secretHash: await hashSecret(secret, salt),
+          salt,
+          status: 'ACTIVE',
+          revoked: false
+        });
+
+        const rosterVersion = await getRosterVersion(compId);
+        const draft = await JudgeService.saveDraftMarks({
+          assignmentId: judgeAssignmentId,
+          competitionId: compId,
+          secret,
+          rosterVersion,
+          scores: { [assignedCode]: 87 }
+        });
+        expect(draft.success).toBe(true);
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'FRZ-02',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/Green Room check-in is locked because judge marking has started/i);
+
+        const roster = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(roster.docs).toHaveLength(1);
+        expect(roster.docs[0].data().registrationId).toBe(registrationIds[0]);
+        expect(roster.docs[0].data().codeLetter).toBe(assignedCode);
+      } finally {
+        const batch = db.batch();
+        registrationIds.forEach(id => {
+          batch.delete(db.collection('registrations').doc(id));
+          batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${id}`));
+        });
+        batch.delete(db.collection('judgeAssignments').doc(judgeAssignmentId));
+        batch.delete(db.collection('markEntries').doc(`me-${judgeAssignmentId}`));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
+    });
+  });
+
+  describe('14. Green Room rejects registrations without a stable person identity', () => {
+    it('does not allocate a Code Letter to an approved registration with no participant or group identity', async () => {
+      const compId = 'cmp-gr-no-identity-test';
+      const registrationId = 'reg-gr-no-identity-test';
+
+      try {
+        await db.collection('competitions').doc(compId).set({
+          id: compId,
+          code: 'NO-ID-01',
+          name: 'Missing Identity Test',
+          categoryId: 'cat-senior',
+          categoryName: 'Senior',
+          type: 'SOLO',
+          status: 'SCHEDULED'
+        });
+        await db.collection('registrations').doc(registrationId).set({
+          id: registrationId,
+          competitionId: compId,
+          status: 'APPROVED',
+          chestNumber: 'NO-ID-01'
+        });
+
+        await expect(
+          GreenRoomService.checkInContestant({
+            competitionId: compId,
+            participantIdentifier: 'NO-ID-01',
+            checkInMethod: 'MANUAL_LOOKUP',
+            operatorIdToken: staffIdToken
+          })
+        ).rejects.toThrow(/no verifiable participant or group identity/i);
+
+        const roster = await db.collection('greenRoomAssignments')
+          .where('competitionId', '==', compId)
+          .get();
+        expect(roster.empty).toBe(true);
+        const counter = await db.collection('greenRoomCounters').doc(compId).get();
+        expect(counter.exists).toBe(false);
+      } finally {
+        const batch = db.batch();
+        batch.delete(db.collection('registrations').doc(registrationId));
+        batch.delete(db.collection('greenRoomAssignments').doc(`${compId}_${registrationId}`));
+        batch.delete(db.collection('greenRoomCounters').doc(compId));
+        batch.delete(db.collection('competitionMarkingLocks').doc(compId));
+        batch.delete(db.collection('competitions').doc(compId));
+        await batch.commit();
+      }
     });
   });
 });
