@@ -23,7 +23,6 @@ function DirectoryContent() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
-  const [exportingGazette, setExportingGazette] = useState(false);
 
   // Filter ratified published results only
   const publishedResults = useMemo(() => {
@@ -68,14 +67,6 @@ function DirectoryContent() {
     setSearch('');
     setSelectedCategory('ALL');
     setSelectedType('ALL');
-  };
-
-  const handleExportGazette = () => {
-    setExportingGazette(true);
-    setTimeout(() => {
-      window.print();
-      setExportingGazette(false);
-    }, 600);
   };
 
   return (
@@ -471,38 +462,6 @@ function DirectoryContent() {
         )}
       </div>
 
-      {/* PAGINATION & EXPORT FOLIO BAR (MATCHING STITCH) */}
-      <section className="w-full bg-[#1B090B] rounded-2xl border border-[#BA1912]/30 p-4 sm:p-5 shadow-inner">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleExportGazette}
-              disabled={exportingGazette}
-              className="w-full sm:w-auto px-4 py-3 bg-[#BA1912] hover:bg-[#A91D3A] text-[#F2F3E6] text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 border border-[#FDBF0F]/30"
-            >
-              <span className="material-symbols-outlined text-[18px] text-[#FDBF0F]">
-                {exportingGazette ? 'sync' : 'picture_as_pdf'}
-              </span>
-              <span>{exportingGazette ? 'Preparing Gazette...' : 'Export Full Session Gazette (PDF)'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              title="Print official merit summary"
-              className="hidden sm:flex p-3 bg-[#230D0F] hover:bg-[#281014] text-[#F2F3E6] rounded-lg border border-white/5 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">print</span>
-            </button>
-          </div>
-
-          <div className="text-right">
-            <span className="text-xs uppercase tracking-wider text-[#F2F3E6]/70">
-              Showing Records 01 - {filtered.length} of {publishedResults.length} Ratified
-            </span>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

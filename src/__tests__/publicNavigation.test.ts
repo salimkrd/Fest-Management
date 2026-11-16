@@ -71,3 +71,27 @@ describe('Public championship page simplification', () => {
     expect(championshipPage).toContain('Cumulative Aggregate');
   });
 });
+
+
+describe('Public Results Directory bottom action strip removal', () => {
+  const directoryPage = readProjectFile('src/app/public/directory/page.tsx');
+
+  it('removes the full-session gazette export and print controls', () => {
+    expect(directoryPage).not.toContain('PAGINATION & EXPORT FOLIO BAR');
+    expect(directoryPage).not.toContain('Export Full Session Gazette (PDF)');
+    expect(directoryPage).not.toContain('Print official merit summary');
+    expect(directoryPage).not.toContain('handleExportGazette');
+    expect(directoryPage).not.toContain('exportingGazette');
+  });
+
+  it('removes the redundant Showing Records count in the bottom strip', () => {
+    expect(directoryPage).not.toContain('Showing Records 01 -');
+  });
+
+  it('preserves the search filters, published result cards, and result navigation', () => {
+    expect(directoryPage).toContain('SEARCH, DIVISION TABS & ADVANCED FILTER SUITE');
+    expect(directoryPage).toContain('OFFICIAL COMPETITION RESULTS GRID');
+    expect(directoryPage).toContain('<PosterDownloadDialog result={res} theme={theme} />');
+    expect(directoryPage).toContain('/public/competition/');
+  });
+});
