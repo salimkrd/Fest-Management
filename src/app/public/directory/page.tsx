@@ -11,7 +11,7 @@ function DirectoryContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
-  const { results, categories, competitions, theme, resultsSyncState } = useFest();
+  const { results, categories, competitions, competitionsSyncState, theme, resultsSyncState } = useFest();
 
   const [search, setSearch] = useState(initialQuery);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
@@ -109,7 +109,11 @@ function DirectoryContent() {
             <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#230D0F] border border-[#FDBF0F]/40 shadow-xs">
               <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
               <span className="text-xs font-bold uppercase tracking-wider text-[#FDBF0F] font-mono">
-                {publishedResults.length} / {competitions.length || 54} Events Ratified
+                {competitionsSyncState === 'loading'
+                  ? 'Loading event total…'
+                  : competitionsSyncState === 'ready'
+                  ? `${publishedResults.length} / ${competitions.length} Events Ratified`
+                  : `${publishedResults.length} Published Results`}
               </span>
             </div>
 

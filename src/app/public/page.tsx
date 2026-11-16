@@ -187,7 +187,7 @@ export default function InspirathPublicHomePage() {
   const festivalTitle = theme.festivalName || 'INSPIRAATH';
 
   return (
-    <div className="bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
+    <div className="public-experience bg-[#FDBF0F] font-body antialiased selection:bg-[#4A0A1C] selection:text-[#FDBF0F] text-[#1A080B] min-h-screen">
 
 
       <main className="w-full">

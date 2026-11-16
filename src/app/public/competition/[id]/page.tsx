@@ -7,6 +7,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import type { ResultRank } from '@/types/fest';
 import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
+import { getPublishedOfficialPoints } from '@/domain/publicChampionship';
 import { Loader2 } from 'lucide-react';
 
 interface WinnerPhotoProps {
@@ -69,6 +70,9 @@ function CompetitionDetailContent() {
   const rank1 = result?.ranks.find(r => r.rank === 1);
   const rank2 = result?.ranks.find(r => r.rank === 2);
   const rank3 = result?.ranks.find(r => r.rank === 3);
+  const rank1Points = rank1 ? getPublishedOfficialPoints(rank1) : null;
+  const rank2Points = rank2 ? getPublishedOfficialPoints(rank2) : null;
+  const rank3Points = rank3 ? getPublishedOfficialPoints(rank3) : null;
 
   const [winnerPhotos, setWinnerPhotos] = useState<Record<string, string>>({});
 
@@ -388,7 +392,7 @@ function CompetitionDetailContent() {
                 <div className="text-right">
                   <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
                   <span className="text-base font-black text-[#D8C8B7]">
-                    +{rank2.officialPoints ?? rank2.totalEarnedPoints ?? 5} PTS
+                    {rank2Points === null ? 'Unavailable' : `+${rank2Points} PTS`}
                   </span>
                 </div>
               </div>
@@ -452,7 +456,7 @@ function CompetitionDetailContent() {
                 <div className="text-right">
                   <span className="text-[9px] uppercase tracking-wider text-[#FDBF0F] block font-bold">Accredited Points</span>
                   <span className="text-lg font-black text-[#FDBF0F]">
-                    +{rank1.officialPoints ?? rank1.totalEarnedPoints ?? 10} PTS
+                    {rank1Points === null ? 'Unavailable' : `+${rank1Points} PTS`}
                   </span>
                 </div>
               </div>
@@ -512,7 +516,7 @@ function CompetitionDetailContent() {
                 <div className="text-right">
                   <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
                   <span className="text-base font-black text-[#FDBF0F]">
-                    +{rank3.officialPoints ?? rank3.totalEarnedPoints ?? 3} PTS
+                    {rank3Points === null ? 'Unavailable' : `+${rank3Points} PTS`}
                   </span>
                 </div>
               </div>
@@ -634,7 +638,7 @@ function CompetitionDetailContent() {
 
                   {/* Points Accredited */}
                   <td className="py-3.5 px-4 text-right font-black text-[#FDBF0F] text-sm font-mono">
-                    +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
+                    {getPublishedOfficialPoints(rk) === null ? 'Unavailable' : `+${getPublishedOfficialPoints(rk)} pts`}
                     {result.type === 'GROUP' ? ' · Team' : ''}
                   </td>
                 </tr>
@@ -676,7 +680,7 @@ function CompetitionDetailContent() {
                 </div>
 
                 <span className="text-xs font-black text-[#FDBF0F] font-mono">
-                  +{rk.officialPoints ?? rk.totalEarnedPoints ?? 0} pts
+                  {getPublishedOfficialPoints(rk) === null ? 'Unavailable' : `+${getPublishedOfficialPoints(rk)} pts`}
                 </span>
               </div>
 

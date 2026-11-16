@@ -125,3 +125,72 @@ describe('Shared compact footer across primary public pages', () => {
     expect(publicLayout).not.toContain('SANCTIFIED UNDER CENTRAL DIRECTIVE');
   });
 });
+
+
+describe('Public championship division and official points integrity', () => {
+  const championshipPage = readProjectFile('src/app/public/championship/page.tsx');
+  const competitionDetail = readProjectFile('src/app/public/competition/[id]/page.tsx');
+  const directoryPage = readProjectFile('src/app/public/directory/page.tsx');
+
+  it('builds division-filtered standings from published results rather than only changing the selected tab', () => {
+    expect(championshipPage).toContain('buildDivisionTeamStandings(teams, results, selectedDivision)');
+    expect(championshipPage).toContain('{displayedTeams.map((team, idx) => {');
+    expect(championshipPage).toContain('resultsSyncState');
+    expect(championshipPage).toContain('No Published Results for This Division');
+  });
+
+  it('does not show a podium or share percentages when division point data is incomplete', () => {
+    expect(championshipPage).toContain('divisionPointsIncomplete');
+    expect(championshipPage).toContain('No points are estimated from rank');
+    expect(championshipPage).toContain('sharePercent === null');
+  });
+
+  it('never manufactures 10, 5, or 3 points for a public result from its place number', () => {
+    expect(competitionDetail).not.toContain('?? 10');
+    expect(competitionDetail).not.toContain('?? 5');
+    expect(competitionDetail).not.toContain('?? 3');
+    expect(competitionDetail).not.toContain('?? 0} pts');
+    expect(competitionDetail).toContain('getPublishedOfficialPoints');
+    expect(competitionDetail).toContain('Unavailable');
+  });
+
+  it('shows the real competition total only after the competition subscription is ready', () => {
+    expect(directoryPage).not.toContain('competitions.length || 54');
+    expect(directoryPage).toContain('competitionsSyncState');
+    expect(directoryPage).toContain('Loading event total');
+    expect(directoryPage).toContain('${publishedResults.length} / ${competitions.length} Events Ratified');
+  });
+});
+
+
+describe('Public-only stylesheet isolation', () => {
+  const globalCss = readProjectFile('src/app/globals.css');
+  const publicCss = readProjectFile('src/app/public/public.css');
+  const rootLayout = readProjectFile('src/app/layout.tsx');
+  const rootPage = readProjectFile('src/app/page.tsx');
+  const homePage = readProjectFile('src/app/public/page.tsx');
+  const publicLayout = readProjectFile('src/components/layout/PublicLayout.tsx');
+  const publicRouteLayout = readProjectFile('src/app/public/layout.tsx');
+
+  it('keeps public theme CSS out of the shared global stylesheet while retaining judge print styles', () => {
+    expect(globalCss).not.toContain('.public-experience');
+    expect(globalCss).not.toContain('.font-brand');
+    expect(globalCss).not.toContain('.material-symbols-outlined');
+    expect(globalCss).toContain('.judge-receipt-print');
+  });
+
+  it('loads public CSS from the public home and public route layout only', () => {
+    expect(rootPage).toContain("import './public/public.css'");
+    expect(publicRouteLayout).toContain("import './public.css'");
+    expect(publicCss).toContain('.public-experience .font-brand');
+    expect(publicCss).toContain('.public-experience .material-symbols-outlined');
+  });
+
+  it('scopes the public theme inside public wrappers and keeps root portal typography unchanged', () => {
+    expect(homePage).toContain('className="public-experience bg-[#FDBF0F]');
+    expect(publicLayout).toContain('className="public-experience min-h-screen');
+    expect(rootLayout).toContain('bg-white text-[#111111]');
+    expect(rootLayout).not.toContain('family=Bruno+Ace');
+    expect(publicCss).toContain('.public-experience .public-main');
+  });
+});

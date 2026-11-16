@@ -4,10 +4,11 @@ import React, { useState, useMemo } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { useFest } from '@/context/FestContext';
 import { ChampionshipPodium } from '@/components/domain/ChampionshipPodium';
+import { buildDivisionTeamStandings } from '@/domain/publicChampionship';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function PublicChampionshipPage() {
-  const { teams, theme, teamsSyncState } = useFest();
+  const { teams, results, theme, teamsSyncState, resultsSyncState } = useFest();
 
   const [selectedDivision, setSelectedDivision] = useState<'ALL' | 'SENIOR' | 'GENERAL' | 'SUB_JUNIOR'>('ALL');
 
@@ -15,9 +16,23 @@ export default function PublicChampionshipPage() {
     return [...teams].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
   }, [teams]);
 
+  const displayedTeams = useMemo(() => {
+    if (selectedDivision === 'ALL') {
+      return sortedTeams.map(team => ({ ...team, pointsComplete: true, missingPointEntries: 0 }));
+    }
+    if (resultsSyncState !== 'ready') return [];
+    return buildDivisionTeamStandings(teams, results, selectedDivision);
+  }, [selectedDivision, sortedTeams, teams, results, resultsSyncState]);
+
+  const divisionPointsIncomplete =
+    selectedDivision !== 'ALL' && resultsSyncState === 'ready' && displayedTeams.some(team => !team.pointsComplete);
+  const divisionStandingsUnavailable = selectedDivision !== 'ALL' && resultsSyncState !== 'ready';
+  const divisionRankingUnavailable = divisionPointsIncomplete || divisionStandingsUnavailable;
+
   const totalFestPoints = useMemo(() => {
-    return sortedTeams.reduce((acc, t) => acc + (t.totalPoints || 0), 0) || 1;
-  }, [sortedTeams]);
+    if (divisionRankingUnavailable) return null;
+    return displayedTeams.reduce((acc, team) => acc + (team.totalPoints || 0), 0);
+  }, [displayedTeams, divisionRankingUnavailable]);
 
   return (
     <PublicLayout>
@@ -86,13 +101,13 @@ export default function PublicChampionshipPage() {
               <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#230D0F] border border-[#FDBF0F]/40 shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-[#FDBF0F] animate-pulse" />
                 <span className="text-xs font-bold uppercase tracking-wider text-[#FDBF0F] font-mono">
-                  {teams.length} Guild Delegations Competing
+                  {(selectedDivision === 'ALL' ? teams.length : displayedTeams.length)} Guild Delegations Competing
                 </span>
               </div>
 
               <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#1B090B] border border-white/10 text-xs font-mono text-[#F2F3E6]">
                 <span className="text-[#F2F3E6]/60 uppercase text-[10px]">Total Awarded:</span>
-                <strong className="text-[#FDBF0F] font-black">{totalFestPoints} PTS</strong>
+                <strong className="text-[#FDBF0F] font-black">{totalFestPoints === null ? 'POINTS UNAVAILABLE' : `${totalFestPoints} PTS`}</strong>
               </div>
 
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#230D0F] border border-[#BA1912]/40 text-[#F2F3E6]/80 text-xs font-mono">
@@ -123,10 +138,34 @@ export default function PublicChampionshipPage() {
           </div>
         )}
 
+        {selectedDivision !== 'ALL' && resultsSyncState === 'loading' && (
+          <div className="p-6 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30">
+            <Loader2 className="w-6 h-6 text-[#FDBF0F] animate-spin mx-auto mb-2" />
+            <p className="text-xs text-[#F2F3E6]/75">Loading published results for this division…</p>
+          </div>
+        )}
+        {selectedDivision !== 'ALL' && resultsSyncState === 'ready' && displayedTeams.length === 0 && (
+          <div className="p-6 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30">
+            <h3 className="text-sm font-bold text-[#F2F3E6]">No Published Results for This Division</h3>
+            <p className="text-xs text-[#F2F3E6]/65 mt-1">Division standings will appear after results are officially published.</p>
+          </div>
+        )}
+        {selectedDivision !== 'ALL' && resultsSyncState === 'error' && (
+          <div role="alert" className="p-5 rounded-2xl bg-[#2D1217] border border-red-500/40">
+            <p className="text-xs text-red-200">Published division results could not be synchronized. Division totals are unavailable until synchronization succeeds.</p>
+          </div>
+        )}
+        {divisionPointsIncomplete && (
+          <div role="alert" className="p-5 rounded-2xl bg-[#2D1217] border border-amber-500/40">
+            <p className="text-xs text-[#F2F3E6] font-semibold">Some published result records do not contain official point values.</p>
+            <p className="text-xs text-[#F2F3E6]/70 mt-1">Affected team totals are marked unavailable. No points are estimated from rank, and division ranking/share calculations are withheld.</p>
+          </div>
+        )}
+
         {/* ========================================================= */}
         {/* SECTION 2: TOP 3 WINNERS PODIUM (Podium of Eminence)      */}
         {/* ========================================================= */}
-        {sortedTeams.length > 0 && <ChampionshipPodium teams={teams} />}
+        {displayedTeams.length > 0 && !divisionRankingUnavailable && <ChampionshipPodium teams={displayedTeams} />}
 
         {/* ========================================================= */}
         {/* SECTION 3: OVERALL GUILD LEADERBOARD & RATIFICATION TABLE */}
@@ -215,8 +254,8 @@ export default function PublicChampionshipPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#BA1912]/15">
-                {sortedTeams.map((team, idx) => {
-                  const sharePercent = totalFestPoints > 0 ? ((team.totalPoints || 0) / totalFestPoints * 100).toFixed(1) : '0';
+                {displayedTeams.map((team, idx) => {
+                  const sharePercent = totalFestPoints === null ? null : totalFestPoints > 0 ? ((team.totalPoints || 0) / totalFestPoints * 100).toFixed(1) : '0';
 
                   return (
                     <tr
@@ -236,7 +275,7 @@ export default function PublicChampionshipPage() {
                               : 'bg-[#1B090B] text-[#F2F3E6]/70 border border-white/5'
                           }`}
                         >
-                          {String(idx + 1).padStart(2, '0')}
+                          {divisionRankingUnavailable ? '—' : String(idx + 1).padStart(2, '0')}
                         </span>
                       </td>
 
@@ -262,12 +301,12 @@ export default function PublicChampionshipPage() {
 
                       {/* Solo Events */}
                       <td className="py-4 px-4 text-center font-mono text-sm font-semibold text-[#F2F3E6]">
-                        {team.soloPoints || 0}
+                        {team.pointsComplete ? (team.soloPoints || 0) : '—'}
                       </td>
 
                       {/* Group Events */}
                       <td className="py-4 px-4 text-center font-mono text-sm font-semibold text-[#F2F3E6]">
-                        {team.groupPoints || 0}
+                        {team.pointsComplete ? (team.groupPoints || 0) : '—'}
                       </td>
 
                       {/* Medals */}
@@ -291,7 +330,7 @@ export default function PublicChampionshipPage() {
                           className="text-lg font-black text-[#FDBF0F] font-mono block leading-none"
                           style={{ fontFamily: "'Cinzel', serif" }}
                         >
-                          {team.totalPoints || 0}
+                          {team.pointsComplete ? (team.totalPoints || 0) : '—'}
                         </span>
                         <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 font-mono">
                           PTS
@@ -302,17 +341,19 @@ export default function PublicChampionshipPage() {
                       <td className="py-4 px-4">
                         <div className="space-y-1">
                           <div className="flex justify-between text-[10px] font-mono text-[#F2F3E6]/75">
-                            <span className="font-bold">{sharePercent}%</span>
+                            <span className="font-bold">{sharePercent === null ? 'Unavailable' : `${sharePercent}%`}</span>
                             <span className="text-[9px] text-[#F2F3E6]/50">of tally</span>
                           </div>
                           <div className="w-full bg-[#1B090B] h-2 rounded-full overflow-hidden border border-white/5">
-                            <div
-                              className="h-full rounded-full transition-all duration-500 shadow-xs"
-                              style={{
-                                width: `${Math.max(Number(sharePercent), 4)}%`,
-                                backgroundColor: team.color || '#BA1912'
-                              }}
-                            />
+                            {sharePercent !== null && (
+                              <div
+                                className="h-full rounded-full transition-all duration-500 shadow-xs"
+                                style={{
+                                  width: `${Math.max(Number(sharePercent), 4)}%`,
+                                  backgroundColor: team.color || '#BA1912'
+                                }}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
@@ -328,8 +369,8 @@ export default function PublicChampionshipPage() {
           {/* MOBILE GUILD LEDGER CARDS (Matching Stitch Mobile)        */}
           {/* ========================================================= */}
           <div className="block md:hidden p-4 space-y-3">
-            {sortedTeams.map((team, idx) => {
-              const sharePercent = totalFestPoints > 0 ? ((team.totalPoints || 0) / totalFestPoints * 100).toFixed(1) : '0';
+            {displayedTeams.map((team, idx) => {
+              const sharePercent = totalFestPoints === null ? null : totalFestPoints > 0 ? ((team.totalPoints || 0) / totalFestPoints * 100).toFixed(1) : '0';
 
               return (
                 <div
@@ -357,7 +398,7 @@ export default function PublicChampionshipPage() {
                                 : 'bg-[#230D0F] text-[#F2F3E6]/70'
                             }`}
                           >
-                            {idx + 1}
+                            {divisionRankingUnavailable ? '—' : idx + 1}
                           </span>
                           <h4 className="font-bold text-sm text-[#F2F3E6] uppercase">{team.name}</h4>
                         </div>
@@ -367,10 +408,10 @@ export default function PublicChampionshipPage() {
 
                     <div className="text-right shrink-0">
                       <span className="text-xl font-black text-[#FDBF0F] font-mono leading-none block">
-                        {team.totalPoints || 0}
+                        {team.pointsComplete ? (team.totalPoints || 0) : '—'}
                       </span>
                       <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block font-mono">
-                        TOTAL PTS
+                        {team.pointsComplete ? 'TOTAL PTS' : 'POINTS INCOMPLETE'}
                       </span>
                     </div>
                   </div>
@@ -379,11 +420,11 @@ export default function PublicChampionshipPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-[#230D0F] p-2 rounded-lg border border-white/5">
                     <div>
                       <span className="text-[9px] text-[#F2F3E6]/60 uppercase block">Solo Events</span>
-                      <span className="font-bold text-[#F2F3E6] text-xs">{team.soloPoints || 0} pts</span>
+                      <span className="font-bold text-[#F2F3E6] text-xs">{team.pointsComplete ? `${team.soloPoints || 0} pts` : '—'}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-[9px] text-[#F2F3E6]/60 uppercase block">Group Ensembles</span>
-                      <span className="font-bold text-[#F2F3E6] text-xs">{team.groupPoints || 0} pts</span>
+                      <span className="font-bold text-[#F2F3E6] text-xs">{team.pointsComplete ? `${team.groupPoints || 0} pts` : '—'}</span>
                     </div>
                   </div>
 
@@ -394,18 +435,20 @@ export default function PublicChampionshipPage() {
                       <span className="text-[#D8C8B7] font-bold">🥈 {team.secondCount || 0}</span>
                       <span className="text-[#BA1912] font-bold">🥉 {team.thirdCount || 0}</span>
                     </div>
-                    <span className="text-[11px] text-[#FDBF0F] font-bold">{sharePercent}% Share</span>
+                    <span className="text-[11px] text-[#FDBF0F] font-bold">{sharePercent === null ? 'Share unavailable' : `${sharePercent}% Share`}</span>
                   </div>
 
                   {/* Share progress bar */}
                   <div className="w-full bg-[#230D0F] h-1.5 rounded-full overflow-hidden border border-white/5">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.max(Number(sharePercent), 4)}%`,
-                        backgroundColor: team.color || '#BA1912'
-                      }}
-                    />
+                    {sharePercent !== null && (
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max(Number(sharePercent), 4)}%`,
+                          backgroundColor: team.color || '#BA1912'
+                        }}
+                      />
+                    )}
                   </div>
 
                 </div>
