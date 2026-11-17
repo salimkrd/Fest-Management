@@ -146,7 +146,7 @@ export default function InspirathPublicHomePage() {
           className="relative z-20 w-full inspirath-halftone-hero text-[#FFF8EE] overflow-x-clip overflow-y-visible border-b border-[#2A0C0C]"
           id="home"
         >
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-10 lg:pb-12">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-20 sm:pb-24 lg:pb-28">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
               {/* Left Hero Identity Column */}
               <div className="lg:col-span-7 flex flex-col items-start">
@@ -261,7 +261,7 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
-        <section className="relative z-0 w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">
+        <section className="relative z-0 w-full bg-[#FDBF0F] border-b border-[#D69700] pt-18 sm:pt-20 pb-10 sm:pb-12">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2.5 mb-5">
