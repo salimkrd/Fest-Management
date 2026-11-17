@@ -206,11 +206,10 @@ export class CompetitionScheduleService {
     const result = await db.runTransaction(async transaction => {
       const competitionRef = db.collection('competitions').doc(competitionId);
       const slotsQuery = db.collection('schedules').where('competitionId', '==', competitionId);
+      // Query by the single-field targetDocId index, then filter/sort locally.
+      // This avoids requiring a new Firestore composite index for recovery.
       const auditQuery = db.collection('auditLogs')
-        .where('action', '==', 'COMPETITION_MARKED_COMPLETED')
-        .where('targetDocId', '==', competitionId)
-        .orderBy('timestamp', 'desc')
-        .limit(10);
+        .where('targetDocId', '==', competitionId);
 
       const [competitionSnapshot, slotsSnapshot, auditSnapshot] = await Promise.all([
         transaction.get(competitionRef),
@@ -229,7 +228,9 @@ export class CompetitionScheduleService {
         throw new Error('Validation Error: No schedule slots were found for this competition.');
       }
 
-      const completionLog = auditSnapshot.docs.find(doc => !doc.data().revertedAt);
+      const completionLog = auditSnapshot.docs
+        .filter(doc => doc.data().action === 'COMPETITION_MARKED_COMPLETED' && !doc.data().revertedAt)
+        .sort((a, b) => String(b.data().timestamp || '').localeCompare(String(a.data().timestamp || '')))[0];
       if (!completionLog) {
         throw new Error('Conflict: No active completion audit record was found. Contact the Chief Admin before changing this competition.');
       }
