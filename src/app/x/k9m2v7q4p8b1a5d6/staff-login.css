@@ -924,3 +924,38 @@
     overflow-y: visible;
   }
 }
+
+
+/*
+ * Keep the staff-login canvas painted across the entire mobile viewport.
+ * The page content can be shorter than the browser viewport after scrolling;
+ * a fixed backdrop prevents the document's default white body background showing below it.
+ */
+.staff-login::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 78% 16%, rgba(186, 25, 18, 0.28), transparent 34rem),
+    radial-gradient(ellipse at 10% 92%, rgba(253, 191, 15, 0.1), transparent 28rem),
+    linear-gradient(135deg, #1B090B 0%, #2B0C14 48%, #4A0A1C 100%);
+}
+
+@media (max-width: 640px) {
+  .staff-login {
+    min-height: 100vh;
+    min-height: max(100svh, 100dvh);
+    background: transparent;
+  }
+
+  .staff-login::before {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 78% 16%, rgba(186, 25, 18, 0.28), transparent 34rem),
+      radial-gradient(ellipse at 10% 92%, rgba(253, 191, 15, 0.1), transparent 28rem),
+      linear-gradient(135deg, #1B090B 0%, #2B0C14 48%, #4A0A1C 100%);
+  }
+}
