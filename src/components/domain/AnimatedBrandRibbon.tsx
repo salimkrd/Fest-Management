@@ -16,33 +16,33 @@ interface RibbonTrackConfig {
 }
 
 const RIBBON_TRACKS: RibbonTrackConfig[] = [
-  // Strip 1: Bottom Strip - Exact Dark Maroon #2A0C0C, tilted +1.5deg, scrolling right
+  // Strip 1: Bottom Strip - Exact Red #BA200F, moved down from the middle layer
   {
-    id: 'ribbon-bottom-maroon',
-    bgColorClass: 'bg-[#2A0C0C]',
-    backgroundColor: '#2A0C0C',
+    id: 'ribbon-bottom-red',
+    bgColorClass: 'bg-[#BA200F]',
+    backgroundColor: '#BA200F',
     rotationClass: 'rotate-[1.5deg]',
     positionClass: 'bottom-0 sm:bottom-0.5',
     shadowClass: 'shadow-[0_8px_24px_rgba(0,0,0,0.35)]',
     zIndexClass: 'z-10',
-    animationClass: 'animate-ribbon-right',
-    duration: '56s',
-    assetSrc: '/images/brand-ribbon-gold.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Dark Maroon',
-  },
-  // Strip 2: Middle Strip - Exact Red #BA200F, moved down from the top layer
-  {
-    id: 'ribbon-middle-red',
-    bgColorClass: 'bg-[#BA200F]',
-    backgroundColor: '#BA200F',
-    rotationClass: 'rotate-[0.4deg]',
-    positionClass: 'bottom-5 sm:bottom-7 md:bottom-8',
-    shadowClass: 'shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
-    zIndexClass: 'z-20',
     animationClass: 'animate-ribbon-left',
     duration: '42s',
     assetSrc: '/images/brand-ribbon-gold.png',
     altText: 'INSPIRATH Festival Brand Ribbon in Gold on Red',
+  },
+  // Strip 2: Middle Strip - Exact Dark Maroon #2A0C0C, moved up from the bottom layer
+  {
+    id: 'ribbon-middle-maroon',
+    bgColorClass: 'bg-[#2A0C0C]',
+    backgroundColor: '#2A0C0C',
+    rotationClass: 'rotate-[0.4deg]',
+    positionClass: 'bottom-5 sm:bottom-7 md:bottom-8',
+    shadowClass: 'shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
+    zIndexClass: 'z-20',
+    animationClass: 'animate-ribbon-right',
+    duration: '56s',
+    assetSrc: '/images/brand-ribbon-gold.png',
+    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Dark Maroon',
   },
   // Strip 3: Top Strip - Exact Yellow #FDBF0F, moved up from the middle layer
   {
