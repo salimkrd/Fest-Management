@@ -65,7 +65,7 @@ export function AnimatedBrandRibbon() {
     <div
       aria-label="INSPIRATH Festival Brand Showcase"
       role="region"
-      className="relative w-full overflow-hidden select-none pointer-events-none h-28 sm:h-32 md:h-36 bg-transparent"
+      className="absolute inset-x-0 bottom-[-56px] z-40 w-full overflow-hidden select-none pointer-events-none h-28 sm:h-32 md:h-36 bg-transparent"
     >
       <span className="sr-only">INSPIRATH - Official Festival Brand Showcase</span>
 
