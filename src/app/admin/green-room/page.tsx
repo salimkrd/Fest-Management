@@ -43,6 +43,8 @@ export default function GreenRoomPage() {
   const [slipModalOpen, setSlipModalOpen] = useState<boolean>(false);
   const [completeCompetitionModalOpen, setCompleteCompetitionModalOpen] = useState(false);
   const [isCompletingCompetition, setIsCompletingCompetition] = useState(false);
+  const [reopenCompetitionModalOpen, setReopenCompetitionModalOpen] = useState(false);
+  const [isReopeningCompetition, setIsReopeningCompetition] = useState(false);
   const [selectedAssignmentForSlip, setSelectedAssignmentForSlip] = useState<FirestoreGreenRoomAssignment | null>(null);
 
   const [reassignModalOpen, setReassignModalOpen] = useState<boolean>(false);
@@ -273,6 +275,40 @@ export default function GreenRoomPage() {
     }
   };
 
+
+  // Reopen an accidentally completed competition and restore its exact pre-completion schedule states.
+  const handleReopenCompetition = async () => {
+    if (!selectedCompetition || isReopeningCompetition) return;
+    setIsReopeningCompetition(true);
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/admin/green-room/reopen-competition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ competitionId: selectedCompetition.id })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not reopen this competition.');
+
+      setReopenCompetitionModalOpen(false);
+      setFeedbackMessage({
+        type: 'success',
+        text: `${selectedCompetition.name} reopened. ${data.restoredSlots} schedule slot(s) restored to their previous status (${data.scheduleStatus}).`
+      });
+    } catch (err: unknown) {
+      setFeedbackMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Competition reopen failed.'
+      });
+    } finally {
+      setIsReopeningCompetition(false);
+    }
+  };
+
   // Reassignment handler
   const handleReassignSubmit = async () => {
     if (!selectedCompetition || !reassignTarget) return;
@@ -500,7 +536,19 @@ export default function GreenRoomPage() {
               <span className="px-2.5 py-1 rounded-full bg-white/10 text-blue-100 font-medium">
                 {selectedCompetition.type === 'GROUP' ? 'Group entries / team: Unlimited' : `Max ${selectedCompetition.maxEntriesPerTeam} entries / team`}
               </span>
-              {selectedCompetition.scheduleStatus !== 'COMPLETED' && schedules.some(slot => slot.competitionId === selectedCompetition.id) && (
+              {selectedCompetition.scheduleStatus === 'COMPLETED' ? (
+                <Button
+                  variant="outline"
+                  size="md"
+                  leftIcon={<AlertTriangle className="h-4 w-4 text-amber-700" />}
+                  onClick={() => setReopenCompetitionModalOpen(true)}
+                  disabled={isReopeningCompetition}
+                  style={{ color: '#92400E' }}
+                  className="min-h-11 w-full sm:w-auto shrink-0 whitespace-nowrap border-2 border-amber-200 bg-amber-50 px-5 text-sm font-extrabold shadow-md hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <span className="text-sm font-extrabold" style={{ color: '#92400E' }}>Reopen Competition</span>
+                </Button>
+              ) : schedules.some(slot => slot.competitionId === selectedCompetition.id) && (
                 <Button
                   variant="outline"
                   size="md"
@@ -896,6 +944,30 @@ export default function GreenRoomPage() {
         >
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
             Use this after the competition has actually finished. The scheduled end time alone will not complete a competition.
+          </div>
+        </Modal>
+
+
+        {/* Competition Reopen Confirmation */}
+        <Modal
+          isOpen={reopenCompetitionModalOpen}
+          onClose={() => { if (!isReopeningCompetition) setReopenCompetitionModalOpen(false); }}
+          title="Reopen this competition?"
+          description={`Restore ${selectedCompetition?.name || 'this competition'} to the exact schedule status it had before it was marked COMPLETED. This reversal will also be recorded in the audit log.`}
+          maxWidth="sm"
+          footer={
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" size="sm" onClick={() => setReopenCompetitionModalOpen(false)} disabled={isReopeningCompetition}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" leftIcon={<AlertTriangle className="h-3.5 w-3.5" />} onClick={() => void handleReopenCompetition()} disabled={isReopeningCompetition || !selectedCompetition}>
+                {isReopeningCompetition ? 'Reopening…' : 'Confirm Reopen'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            Only use this to correct an accidental completion. Each schedule slot will return to its previous SCHEDULED or LIVE status. The change is logged and the original completion audit entry is marked as reversed.
           </div>
         </Modal>
 
