@@ -48,13 +48,13 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
 
     it('places Red #BA200F at the bottom and Dark Maroon #2A0C0C in the middle', () => {
       expect(componentSrc).toMatch(
-        /id: 'ribbon-bottom-red'[\\s\\S]*?backgroundColor: '#BA200F'[\\s\\S]*?positionClass: 'bottom-0 sm:bottom-0\\.5'[\\s\\S]*?zIndexClass: 'z-10'/
+        /id: 'ribbon-bottom-red'[\s\\S]*?backgroundColor: '#BA200F'[\s\\S]*?positionClass: 'bottom-0 sm:bottom-0\.5'[\s\\S]*?zIndexClass: 'z-10'/
       );
       expect(componentSrc).toMatch(
-        /id: 'ribbon-middle-maroon'[\\s\\S]*?backgroundColor: '#2A0C0C'[\\s\\S]*?positionClass: 'bottom-5 sm:bottom-7 md:bottom-8'[\\s\\S]*?zIndexClass: 'z-20'/
+        /id: 'ribbon-middle-maroon'[\s\\S]*?backgroundColor: '#2A0C0C'[\s\\S]*?positionClass: 'bottom-5 sm:bottom-7 md:bottom-8'[\s\\S]*?zIndexClass: 'z-20'/
       );
       expect(componentSrc).toMatch(
-        /id: 'ribbon-top-yellow'[\\s\\S]*?backgroundColor: '#FDBF0F'[\\s\\S]*?zIndexClass: 'z-30'/
+        /id: 'ribbon-top-yellow'[\s\\S]*?backgroundColor: '#FDBF0F'[\s\\S]*?zIndexClass: 'z-30'/
       );
     });
 
