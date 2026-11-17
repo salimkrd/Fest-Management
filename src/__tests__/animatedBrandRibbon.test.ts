@@ -86,6 +86,14 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(ribbonIdx).toBeLessThan(heroCloseIdx);
       expect(expositionIdx).toBeGreaterThan(heroCloseIdx);
     });
+
+    it('overlays the ribbons across the hero and thematic section boundary without adding layout height', () => {
+      expect(componentSrc).toContain('absolute inset-x-0 bottom-[-56px]');
+      expect(pageSrc).toContain('relative z-20 w-full inspirath-halftone-hero');
+      expect(pageSrc).toContain('overflow-x-clip overflow-y-visible');
+      expect(pageSrc).toContain('relative z-0 w-full bg-[#FDBF0F]');
+    });
+
   });
 
   describe('4. Continuous Infinite Animation & CSS Keyframes', () => {
