@@ -153,7 +153,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, fullBleed 
 
       {/* Main Content Area - padded at bottom for mobile nav bar */}
       <main
-        className={`public-main min-w-0 flex-1 w-full overflow-x-clip ${
+        className={`public-main ${fullBleed ? 'public-main--full-bleed' : ''} min-w-0 flex-1 w-full overflow-x-clip ${
           fullBleed
             ? 'pb-24 lg:pb-0'
             : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 lg:pb-12'
