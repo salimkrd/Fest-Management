@@ -149,8 +149,9 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(componentSrc).toContain('aria-hidden={i !== 0}');
     });
 
-    it('prevents horizontal page overflow with full-bleed container styling', () => {
-      expect(componentSrc).toContain('overflow-hidden');
+    it('prevents horizontal page overflow while allowing rotated bottom ribbon edges to remain visible', () => {
+      expect(componentSrc).toContain('overflow-x-clip overflow-y-visible');
+      expect(componentSrc).toContain('overflow-hidden ${track.positionClass}');
       expect(componentSrc).toContain('-left-[5%]');
       expect(componentSrc).toContain('w-[110%]');
     });
