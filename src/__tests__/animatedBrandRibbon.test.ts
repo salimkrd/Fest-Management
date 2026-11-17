@@ -31,18 +31,18 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(componentSrc).toContain('ribbon-top-yellow');
     });
 
-    it('uses exact hex colors: Top #FDBF0F, Middle #BA200F, Bottom #2A0C0C', () => {
+    it('uses exact hex colors: Top #FDBF0F, Middle #2A0C0C, Bottom #BA200F', () => {
       // Top Yellow track
       expect(componentSrc).toContain('bg-[#FDBF0F]');
-      expect(componentSrc).toContain("#FDBF0F");
+      expect(componentSrc).toContain('#FDBF0F');
 
-      // Middle Red track
-      expect(componentSrc).toContain('bg-[#BA200F]');
-      expect(componentSrc).toContain('#BA200F');
-
-      // Bottom Dark Maroon track
+      // Middle Dark Maroon track
       expect(componentSrc).toContain('bg-[#2A0C0C]');
       expect(componentSrc).toContain('#2A0C0C');
+
+      // Bottom Red track
+      expect(componentSrc).toContain('bg-[#BA200F]');
+      expect(componentSrc).toContain('#BA200F');
       expect(componentSrc).not.toContain('#C13429');
     });
 
