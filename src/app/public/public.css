@@ -960,3 +960,18 @@
     background-position: center, center;
   }
 }
+
+
+/*
+ * Full-bleed public pages (currently the public homepage) must not inherit
+ * the generic .public-main gutters. Keep section backgrounds edge-to-edge,
+ * while retaining clearance for the fixed mobile bottom navigation.
+ */
+@media (max-width: 639px) {
+  .public-experience .public-main.public-main--full-bleed {
+    padding-top: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: 0 !important;
+  }
+}
