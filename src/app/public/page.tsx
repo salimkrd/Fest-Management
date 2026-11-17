@@ -7,6 +7,7 @@ import { useFest } from '@/context/FestContext';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
+import { AnimatedBrandRibbon } from '@/components/domain/AnimatedBrandRibbon';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
 
 export default function InspirathPublicHomePage() {
@@ -255,6 +256,9 @@ export default function InspirathPublicHomePage() {
             </div>
           </div>
         </section>
+
+        {/* INSPIRATH ANIMATED BRAND RIBBON / MARQUEE SECTION */}
+        <AnimatedBrandRibbon />
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
         <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">

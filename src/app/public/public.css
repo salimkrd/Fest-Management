@@ -975,3 +975,45 @@
     padding-left: 0 !important;
   }
 }
+
+/* =========================================================================
+   INSPIRATH Animated Brand Ribbon / Marquee Strips
+   ========================================================================= */
+
+@keyframes ribbonMarqueeLeft {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes ribbonMarqueeRight {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.public-experience .animate-ribbon-left {
+  animation-name: ribbonMarqueeLeft;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.public-experience .animate-ribbon-right {
+  animation-name: ribbonMarqueeRight;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-experience .animate-ribbon-left,
+  .public-experience .animate-ribbon-right {
+    animation: none !important;
+  }
+}
+
