@@ -30,33 +30,33 @@ const RIBBON_TRACKS: RibbonTrackConfig[] = [
     assetSrc: '/images/brand-ribbon-gold.png',
     altText: 'INSPIRATH Festival Brand Ribbon in Gold on Dark Maroon',
   },
-  // Strip 2: Middle Strip - Exact Yellow #FDBF0F, tilted +0.4deg, scrolling left
+  // Strip 2: Middle Strip - Exact Red #BA200F, moved down from the top layer
   {
-    id: 'ribbon-middle-yellow',
-    bgColorClass: 'bg-[#FDBF0F]',
-    backgroundColor: '#FDBF0F',
+    id: 'ribbon-middle-red',
+    bgColorClass: 'bg-[#BA200F]',
+    backgroundColor: '#BA200F',
     rotationClass: 'rotate-[0.4deg]',
     positionClass: 'bottom-5 sm:bottom-7 md:bottom-8',
     shadowClass: 'shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
     zIndexClass: 'z-20',
     animationClass: 'animate-ribbon-left',
-    duration: '70s',
-    assetSrc: '/images/brand-ribbon-red.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Red on Yellow',
+    duration: '42s',
+    assetSrc: '/images/brand-ribbon-gold.png',
+    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Red',
   },
-  // Strip 3: Top Strip - Exact Ruby Red #C13429, tilted -1.9deg, scrolling left
+  // Strip 3: Top Strip - Exact Yellow #FDBF0F, moved up from the middle layer
   {
-    id: 'ribbon-top-red',
-    bgColorClass: 'bg-[#C13429]',
-    backgroundColor: '#C13429',
+    id: 'ribbon-top-yellow',
+    bgColorClass: 'bg-[#FDBF0F]',
+    backgroundColor: '#FDBF0F',
     rotationClass: 'rotate-[-1.9deg]',
     positionClass: 'bottom-10 sm:bottom-13 md:bottom-15',
     shadowClass: 'shadow-[0_14px_40px_rgba(0,0,0,0.45)]',
     zIndexClass: 'z-30',
     animationClass: 'animate-ribbon-left',
-    duration: '42s',
-    assetSrc: '/images/brand-ribbon-gold.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Ruby Red',
+    duration: '70s',
+    assetSrc: '/images/brand-ribbon-red.png',
+    altText: 'INSPIRATH Festival Brand Ribbon in Red on Yellow',
   },
 ];
 
@@ -96,7 +96,7 @@ export function AnimatedBrandRibbon() {
                     aria-hidden={i !== 0}
                     width={1024}
                     height={45}
-                    className="h-5 sm:h-6 md:h-7 lg:h-8 w-auto shrink-0 select-none object-contain"
+                    className="h-6 sm:h-7 md:h-8 lg:h-9 w-auto shrink-0 select-none object-contain"
                     draggable={false}
                     unoptimized
                     priority
@@ -116,7 +116,7 @@ export function AnimatedBrandRibbon() {
                     alt=""
                     width={1024}
                     height={45}
-                    className="h-5 sm:h-6 md:h-7 lg:h-8 w-auto shrink-0 select-none object-contain"
+                    className="h-6 sm:h-7 md:h-8 lg:h-9 w-auto shrink-0 select-none object-contain"
                     draggable={false}
                     unoptimized
                     priority
