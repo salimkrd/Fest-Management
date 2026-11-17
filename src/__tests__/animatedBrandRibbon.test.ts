@@ -26,8 +26,8 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
 
   describe('2. Three Animated Ribbon Tracks & Exact Refined Palette', () => {
     it('implements 3 distinct ribbon tracks', () => {
-      expect(componentSrc).toContain('ribbon-bottom-maroon');
-      expect(componentSrc).toContain('ribbon-middle-red');
+      expect(componentSrc).toContain('ribbon-bottom-red');
+      expect(componentSrc).toContain('ribbon-middle-maroon');
       expect(componentSrc).toContain('ribbon-top-yellow');
     });
 
@@ -44,6 +44,18 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(componentSrc).toContain('bg-[#2A0C0C]');
       expect(componentSrc).toContain('#2A0C0C');
       expect(componentSrc).not.toContain('#C13429');
+    });
+
+    it('places Red #BA200F at the bottom and Dark Maroon #2A0C0C in the middle', () => {
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-bottom-red'[\\s\\S]*?backgroundColor: '#BA200F'[\\s\\S]*?positionClass: 'bottom-0 sm:bottom-0\\.5'[\\s\\S]*?zIndexClass: 'z-10'/
+      );
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-middle-maroon'[\\s\\S]*?backgroundColor: '#2A0C0C'[\\s\\S]*?positionClass: 'bottom-5 sm:bottom-7 md:bottom-8'[\\s\\S]*?zIndexClass: 'z-20'/
+      );
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-top-yellow'[\\s\\S]*?backgroundColor: '#FDBF0F'[\\s\\S]*?zIndexClass: 'z-30'/
+      );
     });
 
     it('applies diagonal rotation angles matching visual reference', () => {
