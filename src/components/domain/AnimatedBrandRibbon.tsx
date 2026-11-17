@@ -55,8 +55,8 @@ const RIBBON_TRACKS: RibbonTrackConfig[] = [
     zIndexClass: 'z-30',
     animationClass: 'animate-ribbon-left',
     duration: '70s',
-    assetSrc: '/images/brand-ribbon-red.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Red on Yellow',
+    assetSrc: '/images/brand-ribbon-yellow.png',
+    altText: 'INSPIRATH Festival Brand Ribbon on Yellow',
   },
 ];
 

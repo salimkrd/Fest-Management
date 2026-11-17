@@ -14,13 +14,26 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
     it('verifies local PNG assets exist in public/images', () => {
       expect(existsSync(resolve(process.cwd(), 'public/images/brand-ribbon-gold.png'))).toBe(true);
       expect(existsSync(resolve(process.cwd(), 'public/images/brand-ribbon-red.png'))).toBe(true);
+      expect(existsSync(resolve(process.cwd(), 'public/images/brand-ribbon-yellow.png'))).toBe(true);
       expect(existsSync(resolve(process.cwd(), 'public/images/Asset 1.png'))).toBe(true);
       expect(existsSync(resolve(process.cwd(), 'public/images/Asset 2.png'))).toBe(true);
+      expect(existsSync(resolve(process.cwd(), 'public/images/Asset 3.png'))).toBe(true);
     });
 
-    it('maps Asset 1 (gold) and Asset 2 (red) across ribbon tracks correctly for optimal contrast', () => {
-      expect(componentSrc).toContain('/images/brand-ribbon-gold.png');
-      expect(componentSrc).toContain('/images/brand-ribbon-red.png');
+    it('maps Asset 3 (brand-ribbon-yellow.png) exclusively to ribbon-top-yellow (#FDBF0F)', () => {
+      expect(componentSrc).toContain('/images/brand-ribbon-yellow.png');
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-top-yellow'[\s\S]*?backgroundColor: '#FDBF0F'[\s\S]*?assetSrc: '\/images\/brand-ribbon-yellow\.png'/
+      );
+    });
+
+    it('confirms middle and bottom ribbon artwork mappings remain unchanged with gold artwork', () => {
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-bottom-red'[\s\S]*?backgroundColor: '#BA200F'[\s\S]*?assetSrc: '\/images\/brand-ribbon-gold\.png'/
+      );
+      expect(componentSrc).toMatch(
+        /id: 'ribbon-middle-maroon'[\s\S]*?backgroundColor: '#2A0C0C'[\s\S]*?assetSrc: '\/images\/brand-ribbon-gold\.png'/
+      );
     });
   });
 
@@ -48,13 +61,13 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
 
     it('places Red #BA200F at the bottom and Dark Maroon #2A0C0C in the middle', () => {
       expect(componentSrc).toMatch(
-        /id: 'ribbon-bottom-red'[\s\\S]*?backgroundColor: '#BA200F'[\s\\S]*?positionClass: 'bottom-0 sm:bottom-0\.5'[\s\\S]*?zIndexClass: 'z-10'/
+        /id: 'ribbon-bottom-red'[\s\S]*?backgroundColor: '#BA200F'[\s\S]*?positionClass: 'bottom-0 sm:bottom-0\.5'[\s\S]*?zIndexClass: 'z-10'/
       );
       expect(componentSrc).toMatch(
-        /id: 'ribbon-middle-maroon'[\s\\S]*?backgroundColor: '#2A0C0C'[\s\\S]*?positionClass: 'bottom-5 sm:bottom-7 md:bottom-8'[\s\\S]*?zIndexClass: 'z-20'/
+        /id: 'ribbon-middle-maroon'[\s\S]*?backgroundColor: '#2A0C0C'[\s\S]*?positionClass: 'bottom-5 sm:bottom-7 md:bottom-8'[\s\S]*?zIndexClass: 'z-20'/
       );
       expect(componentSrc).toMatch(
-        /id: 'ribbon-top-yellow'[\s\\S]*?backgroundColor: '#FDBF0F'[\s\\S]*?zIndexClass: 'z-30'/
+        /id: 'ribbon-top-yellow'[\s\S]*?backgroundColor: '#FDBF0F'[\s\S]*?zIndexClass: 'z-30'/
       );
     });
 
