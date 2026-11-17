@@ -261,7 +261,7 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
-        <section className="relative z-0 w-full bg-[#FDBF0F] border-b border-[#D69700] pt-18 sm:pt-20 pb-10 sm:pb-12">
+        <section className="relative z-0 w-full bg-[#FDBF0F] border-b border-[#D69700] pt-24 sm:pt-28 pb-14 sm:pb-16">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2.5 mb-5">
