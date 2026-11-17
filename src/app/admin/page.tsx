@@ -10,7 +10,7 @@ import {
   Users2,
   Trophy,
   CheckCircle2,
-  Clock3,
+  CalendarCheck,
   ExternalLink,
   PlusCircle,
   ClipboardList,
@@ -30,8 +30,7 @@ export default function AdminDashboardPage() {
   const [themeModalOpen, setThemeModalOpen] = React.useState(false);
 
   const publishedResults = results.filter(result => result.resultStatus === 'PUBLISHED');
-  const publishedCompetitionIds = new Set(publishedResults.map(result => result.competitionId));
-  const pendingResultsCount = competitions.filter(competition => !publishedCompetitionIds.has(competition.id)).length;
+  const completedCompetitionsCount = competitions.filter(competition => competition.scheduleStatus === 'COMPLETED').length;
 
   const upcomingSchedules = schedules
     .filter(slot => slot.status === 'LIVE' || slot.status === 'SCHEDULED')
@@ -61,18 +60,18 @@ export default function AdminDashboardPage() {
       iconSurface: 'bg-violet-50 text-violet-700'
     },
     {
+      label: 'Completed',
+      value: completedCompetitionsCount,
+      helper: 'Competitions marked complete in Green Room',
+      icon: <CalendarCheck className="h-5 w-5" />,
+      iconSurface: 'bg-teal-50 text-teal-700'
+    },
+    {
       label: 'Published results',
       value: publishedResults.length,
       helper: 'Available on the public site',
       icon: <CheckCircle2 className="h-5 w-5" />,
       iconSurface: 'bg-emerald-50 text-emerald-700'
-    },
-    {
-      label: 'Awaiting results',
-      value: pendingResultsCount,
-      helper: 'Competitions not yet published',
-      icon: <Clock3 className="h-5 w-5" />,
-      iconSurface: 'bg-amber-50 text-amber-700'
     }
   ];
 
