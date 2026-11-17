@@ -143,7 +143,7 @@ export default function InspirathPublicHomePage() {
       <div className="w-full">
         {/* HERO SECTION: Red-orange halftone background texture with the existing theme artwork and lamp */}
         <section
-          className="relative w-full inspirath-halftone-hero text-[#FFF8EE] overflow-hidden border-b border-[#2A0C0C]"
+          className="relative z-20 w-full inspirath-halftone-hero text-[#FFF8EE] overflow-x-clip overflow-y-visible border-b border-[#2A0C0C]"
           id="home"
         >
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-10 lg:pb-12">
@@ -261,7 +261,7 @@ export default function InspirathPublicHomePage() {
         </section>
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
-        <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">
+        <section className="relative z-0 w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2.5 mb-5">
