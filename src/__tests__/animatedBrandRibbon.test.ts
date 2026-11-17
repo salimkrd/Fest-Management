@@ -27,22 +27,23 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
   describe('2. Three Animated Ribbon Tracks & Exact Refined Palette', () => {
     it('implements 3 distinct ribbon tracks', () => {
       expect(componentSrc).toContain('ribbon-bottom-maroon');
-      expect(componentSrc).toContain('ribbon-middle-yellow');
-      expect(componentSrc).toContain('ribbon-top-red');
+      expect(componentSrc).toContain('ribbon-middle-red');
+      expect(componentSrc).toContain('ribbon-top-yellow');
     });
 
-    it('uses exact hex colors: Top #C13429, Middle #FDBF0F, Bottom #2A0C0C', () => {
-      // Top Red track
-      expect(componentSrc).toContain('bg-[#C13429]');
-      expect(componentSrc).toContain('#C13429');
-
-      // Middle Yellow track
+    it('uses exact hex colors: Top #FDBF0F, Middle #BA200F, Bottom #2A0C0C', () => {
+      // Top Yellow track
       expect(componentSrc).toContain('bg-[#FDBF0F]');
-      expect(componentSrc).toContain('#FDBF0F');
+      expect(componentSrc).toContain("#FDBF0F");
+
+      // Middle Red track
+      expect(componentSrc).toContain('bg-[#BA200F]');
+      expect(componentSrc).toContain('#BA200F');
 
       // Bottom Dark Maroon track
       expect(componentSrc).toContain('bg-[#2A0C0C]');
       expect(componentSrc).toContain('#2A0C0C');
+      expect(componentSrc).not.toContain('#C13429');
     });
 
     it('applies diagonal rotation angles matching visual reference', () => {
@@ -60,6 +61,12 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(componentSrc).toContain('shadow-[0_14px_40px_rgba(0,0,0,0.45)]');
     });
   });
+
+
+    it('increases ribbon artwork scale on mobile while preserving responsive sizing', () => {
+      expect(componentSrc).toContain('h-6 sm:h-7 md:h-8 lg:h-9');
+      expect((componentSrc.match(/h-6 sm:h-7 md:h-8 lg:h-9/g) || []).length).toBe(2);
+    });
 
   describe('3. Seamless Hero Background Continuity & No Black Gap', () => {
     it('removes plain black background and uses bg-transparent in AnimatedBrandRibbon', () => {
