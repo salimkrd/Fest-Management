@@ -16,41 +16,41 @@ interface RibbonTrackConfig {
 }
 
 const RIBBON_TRACKS: RibbonTrackConfig[] = [
-  // Strip 1: Bottom Strip - Deep Forest Green, tilted +1.5deg, scrolling right
+  // Strip 1: Bottom Strip - Exact Dark Maroon #2A0C0C, tilted +1.5deg, scrolling right
   {
-    id: 'ribbon-bottom-green',
-    bgColorClass: 'bg-[oklch(0.44_0.09_155)]',
-    backgroundColor: '#1f613c',
+    id: 'ribbon-bottom-maroon',
+    bgColorClass: 'bg-[#2A0C0C]',
+    backgroundColor: '#2A0C0C',
     rotationClass: 'rotate-[1.5deg]',
-    positionClass: 'bottom-1 sm:bottom-2',
-    shadowClass: 'shadow-[0_8px_24px_rgba(0,0,0,0.3)]',
+    positionClass: 'bottom-0 sm:bottom-0.5',
+    shadowClass: 'shadow-[0_8px_24px_rgba(0,0,0,0.35)]',
     zIndexClass: 'z-10',
     animationClass: 'animate-ribbon-right',
     duration: '56s',
     assetSrc: '/images/brand-ribbon-gold.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Deep Green',
+    altText: 'INSPIRATH Festival Brand Ribbon in Gold on Dark Maroon',
   },
-  // Strip 2: Middle Strip - Radiant Festival Gold, tilted +0.4deg, scrolling left
+  // Strip 2: Middle Strip - Exact Yellow #FDBF0F, tilted +0.4deg, scrolling left
   {
-    id: 'ribbon-middle-gold',
-    bgColorClass: 'bg-[oklch(0.8_0.13_78)]',
-    backgroundColor: '#ebb353',
+    id: 'ribbon-middle-yellow',
+    bgColorClass: 'bg-[#FDBF0F]',
+    backgroundColor: '#FDBF0F',
     rotationClass: 'rotate-[0.4deg]',
-    positionClass: 'bottom-6 sm:bottom-8 md:bottom-9',
+    positionClass: 'bottom-5 sm:bottom-7 md:bottom-8',
     shadowClass: 'shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
     zIndexClass: 'z-20',
     animationClass: 'animate-ribbon-left',
     duration: '70s',
     assetSrc: '/images/brand-ribbon-red.png',
-    altText: 'INSPIRATH Festival Brand Ribbon in Red on Gold',
+    altText: 'INSPIRATH Festival Brand Ribbon in Red on Yellow',
   },
-  // Strip 3: Top Strip - Rich Ruby-Crimson, tilted -1.9deg, scrolling left
+  // Strip 3: Top Strip - Exact Ruby Red #C13429, tilted -1.9deg, scrolling left
   {
     id: 'ribbon-top-red',
-    bgColorClass: 'bg-[oklch(0.54_0.18_29)]',
-    backgroundColor: '#c13429',
+    bgColorClass: 'bg-[#C13429]',
+    backgroundColor: '#C13429',
     rotationClass: 'rotate-[-1.9deg]',
-    positionClass: 'bottom-11 sm:bottom-14 md:bottom-16',
+    positionClass: 'bottom-10 sm:bottom-13 md:bottom-15',
     shadowClass: 'shadow-[0_14px_40px_rgba(0,0,0,0.45)]',
     zIndexClass: 'z-30',
     animationClass: 'animate-ribbon-left',
@@ -62,9 +62,10 @@ const RIBBON_TRACKS: RibbonTrackConfig[] = [
 
 export function AnimatedBrandRibbon() {
   return (
-    <section
+    <div
       aria-label="INSPIRATH Festival Brand Showcase"
-      className="relative w-full overflow-hidden select-none bg-[#1B090B] pointer-events-none h-28 sm:h-32 md:h-36 border-t border-[#4A0A1C]/60"
+      role="region"
+      className="relative w-full overflow-hidden select-none pointer-events-none h-28 sm:h-32 md:h-36 bg-transparent"
     >
       <span className="sr-only">INSPIRATH - Official Festival Brand Showcase</span>
 
@@ -126,6 +127,6 @@ export function AnimatedBrandRibbon() {
           </div>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

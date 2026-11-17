@@ -143,10 +143,10 @@ export default function InspirathPublicHomePage() {
       <div className="w-full">
         {/* HERO SECTION: Red-orange halftone background texture with the existing theme artwork and lamp */}
         <section
-          className="relative w-full inspirath-halftone-hero text-[#FFF8EE] overflow-hidden border-b border-[#4A0A1C]"
+          className="relative w-full inspirath-halftone-hero text-[#FFF8EE] overflow-hidden border-b border-[#2A0C0C]"
           id="home"
         >
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-24">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-10 lg:pb-12">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
               {/* Left Hero Identity Column */}
               <div className="lg:col-span-7 flex flex-col items-start">
@@ -255,10 +255,10 @@ export default function InspirathPublicHomePage() {
               </div>
             </div>
           </div>
-        </section>
 
-        {/* INSPIRATH ANIMATED BRAND RIBBON / MARQUEE SECTION */}
-        <AnimatedBrandRibbon />
+          {/* INSPIRATH ANIMATED BRAND RIBBON / MARQUEE */}
+          <AnimatedBrandRibbon />
+        </section>
 
         {/* THEMATIC EXPOSITION (PROACTIVE PARADIGMS) - Styled in #FDBF0F with Deep Ruby & Espresso Typography */}
         <section className="w-full bg-[#FDBF0F] border-b border-[#D69700] py-10 sm:py-12">

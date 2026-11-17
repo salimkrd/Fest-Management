@@ -18,31 +18,31 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(existsSync(resolve(process.cwd(), 'public/images/Asset 2.png'))).toBe(true);
     });
 
-    it('maps Asset 1 (gold) and Asset 2 (red) across ribbon tracks correctly', () => {
+    it('maps Asset 1 (gold) and Asset 2 (red) across ribbon tracks correctly for optimal contrast', () => {
       expect(componentSrc).toContain('/images/brand-ribbon-gold.png');
       expect(componentSrc).toContain('/images/brand-ribbon-red.png');
     });
   });
 
-  describe('2. Three Animated Ribbon Tracks & Thematic Palette', () => {
+  describe('2. Three Animated Ribbon Tracks & Exact Refined Palette', () => {
     it('implements 3 distinct ribbon tracks', () => {
-      expect(componentSrc).toContain('ribbon-bottom-green');
-      expect(componentSrc).toContain('ribbon-middle-gold');
+      expect(componentSrc).toContain('ribbon-bottom-maroon');
+      expect(componentSrc).toContain('ribbon-middle-yellow');
       expect(componentSrc).toContain('ribbon-top-red');
     });
 
-    it('uses suitable color combination: Deep Green, Gold, and Ruby Red', () => {
-      // Green track
-      expect(componentSrc).toContain('bg-[oklch(0.44_0.09_155)]');
-      expect(componentSrc).toContain('#1f613c');
+    it('uses exact hex colors: Top #C13429, Middle #FDBF0F, Bottom #2A0C0C', () => {
+      // Top Red track
+      expect(componentSrc).toContain('bg-[#C13429]');
+      expect(componentSrc).toContain('#C13429');
 
-      // Gold track
-      expect(componentSrc).toContain('bg-[oklch(0.8_0.13_78)]');
-      expect(componentSrc).toContain('#ebb353');
+      // Middle Yellow track
+      expect(componentSrc).toContain('bg-[#FDBF0F]');
+      expect(componentSrc).toContain('#FDBF0F');
 
-      // Red track
-      expect(componentSrc).toContain('bg-[oklch(0.54_0.18_29)]');
-      expect(componentSrc).toContain('#c13429');
+      // Bottom Dark Maroon track
+      expect(componentSrc).toContain('bg-[#2A0C0C]');
+      expect(componentSrc).toContain('#2A0C0C');
     });
 
     it('applies diagonal rotation angles matching visual reference', () => {
@@ -55,13 +55,33 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(componentSrc).toContain('z-10');
       expect(componentSrc).toContain('z-20');
       expect(componentSrc).toContain('z-30');
-      expect(componentSrc).toContain('shadow-[0_8px_24px_rgba(0,0,0,0.3)]');
+      expect(componentSrc).toContain('shadow-[0_8px_24px_rgba(0,0,0,0.35)]');
       expect(componentSrc).toContain('shadow-[0_10px_30px_rgba(0,0,0,0.35)]');
       expect(componentSrc).toContain('shadow-[0_14px_40px_rgba(0,0,0,0.45)]');
     });
   });
 
-  describe('3. Continuous Infinite Animation & CSS Keyframes', () => {
+  describe('3. Seamless Hero Background Continuity & No Black Gap', () => {
+    it('removes plain black background and uses bg-transparent in AnimatedBrandRibbon', () => {
+      expect(componentSrc).toContain('bg-transparent');
+      expect(componentSrc).not.toContain('bg-[#1B090B]');
+      expect(componentSrc).not.toContain('border-t border-[#4A0A1C]/60');
+    });
+
+    it('places AnimatedBrandRibbon inside the hero section to inherit halftone artwork seamlessly', () => {
+      const heroStartIdx = pageSrc.indexOf('id="home"');
+      const ribbonIdx = pageSrc.indexOf('<AnimatedBrandRibbon />');
+      const heroCloseIdx = pageSrc.indexOf('</section>', heroStartIdx);
+      const expositionIdx = pageSrc.indexOf('The Idea Behind the Theme');
+
+      expect(heroStartIdx).toBeGreaterThan(0);
+      expect(ribbonIdx).toBeGreaterThan(heroStartIdx);
+      expect(ribbonIdx).toBeLessThan(heroCloseIdx);
+      expect(expositionIdx).toBeGreaterThan(heroCloseIdx);
+    });
+  });
+
+  describe('4. Continuous Infinite Animation & CSS Keyframes', () => {
     it('defines linear infinite CSS keyframes with translate3d in public.css', () => {
       expect(cssSrc).toContain('@keyframes ribbonMarqueeLeft');
       expect(cssSrc).toContain('@keyframes ribbonMarqueeRight');
@@ -86,7 +106,7 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
     });
   });
 
-  describe('4. Accessibility and Performance', () => {
+  describe('5. Accessibility and Performance', () => {
     it('supports prefers-reduced-motion in public.css', () => {
       expect(cssSrc).toContain('@media (prefers-reduced-motion: reduce)');
       expect(cssSrc).toContain('.animate-ribbon-left');
@@ -114,19 +134,8 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
     });
   });
 
-  describe('5. Homepage Integration and Scope Restrictions', () => {
-    it('imports and places AnimatedBrandRibbon immediately below the hero section', () => {
-      expect(pageSrc).toContain("import { AnimatedBrandRibbon } from '@/components/domain/AnimatedBrandRibbon'");
-      const heroIdx = pageSrc.indexOf('id="home"');
-      const ribbonIdx = pageSrc.indexOf('<AnimatedBrandRibbon />');
-      const expositionIdx = pageSrc.indexOf('The Idea Behind the Theme');
-
-      expect(heroIdx).toBeGreaterThan(0);
-      expect(ribbonIdx).toBeGreaterThan(heroIdx);
-      expect(expositionIdx).toBeGreaterThan(ribbonIdx);
-    });
-
-    it('preserves existing hero section content and CTAs', () => {
+  describe('6. Scope Restrictions & Hero Content Preservation', () => {
+    it('preserves existing hero section content, CTAs, and badges', () => {
       expect(pageSrc).toContain('Proactive Paradigms');
       expect(pageSrc).toContain('/images/theme.png');
       expect(pageSrc).toContain('/images/lamp.png');
