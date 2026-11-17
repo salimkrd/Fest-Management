@@ -30,7 +30,6 @@ export default function AdminDashboardPage() {
   const [themeModalOpen, setThemeModalOpen] = React.useState(false);
 
   const publishedResults = results.filter(result => result.resultStatus === 'PUBLISHED');
-  const publishedCompetitionIds = new Set(publishedResults.map(result => result.competitionId));
   const completedCompetitionsCount = competitions.filter(competition => competition.scheduleStatus === 'COMPLETED').length;
 
   const upcomingSchedules = schedules
