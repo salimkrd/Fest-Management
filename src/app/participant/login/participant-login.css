@@ -751,3 +751,31 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/*
+ * Keep the participant-login background painted across the mobile viewport.
+ * Prevents the document's default white background from showing below the page
+ * when the content is shorter than the available screen height.
+ */
+@media (max-width: 720px) {
+  .participant-login {
+    min-height: 100vh;
+    min-height: max(100svh, 100dvh);
+    overflow-x: clip;
+    overflow-y: visible;
+    background: transparent;
+  }
+
+  .participant-login::before {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 78% 16%, rgba(186, 25, 18, 0.25), transparent 34rem),
+      radial-gradient(ellipse at 10% 92%, rgba(253, 191, 15, 0.08), transparent 28rem),
+      linear-gradient(135deg, #1B090B 0%, #2B0C14 48%, #4A0A1C 100%);
+  }
+}
