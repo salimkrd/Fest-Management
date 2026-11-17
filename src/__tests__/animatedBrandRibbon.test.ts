@@ -92,6 +92,8 @@ describe('INSPIRATH Animated Brand Ribbon / Marquee Strips', () => {
       expect(pageSrc).toContain('relative z-20 w-full inspirath-halftone-hero');
       expect(pageSrc).toContain('overflow-x-clip overflow-y-visible');
       expect(pageSrc).toContain('relative z-0 w-full bg-[#FDBF0F]');
+      expect(pageSrc).toContain('pb-20 sm:pb-24 lg:pb-28');
+      expect(pageSrc).toContain('pt-18 sm:pt-20 pb-10 sm:pb-12');
     });
 
   });
