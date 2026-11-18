@@ -13,6 +13,7 @@ import {
   VerificationResult
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
+import { buildAdminJudgeScorecard } from '@/domain/judgeScorecard';
 import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 import {
   buildGreenRoomRosterSnapshot,
@@ -875,6 +876,13 @@ export class JudgeService {
       if (!assignDoc.exists || assignDoc.data()?.competitionId !== params.competitionId) {
         throw new Error('Unauthorized: Judge assignment could not be verified for this competition.');
       }
+      if (
+        assignDoc.data()?.revoked === true ||
+        assignDoc.data()?.status === 'REVOKED' ||
+        assignDoc.data()?.status === 'EXPIRED'
+      ) {
+        throw new Error('Unauthorized: Assignment has been revoked or expired. The judge cannot submit marks.');
+      }
       if (assignDoc.data()?.status === 'SUBMITTED') {
         throw new Error('Unauthorized: Scorecard has already been finalized and submitted. Marks are immutable.');
       }
@@ -955,23 +963,188 @@ export class JudgeService {
   }
 
   /**
-   * Admin operation: Revokes a judge assignment immediately.
-   * Cryptographically verifies Admin ID token before permitting revocation.
+   * Admin operation: Reads one judge's scorecard without exposing participant
+   * identities or registration IDs. Submitted records use their immutable
+   * Code Letter snapshot; draft records require the current roster version to match.
    */
-  static async revokeAssignment(assignmentId: string, adminIdToken: string): Promise<boolean> {
+  static async getAdminScorecard(
+    assignmentId: string,
+    adminIdToken: string
+  ) {
     if (!adminIdToken || typeof adminIdToken !== 'string') {
-      throw new Error('Unauthorized: Admin ID token is required to revoke judge assignments.');
+      throw new Error('Unauthorized: Admin ID token is required to view judge marks.');
     }
     await AuthService.assertAdmin(adminIdToken);
 
-    const db = getAdminDb();
-    if (!db) return true;
+    if (typeof assignmentId !== 'string' || !assignmentId.trim()) {
+      throw new Error('Validation Error: A valid judge assignment ID is required.');
+    }
 
-    await db.collection('judgeAssignments').doc(assignmentId).update({
-      revoked: true,
-      status: 'REVOKED'
+    const db = getAdminDb();
+    if (!db) {
+      throw new Error('Database Unavailable: Cannot load judge marks.');
+    }
+
+    const assignmentSnapshot = await db.collection('judgeAssignments').doc(assignmentId).get();
+    if (!assignmentSnapshot.exists) {
+      throw new Error('Not Found: Judge assignment does not exist.');
+    }
+
+    const assignment = { ...assignmentSnapshot.data(), id: assignmentSnapshot.id } as Record<string, unknown>;
+    const competitionId = String(assignment.competitionId || '').trim();
+    if (!competitionId) {
+      throw new Error('Scorecard Data Error: Judge assignment has no competition reference.');
+    }
+
+    const [competitionSnapshot, markSnapshot] = await Promise.all([
+      db.collection('competitions').doc(competitionId).get(),
+      db.collection('markEntries').doc(`me-${assignmentId}`).get()
+    ]);
+
+    if (!competitionSnapshot.exists) {
+      throw new Error('Not Found: The assigned competition no longer exists.');
+    }
+
+    const markData = markSnapshot.exists ? markSnapshot.data() as Record<string, unknown> : null;
+    const markStatus = String(markData?.status || '').trim().toUpperCase();
+    const greenRoomDocuments = markStatus === 'DRAFT'
+      ? await db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
+      : null;
+
+    return buildAdminJudgeScorecard({
+      assignment,
+      markData,
+      competition: competitionSnapshot.data() as Record<string, unknown>,
+      greenRoomDocuments: greenRoomDocuments?.docs.map(doc => ({
+        id: doc.id,
+        data: doc.data() as Record<string, unknown>
+      })) || []
+    });
+  }
+
+  /**
+   * Admin operation: Revokes an unsubmitted judge assignment.
+   * The update is transactional so a concurrent mark submission cannot race
+   * with the revocation. Submitted scorecards and published results are immutable.
+   */
+  static async revokeAssignment(
+    assignmentId: string,
+    adminIdToken: string
+  ): Promise<{ assignmentId: string; competitionId: string; remainingActiveJudges: number; resultRefreshWarning?: string }> {
+    if (!adminIdToken || typeof adminIdToken !== 'string') {
+      throw new Error('Unauthorized: Admin ID token is required to revoke judge assignments.');
+    }
+    if (typeof assignmentId !== 'string' || !assignmentId.trim()) {
+      throw new Error('Validation Error: A valid judge assignment ID is required.');
+    }
+
+    const admin = await AuthService.assertAdmin(adminIdToken);
+    const db = getAdminDb();
+    if (!db) {
+      throw new Error('Database Unavailable: Cannot revoke judge assignments.');
+    }
+
+    let competitionId = '';
+    let remainingActiveJudges = 0;
+    const revokedAt = new Date().toISOString();
+
+    await db.runTransaction(async (transaction) => {
+      const assignmentRef = db.collection('judgeAssignments').doc(assignmentId);
+      const submittedMarkRef = db.collection('markEntries').doc(`me-${assignmentId}`);
+      const assignmentSnapshot = await transaction.get(assignmentRef);
+
+      if (!assignmentSnapshot.exists) {
+        throw new Error('Not Found: Judge assignment does not exist.');
+      }
+
+      const assignment = assignmentSnapshot.data() as Record<string, unknown>;
+      competitionId = String(assignment.competitionId || '').trim();
+      if (!competitionId) {
+        throw new Error('Validation Error: Judge assignment is missing its competition reference.');
+      }
+      if (assignment.revoked === true || assignment.status === 'REVOKED') {
+        throw new Error('Conflict Error: This judge assignment has already been removed.');
+      }
+
+      const competitionRef = db.collection('competitions').doc(competitionId);
+      const resultRef = db.collection('results').doc(`res-${competitionId}`);
+      const assignmentQuery = db.collection('judgeAssignments').where('competitionId', '==', competitionId);
+      const [competitionSnapshot, resultSnapshot, markSnapshot, competitionAssignments] = await Promise.all([
+        transaction.get(competitionRef),
+        transaction.get(resultRef),
+        transaction.get(submittedMarkRef),
+        transaction.get(assignmentQuery)
+      ]);
+
+      if (!competitionSnapshot.exists) {
+        throw new Error('Not Found: The assigned competition no longer exists.');
+      }
+
+      const resultStatus = String(resultSnapshot.data()?.resultStatus || '').toUpperCase();
+      if (resultStatus === 'PUBLISHED' || resultStatus === 'READY_TO_PUBLISH') {
+        throw new Error('Conflict Error: This competition has entered result publication. Judge assignments can no longer be changed.');
+      }
+
+      const markData = markSnapshot.exists ? markSnapshot.data() : undefined;
+      if (
+        String(assignment.status || '').toUpperCase() === 'SUBMITTED' ||
+        String(markData?.status || '').toUpperCase() === 'SUBMITTED' ||
+        markData?.isFinal === true
+      ) {
+        throw new Error('Conflict Error: This judge has already submitted a final scorecard. Submitted marks are immutable and this assignment cannot be removed.');
+      }
+
+      const isActive = (data: FirebaseFirestore.DocumentData) =>
+        data.revoked !== true &&
+        String(data.status || '').toUpperCase() !== 'REVOKED' &&
+        String(data.status || '').toUpperCase() !== 'EXPIRED';
+
+      const remainingAssignments = competitionAssignments.docs.filter(doc =>
+        doc.id !== assignmentId && isActive(doc.data())
+      );
+      if (remainingAssignments.length === 0) {
+        throw new Error('Conflict Error: At least one active judge must remain assigned to this competition.');
+      }
+
+      remainingActiveJudges = remainingAssignments.length;
+      const assignedJudgeNames = Array.from(new Set(
+        remainingAssignments
+          .map(doc => String(doc.data().judgeName || '').trim())
+          .filter(Boolean)
+      ));
+
+      // Keep the assignment and any draft record for audit history. Revocation
+      // disables its token and excludes it from future result-readiness checks.
+      transaction.update(assignmentRef, {
+        revoked: true,
+        status: 'REVOKED',
+        revokedAt,
+        revokedBy: admin.uid,
+        revokedByRole: 'ADMIN'
+      });
+      transaction.update(competitionRef, {
+        assignedJudges: assignedJudgeNames,
+        updatedAt: revokedAt
+      });
     });
 
-    return true;
+    // Re-evaluate the competition using only the remaining active assignments.
+    // If those judges have all submitted, this generates/refreshes READY_FOR_REVIEW.
+    // If any remaining judge is still pending, no result is prematurely generated.
+    let resultRefreshWarning: string | undefined;
+    try {
+      await this.updateResultForCompetition(db, competitionId);
+    } catch (error: unknown) {
+      resultRefreshWarning = error instanceof Error
+        ? error.message
+        : 'The assignment was revoked, but result readiness could not be refreshed.';
+    }
+
+    return {
+      assignmentId,
+      competitionId,
+      remainingActiveJudges,
+      ...(resultRefreshWarning ? { resultRefreshWarning } : {})
+    };
   }
 }

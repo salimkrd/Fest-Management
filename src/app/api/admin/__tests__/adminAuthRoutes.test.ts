@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { DELETE as deleteCompetitionHandler } from '../competitions/[id]/route';
 import { POST as cleanupOrphanedHandler } from '../judge-assignments/cleanup-orphaned/route';
+import { POST as revokeJudgeAssignmentHandler } from '../judge-assignments/revoke/route';
+import { GET as judgeScorecardHandler } from '../judge-assignments/[assignmentId]/scorecard/route';
 import { DELETE as deleteCategoryHandler } from '../categories/[id]/route';
 import { AuthService } from '@/services/authService';
 
@@ -58,7 +60,28 @@ describe('Admin Endpoints Authentication and Authorization Protection', () => {
     expect(body.error).toContain('Unauthorized');
   });
 
-  it('3. DELETE /api/admin/categories/[id] rejects unauthorized requests (no token) with 401', async () => {
+  it('3. GET /api/admin/judge-assignments/[assignmentId]/scorecard rejects requests without an admin token', async () => {
+    const req = new NextRequest('http://localhost/api/admin/judge-assignments/assignment-1/scorecard', {
+      method: 'GET'
+    });
+
+    const res = await judgeScorecardHandler(req, { params: Promise.resolve({ assignmentId: 'assignment-1' }) });
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toContain('Unauthorized');
+  });
+
+  it('4. POST /api/admin/judge-assignments/revoke rejects requests without an admin token', async () => {
+    const req = new NextRequest('http://localhost/api/admin/judge-assignments/revoke', {
+      method: 'POST',
+      body: JSON.stringify({ assignmentId: 'assignment-1' })
+    });
+
+    const res = await revokeJudgeAssignmentHandler(req);
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toContain('Unauthorized');
+  });
+
+  it('5. DELETE /api/admin/categories/[id] rejects unauthorized requests (no token) with 401', async () => {
     const req = new NextRequest('http://localhost/api/admin/categories/cat-1', {
       method: 'DELETE'
     });
@@ -69,7 +92,7 @@ describe('Admin Endpoints Authentication and Authorization Protection', () => {
     expect(body.error).toContain('Unauthorized');
   });
 
-  it('4. Rejects non-admin token with 403 Forbidden or authorization failure', async () => {
+  it('6. Rejects non-admin token with 403 Forbidden or authorization failure', async () => {
     vi.mocked(AuthService.assertAdmin).mockRejectedValueOnce(
       new Error('Forbidden: Insufficient privileges. Administrator access required.')
     );
