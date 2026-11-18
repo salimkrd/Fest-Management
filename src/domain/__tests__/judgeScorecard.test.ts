@@ -146,6 +146,22 @@ describe('Admin judge scorecard Code Letter resolution', () => {
     expect(result.rows).toEqual([]);
   });
 
+  it('uses a 100-point maximum for verified modern total-mark scorecards', () => {
+    const result = buildAdminJudgeScorecard({
+      assignment,
+      competition: { ...competition, maxMarks: 240 },
+      markData: {
+        assignmentId: 'asgn-1', competitionId: 'cmp-1', status: 'SUBMITTED',
+        rosterVersion: 'a'.repeat(64),
+        scores: { 'reg-1': 77 },
+        anonymousRoster: [{ codeLetter: 'A', codeIndex: 0 }],
+        codeRegistrationSnapshot: [{ registrationId: 'reg-1', codeLetter: 'A', codeIndex: 0 }]
+      }
+    });
+    expect(result.maximumMarks).toBe(100);
+    expect(result.rows[0]).toMatchObject({ codeLetter: 'A', totalMarks: 77 });
+  });
+
   it('accepts legacy total-number marks and labels them as totals', () => {
     const result = buildAdminJudgeScorecard({
       assignment, competition,
