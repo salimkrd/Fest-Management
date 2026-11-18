@@ -56,7 +56,6 @@ interface OrphanCleanupResult {
   orphanedJudgeDetails?: Array<{ id: string; competitionId: string; judgeName: string }>;
   orphanedMarkDetails?: Array<{ id: string; competitionId: string }>;
 }
-import Link from 'next/link';
 
 export default function MarkEntryPage() {
   const { markEntries, markEntriesSyncState, competitions, addOrUpdateJudgeAssignment, revokeJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
