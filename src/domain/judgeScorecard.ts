@@ -151,11 +151,17 @@ export function buildAdminJudgeScorecard(params: {
   }
 
   const criteria = resolveCriteria(competition);
-  const declaredMax = Number(competition.maxMarks);
-  const maximumMarks = Number.isFinite(declaredMax) && declaredMax > 0
-    ? declaredMax
-    : criteria.reduce((total, criterion) => total + criterion.maxMarks, 0) || 100;
   const markData = params.markData ? asRecord(params.markData) : null;
+  const rawScoresForScale = asRecord(markData?.scores);
+  const containsVerifiedHundredPointTotals =
+    typeof markData?.rosterVersion === 'string' &&
+    Object.values(rawScoresForScale).some(value => typeof value === 'number');
+  const declaredMax = Number(competition.maxMarks);
+  const maximumMarks = containsVerifiedHundredPointTotals
+    ? 100
+    : Number.isFinite(declaredMax) && declaredMax > 0
+      ? declaredMax
+      : criteria.reduce((total, criterion) => total + criterion.maxMarks, 0) || 100;
   const base: AdminJudgeScorecard = {
     assignmentId,
     competitionId,
