@@ -19,7 +19,7 @@ describe('Admin Mark Entry Open Sheet scorecard view', () => {
   it('uses an Admin-authenticated no-store read endpoint', () => {
     expect(page).toContain('/api/admin/judge-assignments/');
     expect(page).toContain('cache: \'no-store\'');
-    expect(route).toContain('Auth');
+    expect(route).toContain("authorization.startsWith('Bearer ')");
     expect(route).toContain('JudgeService.getAdminScorecard(assignmentId, adminIdToken)');
     expect(route).toContain('Cache-Control');
     expect(service).toContain('AuthService.assertAdmin(adminIdToken)');
