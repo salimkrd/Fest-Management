@@ -51,6 +51,7 @@ export default function MarkEntryPage() {
   const [removingAssignment, setRemovingAssignment] = useState(false);
   const [removeError, setRemoveError] = useState('');
   const [removeFeedback, setRemoveFeedback] = useState('');
+  const [removeFeedbackIsWarning, setRemoveFeedbackIsWarning] = useState(false);
 
   // Admin-authorized Dry-Run & Confirmed Orphan Inspection State
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
@@ -172,6 +173,7 @@ export default function MarkEntryPage() {
     setRemovingAssignment(true);
     setRemoveError('');
     setRemoveFeedback('');
+    setRemoveFeedbackIsWarning(false);
     try {
       const result = await revokeJudgeAssignment(assignmentToRemove.id);
       const judgeName = assignmentToRemove.judgeName;
@@ -179,6 +181,7 @@ export default function MarkEntryPage() {
       setAssignmentToRemove(null);
 
       if (result.resultRefreshWarning) {
+        setRemoveFeedbackIsWarning(true);
         setRemoveFeedback(
           `${judgeName}'s access was revoked from ${competitionName}, but result readiness refresh was blocked: ${result.resultRefreshWarning}`
         );
@@ -298,7 +301,7 @@ export default function MarkEntryPage() {
           </div>
           {markEntriesSyncState === 'error' && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-xs text-red-800 sm:px-5">Live judge assignment updates could not be loaded. Check the administrator session and Firestore permissions, then reload the page.</div>}
           {markEntriesSyncState === 'loading' && <div className="flex items-center gap-3 border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-800 sm:px-5"><Clock className="h-4 w-4 animate-spin" />Connecting to the live judge assignment feed…</div>}
-          {removeFeedback && <div role="status" className="border-b border-emerald-100 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800 sm:px-5">{removeFeedback}</div>}
+          {removeFeedback && <div role="status" className={`border-b px-4 py-3 text-xs leading-5 sm:px-5 ${removeFeedbackIsWarning ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-100 bg-emerald-50 text-emerald-800'}`}>{removeFeedback}</div>}
           <div className="divide-y divide-[#E2E8F0] lg:hidden">
             {filteredEntries.length === 0 ? <div className="px-4 py-10 text-center"><FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-[#0F172A]">{markEntriesSyncState === 'loading' ? 'Loading assignments…' : 'No mark entries found'}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#64748B]">{competitions.length === 0 ? 'Create a competition before assigning a judge.' : 'No judge assignments match the current search or status filter.'}</p></div> : filteredEntries.map(entry => (
               <article key={entry.id} className="space-y-3 p-4">
@@ -476,7 +479,7 @@ export default function MarkEntryPage() {
                 <p className="mt-1 text-xs text-slate-500">Current status: {assignmentToRemove.status.replace('_', ' ')}</p>
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-                Removing this judge immediately revokes their access and excludes this assignment from the competition's active judge count and future result calculation. The assignment record and any draft marks are retained for audit history. All remaining active judges must submit before the result can become ready.
+                Removing this judge immediately revokes their access and excludes this assignment from the competition's active judge count and future result calculation. The assignment record and any draft marks are retained for audit history. At least one active judge must remain assigned, and all remaining active judges must submit before the result can become ready.
               </div>
               {assignmentToRemove.status === 'SUBMITTED' && (
                 <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
