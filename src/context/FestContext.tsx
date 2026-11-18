@@ -105,7 +105,7 @@ interface FestContextType {
     stageName?: string;
   }) => Promise<{ assignmentId: string; accessCode: string; oneTimeSecret: string; directUrl: string }>;
   submitJudgeMarks: (markEntryId: string, scores: MarkEntry['scores'], verificationHash?: string) => void;
-  revokeJudgeAssignment: (markEntryId: string) => void;
+  revokeJudgeAssignment: (markEntryId: string) => Promise<{ resultRefreshWarning?: string }>;
   cleanupOrphanedJudgeAssignments: (options?: { dryRun?: boolean; confirm?: boolean }) => Promise<{
     success: boolean;
     dryRun?: boolean;
@@ -2875,18 +2875,84 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const revokeJudgeAssignment = async (markEntryId: string) => {
-    setMarkEntries(prev => prev.map(m => m.id === markEntryId ? { ...m, revoked: true, status: 'REVOKED' } : m));
-    if (!isIsolatedDemoOrTest && db) {
-      try {
-        await updateDoc(doc(db, 'judgeAssignments', markEntryId), {
-          revoked: true,
-          status: 'REVOKED'
-        });
-      } catch (err) {
-        console.warn('[FestContext] Firestore revokeJudgeAssignment error:', err);
-      }
+  const revokeJudgeAssignment = async (
+    markEntryId: string
+  ): Promise<{ resultRefreshWarning?: string }> => {
+    const assignment = markEntries.find(entry => entry.id === markEntryId);
+    if (!assignment) {
+      throw new Error('The selected judge assignment could not be found. Refresh the page and try again.');
     }
+    if (assignment.revoked || assignment.status === 'REVOKED') {
+      throw new Error('This judge assignment has already been removed.');
+    }
+    if (assignment.status === 'SUBMITTED') {
+      throw new Error('This judge has already submitted final marks. Submitted assignments cannot be removed.');
+    }
+
+    if (isIsolatedDemoOrTest) {
+      const remainingAssignments = markEntries.filter(entry =>
+        entry.competitionId === assignment.competitionId &&
+        entry.id !== markEntryId &&
+        !entry.revoked &&
+        entry.status !== 'REVOKED' &&
+        entry.status !== 'EXPIRED'
+      );
+      if (remainingAssignments.length === 0) {
+        throw new Error('At least one active judge must remain assigned to this competition.');
+      }
+
+      setMarkEntries(prev => prev.map(entry =>
+        entry.id === markEntryId
+          ? { ...entry, revoked: true, status: 'REVOKED' }
+          : entry
+      ));
+
+      const allRemainingJudgesSubmitted = remainingAssignments.every(entry => entry.status === 'SUBMITTED');
+      setResults(prev => prev.map(result => result.competitionId === assignment.competitionId
+        ? {
+            ...result,
+            marksStatus: allRemainingJudgesSubmitted ? 'COMPLETE' : 'PARTIAL',
+            resultStatus: allRemainingJudgesSubmitted ? 'READY_FOR_REVIEW' : 'AWAITING_MARKS'
+          }
+        : result
+      ));
+      return {};
+    }
+
+    if (!db || !auth?.currentUser) {
+      throw new Error('Administrator sign-in and a live Firestore connection are required to remove a judge.');
+    }
+
+    const response = await fetch('/api/admin/judge-assignments/revoke', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await auth.currentUser.getIdToken()}`
+      },
+      body: JSON.stringify({ assignmentId: markEntryId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not remove the judge assignment.'
+      );
+    }
+
+    // Firestore onSnapshot will also deliver this change; update local state
+    // immediately after the server confirms the transactional revocation.
+    setMarkEntries(prev => prev.map(entry =>
+      entry.id === markEntryId
+        ? { ...entry, revoked: true, status: 'REVOKED' }
+        : entry
+    ));
+
+    return {
+      resultRefreshWarning: typeof payload.resultRefreshWarning === 'string'
+        ? payload.resultRefreshWarning
+        : undefined
+    };
   };
 
   // Task 2: Fix Result Publication Logic
