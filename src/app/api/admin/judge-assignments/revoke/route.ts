@@ -40,6 +40,16 @@ export async function POST(req: NextRequest) {
       ...result
     }, { status: 200 });
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    if (message.includes('Conflict Error')) {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    if (message.includes('Not Found')) {
+      return NextResponse.json({ error: message }, { status: 404 });
+    }
+    if (message.includes('Validation Error')) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     return handleApiError(error);
   }
 }
