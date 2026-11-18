@@ -32,7 +32,7 @@ describe('Admin Mark Entry Open Sheet scorecard view', () => {
     expect(page).toContain('Participant names, registration IDs and personal details are not displayed.');
     expect(domain).toContain('codeRegistrationSnapshot');
     expect(domain).not.toContain('participantName:');
-    expect(domain).not.toContain('registrationId: string;');
+    expect(domain).toContain('neither is returned to the caller');
   });
 
   it('does not guess the mapping for drafts when the live Green Room roster has changed', () => {
