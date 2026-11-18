@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { CompetitionSearchSelect } from './CompetitionSearchSelect';
 import { WhatsAppDispatchModal } from '@/components/domain/WhatsAppDispatchModal';
+import { auth } from '@/lib/firebase/client';
 import {
   MessageSquare,
   Search,
@@ -22,6 +23,25 @@ import {
   ShieldCheck,
   ExternalLink
 } from 'lucide-react';
+
+interface AdminJudgeScorecardView {
+  assignmentId: string;
+  competitionId: string;
+  judgeName: string;
+  competitionName: string;
+  competitionCode: string;
+  assignmentStatus: string;
+  markStatus: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED' | 'NO_SCORECARD';
+  submittedAt?: string;
+  criteria: Array<{ id: string; name: string; maxMarks: number }>;
+  maximumMarks: number;
+  rows: Array<{
+    codeLetter: string;
+    codeIndex: number;
+    criterionMarks: Record<string, number | null>;
+    totalMarks: number | null;
+  }>;
+}
 
 interface OrphanCleanupResult {
   success: boolean;
@@ -52,6 +72,10 @@ export default function MarkEntryPage() {
   const [removeError, setRemoveError] = useState('');
   const [removeFeedback, setRemoveFeedback] = useState('');
   const [removeFeedbackIsWarning, setRemoveFeedbackIsWarning] = useState(false);
+  const [scorecardAssignment, setScorecardAssignment] = useState<MarkEntry | null>(null);
+  const [scorecardLoading, setScorecardLoading] = useState(false);
+  const [scorecardError, setScorecardError] = useState('');
+  const [scorecardData, setScorecardData] = useState<AdminJudgeScorecardView | null>(null);
 
   // Admin-authorized Dry-Run & Confirmed Orphan Inspection State
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
@@ -165,6 +189,45 @@ export default function MarkEntryPage() {
     } finally {
       setSavingAssignment(false);
     }
+  };
+
+  const handleOpenScorecard = async (entry: MarkEntry) => {
+    setScorecardAssignment(entry);
+    setScorecardData(null);
+    setScorecardError('');
+    setScorecardLoading(true);
+
+    try {
+      const user = auth?.currentUser;
+      if (!user) {
+        throw new Error('Sign in as an administrator to view judge marks.');
+      }
+      const response = await fetch(
+        `/api/admin/judge-assignments/${encodeURIComponent(entry.id)}/scorecard`,
+        {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+          cache: 'no-store',
+          credentials: 'same-origin'
+        }
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.scorecard) {
+        throw new Error(payload.error || 'Could not load this judge scorecard.');
+      }
+      setScorecardData(payload.scorecard as AdminJudgeScorecardView);
+    } catch (err: unknown) {
+      setScorecardError(err instanceof Error ? err.message : 'Could not load this judge scorecard.');
+    } finally {
+      setScorecardLoading(false);
+    }
+  };
+
+  const handleCloseScorecard = () => {
+    if (scorecardLoading) return;
+    setScorecardAssignment(null);
+    setScorecardData(null);
+    setScorecardError('');
   };
 
   const handleConfirmRemoveAssignment = async () => {
@@ -309,7 +372,7 @@ export default function MarkEntryPage() {
                 <div className="rounded-lg bg-slate-50 px-3 py-2.5"><p className="text-sm font-semibold text-[#0F172A]">{entry.judgeName}</p><p className="mt-0.5 text-xs text-[#64748B]">{entry.judgePhone}</p>{entry.submittedAt && <p className="mt-1 text-[11px] text-emerald-700">Submitted: {entry.submittedAt}</p>}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button variant="outline" size="sm" className="w-full" leftIcon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => { setDispatchCredentials(null); setSelectedForDispatch(entry); }}>Dispatch details</Button>
-                  <Link href={`/judge/marking?code=${encodeURIComponent(entry.accessCode)}&competitionId=${encodeURIComponent(entry.competitionId)}`} target="_blank" className="w-full"><Button variant="secondary" size="sm" className="w-full" leftIcon={<ExternalLink className="h-3.5 w-3.5" />}>Open sheet</Button></Link>
+                  <Button variant="secondary" size="sm" className="w-full" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} onClick={() => void handleOpenScorecard(entry)}>Open Sheet</Button>
                   {entry.revoked || entry.status === 'REVOKED' ? (
                     <span className="inline-flex min-h-9 items-center justify-center rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-500">Assignment removed</span>
                   ) : (
@@ -396,18 +459,14 @@ export default function MarkEntryPage() {
                           </Button>
 
                           {/* Open as Judge Simulator link */}
-                          <Link
-                            href={`/judge/marking?code=${entry.accessCode}&competitionId=${entry.competitionId}`}
-                            target="_blank"
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                            onClick={() => void handleOpenScorecard(entry)}
                           >
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
-                            >
-                              Open Sheet
-                            </Button>
-                          </Link>
+                            Open Sheet
+                          </Button>
                           {entry.revoked || entry.status === 'REVOKED' ? (
                             <span className="rounded-md bg-slate-100 px-2.5 py-2 text-[11px] font-semibold text-slate-500">Removed</span>
                           ) : (
@@ -431,6 +490,119 @@ export default function MarkEntryPage() {
             </table>
           </div>
         </div>
+
+        {/* Admin-only Judge Scorecard Modal */}
+        <Modal
+          isOpen={!!scorecardAssignment}
+          onClose={handleCloseScorecard}
+          title="Judge Scorecard"
+          description="Read-only marks recorded by this judge for each anonymous Green Room Code Letter."
+          maxWidth="xl"
+        >
+          <div className="space-y-4">
+            {scorecardAssignment && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-950">{scorecardAssignment.judgeName}</p>
+                    <p className="mt-1 text-xs text-slate-600">{scorecardAssignment.competitionName} · {scorecardAssignment.competitionCode}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={scorecardData?.markStatus === 'SUBMITTED' ? 'success' : scorecardData?.markStatus === 'DRAFT' ? 'warning' : 'default'} size="sm">
+                      {scorecardData?.markStatus ? scorecardData.markStatus.replace('_', ' ') : scorecardAssignment.status.replace('_', ' ')}
+                    </Badge>
+                    {scorecardData?.submittedAt && <span className="text-[11px] text-slate-500">Submitted: {scorecardData.submittedAt}</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {scorecardLoading && (
+              <div className="flex min-h-36 flex-col items-center justify-center gap-3 text-center">
+                <Clock className="h-7 w-7 animate-spin text-blue-600" />
+                <p className="text-sm font-semibold text-slate-800">Loading judge marks…</p>
+              </div>
+            )}
+
+            {!scorecardLoading && scorecardError && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-800">
+                {scorecardError}
+              </div>
+            )}
+
+            {!scorecardLoading && !scorecardError && scorecardData && (
+              <>
+                {scorecardData.rows.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                    <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-semibold text-slate-900">
+                      {scorecardData.markStatus === 'NOT_STARTED' ? 'Judge has not started marking' : 'No saved marks available'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">No Code Letter marks have been saved for this assignment yet.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Anonymous scorecard</p>
+                        <p className="mt-1 text-[11px] text-slate-500">{scorecardData.rows.length} Code Letter(s) · Maximum {scorecardData.maximumMarks} marks</p>
+                      </div>
+                      <Badge variant="default" size="sm">Read only</Badge>
+                    </div>
+
+                    <div className="space-y-2 md:hidden">
+                      {scorecardData.rows.map(row => (
+                        <article key={row.codeLetter} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-slate-950 px-2 font-mono text-sm font-black text-white">{row.codeLetter}</span>
+                              <div><p className="text-sm font-bold text-slate-950">Code {row.codeLetter}</p><p className="text-[10px] text-slate-500">Stage entry #{row.codeIndex + 1}</p></div>
+                            </div>
+                            <div className="text-right"><p className="text-[10px] font-bold uppercase text-slate-500">Total</p><p className="text-lg font-black tabular-nums text-slate-950">{row.totalMarks === null ? '—' : row.totalMarks}</p></div>
+                          </div>
+                          {scorecardData.criteria.length > 0 && Object.keys(row.criterionMarks).length > 0 && (
+                            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+                              {scorecardData.criteria.map(criterion => (
+                                <div key={criterion.id} className="rounded-lg bg-slate-50 p-2">
+                                  <p className="text-[10px] font-semibold text-slate-500">{criterion.name}</p>
+                                  <p className="mt-0.5 text-sm font-bold tabular-nums text-slate-900">{row.criterionMarks[criterion.id] === null || row.criterionMarks[criterion.id] === undefined ? '—' : row.criterionMarks[criterion.id]} <span className="text-[10px] font-medium text-slate-400">/ {criterion.maxMarks}</span></p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+
+                    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
+                      <table className="w-full min-w-[640px] text-left text-xs">
+                        <thead><tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          <th className="px-4 py-3">Code Letter</th>
+                          {scorecardData.criteria.length > 0 && scorecardData.rows.some(row => Object.keys(row.criterionMarks).length > 0) && scorecardData.criteria.map(criterion => (
+                            <th key={criterion.id} className="px-4 py-3 text-center">{criterion.name} <span className="normal-case font-medium">(/ {criterion.maxMarks})</span></th>
+                          ))}
+                          <th className="px-4 py-3 text-right">Total <span className="normal-case font-medium">(/ {scorecardData.maximumMarks})</span></th>
+                        </tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {scorecardData.rows.map(row => (
+                            <tr key={row.codeLetter}>
+                              <td className="px-4 py-3"><div className="flex items-center gap-2"><span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-950 px-2 font-mono text-sm font-black text-white">{row.codeLetter}</span><span className="text-[10px] text-slate-500">#{row.codeIndex + 1}</span></div></td>
+                              {scorecardData.criteria.length > 0 && scorecardData.rows.some(item => Object.keys(item.criterionMarks).length > 0) && scorecardData.criteria.map(criterion => (
+                                <td key={criterion.id} className="px-4 py-3 text-center font-semibold tabular-nums text-slate-800">{row.criterionMarks[criterion.id] === null || row.criterionMarks[criterion.id] === undefined ? '—' : row.criterionMarks[criterion.id]}</td>
+                              ))}
+                              <td className="px-4 py-3 text-right font-black tabular-nums text-slate-950">{row.totalMarks === null ? '—' : row.totalMarks}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-[10px] leading-4 text-slate-500">Only anonymous Code Letters and marks are shown. Participant names, registration IDs and personal details are not displayed.</p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </Modal>
 
         {/* Remove Judge Assignment Confirmation Modal */}
         <Modal
