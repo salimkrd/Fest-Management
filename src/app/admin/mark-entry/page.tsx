@@ -18,6 +18,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
   UserPlus,
+  UserMinus,
   ShieldCheck,
   ExternalLink
 } from 'lucide-react';
@@ -38,7 +39,7 @@ interface OrphanCleanupResult {
 import Link from 'next/link';
 
 export default function MarkEntryPage() {
-  const { markEntries, markEntriesSyncState, competitions, addOrUpdateJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
+  const { markEntries, markEntriesSyncState, competitions, addOrUpdateJudgeAssignment, revokeJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -46,6 +47,10 @@ export default function MarkEntryPage() {
   const [dispatchCredentials, setDispatchCredentials] = useState<{ oneTimeSecret: string; directUrl: string } | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [assignmentToRemove, setAssignmentToRemove] = useState<MarkEntry | null>(null);
+  const [removingAssignment, setRemovingAssignment] = useState(false);
+  const [removeError, setRemoveError] = useState('');
+  const [removeFeedback, setRemoveFeedback] = useState('');
 
   // Admin-authorized Dry-Run & Confirmed Orphan Inspection State
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
@@ -161,6 +166,34 @@ export default function MarkEntryPage() {
     }
   };
 
+  const handleConfirmRemoveAssignment = async () => {
+    if (!assignmentToRemove) return;
+
+    setRemovingAssignment(true);
+    setRemoveError('');
+    setRemoveFeedback('');
+    try {
+      const result = await revokeJudgeAssignment(assignmentToRemove.id);
+      const judgeName = assignmentToRemove.judgeName;
+      const competitionName = assignmentToRemove.competitionName;
+      setAssignmentToRemove(null);
+
+      if (result.resultRefreshWarning) {
+        setRemoveFeedback(
+          `${judgeName}'s access was revoked from ${competitionName}, but result readiness refresh was blocked: ${result.resultRefreshWarning}`
+        );
+      } else {
+        setRemoveFeedback(
+          `${judgeName} was removed from ${competitionName}. Remaining active judges will determine when the result becomes ready.`
+        );
+      }
+    } catch (err: unknown) {
+      setRemoveError(err instanceof Error ? err.message : 'Could not remove this judge assignment.');
+    } finally {
+      setRemovingAssignment(false);
+    }
+  };
+
   const getStatusBadge = (st: MarkEntry['status']) => {
     switch (st) {
       case 'SUBMITTED':
@@ -265,12 +298,30 @@ export default function MarkEntryPage() {
           </div>
           {markEntriesSyncState === 'error' && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-xs text-red-800 sm:px-5">Live judge assignment updates could not be loaded. Check the administrator session and Firestore permissions, then reload the page.</div>}
           {markEntriesSyncState === 'loading' && <div className="flex items-center gap-3 border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-800 sm:px-5"><Clock className="h-4 w-4 animate-spin" />Connecting to the live judge assignment feed…</div>}
+          {removeFeedback && <div role="status" className="border-b border-emerald-100 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800 sm:px-5">{removeFeedback}</div>}
           <div className="divide-y divide-[#E2E8F0] lg:hidden">
             {filteredEntries.length === 0 ? <div className="px-4 py-10 text-center"><FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-[#0F172A]">{markEntriesSyncState === 'loading' ? 'Loading assignments…' : 'No mark entries found'}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#64748B]">{competitions.length === 0 ? 'Create a competition before assigning a judge.' : 'No judge assignments match the current search or status filter.'}</p></div> : filteredEntries.map(entry => (
               <article key={entry.id} className="space-y-3 p-4">
                 <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700">{entry.competitionCode}</span><h4 className="mt-1.5 break-words text-sm font-bold leading-5 text-[#0F172A]">{entry.competitionName}</h4><p className="mt-1 text-xs text-[#64748B]">{entry.categoryName} · {entry.type === 'SOLO' ? 'Individual' : 'Group'}</p></div><div className="shrink-0">{getStatusBadge(entry.status)}</div></div>
                 <div className="rounded-lg bg-slate-50 px-3 py-2.5"><p className="text-sm font-semibold text-[#0F172A]">{entry.judgeName}</p><p className="mt-0.5 text-xs text-[#64748B]">{entry.judgePhone}</p>{entry.submittedAt && <p className="mt-1 text-[11px] text-emerald-700">Submitted: {entry.submittedAt}</p>}</div>
-                <div className="grid grid-cols-2 gap-2"><Button variant="outline" size="sm" className="w-full" leftIcon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => { setDispatchCredentials(null); setSelectedForDispatch(entry); }}>Dispatch details</Button><Link href={`/judge/marking?code=${encodeURIComponent(entry.accessCode)}&competitionId=${encodeURIComponent(entry.competitionId)}`} target="_blank" className="w-full"><Button variant="secondary" size="sm" className="w-full" leftIcon={<ExternalLink className="h-3.5 w-3.5" />}>Open sheet</Button></Link></div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <Button variant="outline" size="sm" className="w-full" leftIcon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => { setDispatchCredentials(null); setSelectedForDispatch(entry); }}>Dispatch details</Button>
+                  <Link href={`/judge/marking?code=${encodeURIComponent(entry.accessCode)}&competitionId=${encodeURIComponent(entry.competitionId)}`} target="_blank" className="w-full"><Button variant="secondary" size="sm" className="w-full" leftIcon={<ExternalLink className="h-3.5 w-3.5" />}>Open sheet</Button></Link>
+                  {entry.revoked || entry.status === 'REVOKED' ? (
+                    <span className="inline-flex min-h-9 items-center justify-center rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-500">Assignment removed</span>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-red-200 text-red-700 hover:bg-red-50"
+                      leftIcon={<UserMinus className="h-3.5 w-3.5" />}
+                      disabled={entry.status === 'SUBMITTED'}
+                      onClick={() => { setRemoveError(''); setAssignmentToRemove(entry); }}
+                    >
+                      {entry.status === 'SUBMITTED' ? 'Submitted · Locked' : 'Remove Judge'}
+                    </Button>
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -354,6 +405,20 @@ export default function MarkEntryPage() {
                               Open Sheet
                             </Button>
                           </Link>
+                          {entry.revoked || entry.status === 'REVOKED' ? (
+                            <span className="rounded-md bg-slate-100 px-2.5 py-2 text-[11px] font-semibold text-slate-500">Removed</span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-red-200 text-red-700 hover:bg-red-50"
+                              leftIcon={<UserMinus className="w-3.5 h-3.5" />}
+                              disabled={entry.status === 'SUBMITTED'}
+                              onClick={() => { setRemoveError(''); setAssignmentToRemove(entry); }}
+                            >
+                              {entry.status === 'SUBMITTED' ? 'Submitted · Locked' : 'Remove Judge'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -363,6 +428,69 @@ export default function MarkEntryPage() {
             </table>
           </div>
         </div>
+
+        {/* Remove Judge Assignment Confirmation Modal */}
+        <Modal
+          isOpen={!!assignmentToRemove}
+          onClose={() => {
+            if (!removingAssignment) {
+              setAssignmentToRemove(null);
+              setRemoveError('');
+            }
+          }}
+          title="Remove Judge Assignment?"
+          description="Confirm that this judge was assigned to the wrong competition or should no longer evaluate it."
+          maxWidth="md"
+          footer={
+            <div className="flex w-full items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={removingAssignment}
+                onClick={() => {
+                  setAssignmentToRemove(null);
+                  setRemoveError('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-red-600 text-white hover:bg-red-700"
+                leftIcon={<UserMinus className="h-3.5 w-3.5" />}
+                onClick={handleConfirmRemoveAssignment}
+                disabled={removingAssignment || !assignmentToRemove || assignmentToRemove.status === 'SUBMITTED'}
+                isLoading={removingAssignment}
+              >
+                {removingAssignment ? 'Removing...' : 'Confirm Remove Judge'}
+              </Button>
+            </div>
+          }
+        >
+          {assignmentToRemove && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-bold text-slate-900">{assignmentToRemove.judgeName}</p>
+                <p className="mt-1 text-xs text-slate-600">{assignmentToRemove.competitionName} · {assignmentToRemove.competitionCode}</p>
+                <p className="mt-1 text-xs text-slate-500">Current status: {assignmentToRemove.status.replace('_', ' ')}</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                Removing this judge immediately revokes their access and excludes this assignment from the competition's active judge count and future result calculation. The assignment record and any draft marks are retained for audit history. All remaining active judges must submit before the result can become ready.
+              </div>
+              {assignmentToRemove.status === 'SUBMITTED' && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                  This judge has submitted final marks. Submitted scorecards are immutable and cannot be removed.
+                </div>
+              )}
+              {removeError && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">
+                  {removeError}
+                </div>
+              )}
+            </div>
+          )}
+        </Modal>
 
         {/* WhatsApp Dispatch Drawer Modal */}
         <WhatsAppDispatchModal
