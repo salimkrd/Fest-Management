@@ -20,8 +20,7 @@ import {
   FileSpreadsheet,
   UserPlus,
   UserMinus,
-  ShieldCheck,
-  
+  ShieldCheck
 } from 'lucide-react';
 
 interface AdminJudgeScorecardView {
