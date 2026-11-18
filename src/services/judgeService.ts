@@ -13,6 +13,7 @@ import {
   VerificationResult
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
+import { buildAdminJudgeScorecard } from '@/domain/judgeScorecard';
 import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 import {
   buildGreenRoomRosterSnapshot,
@@ -959,6 +960,66 @@ export class JudgeService {
       submittedAt,
       markEntryId
     };
+  }
+
+  /**
+   * Admin operation: Reads one judge's scorecard without exposing participant
+   * identities or registration IDs. Submitted records use their immutable
+   * Code Letter snapshot; draft records require the current roster version to match.
+   */
+  static async getAdminScorecard(
+    assignmentId: string,
+    adminIdToken: string
+  ) {
+    if (!adminIdToken || typeof adminIdToken !== 'string') {
+      throw new Error('Unauthorized: Admin ID token is required to view judge marks.');
+    }
+    await AuthService.assertAdmin(adminIdToken);
+
+    if (typeof assignmentId !== 'string' || !assignmentId.trim()) {
+      throw new Error('Validation Error: A valid judge assignment ID is required.');
+    }
+
+    const db = getAdminDb();
+    if (!db) {
+      throw new Error('Database Unavailable: Cannot load judge marks.');
+    }
+
+    const assignmentSnapshot = await db.collection('judgeAssignments').doc(assignmentId).get();
+    if (!assignmentSnapshot.exists) {
+      throw new Error('Not Found: Judge assignment does not exist.');
+    }
+
+    const assignment = { ...assignmentSnapshot.data(), id: assignmentSnapshot.id } as Record<string, unknown>;
+    const competitionId = String(assignment.competitionId || '').trim();
+    if (!competitionId) {
+      throw new Error('Scorecard Data Error: Judge assignment has no competition reference.');
+    }
+
+    const [competitionSnapshot, markSnapshot] = await Promise.all([
+      db.collection('competitions').doc(competitionId).get(),
+      db.collection('markEntries').doc(`me-${assignmentId}`).get()
+    ]);
+
+    if (!competitionSnapshot.exists) {
+      throw new Error('Not Found: The assigned competition no longer exists.');
+    }
+
+    const markData = markSnapshot.exists ? markSnapshot.data() as Record<string, unknown> : null;
+    const markStatus = String(markData?.status || '').trim().toUpperCase();
+    const greenRoomDocuments = markStatus === 'DRAFT'
+      ? await db.collection('greenRoomAssignments').where('competitionId', '==', competitionId).get()
+      : null;
+
+    return buildAdminJudgeScorecard({
+      assignment,
+      markData,
+      competition: competitionSnapshot.data() as Record<string, unknown>,
+      greenRoomDocuments: greenRoomDocuments?.docs.map(doc => ({
+        id: doc.id,
+        data: doc.data() as Record<string, unknown>
+      })) || []
+    });
   }
 
   /**
