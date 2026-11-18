@@ -2890,6 +2890,11 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (isIsolatedDemoOrTest) {
+      const existingResult = results.find(result => result.competitionId === assignment.competitionId);
+      if (existingResult && ['PUBLISHED', 'READY_TO_PUBLISH'].includes(existingResult.resultStatus)) {
+        throw new Error('This competition has entered result publication. Judge assignments can no longer be changed.');
+      }
+
       const remainingAssignments = markEntries.filter(entry =>
         entry.competitionId === assignment.competitionId &&
         entry.id !== markEntryId &&
