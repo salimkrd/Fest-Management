@@ -113,7 +113,13 @@ function draftCodeMap(
     throw new Error('Unverified Mapping Error: This draft has no valid Green Room roster version. Its Code Letter mapping cannot be safely verified.');
   }
 
-  const roster = buildGreenRoomRosterSnapshot(competitionId, greenRoomDocuments);
+  let roster: ReturnType<typeof buildGreenRoomRosterSnapshot>;
+  try {
+    roster = buildGreenRoomRosterSnapshot(competitionId, greenRoomDocuments);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : 'The live roster is invalid.';
+    throw new Error('Unverified Mapping Error: The current Green Room Code Letter map could not be verified. ' + detail);
+  }
   if (roster.version !== version) {
     throw new Error('Unverified Mapping Error: The Green Room roster changed after this draft was saved. Refreshing or reconciling the draft is required before Code Letter marks can be displayed.');
   }
