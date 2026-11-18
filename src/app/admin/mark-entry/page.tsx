@@ -316,7 +316,7 @@ export default function MarkEntryPage() {
                       className="w-full border-red-200 text-red-700 hover:bg-red-50"
                       leftIcon={<UserMinus className="h-3.5 w-3.5" />}
                       disabled={entry.status === 'SUBMITTED'}
-                      onClick={() => { setRemoveError(''); setAssignmentToRemove(entry); }}
+                      onClick={() => { setRemoveError(''); setRemoveFeedback(''); setAssignmentToRemove(entry); }}
                     >
                       {entry.status === 'SUBMITTED' ? 'Submitted · Locked' : 'Remove Judge'}
                     </Button>
@@ -414,7 +414,7 @@ export default function MarkEntryPage() {
                               className="border-red-200 text-red-700 hover:bg-red-50"
                               leftIcon={<UserMinus className="w-3.5 h-3.5" />}
                               disabled={entry.status === 'SUBMITTED'}
-                              onClick={() => { setRemoveError(''); setAssignmentToRemove(entry); }}
+                              onClick={() => { setRemoveError(''); setRemoveFeedback(''); setAssignmentToRemove(entry); }}
                             >
                               {entry.status === 'SUBMITTED' ? 'Submitted · Locked' : 'Remove Judge'}
                             </Button>
