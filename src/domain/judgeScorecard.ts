@@ -1,4 +1,5 @@
-import { buildGreenRoomRosterSnapshot, GreenRoomRosterDocument } from '@/domain/greenRoomRoster';
+import { buildGreenRoomRosterSnapshot } from '@/domain/greenRoomRoster';
+import type { GreenRoomRosterDocument } from '@/domain/greenRoomRoster';
 import { codeLetterToIndex, isValidCodeLetter } from '@/domain/greenRoom';
 
 export interface AdminJudgeScorecardCriterion {
