@@ -21,6 +21,8 @@ describe('Mark Entry judge assignment removal flow', () => {
     expect(page).toContain('Confirm Remove Judge');
     expect(page).toContain('onClick={handleConfirmRemoveAssignment}');
     expect(page).toContain('Removing this judge immediately revokes their access');
+    expect(page).toContain('At least one active judge must remain assigned');
+    expect(page).toContain('removeFeedbackIsWarning ?');
   });
 
   it('calls the secured admin revocation endpoint and only updates local state after success', () => {
