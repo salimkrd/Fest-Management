@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { db, auth } from '@/lib/firebase/client';
@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { GreenRoomScanner } from '@/components/domain/GreenRoomScanner';
 import { GreenRoomCodeSlip } from '@/components/domain/GreenRoomCodeSlip';
+import { GreenRoomCodeReveal } from '@/components/domain/GreenRoomCodeReveal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -35,12 +36,14 @@ export default function GreenRoomPage() {
 
   // Manual search state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [manualCodeInput, setManualCodeInput] = useState<string>('');
+  const [selectedManualRegistrationId, setSelectedManualRegistrationId] = useState<string>('');
   const [isCheckingIn, setIsCheckingIn] = useState<boolean>(false);
+  const checkInInFlightRef = useRef(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Modals state
   const [slipModalOpen, setSlipModalOpen] = useState<boolean>(false);
+  const [codeReveal, setCodeReveal] = useState<{ assignment: FirestoreGreenRoomAssignment; isExisting: boolean } | null>(null);
   const [completeCompetitionModalOpen, setCompleteCompetitionModalOpen] = useState(false);
   const [isCompletingCompetition, setIsCompletingCompetition] = useState(false);
   const [reopenCompetitionModalOpen, setReopenCompetitionModalOpen] = useState(false);
@@ -150,19 +153,30 @@ export default function GreenRoomPage() {
     }).slice(0, 5);
   }, [searchQuery, currentCompRegistrations, selectedCompetition]);
 
+  const selectedManualRegistration = useMemo(
+    () => currentCompRegistrations.find(registration => registration.id === selectedManualRegistrationId) || null,
+    [currentCompRegistrations, selectedManualRegistrationId]
+  );
+
+  useEffect(() => {
+    setSearchQuery('');
+    setSelectedManualRegistrationId('');
+  }, [effectiveCompId]);
+
   // Helper to get auth ID token
   const getIdToken = async (): Promise<string> => {
     if (!auth?.currentUser) throw new Error('Not authenticated.');
     return auth.currentUser.getIdToken();
   };
 
-  // Perform check-in via API
+  // Perform check-in through the same authoritative flow for QR and Manual Lookup.
   const handlePerformCheckIn = async (
     identifier: string,
-    manualCode?: string,
     method: 'QR_SCAN' | 'MANUAL_LOOKUP' = 'MANUAL_LOOKUP'
   ) => {
-    if (!selectedCompetition) return;
+    if (!selectedCompetition || !identifier.trim() || checkInInFlightRef.current) return;
+
+    checkInInFlightRef.current = true;
     setIsCheckingIn(true);
     setFeedbackMessage(null);
 
@@ -177,8 +191,7 @@ export default function GreenRoomPage() {
         body: JSON.stringify({
           competitionId: selectedCompetition.id,
           participantIdentifier: identifier,
-          checkInMethod: method,
-          manualCodeLetter: manualCode || undefined
+          checkInMethod: method
         })
       });
 
@@ -186,31 +199,25 @@ export default function GreenRoomPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to check in contestant.');
       }
-
-      const isQrVerified = data.qrVerified === true;
-      const successText = isQrVerified
-        ? `QR Verified: Code Letter ${data.assignment?.codeLetter} Assigned to ${data.assignment?.participantName || 'Contestant'}`
-        : (data.message || `Code Letter ${data.assignment?.codeLetter} Assigned!`);
-
-      setFeedbackMessage({
-        type: 'success',
-        text: successText
-      });
-
-      setSearchQuery('');
-      setManualCodeInput('');
-
-      // Auto-open print slip
-      if (data.assignment) {
-        setSelectedAssignmentForSlip(data.assignment);
-        setSlipModalOpen(true);
+      if (!data.assignment?.codeLetter) {
+        throw new Error('Check-in completed without a verifiable Code Letter. Refresh the Green Room roster before continuing.');
       }
+
+      const assignment = data.assignment as FirestoreGreenRoomAssignment;
+      setSelectedAssignmentForSlip(assignment);
+      setCodeReveal({
+        assignment,
+        isExisting: data.isExisting === true
+      });
+      setSearchQuery('');
+      setSelectedManualRegistrationId('');
     } catch (err: unknown) {
       setFeedbackMessage({
         type: 'error',
         text: err instanceof Error ? err.message : 'Check-in failed.'
       });
     } finally {
+      checkInInFlightRef.current = false;
       setIsCheckingIn(false);
     }
   };
@@ -634,7 +641,7 @@ export default function GreenRoomPage() {
           <div className="min-w-0 xl:col-span-5 space-y-4 sm:space-y-5">
             {/* Camera QR Scanner */}
             <GreenRoomScanner
-              onScanSuccess={(code) => handlePerformCheckIn(code, undefined, 'QR_SCAN')}
+              onScanSuccess={(code) => void handlePerformCheckIn(code, 'QR_SCAN')}
               isProcessing={isCheckingIn}
             />
 
@@ -651,82 +658,106 @@ export default function GreenRoomPage() {
                     label="Search Contestant or Group"
                     placeholder="Search by Name, Bib #, Chest #, or Team..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSelectedManualRegistrationId('');
+                    }}
+                    disabled={isCheckingIn}
                   />
 
-                  {/* Autocomplete dropdown */}
-                  {searchResults.length > 0 && (
+                  {/* Select a participant first, then confirm Check In. */}
+                  {searchResults.length > 0 && !selectedManualRegistration && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#CBD5E1] rounded-xl shadow-lg z-30 overflow-hidden divide-y divide-[#E1E7EF]">
                       {searchResults.map((reg) => {
                         const isAssigned = roster.some(r => r.registrationId === reg.id);
                         return (
-                          <div
+                          <button
+                            type="button"
                             key={reg.id}
-                            onClick={() => {
-                              handlePerformCheckIn(reg.id, manualCodeInput, 'MANUAL_LOOKUP');
-                            }}
-                            className="p-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                            disabled={isCheckingIn}
+                            onClick={() => setSelectedManualRegistrationId(reg.id)}
+                            className="w-full p-3 text-left hover:bg-blue-50 disabled:opacity-50 flex items-center justify-between gap-3 text-xs transition-colors"
                           >
-                            <div>
-                              <div className="flex items-center gap-2">
+                            <span className="min-w-0">
+                              <span className="flex items-center gap-2">
                                 <span className="font-bold text-[#111111]">{reg.participantName}</span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 text-[#526070]">
+                                <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 text-[#526070]">
                                   {reg.chestNumber || reg.code}
                                 </span>
-                              </div>
-                              <span className="text-[11px] text-[#526070]">{reg.teamName} ({reg.teamCode})</span>
-                            </div>
+                              </span>
+                              <span className="block text-[11px] text-[#526070] mt-0.5">{reg.teamName} ({reg.teamCode})</span>
+                            </span>
 
-                            <div>
-                              {isAssigned ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Already Assigned
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#2563EB] border border-blue-200">
-                                  Check In &rarr;
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                            {isAssigned ? (
+                              <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Already Assigned
+                              </span>
+                            ) : (
+                              <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-[#2563EB] border border-blue-200">
+                                Select
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-1/2">
-                    <Input
-                      label="Manual Code Letter (Optional)"
-                      placeholder="e.g. D (Auto if empty)"
-                      value={manualCodeInput}
-                      onChange={(e) => setManualCodeInput(e.target.value.toUpperCase())}
-                      maxLength={2}
-                    />
+                {selectedManualRegistration && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Selected Participant</p>
+                        <p className="mt-1 break-words text-sm font-extrabold text-slate-900">{selectedManualRegistration.participantName}</p>
+                        <p className="mt-0.5 text-xs text-slate-600">
+                          {selectedManualRegistration.teamName} ({selectedManualRegistration.teamCode})
+                          {selectedManualRegistration.chestNumber ? ` · Chest #${selectedManualRegistration.chestNumber}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isCheckingIn}
+                        onClick={() => setSelectedManualRegistrationId('')}
+                        className="shrink-0 rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    {roster.some(item => item.registrationId === selectedManualRegistration.id) && (
+                      <p className="mt-2 text-[11px] font-semibold text-emerald-700">
+                        Already checked in — the existing Code Letter will be shown without reassignment.
+                      </p>
+                    )}
                   </div>
+                )}
 
-                  <div className="w-1/2 flex items-end">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="w-full"
-                      disabled={isCheckingIn || !searchQuery.trim()}
-                      onClick={() => handlePerformCheckIn(searchQuery, manualCodeInput, 'MANUAL_LOOKUP')}
-                    >
-                      Check In
-                    </Button>
-                  </div>
-                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  disabled={isCheckingIn || !selectedManualRegistration}
+                  onClick={() => {
+                    if (selectedManualRegistration) {
+                      void handlePerformCheckIn(selectedManualRegistration.id, 'MANUAL_LOOKUP');
+                    }
+                  }}
+                >
+                  {isCheckingIn
+                    ? 'Checking In…'
+                    : selectedManualRegistration && roster.some(item => item.registrationId === selectedManualRegistration.id)
+                      ? 'View Existing Code Letter'
+                      : 'Check In & Assign Random Code'}
+                </Button>
 
-                {searchQuery.trim() && searchResults.length === 0 && (
+                {searchQuery.trim() && searchResults.length === 0 && !selectedManualRegistration && (
                   <p className="text-xs text-amber-700" role="status">
                     No approved registrations match this competition. Verify competition selection, registration status and participant code.
                   </p>
                 )}
 
-                <p className="text-[11px] text-[#526070]">
-                  Leave manual code empty to randomly assign one unused letter within the approved competition roster (3 entries: A-C; 5 entries: A-E). Codes cannot repeat.
+                <p className="text-[11px] leading-5 text-[#526070]">
+                  Select an approved participant and confirm Check In. An unused Code Letter will be assigned randomly and revealed with the same rolling animation used after QR scanning.
                 </p>
               </div>
             </div>
@@ -970,6 +1001,19 @@ export default function GreenRoomPage() {
             Only use this to correct an accidental completion. Each schedule slot will return to its previous SCHEDULED or LIVE status. The change is logged and the original completion audit entry is marked as reversed.
           </div>
         </Modal>
+
+        {/* Rolling reveal of the server-assigned anonymous Code Letter */}
+        <GreenRoomCodeReveal
+          isOpen={Boolean(codeReveal)}
+          assignment={codeReveal?.assignment || null}
+          isExisting={codeReveal?.isExisting ?? false}
+          onClose={() => setCodeReveal(null)}
+          onPrint={() => {
+            if (!selectedAssignmentForSlip) return;
+            setCodeReveal(null);
+            setSlipModalOpen(true);
+          }}
+        />
 
         {/* Modal 1: Code Slip Modal */}
         <GreenRoomCodeSlip
