@@ -4,12 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Participant } from '@/types/fest';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Printer, Download, QrCode } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase/client';
-import { ParticipantPhoto, isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
+import { isStockPhotoPlaceholder } from '@/components/domain/ParticipantPhoto';
 import { useSafeFest, defaultTheme } from '@/context/FestContext';
+import { IdCardBadge } from '@/components/domain/IdCardBadge';
 
 interface DigitalIdCardProps {
   participant: Participant | null;
@@ -34,6 +35,30 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const participantId = participant?.id;
+
+  // Manage print isolation lifecycle when print is requested
+  useEffect(() => {
+    if (!isOpen) {
+      document.body.classList.remove('id-card-print-active');
+      return;
+    }
+
+    const handleBeforePrint = () => {
+      document.body.classList.add('id-card-print-active');
+    };
+    const handleAfterPrint = () => {
+      document.body.classList.remove('id-card-print-active');
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+      document.body.classList.remove('id-card-print-active');
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!participantId || !isOpen) {
@@ -74,11 +99,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         setSignedPayload(data.payload);
 
         const url = await QRCode.toDataURL(data.payload, {
-          width: 600,
+          width: 800,
           margin: 4,
           errorCorrectionLevel: 'Q',
           color: {
-            dark: '#111111',
+            dark: '#000000',
             light: '#FFFFFF'
           }
         });
@@ -110,6 +135,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   if (!participant) return null;
 
   const handlePrint = () => {
+    document.body.classList.add('id-card-print-active');
     window.print();
   };
 
@@ -200,71 +226,29 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           {exportError}
         </p>
       )}
+
+      {fetchError && (
+        <p role="alert" className="text-xs font-semibold text-red-700 bg-red-50 rounded-lg p-3 mb-3">
+          {fetchError}
+        </p>
+      )}
+
       <div className="flex justify-center py-2">
-        {/* Printable / downloadable ID card — shared by Admin, Team Manager and Participant portals. */}
-        <div className="w-full max-w-[430px] rounded-[26px] border-[3px] border-[#60A5FA] overflow-hidden shadow-[0_12px_32px_rgba(37,99,235,0.20)] bg-white flex flex-col">
-          <div className="bg-gradient-to-br from-[#0758D8] via-[#1675F7] to-[#38A5FF] text-white px-5 pt-5 pb-6 text-center relative overflow-hidden">
-            <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full border-[18px] border-white/10" />
-            <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[20px] border-white/10" />
-            <span className="relative text-[10px] sm:text-xs font-bold uppercase tracking-[0.22em] text-blue-100 block mb-3">OFFICIAL FESTIVAL PASS</span>
-            <h4 className="relative text-xl sm:text-2xl font-extrabold tracking-tight leading-tight break-words">
-              <span className="festival-name">{(theme.festivalName || 'SAHITHYOLSAV 2025').toUpperCase()}</span>
-            </h4>
-            <p className="relative text-xs sm:text-sm text-blue-100 mt-1">{theme.institutionName}</p>
-            <div className="relative flex justify-center mt-5">
-              <div className="w-[108px] h-[108px] rounded-full p-1.5 bg-white ring-4 ring-blue-200 shadow-lg">
-                <ParticipantPhoto photoUrl={participant.photoUrl} name={participant.name} shape="circle" size="lg" className="!w-full !h-full border-2 border-[#2563EB]" />
-              </div>
-              <span className="absolute -bottom-3 bg-black text-white text-sm font-extrabold px-6 py-1 rounded-full border-2 border-white shadow-md">{participant.bib.startsWith('#') ? participant.bib : `#${participant.bib}`}</span>
-            </div>
-          </div>
-
-          <div className="px-5 pt-6 pb-4 text-center bg-gradient-to-b from-white to-blue-50/70">
-            <h3 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] break-words">{participant.name}</h3>
-            {participant.classGrade && (
-              <p className="text-xs text-[#526070] mt-0.5">{participant.classGrade}{participant.division ? ` - Div ${participant.division}` : ''}</p>
-            )}
-            <p className="text-sm font-semibold text-[#64748B] mt-1 uppercase">{participant.categoryName}</p>
-            <div className="mt-3 inline-flex max-w-full items-center justify-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-[#0758D8] text-sm font-bold">
-              <span className="w-2 h-2 shrink-0 rounded-full bg-blue-600" />
-              <span className="break-words">{participant.teamName} ({participant.teamCode})</span>
-            </div>
-          </div>
-
-          <div className="mx-4 mb-4 p-4 rounded-2xl border border-blue-100 bg-[#F8FBFF] grid grid-cols-2 gap-x-4 gap-y-4 text-left">
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Participant ID</span>
-              <span className="mt-1 font-bold text-[11px] leading-4 text-[#111827] break-all block">{participant.id.toUpperCase()}</span>
-            </div>
-            <div className="min-w-0 border-l border-blue-100 pl-3">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Category Tier</span>
-              <span className="mt-1 font-extrabold text-sm text-[#111827] block break-words">{participant.categoryName}</span>
-            </div>
-            <div className="min-w-0 border-t border-blue-100 pt-3">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Events Registered</span>
-              <span className="mt-1 font-extrabold text-sm text-[#111827] block">{participant.registeredEventIds.length} Contests</span>
-            </div>
-            <div className="min-w-0 border-t border-blue-100 pt-3 border-l pl-3">
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#64748B] block">Security Auth</span>
-              <span className="mt-1 font-extrabold text-sm text-emerald-700 block">VERIFIED</span>
-            </div>
-          </div>
-
-          <div className="mx-4 mb-4 rounded-2xl border-2 border-blue-100 bg-gradient-to-b from-white to-blue-50 px-4 pt-4 pb-3 flex flex-col items-center text-center">
-            <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#0758D8]">Scan at Venue Entrance &amp; Stage Gate</div>
-            <div className="mt-3 w-[204px] h-[204px] p-2 bg-white rounded-2xl shadow-sm border border-blue-50 flex items-center justify-center">
-              {qrDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qrDataUrl} alt={`QR Verification for ${participant.bib}`} className="w-full h-full object-contain" />
-              ) : (
-                <QrCode className="w-14 h-14 text-neutral-400 animate-pulse" />
-              )}
-            </div>
-            <div className="mt-3 w-full rounded-full bg-blue-50 border border-blue-100 px-3 py-2 text-[10px] sm:text-xs font-mono text-[#111827] break-all">
-              <span className="font-extrabold text-[#0758D8]">TOKEN:</span> {fetchError ? 'AUTH ERROR' : signedToken ? signedToken.slice(0, 16).toUpperCase() : 'VERIFYING...'}
-            </div>
-            {fetchError && <p role="alert" className="mt-2 text-xs text-red-700">{fetchError}</p>}
-          </div>
+        {/* Printable / downloadable ID card — shared by Admin, Team Manager and Participant portals */}
+        <div
+          id="printable-id-card"
+          className="id-card-printable-container w-full max-w-[340px] rounded-2xl overflow-hidden shadow-xl border border-neutral-200 bg-white"
+        >
+          <IdCardBadge
+            participant={participant}
+            festivalName={theme.festivalName}
+            institutionName={theme.institutionName}
+            festivalNameFont={theme.festivalNameFont}
+            qrDataUrl={qrDataUrl}
+            signedToken={signedToken}
+            loadingQr={loading}
+            fetchError={fetchError}
+          />
         </div>
       </div>
     </Modal>

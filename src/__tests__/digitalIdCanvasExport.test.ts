@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Participant } from '@/types/fest';
 import { exportDigitalIdAsPng } from '@/utils/canvasExport';
+import { ID_CARD_DIMENSIONS } from '@/domain/idCardDesign';
 
 vi.mock('qrcode', () => ({
   default: { toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,qr') }
@@ -28,9 +29,13 @@ describe('Digital ID PNG canvas photo rendering', () => {
   const ctx = {
     drawImage, fillText, fillRect: vi.fn(), strokeRect: vi.fn(),
     beginPath: vi.fn(), arc: vi.fn(), fill: vi.fn(), stroke: vi.fn(),
+    moveTo: vi.fn(), lineTo: vi.fn(), bezierCurveTo: vi.fn(), closePath: vi.fn(),
+    translate: vi.fn(), rotate: vi.fn(),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
     roundRect: vi.fn(), measureText: vi.fn((text: string) => ({ width: text.length * 8 })),
     save: vi.fn(), clip: vi.fn(), restore: vi.fn(), scale: vi.fn(),
-    fillStyle: '', strokeStyle: '', lineWidth: 0, textAlign: 'left', font: '', letterSpacing: ''
+    fillStyle: '', strokeStyle: '', lineWidth: 0, textAlign: 'left', font: '', letterSpacing: '',
+    globalAlpha: 1
   };
   class FakeImage {
     src = '';
@@ -54,23 +59,23 @@ describe('Digital ID PNG canvas photo rendering', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('draws real participant photo inside circular avatar and still draws QR', async () => {
+  it('draws real participant photo inside circular avatar and still draws QR on 74x105mm card', async () => {
     const originalPhoto = new Blob(['participant image'], { type: 'image/jpeg' });
     await exportDigitalIdAsPng(participant, 'SAHITHYOLSAV 2025', {
       token: 'signedtoken', qrPayload: 'secure qr', photoBlob: originalPhoto,
       institutionName: "Ma'din Suffa Campus Vavoor"
     });
     // One draw for the real portrait, one for the signed QR.
-    expect(ctx.scale).toHaveBeenCalledWith(4, 4);
+    expect(ctx.scale).toHaveBeenCalledWith(ID_CARD_DIMENSIONS.exportScale, ID_CARD_DIMENSIONS.exportScale);
     expect(drawImage).toHaveBeenCalledTimes(2);
     expect((drawImage.mock.calls[0][0] as FakeImage).src).toBe('blob:photo');
     expect(ctx.clip).toHaveBeenCalled();
     expect(ctx.restore).toHaveBeenCalled();
-    expect(fillText).toHaveBeenCalledWith('SAHITHYOLSAV 2025', 320, 105);
-    expect(fillText).toHaveBeenCalledWith("Ma'din Suffa Campus Vavoor", 320, 140);
+    expect(fillText).toHaveBeenCalledWith('SAHITHYOLSAV 2025', 370, 105);
+    expect(fillText).toHaveBeenCalledWith("Ma'din Suffa Campus Vavoor", 370, 140);
     expect(linkClick).toHaveBeenCalledOnce();
     expect(link.download).toContain('Digital_ID_#1001');
-    const idLines = fillText.mock.calls.filter(call => call[1] === 70 && call[3] === 245);
+    const idLines = fillText.mock.calls.filter(call => call[1] === 45 && call[3] === 320);
     expect(idLines.length).toBeGreaterThanOrEqual(2);
     expect(idLines.every(call => call[0].length <= 18)).toBe(true);
   });
@@ -87,7 +92,7 @@ describe('Digital ID PNG canvas photo rendering', () => {
       token: 'signed', qrPayload: 'secure'
     });
     expect(drawImage).toHaveBeenCalledTimes(1); // QR only
-    expect(fillText.mock.calls.some(call => call[0] === 'T')).toBe(true);
+    expect(fillText.mock.calls.some(call => call[0] === 'TP' || call[0] === 'T')).toBe(true);
     expect(linkClick).toHaveBeenCalledOnce();
   });
 });
