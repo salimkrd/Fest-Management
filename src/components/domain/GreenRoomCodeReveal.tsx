@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { CheckCircle2, LoaderCircle, Printer, Sparkles } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Printer, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import type { FirestoreGreenRoomAssignment } from '@/types/firestore';
@@ -16,16 +16,84 @@ interface GreenRoomCodeRevealProps {
 
 type RevealPhase = 'rolling' | 'complete';
 
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const SEGMENT_COUNT = 12;
+const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
+const SPIN_DURATION_MS = 5_000;
+const EXTRA_SPIN_TURNS = 6;
 const ROLLING_CODES = [
-  ...ALPHABET,
-  ...ALPHABET.flatMap(first => ALPHABET.map(second => `${first}${second}`))
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').flatMap(first =>
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(second => `${first}${second}`)
+  )
 ];
 
+const SEGMENT_COLORS = [
+  '#f4512d',
+  '#ffc928',
+  '#48b85b',
+  '#1688ed',
+  '#963bd0',
+  '#f4512d',
+  '#ffc928',
+  '#48b85b',
+  '#1688ed',
+  '#963bd0',
+  '#f4512d',
+  '#ffc928'
+];
+
+function hashSeed(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Build a stable wheel for this assignment so the first render is hydration-safe. */
+function buildWheelCodes(seedValue: string, targetCode: string) {
+  let seed = hashSeed(seedValue || targetCode);
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x1_0000_0000;
+  };
+
+  const available = ROLLING_CODES.filter(code => code !== targetCode);
+  const codes: string[] = [];
+
+  for (let index = 0; index < SEGMENT_COUNT - 1; index += 1) {
+    const selectedIndex = Math.floor(random() * available.length);
+    codes.push(available.splice(selectedIndex, 1)[0]);
+  }
+
+  const targetIndex = Math.floor(random() * SEGMENT_COUNT);
+  codes.splice(targetIndex, 0, targetCode);
+
+  return { codes, targetIndex };
+}
+
+function polarPoint(angleDegrees: number, radius: number) {
+  const radians = (angleDegrees * Math.PI) / 180;
+  return {
+    x: 200 + Math.cos(radians) * radius,
+    y: 200 + Math.sin(radians) * radius
+  };
+}
+
+function describeSegment(index: number) {
+  const startAngle = -90 + index * SEGMENT_ANGLE;
+  const endAngle = startAngle + SEGMENT_ANGLE;
+  const start = polarPoint(startAngle, 190);
+  const end = polarPoint(endAngle, 190);
+
+  return `M 200 200 L ${start.x} ${start.y} A 190 190 0 0 1 ${end.x} ${end.y} Z`;
+}
+
 /**
- * Presents the server-assigned Code Letter as a rolling reveal.
- * The animation is visual only: the authoritative value always comes from
- * the Firestore transaction response in GreenRoomService.
+ * A visual Fortune Wheel for the Green Room check-in flow.
+ * The Code Letter is already allocated by the authoritative server transaction.
+ * The wheel only reveals that saved value; it never chooses or changes an assignment.
  */
 export const GreenRoomCodeReveal: React.FC<GreenRoomCodeRevealProps> = ({
   isOpen,
@@ -34,70 +102,86 @@ export const GreenRoomCodeReveal: React.FC<GreenRoomCodeRevealProps> = ({
   onClose,
   onPrint
 }) => {
-  const [displayedCode, setDisplayedCode] = useState('A');
   const [phase, setPhase] = useState<RevealPhase>('rolling');
+  const [rotation, setRotation] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(false);
+
+  const wheel = useMemo(
+    () => buildWheelCodes(assignment?.id || assignment?.registrationId || '', assignment?.codeLetter || 'A'),
+    [assignment?.id, assignment?.registrationId, assignment?.codeLetter]
+  );
+
+  const finalRotation =
+    EXTRA_SPIN_TURNS * 360 - (wheel.targetIndex + 0.5) * SEGMENT_ANGLE;
 
   useEffect(() => {
     if (!isOpen || !assignment) return;
 
+    let startTimer: ReturnType<typeof setTimeout> | undefined;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+
     if (isExisting) {
-      setDisplayedCode(assignment.codeLetter);
+      setRotation(finalRotation);
+      setIsSpinning(false);
       setPhase('complete');
       return;
     }
 
-    const delays = [55, 60, 65, 75, 85, 100, 120, 150, 190, 240, 310, 390];
-    let step = 0;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
     setPhase('rolling');
-    setDisplayedCode(ROLLING_CODES[0]);
+    setIsSpinning(false);
+    setRotation(0);
 
-    const tick = () => {
-      if (step >= delays.length) {
-        setDisplayedCode(assignment.codeLetter);
-        setPhase('complete');
-        return;
-      }
+    // Allow the zero-degree state to paint before starting the 5-second transition.
+    startTimer = setTimeout(() => {
+      setIsSpinning(true);
+      setRotation(finalRotation);
+    }, 50);
 
-      const nextIndex = Math.floor(Math.random() * ROLLING_CODES.length);
-      setDisplayedCode(ROLLING_CODES[nextIndex]);
-      timeout = setTimeout(tick, delays[step]);
-      step += 1;
-    };
-
-    timeout = setTimeout(tick, delays[step]);
-    step += 1;
+    // Transition-end is the normal completion signal; this is a defensive fallback.
+    fallbackTimer = setTimeout(() => {
+      setPhase('complete');
+    }, SPIN_DURATION_MS + 700);
 
     return () => {
-      if (timeout) clearTimeout(timeout);
+      if (startTimer) clearTimeout(startTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
     };
-  }, [isOpen, assignment?.id, assignment?.codeLetter, isExisting]);
+  }, [isOpen, assignment?.id, assignment?.codeLetter, isExisting, finalRotation]);
 
   if (!assignment) return null;
+
+  const handleClose = () => {
+    if (phase === 'complete') onClose();
+  };
+
+  const handleWheelTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
+    if (event.propertyName === 'transform' && isSpinning) {
+      setPhase('complete');
+    }
+  };
 
   const title = isExisting
     ? 'Participant Already Checked In'
     : phase === 'complete'
       ? 'Code Letter Assigned'
-      : 'Assigning Code Letter';
+      : 'Spinning Code Letter Wheel';
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={title}
       description={
         isExisting
           ? 'This participant already has a Green Room Code Letter. The original assignment has been retained.'
           : phase === 'complete'
-            ? 'The random Code Letter has been securely assigned and saved.'
-            : 'Revealing the Code Letter selected by the secure Green Room assignment process…'
+            ? 'The wheel has stopped on the Code Letter securely assigned and saved by the server.'
+            : 'The Fortune Wheel is spinning for 5 seconds. The final Code Letter is already securely assigned.'
       }
       maxWidth="md"
       footer={
         <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={handleClose} disabled={phase !== 'complete'}>
             Done
           </Button>
           <Button
@@ -143,58 +227,121 @@ export const GreenRoomCodeReveal: React.FC<GreenRoomCodeRevealProps> = ({
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-7 text-center sm:py-8">
-          <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-blue-100/60 blur-2xl" />
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-blue-700">
-              {phase === 'complete' ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              ) : (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              )}
-              {isExisting
-                ? 'Previously Assigned Code'
-                : phase === 'complete'
-                  ? 'Final Code Letter'
-                  : 'Selecting Code Letter'}
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-3 py-5 sm:px-5 sm:py-6">
+          <div className="mb-4 flex items-center justify-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-600">
+            {phase === 'complete' ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            ) : (
+              <span className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+            )}
+            {isExisting
+              ? 'Previously Assigned Code'
+              : phase === 'complete'
+                ? 'Final Code Letter'
+                : 'Wheel Spinning · 5 Seconds'}
+          </div>
+
+          <div className="relative mx-auto aspect-square w-full max-w-[340px]">
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                transform: `rotate(${rotation}deg)`,
+                transition: isSpinning
+                  ? `transform ${SPIN_DURATION_MS}ms cubic-bezier(0.08, 0.72, 0.12, 1)`
+                  : 'none'
+              }}
+              onTransitionEnd={handleWheelTransitionEnd}
+              role="img"
+              aria-label={`Fortune Wheel with Code Letter segments. ${phase === 'complete' ? `Selected code: ${assignment.codeLetter}` : 'Wheel spinning'}.`}
+            >
+              <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible drop-shadow-xl" aria-hidden="true">
+                <circle cx="200" cy="200" r="197" fill="#18234f" />
+                <circle cx="200" cy="200" r="192" fill="#f8fafc" stroke="#28366d" strokeWidth="5" />
+                {wheel.codes.map((code, index) => {
+                  const midAngle = -90 + (index + 0.5) * SEGMENT_ANGLE;
+                  const label = polarPoint(midAngle, 132);
+
+                  return (
+                    <g key={`${code}-${index}`}>
+                      <path
+                        d={describeSegment(index)}
+                        fill={SEGMENT_COLORS[index]}
+                        stroke="#ffffff"
+                        strokeWidth="3"
+                        strokeLinejoin="round"
+                      />
+                      <text
+                        x={label.x}
+                        y={label.y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#ffffff"
+                        fontSize={code.length === 1 ? 31 : 23}
+                        fontWeight="900"
+                        transform={`rotate(${midAngle + 90} ${label.x} ${label.y})`}
+                        style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.16)', strokeWidth: 1.5 }}
+                      >
+                        {code}
+                      </text>
+                    </g>
+                  );
+                })}
+                <circle cx="200" cy="200" r="191" fill="none" stroke="#101b49" strokeWidth="8" />
+                <circle cx="200" cy="200" r="184" fill="none" stroke="rgba(255,255,255,0.48)" strokeWidth="2" />
+              </svg>
             </div>
 
-            <div className="relative mx-auto flex h-36 w-36 items-center justify-center sm:h-40 sm:w-40">
-              <div
-                className={`absolute inset-0 rounded-[2rem] border-[5px] border-dashed border-blue-200 ${phase === 'rolling' ? 'animate-spin' : ''}`}
-                style={phase === 'rolling' ? { animationDuration: '1.8s' } : undefined}
-                aria-hidden="true"
+            {/* Fixed centre pointer, matching the supplied Fortune Wheel reference. */}
+            <svg
+              viewBox="0 0 400 400"
+              className="pointer-events-none absolute inset-0 h-full w-full drop-shadow-lg"
+              aria-hidden="true"
+            >
+              <path
+                d="M 200 105 C 184 145 154 174 154 207 C 154 239 174 259 200 259 C 226 259 246 239 246 207 C 246 174 216 145 200 105 Z"
+                fill="#ff6a00"
+                stroke="#d94b00"
+                strokeWidth="5"
               />
-              <div className="flex h-28 w-28 items-center justify-center rounded-3xl border border-blue-100 bg-white shadow-xl shadow-blue-900/10 sm:h-32 sm:w-32">
-                <span
-                  key={displayedCode}
-                  aria-live="polite"
-                  aria-atomic="true"
-                  className={`font-mono text-6xl font-black tracking-tight text-blue-700 transition-all duration-150 sm:text-7xl ${phase === 'rolling' ? 'scale-95 blur-[0.4px]' : 'scale-100 blur-0'}`}
-                >
-                  {displayedCode}
+              <path
+                d="M 200 119 C 190 151 166 178 166 207"
+                fill="none"
+                stroke="rgba(255,255,255,0.5)"
+                strokeWidth="5"
+                strokeLinecap="round"
+              />
+              <circle cx="200" cy="211" r="22" fill="#ffffff" stroke="#f1f5f9" strokeWidth="3" />
+            </svg>
+          </div>
+
+          <div className="mt-4 flex min-h-6 items-center justify-center gap-2 text-xs font-semibold">
+            {phase === 'complete' ? (
+              <>
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                <span className="text-emerald-700">
+                  {isExisting ? 'Original Code Letter retained' : 'Wheel stopped · Code Letter assigned'}
                 </span>
+              </>
+            ) : (
+              <span className="text-slate-500">Please wait for the wheel to stop…</span>
+            )}
+          </div>
+
+          {phase === 'complete' && (
+            <div className="mt-3 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                Assigned Code Letter
+              </p>
+              <div className="mt-1 inline-flex min-w-24 items-center justify-center rounded-2xl border-2 border-orange-200 bg-orange-50 px-6 py-2 font-mono text-4xl font-black text-orange-600 shadow-sm">
+                {assignment.codeLetter}
               </div>
             </div>
-
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold">
-              {phase === 'complete' ? (
-                <>
-                  <Sparkles className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-700">
-                    {isExisting ? 'Original Code Letter restored' : 'Code Letter successfully assigned'}
-                  </span>
-                </>
-              ) : (
-                <span className="text-slate-500">Please wait for the reveal to finish…</span>
-              )}
-            </div>
-          </div>
+          )}
         </div>
 
         {phase === 'complete' && (
           <p className="text-center text-[11px] leading-5 text-slate-500">
-            This Code Letter is saved in the competition roster. It will not be reassigned by scanning this participant again.
+            This Code Letter is saved in the competition roster. Scanning or checking in this participant again will retain the original assignment.
           </p>
         )}
       </div>
