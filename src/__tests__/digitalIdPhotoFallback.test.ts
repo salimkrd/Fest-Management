@@ -240,8 +240,8 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
         })
       );
 
-      expect(html).toContain('<img');
-      expect(html).toContain('src="https://staging.inspirath.org/photos/nihad.jpg"');
+      expect(html).toContain('<image');
+      expect(html).toContain('href="https://staging.inspirath.org/photos/nihad.jpg"');
       expect(html).not.toContain('unsplash.com');
     });
 

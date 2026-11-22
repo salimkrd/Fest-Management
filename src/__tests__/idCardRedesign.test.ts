@@ -10,6 +10,13 @@ import {
   formatRegisteredContests,
   formatCardToken
 } from '@/domain/idCardDesign';
+import {
+  buildIdCardSvg,
+  extractIdCardData,
+  idCardSvgDataUrl,
+  type IdCardData,
+  type IdCardAssets
+} from '@/domain/idCardSvg';
 import type { Participant } from '@/types/fest';
 
 vi.mock('qrcode', () => ({
@@ -26,7 +33,7 @@ vi.mock('@/lib/firebase/client', () => ({
   auth: { currentUser: null }
 }));
 
-describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
+describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
   const sampleParticipant: Participant = {
     id: 'part-c37b82fa-9021-4d3e-8e5f-172901234567',
     bib: '#1042',
@@ -66,8 +73,107 @@ describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
     });
   });
 
-  describe('2. IdCardBadge Shared Presentation Component', () => {
-    it('renders all reference design fields in their designated positions', () => {
+  describe('2. Canonical buildIdCardSvg Pure Renderer', () => {
+    it('generates complete self-contained SVG artwork with all reference elements', () => {
+      const cardData: IdCardData = {
+        festivalName: 'INSPIRATH 2025',
+        institutionName: 'Suffa University Campus',
+        participantName: 'Nihad Mohammed',
+        bib: '#1042',
+        teamName: 'Al-Farooq House',
+        teamCode: 'ALF',
+        categoryName: 'Senior',
+        participantId: 'part-c37b82fa-9021-4d3e-8e5f-172901234567',
+        registeredCompetitionsCount: 3,
+        token: 'abcdef1234567890abcdef1234567890'
+      };
+
+      const assets: IdCardAssets = {
+        photoDataUri: 'data:image/jpeg;base64,mockPhotoDataUri',
+        qrDataUri: 'data:image/png;base64,mockQrCodeDataUri'
+      };
+
+      const svg = buildIdCardSvg(cardData, assets);
+
+      // Root viewBox and aspect ratio
+      expect(svg).toContain('viewBox="0 0 740 1050"');
+      expect(svg).toContain('aspect-ratio:74/105');
+
+      // Header, Halftone, Starbursts & Wave
+      expect(svg).toContain('#header-red-gradient');
+      expect(svg).toContain('halftone-dots');
+      expect(svg).toContain('starburst-blur-left');
+      expect(svg).toContain('header-wave-clip');
+
+      // Top Typography
+      expect(svg).toContain('OFFICIAL FEST PASS');
+      expect(svg).toContain('INSPIRATH 2025');
+      expect(svg).toContain('Suffa University Campus');
+
+      // Photo and QR
+      expect(svg).toContain('data:image/jpeg;base64,mockPhotoDataUri');
+      expect(svg).toContain('data:image/png;base64,mockQrCodeDataUri');
+
+      // Bib & Yellow Name
+      expect(svg).toContain('#1042');
+      expect(svg).toContain('Nihad Mohammed');
+      expect(svg).toContain(ID_CARD_COLORS.nameYellow);
+
+      // Left Column Metadata
+      expect(svg).toContain('Al-Farooq House (ALF)');
+      expect(svg).toContain('Senior');
+      expect(svg).toContain('Participant Id:');
+      expect(svg).toContain('PART-C37B82FA-9021');
+      expect(svg).toContain('Registered Contests:');
+      expect(svg).toContain('3 Competitions');
+      expect(svg).toContain('Token: ABCDEF1234567890ABCD');
+
+      // QR Container border
+      expect(svg).toContain('stroke="#000000"');
+      expect(svg).toContain('stroke-width="5"');
+
+      // Bottom Decorative Literary Ribbon
+      expect(svg).toContain(ID_CARD_COLORS.ribbonBurgundy);
+    });
+
+    it('renders neutral silhouette and initials fallback when no photo data URI is provided', () => {
+      const cardData: IdCardData = {
+        festivalName: 'INSPIRATH 2025',
+        participantName: 'Nihad Mohammed',
+        bib: '#1042',
+        teamName: 'Al-Farooq House',
+        categoryName: 'Senior',
+        participantId: 'part-1234',
+        registeredCompetitionsCount: 1
+      };
+
+      const svg = buildIdCardSvg(cardData, {});
+
+      expect(svg).toContain('data-testid="participant-photo-fallback"');
+      expect(svg).toContain('data-testid="participant-silhouette"');
+      expect(svg).toContain('data-testid="participant-initials"');
+      expect(svg).toContain('NM');
+    });
+
+    it('idCardSvgDataUrl returns properly encoded data URI', () => {
+      const cardData: IdCardData = {
+        festivalName: 'INSPIRATH 2025',
+        participantName: 'Nihad Mohammed',
+        bib: '#1042',
+        teamName: 'Al-Farooq House',
+        categoryName: 'Senior',
+        participantId: 'part-1234',
+        registeredCompetitionsCount: 1
+      };
+
+      const dataUrl = idCardSvgDataUrl(cardData);
+      expect(dataUrl.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
+      expect(dataUrl).toContain(encodeURIComponent('INSPIRATH 2025'));
+    });
+  });
+
+  describe('3. IdCardBadge Shared Presentation Component in Preview & Print', () => {
+    it('renders the exact canonical SVG inside the preview element', () => {
       const html = renderToStaticMarkup(
         React.createElement(IdCardBadge, {
           participant: sampleParticipant,
@@ -78,42 +184,23 @@ describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
         })
       );
 
-      // Kicker
+      // Embedded canonical SVG
+      expect(html).toContain('<svg');
+      expect(html).toContain('viewBox="0 0 740 1050"');
       expect(html).toContain('OFFICIAL FEST PASS');
-
-      // Festival Name & Institution Name
       expect(html).toContain('INSPIRATH 2025');
       expect(html).toContain('Suffa University Campus');
-
-      // Circular Photo
-      expect(html).toContain('<img');
-      expect(html).toContain('src="https://staging.inspirath.org/photos/nihad.jpg"');
-
-      // Bib Number & Yellow Participant Name
+      expect(html).toContain('<image');
+      expect(html).toContain('href="https://staging.inspirath.org/photos/nihad.jpg"');
       expect(html).toContain('#1042');
       expect(html).toContain('Nihad Mohammed');
-      expect(html).toContain('text-[#FBBF24]');
-
-      // Left Column Details
+      expect(html).toContain('fill="#FBBF24"');
       expect(html).toContain('Al-Farooq House (ALF)');
       expect(html).toContain('Senior');
-      expect(html).toContain('Participant Id:');
-      expect(html).toContain('PART-C37B82FA-9021-4D3E-8E5F-172901234567');
-      expect(html).toContain('Registered Contests:');
       expect(html).toContain('3 Competitions');
-      expect(html).toContain('Token:');
-      expect(html).toContain('ABCDEF1234567890ABCD');
-
-      // Right Column QR Code Container
-      expect(html).toContain('border-black');
-      expect(html).toContain('data:image/png;base64,mockQr');
-
-      // Bottom Decorative Literary Ribbon
-      expect(html).toContain('bg-[#931B1E]');
-      expect(html).toContain('svg');
     });
 
-    it('does not reintroduce removed fields such as Class/Grade on the card', () => {
+    it('strictly omits removed fields such as Class/Grade from the canonical SVG', () => {
       const html = renderToStaticMarkup(
         React.createElement(IdCardBadge, {
           participant: sampleParticipant,
@@ -121,12 +208,11 @@ describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
         })
       );
 
-      // Verified: ClassGrade ('Grade 12') and Division ('Div A') are strictly excluded from the card
       expect(html).not.toContain('Grade 12');
       expect(html).not.toContain('Div A');
     });
 
-    it('handles long participant names and long teams gracefully without layout breaks', () => {
+    it('safely scales typography for exceptionally long names to prevent layout breaking', () => {
       const longParticipant: Participant = {
         ...sampleParticipant,
         name: 'Sayyid Muhammad Abdurrahman Faris Al-Bukhari Thangal',
@@ -144,11 +230,12 @@ describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
 
       expect(html).toContain('Sayyid Muhammad Abdurrahman Faris Al-Bukhari Thangal');
       expect(html).toContain('15 Competitions');
-      expect(html).toContain('truncate');
+      // Scaled down font size for long name
+      expect(html).toContain('font-size="22"');
     });
   });
 
-  describe('3. Single Reusable Component Integration across Portals', () => {
+  describe('4. Single Reusable Component Integration across Portals', () => {
     it('DigitalIdCard embeds the IdCardBadge inside the printable container', () => {
       const html = renderToStaticMarkup(
         React.createElement(DigitalIdCard, {
@@ -167,7 +254,7 @@ describe('INSPIRATH ID Card Complete Redesign (74mm x 105mm)', () => {
     });
   });
 
-  describe('4. Formatting Helpers', () => {
+  describe('5. Formatting Helpers', () => {
     it('formatCardBib ensures clean leading hash', () => {
       expect(formatCardBib('1042')).toBe('#1042');
       expect(formatCardBib('#1042')).toBe('#1042');
