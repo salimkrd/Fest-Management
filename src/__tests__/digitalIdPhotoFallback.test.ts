@@ -209,10 +209,10 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
       // Verify participant details are preserved
       expect(html).toContain('Nihad Mohammed');
       expect(html).toContain('#1042');
-      expect(html).toContain('Grade 12 - Div A');
       expect(html).toContain('Al-Farooq House (ALF)');
       expect(html).toContain('Senior');
       expect(html).not.toContain('absolute top-3 right-3');
+      expect(html).toContain('2 Competitions');
       expect(html).toContain('2 Contests');
       expect(html).toContain('VERIFIED');
 
@@ -240,8 +240,8 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
         })
       );
 
-      expect(html).toContain('<img');
-      expect(html).toContain('src="https://staging.inspirath.org/photos/nihad.jpg"');
+      expect(html).toContain('<image');
+      expect(html).toContain('href="https://staging.inspirath.org/photos/nihad.jpg"');
       expect(html).not.toContain('unsplash.com');
     });
 

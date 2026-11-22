@@ -80,6 +80,66 @@
   font-family: var(--festival-name-font, var(--font-montserrat), sans-serif) !important;
 }
 
+/* Official Participant ID Card: 74mm x 105mm portrait physical print format */
+@page id-card-print {
+  size: 74mm 105mm;
+  margin: 0;
+}
+
+@media print {
+  body.id-card-print-active {
+    width: 74mm !important;
+    height: 105mm !important;
+    min-width: 0 !important;
+    max-width: 74mm !important;
+    min-height: 0 !important;
+    max-height: 105mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body.id-card-print-active * {
+    visibility: hidden !important;
+  }
+
+  body.id-card-print-active .id-card-printable-container,
+  body.id-card-print-active .id-card-printable-container * {
+    visibility: visible !important;
+  }
+
+  body.id-card-print-active .id-card-printable-container {
+    page: id-card-print;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 74mm !important;
+    height: 105mm !important;
+    max-width: 74mm !important;
+    max-height: 105mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    z-index: 999999 !important;
+  }
+
+  body.id-card-print-active .id-card-printable-container .id-card-element {
+    width: 74mm !important;
+    height: 105mm !important;
+    max-width: 74mm !important;
+    max-height: 105mm !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 
 /* Judge receipt PDF: named A4 page keeps all other print workflows unchanged. */
 @page judge-receipt {
