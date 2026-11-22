@@ -279,12 +279,12 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
     <text x="${layout.details.leftX}" y="${layout.details.categoryY}" fill="${ID_CARD_COLORS.textBlack}" font-size="${categoryFontSize}" font-weight="700">${escapedCategory}</text>
 
     <!-- Participant Id -->
-    <text x="${layout.details.leftX}" y="${layout.details.participantIdLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="18" font-weight="700">Participant ID</text>
+    <text x="${layout.details.leftX}" y="${layout.details.participantIdLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="18" font-weight="700">Participant Id:</text>
     <text x="${layout.details.leftX}" y="${layout.details.participantIdLine1Y}" fill="#1F2937" font-size="14" font-weight="600" font-family="monospace, sans-serif">${escapedId1}</text>
     ${escapedId2 ? `<text x="${layout.details.leftX}" y="${layout.details.participantIdLine2Y}" fill="#1F2937" font-size="14" font-weight="600" font-family="monospace, sans-serif">${escapedId2}</text>` : ''}
 
     <!-- Registered Contests -->
-    <text x="${layout.details.leftX}" y="${layout.details.registeredLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="17" font-weight="700">Registered Contests</text>
+    <text x="${layout.details.leftX}" y="${layout.details.registeredLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="17" font-weight="700">Registered Contests:</text>
     <text x="${layout.details.leftX}" y="${layout.details.registeredCountY}" fill="${ID_CARD_COLORS.textBlack}" font-size="22" font-weight="800" aria-label="${count} Contests">${count} Competitions</text>
 
     <!-- Token -->
