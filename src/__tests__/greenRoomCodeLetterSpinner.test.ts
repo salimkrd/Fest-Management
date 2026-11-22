@@ -34,6 +34,15 @@ describe('Green Room Fortune Wheel check-in reveal', () => {
     expect(revealSrc).toContain('describeSegment(index)');
   });
 
+  it('uses one unique alphabet character per wheel slot while retaining the full assigned code', () => {
+    expect(revealSrc).toContain("const WHEEL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')");
+    expect(revealSrc).toContain("const targetLetter = (targetCode.trim().toUpperCase()[0] || 'A')");
+    expect(revealSrc).toContain('const available = WHEEL_LETTERS.filter(letter => letter !== targetLetter)');
+    expect(revealSrc).toContain('fontSize={31}');
+    expect(revealSrc).toContain('{assignment.codeLetter}');
+    expect(revealSrc).not.toContain('ROLLING_CODES');
+  });
+
   it('stops the wheel on the exact Code Letter returned by the server', () => {
     expect(revealSrc).toContain('assignment.codeLetter');
     expect(revealSrc).toContain('setRotation(finalRotation)');
