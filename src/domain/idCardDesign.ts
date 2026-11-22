@@ -46,7 +46,7 @@ export const ID_CARD_LAYOUT = {
   bibY: 520,
   participantNameY: 575,
   details: {
-    leftX: 45,
+    leftX: 64,
     teamY: 704,
     categoryY: 745,
     participantIdLabelY: 790,
@@ -57,12 +57,12 @@ export const ID_CARD_LAYOUT = {
     tokenY: 954,
   },
   qr: {
-    x: 390,
-    y: 655,
-    size: 305,
-    innerX: 410,
-    innerY: 675,
-    innerSize: 265,
+    x: 380,
+    y: 680,
+    size: 300,
+    innerX: 400,
+    innerY: 700,
+    innerSize: 260,
   },
   ribbon: {
     y: 1018,
