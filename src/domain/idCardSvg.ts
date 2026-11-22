@@ -13,6 +13,7 @@ import { getParticipantInitials } from '@/components/domain/ParticipantPhoto';
 import {
   ID_CARD_DIMENSIONS,
   ID_CARD_COLORS,
+  ID_CARD_LAYOUT,
   WAVE_PATH,
   formatCardBib,
   formatCardToken
@@ -84,6 +85,7 @@ export function extractIdCardData(
 export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): string {
   const width = ID_CARD_DIMENSIONS.baseWidth;   // 740
   const height = ID_CARD_DIMENSIONS.baseHeight; // 1050
+  const layout = ID_CARD_LAYOUT;
 
   const escapedFestival = escapeXml(data.festivalName.toUpperCase());
   const escapedInstitution = escapeXml(data.institutionName);
@@ -113,21 +115,22 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   const festFontSize = festNameLength > 28 ? 22 : festNameLength > 20 ? 26 : festNameLength > 15 ? 30 : 34;
 
   const nameLength = data.participantName.length;
-  const nameFontSize = nameLength > 26 ? 22 : nameLength > 18 ? 26 : 32;
+  const nameFontSize = nameLength > 28 ? 30 : nameLength > 22 ? 36 : 44;
 
   const teamLength = teamDisplay.length;
-  const teamFontSize = teamLength > 30 ? 17 : teamLength > 22 ? 20 : 23;
+  const teamFontSize = teamLength > 34 ? 20 : teamLength > 26 ? 24 : 28;
+  const categoryFontSize = data.categoryName.length > 26 ? 18 : data.categoryName.length > 18 ? 21 : 24;
 
   // Font family resolution
   const fontChoice = FESTIVAL_NAME_FONTS.find(font => font.name === data.festivalNameFont)
     || FESTIVAL_NAME_FONTS.find(font => font.name === DEFAULT_FESTIVAL_NAME_FONT)!;
   const festFontFamily = fontChoice.name === 'Montserrat' ? 'Montserrat, system-ui, sans-serif' : `${fontChoice.name}, Montserrat, system-ui, sans-serif`;
 
-  // Pre-generate bottom ribbon 20 tiles
-  const numRibbonTiles = 20;
-  const tileWidth = width / numRibbonTiles; // 37
-  const ribbonY = 1005;
-  const ribbonHeight = 45;
+  // Compact 20-tile literary ribbon, proportioned to the supplied reference.
+  const numRibbonTiles = layout.ribbon.tiles;
+  const tileWidth = width / numRibbonTiles;
+  const ribbonY = layout.ribbon.y;
+  const ribbonHeight = layout.ribbon.height;
 
   let ribbonTilesSvg = '';
   for (let i = 0; i < numRibbonTiles; i++) {
@@ -158,16 +161,16 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   // Participant Photo inside frame
   let photoContentSvg = '';
   if (assets.photoDataUri) {
-    photoContentSvg = `<image data-testid="participant-photo-image" href="${escapeXml(assets.photoDataUri)}" x="262" y="177" width="216" height="216" preserveAspectRatio="xMidYMid slice" clip-path="url(#photo-circle-clip)" />`;
+    photoContentSvg = `<image data-testid="participant-photo-image" href="${escapeXml(assets.photoDataUri)}" x="${layout.photo.x}" y="${layout.photo.y}" width="${layout.photo.size}" height="${layout.photo.size}" preserveAspectRatio="xMidYMid slice" clip-path="url(#photo-circle-clip)" />`;
   } else {
     photoContentSvg = `
       <g data-testid="participant-photo-fallback" aria-label="Photo placeholder for ${escapedName}">
-        <circle cx="370" cy="285" r="108" fill="#F3F4F6" />
+        <circle cx="${layout.photo.centerX}" cy="${layout.photo.centerY}" r="${layout.photo.radius}" fill="#F3F4F6" />
         <g data-testid="participant-silhouette" clip-path="url(#photo-circle-clip)">
-          <circle cx="370" cy="260" r="40" fill="#D1D5DB" />
-          <ellipse cx="370" cy="345" rx="70" ry="48" fill="#D1D5DB" />
+          <circle cx="${layout.photo.centerX}" cy="${layout.photo.centerY - 28}" r="48" fill="#D1D5DB" />
+          <ellipse cx="${layout.photo.centerX}" cy="${layout.photo.centerY + 65}" rx="78" ry="54" fill="#D1D5DB" />
         </g>
-        <text data-testid="participant-initials" x="370" y="297" text-anchor="middle" fill="#374151" font-size="52" font-weight="800" font-family="'Montserrat', system-ui, sans-serif">${escapedInitials}</text>
+        <text data-testid="participant-initials" x="${layout.photo.centerX}" y="${layout.photo.centerY + 18}" text-anchor="middle" fill="#374151" font-size="56" font-weight="800" font-family="'Montserrat', system-ui, sans-serif">${escapedInitials}</text>
       </g>
     `;
   }
@@ -175,12 +178,12 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   // QR Code inside container
   let qrContentSvg = '';
   if (assets.qrDataUri) {
-    qrContentSvg = `<image href="${escapeXml(assets.qrDataUri)}" x="410" y="640" width="265" height="265" preserveAspectRatio="xMidYMid meet" />`;
+    qrContentSvg = `<image href="${escapeXml(assets.qrDataUri)}" x="${layout.qr.innerX}" y="${layout.qr.innerY}" width="${layout.qr.innerSize}" height="${layout.qr.innerSize}" preserveAspectRatio="xMidYMid meet" />`;
   } else {
     qrContentSvg = `
       <g>
-        <rect x="435" y="665" width="215" height="215" rx="16" fill="#F3F4F6" stroke="#E5E7EB" stroke-width="2" />
-        <text x="542" y="780" text-anchor="middle" fill="#6B7280" font-size="20" font-weight="800" font-family="'Montserrat', system-ui, sans-serif">QR CODE</text>
+        <rect x="${layout.qr.x + 45}" y="${layout.qr.y + 45}" width="${layout.qr.size - 90}" height="${layout.qr.size - 90}" rx="16" fill="#F3F4F6" stroke="#E5E7EB" stroke-width="2" />
+        <text x="${layout.qr.x + layout.qr.size / 2}" y="${layout.qr.y + layout.qr.size / 2 + 8}" text-anchor="middle" fill="#6B7280" font-size="20" font-weight="800" font-family="'Montserrat', system-ui, sans-serif">QR CODE</text>
       </g>
     `;
   }
@@ -201,20 +204,20 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
       <stop offset="50%" stop-color="${ID_CARD_COLORS.headerRed}" />
       <stop offset="100%" stop-color="${ID_CARD_COLORS.headerRedGradientEnd}" />
     </linearGradient>
-    <pattern id="halftone-dots" width="16" height="16" patternUnits="userSpaceOnUse">
-      <circle cx="8" cy="8" r="1.5" fill="#FFFFFF" opacity="0.14" />
+    <pattern id="halftone-dots" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="1.15" fill="#FFFFFF" opacity="0.12" />
     </pattern>
     <filter id="starburst-blur-left" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="15" />
+      <feGaussianBlur stdDeviation="12" />
     </filter>
     <filter id="starburst-blur-right" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="16" />
+      <feGaussianBlur stdDeviation="13" />
     </filter>
     <clipPath id="header-wave-clip">
       <path d="${WAVE_PATH}" />
     </clipPath>
     <clipPath id="photo-circle-clip">
-      <circle cx="370" cy="285" r="108" />
+      <circle cx="${layout.photo.centerX}" cy="${layout.photo.centerY}" r="${layout.photo.radius}" />
     </clipPath>
   </defs>
 
@@ -230,19 +233,19 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
     <rect x="0" y="0" width="${width}" height="640" fill="url(#halftone-dots)" />
 
     <!-- Ambient Amber Starburst (Left) -->
-    <g transform="translate(-10, 380)" filter="url(#starburst-blur-left)" fill="${ID_CARD_COLORS.starburstAmber}" opacity="0.68">
-      <rect x="-22" y="-140" width="44" height="280" rx="22" />
-      <rect x="-22" y="-140" width="44" height="280" rx="22" transform="rotate(45)" />
-      <rect x="-22" y="-140" width="44" height="280" rx="22" transform="rotate(90)" />
-      <rect x="-22" y="-140" width="44" height="280" rx="22" transform="rotate(135)" />
+    <g transform="translate(-12, 390)" filter="url(#starburst-blur-left)" fill="${ID_CARD_COLORS.starburstAmber}" opacity="0.52">
+      <rect x="-18" y="-112" width="36" height="224" rx="18" />
+      <rect x="-18" y="-112" width="36" height="224" rx="18" transform="rotate(45)" />
+      <rect x="-18" y="-112" width="36" height="224" rx="18" transform="rotate(90)" />
+      <rect x="-18" y="-112" width="36" height="224" rx="18" transform="rotate(135)" />
     </g>
 
     <!-- Ambient Amber Starburst (Upper-Right) -->
-    <g transform="translate(710, 140)" filter="url(#starburst-blur-right)" fill="${ID_CARD_COLORS.starburstAmber}" opacity="0.62">
-      <rect x="-24" y="-150" width="48" height="300" rx="24" />
-      <rect x="-24" y="-150" width="48" height="300" rx="24" transform="rotate(45)" />
-      <rect x="-24" y="-150" width="48" height="300" rx="24" transform="rotate(90)" />
-      <rect x="-24" y="-150" width="48" height="300" rx="24" transform="rotate(135)" />
+    <g transform="translate(714, 185)" filter="url(#starburst-blur-right)" fill="${ID_CARD_COLORS.starburstAmber}" opacity="0.48">
+      <rect x="-20" y="-118" width="40" height="236" rx="20" />
+      <rect x="-20" y="-118" width="40" height="236" rx="20" transform="rotate(45)" />
+      <rect x="-20" y="-118" width="40" height="236" rx="20" transform="rotate(90)" />
+      <rect x="-20" y="-118" width="40" height="236" rx="20" transform="rotate(135)" />
     </g>
   </g>
 
@@ -255,46 +258,46 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
 
   <!-- 4. Circular Participant Photo Container -->
   <!-- Outer White Circle Ring -->
-  <circle cx="370" cy="285" r="114" fill="${ID_CARD_COLORS.textWhite}" />
+  <circle cx="${layout.photo.centerX}" cy="${layout.photo.centerY}" r="${layout.photo.outerRadius}" fill="${ID_CARD_COLORS.textWhite}" />
 
   <!-- Inside Photo or Neutral Silhouette -->
   ${photoContentSvg}
 
   <!-- 5. Bib Number (Centered Below Photo) -->
-  <text x="370" y="432" text-anchor="middle" fill="${ID_CARD_COLORS.textWhite}" font-size="17" font-weight="700" letter-spacing="1">${escapedBib}</text>
+  <text x="370" y="${layout.bibY}" text-anchor="middle" fill="${ID_CARD_COLORS.textWhite}" font-size="18" font-weight="700" letter-spacing="1">${escapedBib}</text>
 
   <!-- 6. Participant Name (Yellow Centered) -->
-  <text x="370" y="480" text-anchor="middle" fill="${ID_CARD_COLORS.nameYellow}" font-size="${nameFontSize}" font-weight="900" letter-spacing="0">${escapedName}</text>
+  <text x="370" y="${layout.participantNameY}" text-anchor="middle" fill="${ID_CARD_COLORS.nameYellow}" font-size="${nameFontSize}" font-weight="900" letter-spacing="0">${escapedName}</text>
 
   <!-- 7. Lower Section: Two Balanced Columns -->
   <!-- Left Column: Team, Category, Participant Id, Registered Contests, Token -->
   <g text-anchor="start">
     <!-- Team Name -->
-    <text x="45" y="650" fill="${ID_CARD_COLORS.textBlack}" font-size="${teamFontSize}" font-weight="800">${escapedTeam}</text>
+    <text x="${layout.details.leftX}" y="${layout.details.teamY}" fill="${ID_CARD_COLORS.textBlack}" font-size="${teamFontSize}" font-weight="800">${escapedTeam}</text>
 
     <!-- Category Name -->
-    <text x="45" y="685" fill="${ID_CARD_COLORS.textBlack}" font-size="21" font-weight="700">${escapedCategory}</text>
+    <text x="${layout.details.leftX}" y="${layout.details.categoryY}" fill="${ID_CARD_COLORS.textBlack}" font-size="${categoryFontSize}" font-weight="700">${escapedCategory}</text>
 
     <!-- Participant Id -->
-    <text x="45" y="725" fill="${ID_CARD_COLORS.textBlack}" font-size="15" font-weight="700">Participant Id:</text>
-    <text x="45" y="746" fill="#1F2937" font-size="12.5" font-weight="600" font-family="'Montserrat', monospace, sans-serif">${escapedId1}</text>
-    ${escapedId2 ? `<text x="45" y="764" fill="#1F2937" font-size="12.5" font-weight="600" font-family="'Montserrat', monospace, sans-serif">${escapedId2}</text>` : ''}
+    <text x="${layout.details.leftX}" y="${layout.details.participantIdLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="18" font-weight="700">Participant ID</text>
+    <text x="${layout.details.leftX}" y="${layout.details.participantIdLine1Y}" fill="#1F2937" font-size="14" font-weight="600" font-family="monospace, sans-serif">${escapedId1}</text>
+    ${escapedId2 ? `<text x="${layout.details.leftX}" y="${layout.details.participantIdLine2Y}" fill="#1F2937" font-size="14" font-weight="600" font-family="monospace, sans-serif">${escapedId2}</text>` : ''}
 
     <!-- Registered Contests -->
-    <text x="45" y="808" fill="${ID_CARD_COLORS.textBlack}" font-size="15" font-weight="700">Registered Contests:</text>
-    <text x="45" y="834" fill="${ID_CARD_COLORS.textBlack}" font-size="18" font-weight="800" aria-label="${count} Contests">${count} Competitions</text>
+    <text x="${layout.details.leftX}" y="${layout.details.registeredLabelY}" fill="${ID_CARD_COLORS.textBlack}" font-size="17" font-weight="700">Registered Contests</text>
+    <text x="${layout.details.leftX}" y="${layout.details.registeredCountY}" fill="${ID_CARD_COLORS.textBlack}" font-size="22" font-weight="800" aria-label="${count} Contests">${count} Competitions</text>
 
     <!-- Token -->
-    <text x="45" y="875" fill="${ID_CARD_COLORS.textMuted}" font-size="12" font-weight="600" font-family="monospace, sans-serif">Token: ${escapedToken}</text>
+    <text x="${layout.details.leftX}" y="${layout.details.tokenY}" fill="${ID_CARD_COLORS.textMuted}" font-size="15" font-weight="600" font-family="monospace, sans-serif">Token: ${escapedToken}</text>
   </g>
 
   <!-- Right Column: Rounded Black Border QR Code Box -->
-  <rect x="390" y="620" width="305" height="305" rx="32" fill="${ID_CARD_COLORS.cardBgWhite}" stroke="${ID_CARD_COLORS.qrBorderBlack}" stroke-width="5" />
+  <rect x="${layout.qr.x}" y="${layout.qr.y}" width="${layout.qr.size}" height="${layout.qr.size}" rx="32" fill="${ID_CARD_COLORS.cardBgWhite}" stroke="${ID_CARD_COLORS.qrBorderBlack}" stroke-width="5" />
   ${qrContentSvg}
 
   <!-- 8. Bottom Decorative Ribbon Strip -->
   ${ribbonTilesSvg}
-  <line x1="0" y1="1005" x2="${width}" y2="1005" stroke="${ID_CARD_COLORS.ribbonBurgundy}" stroke-width="1" />
+  <line x1="0" y1="${layout.ribbon.y}" x2="${width}" y2="${layout.ribbon.y}" stroke="${ID_CARD_COLORS.ribbonBurgundy}" stroke-width="1" />
 </svg>`;
 }
 
