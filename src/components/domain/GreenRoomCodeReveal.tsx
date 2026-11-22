@@ -20,12 +20,7 @@ const SEGMENT_COUNT = 12;
 const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
 const SPIN_DURATION_MS = 5_000;
 const EXTRA_SPIN_TURNS = 6;
-const ROLLING_CODES = [
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').flatMap(first =>
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(second => `${first}${second}`)
-  )
-];
+const WHEEL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 const SEGMENT_COLORS = [
   '#f4512d',
@@ -51,7 +46,11 @@ function hashSeed(value: string): number {
   return hash >>> 0;
 }
 
-/** Build a stable wheel for this assignment so the first render is hydration-safe. */
+/**
+ * Build a stable wheel using single-character labels only.
+ * For two-character server codes (e.g. WF), the wheel points to the first
+ * character (W); the complete assigned code remains visible below the wheel.
+ */
 function buildWheelCodes(seedValue: string, targetCode: string) {
   let seed = hashSeed(seedValue || targetCode);
   const random = () => {
@@ -59,7 +58,8 @@ function buildWheelCodes(seedValue: string, targetCode: string) {
     return seed / 0x1_0000_0000;
   };
 
-  const available = ROLLING_CODES.filter(code => code !== targetCode);
+  const targetLetter = (targetCode.trim().toUpperCase()[0] || 'A');
+  const available = WHEEL_LETTERS.filter(letter => letter !== targetLetter);
   const codes: string[] = [];
 
   for (let index = 0; index < SEGMENT_COUNT - 1; index += 1) {
@@ -68,7 +68,7 @@ function buildWheelCodes(seedValue: string, targetCode: string) {
   }
 
   const targetIndex = Math.floor(random() * SEGMENT_COUNT);
-  codes.splice(targetIndex, 0, targetCode);
+  codes.splice(targetIndex, 0, targetLetter);
 
   return { codes, targetIndex };
 }
@@ -175,7 +175,7 @@ export const GreenRoomCodeReveal: React.FC<GreenRoomCodeRevealProps> = ({
         isExisting
           ? 'This participant already has a Green Room Code Letter. The original assignment has been retained.'
           : phase === 'complete'
-            ? 'The wheel has stopped on the Code Letter securely assigned and saved by the server.'
+            ? 'The wheel has stopped on the assigned letter. The complete Code Letter is shown below.'
             : 'The Fortune Wheel is spinning for 5 seconds. The final Code Letter is already securely assigned.'
       }
       maxWidth="md"
@@ -276,7 +276,7 @@ export const GreenRoomCodeReveal: React.FC<GreenRoomCodeRevealProps> = ({
                         textAnchor="middle"
                         dominantBaseline="central"
                         fill="#ffffff"
-                        fontSize={code.length === 1 ? 31 : 23}
+                        fontSize={31}
                         fontWeight="900"
                         transform={`rotate(${midAngle + 90} ${label.x} ${label.y})`}
                         style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.16)', strokeWidth: 1.5 }}
