@@ -6,6 +6,7 @@ import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import {
   ID_CARD_DIMENSIONS,
   ID_CARD_COLORS,
+  ID_CARD_LAYOUT,
   formatCardBib,
   formatRegisteredContests,
   formatCardToken
@@ -63,6 +64,12 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       // Scaled output at 4x gives 2960 x 4200 px (over 1000 DPI)
       expect(ID_CARD_DIMENSIONS.baseWidth * ID_CARD_DIMENSIONS.exportScale).toBe(2960);
       expect(ID_CARD_DIMENSIONS.baseHeight * ID_CARD_DIMENSIONS.exportScale).toBe(4200);
+
+      // Reference-based layout proportions: larger portrait, lower QR block, compact footer.
+      expect(ID_CARD_LAYOUT.photo.radius).toBe(140);
+      expect(ID_CARD_LAYOUT.photo.centerY).toBe(338);
+      expect(ID_CARD_LAYOUT.qr.y).toBe(655);
+      expect(ID_CARD_LAYOUT.ribbon.height).toBe(32);
     });
 
     it('defines authoritative reference colors', () => {
@@ -231,7 +238,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(html).toContain('Sayyid Muhammad Abdurrahman Faris Al-Bukhari Thangal');
       expect(html).toContain('15 Competitions');
       // Scaled down font size for long name
-      expect(html).toContain('font-size="22"');
+      expect(html).toContain('font-size="30"');
     });
   });
 
