@@ -174,7 +174,7 @@ export default function GreenRoomPage() {
     identifier: string,
     method: 'QR_SCAN' | 'MANUAL_LOOKUP' = 'MANUAL_LOOKUP'
   ) => {
-    if (!selectedCompetition || !identifier.trim() || checkInInFlightRef.current) return;
+    if (!selectedCompetition || !identifier.trim() || checkInInFlightRef.current || codeReveal) return;
 
     checkInInFlightRef.current = true;
     setIsCheckingIn(true);
@@ -643,6 +643,7 @@ export default function GreenRoomPage() {
             <GreenRoomScanner
               onScanSuccess={(code) => void handlePerformCheckIn(code, 'QR_SCAN')}
               isProcessing={isCheckingIn}
+              isPaused={isCheckingIn || Boolean(codeReveal)}
             />
 
             {/* Manual Search & Check-in Card */}
@@ -662,7 +663,7 @@ export default function GreenRoomPage() {
                       setSearchQuery(e.target.value);
                       setSelectedManualRegistrationId('');
                     }}
-                    disabled={isCheckingIn}
+                    disabled={isCheckingIn || Boolean(codeReveal)}
                   />
 
                   {/* Select a participant first, then confirm Check In. */}
@@ -717,7 +718,7 @@ export default function GreenRoomPage() {
                       </div>
                       <button
                         type="button"
-                        disabled={isCheckingIn}
+                        disabled={isCheckingIn || Boolean(codeReveal)}
                         onClick={() => setSelectedManualRegistrationId('')}
                         className="shrink-0 rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
                       >
@@ -736,7 +737,7 @@ export default function GreenRoomPage() {
                   variant="primary"
                   size="sm"
                   className="w-full"
-                  disabled={isCheckingIn || !selectedManualRegistration}
+                  disabled={isCheckingIn || Boolean(codeReveal) || !selectedManualRegistration}
                   onClick={() => {
                     if (selectedManualRegistration) {
                       void handlePerformCheckIn(selectedManualRegistration.id, 'MANUAL_LOOKUP');
