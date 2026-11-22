@@ -117,9 +117,12 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   const nameLength = data.participantName.length;
   const nameFontSize = nameLength > 28 ? 30 : nameLength > 22 ? 36 : 44;
 
+  // Keep the left metadata column inside its fixed width without colliding with the QR frame.
+  const metadataTextWidth = 286;
   const teamLength = teamDisplay.length;
-  const teamFontSize = teamLength > 34 ? 20 : teamLength > 26 ? 24 : 28;
-  const categoryFontSize = data.categoryName.length > 26 ? 18 : data.categoryName.length > 18 ? 21 : 24;
+  const teamFontSize = Math.max(16, Math.min(28, Math.floor(metadataTextWidth / Math.max(teamLength * 0.56, 1))));
+  const categoryLength = data.categoryName.length;
+  const categoryFontSize = Math.max(16, Math.min(24, Math.floor(metadataTextWidth / Math.max(categoryLength * 0.56, 1))));
 
   // Font family resolution
   const fontChoice = FESTIVAL_NAME_FONTS.find(font => font.name === data.festivalNameFont)
