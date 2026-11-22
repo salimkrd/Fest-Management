@@ -43,6 +43,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
   onScanSuccessRef.current = onScanSuccess;
 
   const startScanner = async (desiredFacingMode = facingMode) => {
+    if (isPausedRef.current) return;
     setErrorMessage('');
     try {
       const { Html5Qrcode } = await import('html5-qrcode');
@@ -213,6 +214,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
               size="sm"
               className="mt-4 bg-[#2563EB] hover:bg-blue-700"
               onClick={() => startScanner()}
+              disabled={isProcessing || isPaused}
             >
               Enable Scanner
             </Button>
