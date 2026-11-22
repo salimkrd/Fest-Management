@@ -68,7 +68,9 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       // Reference-based layout proportions: larger portrait, lower QR block, compact footer.
       expect(ID_CARD_LAYOUT.photo.radius).toBe(140);
       expect(ID_CARD_LAYOUT.photo.centerY).toBe(338);
-      expect(ID_CARD_LAYOUT.qr.y).toBe(655);
+      expect(ID_CARD_LAYOUT.qr.y).toBe(680);
+      expect(ID_CARD_LAYOUT.qr.x).toBe(380);
+      expect(ID_CARD_LAYOUT.details.leftX).toBe(64);
       expect(ID_CARD_LAYOUT.ribbon.height).toBe(32);
     });
 
