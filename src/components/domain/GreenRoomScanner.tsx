@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 interface GreenRoomScannerProps {
   onScanSuccess: (decodedText: string) => void;
   isProcessing?: boolean;
+  isPaused?: boolean;
 }
 
 interface Html5QrcodeInstance {
@@ -23,7 +24,8 @@ interface Html5QrcodeInstance {
 
 export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
   onScanSuccess,
-  isProcessing = false
+  isProcessing = false,
+  isPaused = false
 }) => {
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -34,8 +36,14 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
   const readerElementId = 'green-room-qr-reader';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastScannedTimeRef = useRef<number>(0);
+  const scanLockedRef = useRef(false);
+  const isPausedRef = useRef(isProcessing || isPaused);
+  const onScanSuccessRef = useRef(onScanSuccess);
+  isPausedRef.current = isProcessing || isPaused;
+  onScanSuccessRef.current = onScanSuccess;
 
   const startScanner = async (desiredFacingMode = facingMode) => {
+    if (isPausedRef.current) return;
     setErrorMessage('');
     try {
       const { Html5Qrcode } = await import('html5-qrcode');
@@ -60,11 +68,12 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
         (decodedText: string) => {
           const now = Date.now();
           // Debounce 2 seconds between scans of identical data
-          if (now - lastScannedTimeRef.current > 2000) {
+          if (!isPausedRef.current && !scanLockedRef.current && now - lastScannedTimeRef.current > 2000) {
+            scanLockedRef.current = true;
             lastScannedTimeRef.current = now;
             setSuccessNotice('QR Code Captured. Verifying credentials...');
             setTimeout(() => setSuccessNotice(''), 2000);
-            onScanSuccess(decodedText);
+            onScanSuccessRef.current(decodedText);
           }
         },
         () => {
@@ -109,7 +118,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || isPausedRef.current || scanLockedRef.current) return;
 
     setErrorMessage('');
     try {
@@ -124,9 +133,10 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
 
       const decodedText = await tempScanner.scanFile(file, true);
       if (decodedText) {
+        scanLockedRef.current = true;
         setSuccessNotice('QR Code Captured. Verifying credentials...');
         setTimeout(() => setSuccessNotice(''), 2000);
-        onScanSuccess(decodedText);
+        onScanSuccessRef.current(decodedText);
       }
     } catch (err: unknown) {
       console.warn('[GreenRoomScanner] File scan error:', err);
@@ -135,6 +145,10 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  useEffect(() => {
+    if (!isPausedRef.current) scanLockedRef.current = false;
+  }, [isProcessing, isPaused]);
 
   useEffect(() => {
     return () => {
@@ -176,7 +190,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
             variant={cameraActive ? 'destructive' : 'primary'}
             size="sm"
             onClick={cameraActive ? stopScanner : () => startScanner()}
-            disabled={isProcessing}
+            disabled={isProcessing || isPaused}
             leftIcon={<Camera className="w-3.5 h-3.5" />}
           >
             {cameraActive ? 'Stop Camera' : 'Start Camera'}
@@ -200,6 +214,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
               size="sm"
               className="mt-4 bg-[#2563EB] hover:bg-blue-700"
               onClick={() => startScanner()}
+              disabled={isProcessing || isPaused}
             >
               Enable Scanner
             </Button>
@@ -238,7 +253,7 @@ export const GreenRoomScanner: React.FC<GreenRoomScannerProps> = ({
             accept="image/*"
             className="hidden"
             onChange={handleFileUpload}
-            disabled={isProcessing}
+            disabled={isProcessing || isPaused}
           />
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors">
             <Upload className="w-3.5 h-3.5" />
