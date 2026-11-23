@@ -222,10 +222,16 @@ export class ParticipantService {
         }
       }
 
+      // Normalize the optional Place field at the trusted write boundary as well as in the editor.
+      if (updates.place !== undefined && typeof updates.place !== 'string') {
+        throw new Error('Validation Error: Participant place must be text.');
+      }
+
       // Write participant update
       const now = new Date().toISOString();
       const cleanUpdates = {
         ...updates,
+        ...(updates.place !== undefined ? { place: updates.place.trim().slice(0, 100) } : {}),
         categoryName: isCatChanged ? targetCatName : (updates.categoryName || currentPart.categoryName),
         updatedAt: now
       };
