@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, LoaderCircle, Pencil, Save, X } from 'lucide
 
 type EditableProfile = {
   name: string;
+  place: string;
   classGrade: string;
   email: string;
   phone: string;
@@ -27,6 +28,7 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState<EditableProfile>({
     name: profile.name || '',
+    place: profile.place || '',
     classGrade: profile.classGrade || '',
     email: profile.email || '',
     phone: profile.phone || '',
@@ -37,6 +39,7 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
   const openEditor = () => {
     setForm({
       name: profile.name || '',
+      place: profile.place || '',
       classGrade: profile.classGrade || '',
       email: profile.email || '',
       phone: profile.phone || '',
@@ -130,7 +133,7 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
                   Edit My Profile
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Update only the six personal details listed below.
+                  Update your personal details, including the Place shown on your ID card.
                 </p>
               </div>
               <button
@@ -156,6 +159,17 @@ export function ParticipantProfileEditor({ participantId, profile, onSaved }: Pr
                     onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
                     className={inputClass}
                     placeholder="Enter your full name"
+                  />
+                </label>
+                <label className="block">
+                  <span className={labelClass}>Place</span>
+                  <input
+                    maxLength={100}
+                    autoComplete="address-level2"
+                    value={form.place}
+                    onChange={event => setForm(current => ({ ...current, place: event.target.value }))}
+                    className={inputClass}
+                    placeholder="Enter your place / locality"
                   />
                 </label>
                 <label className="block">
