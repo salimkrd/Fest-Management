@@ -11,7 +11,7 @@ import { useFest } from '@/context/FestContext';
 import { FestivalLogo, FestivalStatusBadge } from '@/components/domain/FestivalBrand';
 import type { Participant } from '@/types/fest';
 
-type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'photoUrl' | 'idStatus' | 'email' | 'phone' | 'remarks'>;
+type Profile = Pick<Participant, 'id' | 'bib' | 'name' | 'place' | 'teamId' | 'teamName' | 'teamCode' | 'categoryName' | 'categoryId' | 'classGrade' | 'photoUrl' | 'idStatus' | 'email' | 'phone' | 'remarks'>;
 type Entry = {
   registrationId: string; name: string; code: string; type: 'SOLO' | 'GROUP';
   mode: 'STAGE' | 'OFF_STAGE' | null; date: string; timeSlot: string;
@@ -179,6 +179,7 @@ export default function ParticipantDashboard() {
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-[#526070] sm:text-xs">
               <span className="max-w-full break-all rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">ID: {profile.id}</span>
               <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Bib: {profile.bib}</span>
+              <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Place: {profile.place || 'Not added'}</span>
               <span className="rounded-lg border border-[#E1E7EF] bg-[#F5F7FC] px-2.5 py-1.5">Class: {profile.classGrade || '—'}</span>
             </div>
           </div>
