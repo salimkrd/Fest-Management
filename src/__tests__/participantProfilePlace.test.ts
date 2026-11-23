@@ -35,7 +35,7 @@ describe('Participant self-service Place profile field', () => {
           doc: (id: string) => ({
             update: (data: Record<string, unknown>) => {
               if (name !== 'participants' || id !== 'part-current-user') {
-                throw new Error('Participant update escaped the authenticated user's record.');
+                throw new Error("Participant update escaped the authenticated user record.");
               }
               return updateMock(data);
             }
@@ -75,7 +75,7 @@ describe('Participant self-service Place profile field', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('requires the participant's own authenticated session', async () => {
+  it("requires the participant own authenticated session", async () => {
     getParticipantSessionMock.mockResolvedValueOnce(null);
     const response = await PATCH(request({ place: 'Pattambi' }));
     expect(response.status).toBe(401);
