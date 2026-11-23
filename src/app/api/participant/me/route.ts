@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getParticipantSession } from '@/services/participantPortalAuth';
+import { countParticipantRegisteredCompetitions } from '@/domain/registrationCounts';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     [...solo.docs, ...leader.docs, ...legacy.docs].forEach(doc => registrationDocs.set(doc.id, doc));
     const registrations = Array.from(registrationDocs.values()).filter(doc => {
       const reg = doc.data();
-      return reg.status !== 'REJECTED' && (reg.type === 'SOLO' ? reg.participantId === id :
+      return reg.status !== 'REJECTED' && reg.status !== 'CANCELLED' && (reg.type === 'SOLO' ? reg.participantId === id :
         reg.groupLeaderId === id || (Array.isArray(reg.groupMembers) && reg.groupMembers.includes(id)));
     });
 
@@ -71,6 +72,10 @@ export async function GET(req: NextRequest) {
     });
     events.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
     const individualPoints = events.reduce((sum, event) => sum + (event.published ? event.individualPoints : 0), 0);
+    const registeredCompetitionsCount = countParticipantRegisteredCompetitions(
+      registrations.map(doc => doc.data()),
+      id
+    );
     const profile = {
       id,
       bib: data.bib || '',
@@ -92,7 +97,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       profile, events,
       summary: {
-        competitions: events.length,
+        competitions: registeredCompetitionsCount,
         soloEvents: events.filter(x => x.type === 'SOLO').length,
         groupEvents: events.filter(x => x.type === 'GROUP').length,
         individualPoints
