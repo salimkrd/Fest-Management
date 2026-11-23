@@ -112,7 +112,9 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(svg).toContain('id-starburst-left');
       expect(svg).toContain('id-halftone');
 
-      // Top Typography
+      // All non-festival ID text uses Sora; the festival title keeps its selected font.
+      expect(svg).toContain("text { font-family: 'Sora', Arial, sans-serif; }");
+      expect(svg).toContain('.festival-title { font-family: Montserrat, Arial, sans-serif; }');
       expect(svg).toContain('OFFICIAL FEST PASS');
       expect(svg).toContain('INSPIRATH 2025');
       expect(svg).toContain('Suffa University Campus');
