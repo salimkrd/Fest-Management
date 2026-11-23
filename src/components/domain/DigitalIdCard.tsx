@@ -101,12 +101,16 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           registeredCompetitionsCount?: number;
         };
         if (!isMounted) return;
-        if (!Number.isInteger(data.registeredCompetitionsCount) || (data.registeredCompetitionsCount ?? -1) < 0) {
+        const registeredCount = data.registeredCompetitionsCount;
+        if (typeof registeredCount !== 'number' || !Number.isInteger(registeredCount) || registeredCount < 0) {
           throw new Error('Could not verify this participant’s registered competition count. Please reopen the ID card.');
         }
+        if (typeof data.token !== 'string' || typeof data.payload !== 'string') {
+          throw new Error('Could not retrieve the participant’s verified QR credentials.');
+        }
 
-        setRegisteredCompetitionsCount(data.registeredCompetitionsCount!);
-        setSignedToken(data.token || '');
+        setRegisteredCompetitionsCount(registeredCount);
+        setSignedToken(data.token);
         setSignedPayload(data.payload);
 
         const url = await QRCode.toDataURL(data.payload, {
