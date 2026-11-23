@@ -11,6 +11,7 @@ import { DigitalIdCard } from '@/components/domain/DigitalIdCard';
 import { ParticipantEditorModal } from '@/components/domain/ParticipantEditorModal';
 import { ParticipantPhoto } from '@/components/domain/ParticipantPhoto';
 import { uploadParticipantPhoto } from '@/lib/participantPhotoUpload';
+import { countParticipantRegisteredCompetitions } from '@/domain/registrationCounts';
 import { Plus, Search, Edit2, Trash2, IdCard, FileDown } from 'lucide-react';
 
 const formatPdfScheduleDate = (value: string): string => {
@@ -110,7 +111,7 @@ export default function ParticipantsPage() {
       .filter(reg =>
         reg.status !== 'REJECTED' &&
         reg.status !== 'CANCELLED' &&
-        (reg.participantId === participantId || reg.groupLeaderId === participantId)
+        (reg.participantId === participantId || reg.groupLeaderId === participantId || reg.groupMembers?.includes(participantId))
       )
       .sort((a, b) => {
         const competitionA = competitions.find(item => item.id === a.competitionId);
@@ -120,7 +121,7 @@ export default function ParticipantsPage() {
       });
 
   const getRegisteredEventCount = (participantId: string) =>
-    new Set(getParticipantRegistrations(participantId).map(reg => reg.competitionId)).size;
+    countParticipantRegisteredCompetitions(registrations, participantId);
 
   const handleDownloadCompetitionList = (participant: Participant) => {
     try {
