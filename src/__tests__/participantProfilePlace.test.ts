@@ -12,11 +12,15 @@ vi.mock('@/services/participantPortalAuth', () => ({
 
 import { PATCH } from '@/app/api/participant/profile/route';
 
-const request = (body: unknown, origin = 'https://inspirath.example') => new NextRequest(
-  origin + '/api/participant/profile',
+const request = (
+  body: unknown,
+  requestOrigin = 'https://inspirath.example',
+  headerOrigin = requestOrigin
+) => new NextRequest(
+  requestOrigin + '/api/participant/profile',
   {
     method: 'PATCH',
-    headers: { origin, 'content-type': 'application/json' },
+    headers: { origin: headerOrigin, 'content-type': 'application/json' },
     body: JSON.stringify(body)
   }
 );
@@ -79,7 +83,7 @@ describe('Participant self-service Place profile field', () => {
   });
 
   it('rejects cross-origin profile updates', async () => {
-    const response = await PATCH(request({ place: 'Pattambi' }, 'https://attacker.example'));
+    const response = await PATCH(request({ place: 'Pattambi' }, 'https://inspirath.example', 'https://attacker.example'));
     expect(response.status).toBe(403);
     expect(updateMock).not.toHaveBeenCalled();
   });
