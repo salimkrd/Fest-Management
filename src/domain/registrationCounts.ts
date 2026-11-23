@@ -1,9 +1,12 @@
 import type { Registration } from '@/types/fest';
 
-export type RegistrationCountRecord = Pick<
-  Registration,
-  'participantId' | 'groupLeaderId' | 'groupMembers' | 'competitionId' | 'status'
->;
+export interface RegistrationCountRecord {
+  participantId?: string;
+  groupLeaderId?: string;
+  groupMembers?: string[];
+  competitionId?: string;
+  status?: Registration['status'];
+}
 
 /**
  * Count unique registered competitions from registration documents.
@@ -37,7 +40,7 @@ export function countParticipantRegisteredCompetitions(
  * participant-facing registered-event summary.
  */
 export function buildParticipantEventRegistrationCounts(
-  registrations: readonly Registration[]
+  registrations: readonly RegistrationCountRecord[]
 ): Map<string, number> {
   const competitionIdsByParticipant = new Map<string, Set<string>>();
 
