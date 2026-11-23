@@ -53,7 +53,8 @@ export default function ParticipantsPage() {
     const query = search.trim().toLowerCase();
     const matchesSearch = (p.name || '').toLowerCase().includes(query) ||
                           (p.bib || '').toLowerCase().includes(query) ||
-                          (p.email || '').toLowerCase().includes(query);
+                          (p.email || '').toLowerCase().includes(query) ||
+                          (p.place || '').toLowerCase().includes(query);
     const matchesTeam = teamFilter === 'ALL' || p.teamId === teamFilter;
     const matchesCat = categoryFilter === 'ALL' || p.categoryId === categoryFilter;
     return matchesSearch && matchesTeam && matchesCat;
@@ -426,7 +427,7 @@ export default function ParticipantsPage() {
             <Search className="w-4 h-4 text-[#526070] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by Bib #, Student Name, or Email..."
+              placeholder="Search by Bib, Name, Email, or Place..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full min-h-11 text-sm pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-colors"
@@ -477,6 +478,7 @@ export default function ParticipantsPage() {
                   <th className="py-3 px-4">Participant ID / Bib</th>
                   <th className="py-3 px-6">Photo &amp; Full Name</th>
                   <th className="py-3 px-6">Team Affiliation</th>
+                  <th className="py-3 px-6">Place</th>
                   <th className="py-3 px-6">Category</th>
                   <th className="py-3 px-6">Class / Grade</th>
                   <th className="py-3 px-4 text-center">Registered Events</th>
@@ -486,7 +488,7 @@ export default function ParticipantsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredParticipants.length === 0 ? (
-                  <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No participants match your search or filters.</td></tr>
+                  <tr><td colSpan={9} className="px-6 py-14 text-center text-sm text-slate-500">No participants match your search or filters.</td></tr>
                 ) : filteredParticipants.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-[#111111]">
@@ -510,6 +512,9 @@ export default function ParticipantsPage() {
                     <td className="py-3.5 px-4">
                       <span className="font-semibold text-[#111111]">{p.teamName}</span>
                       <span className="text-[#526070] text-[11px] ml-1">({p.teamCode})</span>
+                    </td>
+                    <td className="py-3.5 px-4 text-[#526070]">
+                      {p.place || '—'}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-[#111111]">
                       {p.categoryName}
