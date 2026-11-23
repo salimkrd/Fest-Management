@@ -133,7 +133,9 @@ export async function exportDigitalIdAsPng(
     festivalName,
     institutionName: options?.institutionName,
     festivalNameFont: options?.festivalNameFont,
-    registeredCompetitionsCount: options?.registeredCompetitionsCount
+    ...(options?.registeredCompetitionsCount !== undefined
+      ? { registeredCompetitionsCount: options.registeredCompetitionsCount }
+      : {})
   });
 
   const assets: IdCardAssets = {
