@@ -11,6 +11,7 @@ const participant: Participant = {
   id: 'part-234db9d5-075d-472d-b6c2-0a2efb132a6a',
   bib: '#1001',
   name: 'Test Participant',
+  place: 'Pattambi',
   email: '', phone: '', teamId: 'team-1',
   teamCode: 'ALP', teamName: 'Team Alpha',
   categoryId: 'senior', categoryName: 'Senior',
@@ -93,11 +94,17 @@ describe('Digital ID PNG canonical SVG rasterization', () => {
     expect(svgString).toContain("Ma'din Suffa Campus Vavoor");
     expect(svgString).toContain('OFFICIAL FEST PASS');
     expect(svgString).toContain('Test Participant');
+    expect(svgString).toContain('Pattambi');
     expect(svgString).toContain('#1001');
-    expect(svgString).toContain('Team Alpha (ALP)');
+    expect(svgString).toContain('Team Alpha');
     expect(svgString).toContain('Senior');
     expect(svgString).toContain('0 Competitions');
-    expect(svgString).toContain('Token: SIGNEDTOKEN12345');
+    expect(svgString).toContain('Bib Number');
+    expect(svgString).toContain('Team Name');
+    expect(svgString).toContain('Category Name');
+    expect(svgString).toContain('Registered Contests:');
+    expect(svgString).not.toContain('SIGNEDTOKEN12345');
+    expect(svgString).not.toContain('Participant Id:');
     expect(svgString).toContain('data:image/jpeg;base64,');
     expect(svgString).toContain('data:image/png;base64,mockQrCodeDataUrl');
 

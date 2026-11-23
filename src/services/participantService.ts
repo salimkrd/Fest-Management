@@ -8,7 +8,7 @@ import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 
 export type NewParticipant = Pick<
   FirestoreParticipant,
-  'name' | 'email' | 'phone' | 'categoryId' | 'categoryName' |
+  'name' | 'place' | 'email' | 'phone' | 'categoryId' | 'categoryName' |
   'classGrade' | 'division' | 'dob' | 'photoUrl' | 'registeredEventIds'
 > & { remarks?: string };
 
@@ -64,6 +64,7 @@ export class ParticipantService {
         id: participantId,
         bib,
         name: input.name.trim(),
+        place: input.place?.trim().slice(0, 100) || '',
         email: input.email?.trim() || '',
         phone: input.phone?.trim() || '',
         teamId,
@@ -221,10 +222,16 @@ export class ParticipantService {
         }
       }
 
+      // Normalize the optional Place field at the trusted write boundary as well as in the editor.
+      if (updates.place !== undefined && typeof updates.place !== 'string') {
+        throw new Error('Validation Error: Participant place must be text.');
+      }
+
       // Write participant update
       const now = new Date().toISOString();
       const cleanUpdates = {
         ...updates,
+        ...(updates.place !== undefined ? { place: updates.place.trim().slice(0, 100) } : {}),
         categoryName: isCatChanged ? targetCatName : (updates.categoryName || currentPart.categoryName),
         updatedAt: now
       };

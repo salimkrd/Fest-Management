@@ -131,8 +131,7 @@ export async function exportDigitalIdAsPng(
   const cardData = extractIdCardData(participant, {
     festivalName,
     institutionName: options?.institutionName,
-    festivalNameFont: options?.festivalNameFont,
-    token: options?.token
+    festivalNameFont: options?.festivalNameFont
   });
 
   const assets: IdCardAssets = {

@@ -39,6 +39,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
     id: 'part-c37b82fa-9021-4d3e-8e5f-172901234567',
     bib: '#1042',
     name: 'Nihad Mohammed',
+    place: 'Pattambi',
     dob: '2010-05-12',
     teamId: 'team-alpha',
     teamName: 'Al-Farooq House',
@@ -65,17 +66,17 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(ID_CARD_DIMENSIONS.baseWidth * ID_CARD_DIMENSIONS.exportScale).toBe(2960);
       expect(ID_CARD_DIMENSIONS.baseHeight * ID_CARD_DIMENSIONS.exportScale).toBe(4200);
 
-      // Reference-based layout proportions: larger portrait, lower QR block, compact footer.
-      expect(ID_CARD_LAYOUT.photo.radius).toBe(140);
-      expect(ID_CARD_LAYOUT.photo.centerY).toBe(338);
-      expect(ID_CARD_LAYOUT.qr.y).toBe(680);
-      expect(ID_CARD_LAYOUT.qr.x).toBe(380);
-      expect(ID_CARD_LAYOUT.details.leftX).toBe(64);
-      expect(ID_CARD_LAYOUT.ribbon.height).toBe(32);
+      // Supplied participant pass layout: portrait in red header, details/QR on white panel.
+      expect(ID_CARD_LAYOUT.header.height).toBe(675);
+      expect(ID_CARD_LAYOUT.header.photo.radius).toBe(143);
+      expect(ID_CARD_LAYOUT.header.photo.centerY).toBe(385);
+      expect(ID_CARD_LAYOUT.qr.y).toBe(718);
+      expect(ID_CARD_LAYOUT.qr.x).toBe(405);
+      expect(ID_CARD_LAYOUT.footer.height).toBe(32);
     });
 
     it('defines authoritative reference colors', () => {
-      expect(ID_CARD_COLORS.headerRed).toBe('#931B1E');
+      expect(ID_CARD_COLORS.headerRed).toBe('#9E1B1E');
       expect(ID_CARD_COLORS.nameYellow).toBe('#FBBF24');
       expect(ID_CARD_COLORS.cardBgWhite).toBe('#FFFFFF');
       expect(ID_CARD_COLORS.qrBorderBlack).toBe('#000000');
@@ -88,13 +89,11 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
         festivalName: 'INSPIRATH 2025',
         institutionName: 'Suffa University Campus',
         participantName: 'Nihad Mohammed',
+        place: 'Pattambi',
         bib: '#1042',
         teamName: 'Al-Farooq House',
-        teamCode: 'ALF',
         categoryName: 'Senior',
-        participantId: 'part-c37b82fa-9021-4d3e-8e5f-172901234567',
         registeredCompetitionsCount: 3,
-        token: 'abcdef1234567890abcdef1234567890'
       };
 
       const assets: IdCardAssets = {
@@ -109,10 +108,9 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(svg).toContain('aspect-ratio:74/105');
 
       // Header, Halftone, Starbursts & Wave
-      expect(svg).toContain('#header-red-gradient');
-      expect(svg).toContain('halftone-dots');
-      expect(svg).toContain('starburst-blur-left');
-      expect(svg).toContain('header-wave-clip');
+      expect(svg).toContain('id-header-gradient');
+      expect(svg).toContain('id-starburst-left');
+      expect(svg).toContain('id-halftone');
 
       // Top Typography
       expect(svg).toContain('OFFICIAL FEST PASS');
@@ -126,23 +124,26 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       // Bib & Yellow Name
       expect(svg).toContain('#1042');
       expect(svg).toContain('Nihad Mohammed');
+      expect(svg).toContain('Pattambi');
       expect(svg).toContain(ID_CARD_COLORS.nameYellow);
 
       // Left Column Metadata
-      expect(svg).toContain('Al-Farooq House (ALF)');
+      expect(svg).toContain('Al-Farooq House');
       expect(svg).toContain('Senior');
-      expect(svg).toContain('Participant Id:');
-      expect(svg).toContain('PART-C37B82FA-9021');
       expect(svg).toContain('Registered Contests:');
       expect(svg).toContain('3 Competitions');
-      expect(svg).toContain('Token: ABCDEF1234567890ABCD');
 
       // QR Container border
-      expect(svg).toContain('stroke="#000000"');
-      expect(svg).toContain('stroke-width="5"');
+      expect(svg).toContain('stroke="#111111"');
+      expect(svg).toContain('stroke-width="3"');
 
-      // Bottom Decorative Literary Ribbon
-      expect(svg).toContain(ID_CARD_COLORS.ribbonBurgundy);
+      expect(svg).toContain('Bib Number');
+      expect(svg).toContain('Team Name');
+      expect(svg).toContain('Category Name');
+      expect(svg).toContain('Registered Contests:');
+      expect(svg).toContain('#1042');
+      expect(svg).not.toContain('Participant Id:');
+      expect(svg).not.toContain('Token:');
     });
 
     it('renders neutral silhouette and initials fallback when no photo data URI is provided', () => {
@@ -152,7 +153,6 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
         bib: '#1042',
         teamName: 'Al-Farooq House',
         categoryName: 'Senior',
-        participantId: 'part-1234',
         registeredCompetitionsCount: 1
       };
 
@@ -171,7 +171,6 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
         bib: '#1042',
         teamName: 'Al-Farooq House',
         categoryName: 'Senior',
-        participantId: 'part-1234',
         registeredCompetitionsCount: 1
       };
 
@@ -189,7 +188,6 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
           festivalName: 'INSPIRATH 2025',
           institutionName: "Suffa University Campus",
           qrDataUrl: 'data:image/png;base64,mockQr',
-          signedToken: 'abcdef1234567890abcdef1234567890'
         })
       );
 
@@ -204,8 +202,9 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(html).toContain('#1042');
       expect(html).toContain('Nihad Mohammed');
       expect(html).toContain('fill="#FBBF24"');
-      expect(html).toContain('Al-Farooq House (ALF)');
+      expect(html).toContain('Al-Farooq House');
       expect(html).toContain('Senior');
+      expect(html).toContain('Pattambi');
       expect(html).toContain('3 Competitions');
     });
 
@@ -219,6 +218,8 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
 
       expect(html).not.toContain('Grade 12');
       expect(html).not.toContain('Div A');
+      expect(html).not.toContain('Participant Id:');
+      expect(html).not.toContain('Token:');
     });
 
     it('safely scales typography for exceptionally long names to prevent layout breaking', () => {
@@ -240,7 +241,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(html).toContain('Sayyid Muhammad Abdurrahman Faris Al-Bukhari Thangal');
       expect(html).toContain('15 Competitions');
       // Scaled down font size for long name
-      expect(html).toContain('font-size="30"');
+      expect(html).toContain('font-size="25"');
     });
   });
 
@@ -275,7 +276,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(formatRegisteredContests(5)).toBe('5 Competitions');
     });
 
-    it('formatCardToken trims and capitalizes token', () => {
+    it('formatCardToken remains available for QR credentials but is not printed on the card', () => {
       expect(formatCardToken('abc123xyz')).toBe('ABC123XYZ');
       expect(formatCardToken('')).toBe('VERIFYING...');
     });

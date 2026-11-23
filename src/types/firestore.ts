@@ -109,6 +109,7 @@ export interface FirestoreParticipant {
   id: string;
   bib: string;
   name: string;
+  place?: string;
   email: string;
   phone: string;
   teamId: string;

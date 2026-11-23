@@ -2,6 +2,7 @@ import type { Category, Participant, Team } from '@/types/fest';
 
 export interface ParticipantEditorFields {
   name: string;
+  place: string;
   email: string;
   phone: string;
   teamId: string;
@@ -21,6 +22,7 @@ export function initialParticipantFields(
 ): ParticipantEditorFields {
   return {
     name: participant?.name || '',
+    place: participant?.place || '',
     email: participant?.email || '',
     phone: participant?.phone || '',
     teamId: lockedTeam?.id || participant?.teamId || teams[0]?.id || '',
@@ -81,6 +83,7 @@ export function prepareParticipantPayload(
 
   return {
     name,
+    place: fields.place.trim().slice(0, 100),
     email,
     phone: fields.phone.trim(),
     teamId: team.id,

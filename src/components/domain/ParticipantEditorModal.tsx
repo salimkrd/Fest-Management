@@ -128,14 +128,23 @@ export function ParticipantEditorModal({
           </div>
         </div>
 
-        <Input
-          label="Full Student Name"
-          placeholder="Enter participant full name"
-          value={fields.name}
-          onChange={e => update('name', e.target.value)}
-          required
-          maxLength={120}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Full Student Name"
+            placeholder="Enter participant full name"
+            value={fields.name}
+            onChange={e => update('name', e.target.value)}
+            required
+            maxLength={120}
+          />
+          <Input
+            label="Place (Optional)"
+            placeholder="Enter participant's place / locality"
+            value={fields.place}
+            onChange={e => update('place', e.target.value)}
+            maxLength={100}
+          />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {isTeamManager ? (
