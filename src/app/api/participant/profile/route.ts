@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getParticipantSession } from '@/services/participantPortalAuth';
 
-const EDITABLE_FIELDS = ['name', 'classGrade', 'email', 'phone', 'photoUrl', 'remarks'] as const;
+const EDITABLE_FIELDS = ['name', 'place', 'classGrade', 'email', 'phone', 'photoUrl', 'remarks'] as const;
 type EditableField = typeof EDITABLE_FIELDS[number];
 
 function cleanText(value: unknown, maxLength: number): string | null {
@@ -29,14 +29,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid profile data.' }, { status: 400 });
     }
 
-    // Explicit allowlist: ignore/reject every field outside the six participant-editable fields.
+    // Explicit allowlist: reject every field outside the participant self-service editable fields.
     const suppliedKeys = Object.keys(body);
     if (suppliedKeys.some(key => !EDITABLE_FIELDS.includes(key as EditableField))) {
       return NextResponse.json({ error: 'One or more fields cannot be edited.' }, { status: 400 });
     }
 
     const limits: Record<EditableField, number> = {
-      name: 120, classGrade: 40, email: 254, phone: 25, photoUrl: 2048, remarks: 1000
+      name: 120, place: 100, classGrade: 40, email: 254, phone: 25, photoUrl: 2048, remarks: 1000
     };
     const updates: Partial<Record<EditableField, string>> = {};
     for (const field of EDITABLE_FIELDS) {
