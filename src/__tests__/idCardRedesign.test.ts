@@ -288,6 +288,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
     it('formatRegisteredContests formats count with "Competitions"', () => {
       expect(formatRegisteredContests(0)).toBe('0 Competitions');
       expect(formatRegisteredContests(5)).toBe('5 Competitions');
+      expect(formatRegisteredContests(null)).toBe('— Competitions');
     });
 
     it('formatCardToken remains available for QR credentials but is not printed on the card', () => {
