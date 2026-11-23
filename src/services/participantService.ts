@@ -8,7 +8,7 @@ import { sanitizeForFirestore } from '@/lib/firebase/sanitize';
 
 export type NewParticipant = Pick<
   FirestoreParticipant,
-  'name' | 'email' | 'phone' | 'categoryId' | 'categoryName' |
+  'name' | 'place' | 'email' | 'phone' | 'categoryId' | 'categoryName' |
   'classGrade' | 'division' | 'dob' | 'photoUrl' | 'registeredEventIds'
 > & { remarks?: string };
 
@@ -64,6 +64,7 @@ export class ParticipantService {
         id: participantId,
         bib,
         name: input.name.trim(),
+        place: input.place?.trim().slice(0, 100) || '',
         email: input.email?.trim() || '',
         phone: input.phone?.trim() || '',
         teamId,
