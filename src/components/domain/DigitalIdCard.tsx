@@ -28,6 +28,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const fest = useSafeFest();
   const theme = fest?.theme || defaultTheme;
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [registeredCompetitionsCount, setRegisteredCompetitionsCount] = useState<number | null>(null);
   const [signedToken, setSignedToken] = useState<string>('');
   const [signedPayload, setSignedPayload] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -63,6 +64,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   useEffect(() => {
     if (!participantId || !isOpen) {
       setQrDataUrl('');
+      setRegisteredCompetitionsCount(null);
       setSignedToken('');
       setSignedPayload('');
       setFetchError(null);
@@ -72,6 +74,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
     let isMounted = true;
     setLoading(true);
+    setRegisteredCompetitionsCount(null);
     setFetchError(null);
 
     const fetchQrBadge = async () => {
@@ -92,10 +95,18 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           throw new Error(errData.error || 'Failed to retrieve signed QR accreditation code.');
         }
 
-        const data = await res.json();
+        const data = await res.json() as {
+          token?: string;
+          payload?: string;
+          registeredCompetitionsCount?: number;
+        };
         if (!isMounted) return;
+        if (!Number.isInteger(data.registeredCompetitionsCount) || (data.registeredCompetitionsCount ?? -1) < 0) {
+          throw new Error('Could not verify this participant’s registered competition count. Please reopen the ID card.');
+        }
 
-        setSignedToken(data.token);
+        setRegisteredCompetitionsCount(data.registeredCompetitionsCount!);
+        setSignedToken(data.token || '');
         setSignedPayload(data.payload);
 
         const url = await QRCode.toDataURL(data.payload, {
@@ -126,6 +137,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     return () => {
       isMounted = false;
       setQrDataUrl('');
+      setRegisteredCompetitionsCount(null);
       setSignedToken('');
       setSignedPayload('');
       setFetchError(null);
@@ -140,7 +152,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!participant || !signedToken || !signedPayload || exporting) return;
+    if (!participant || !signedToken || !signedPayload || registeredCompetitionsCount === null || exporting) return;
     setExporting(true);
     setExportError(null);
     try {
@@ -174,7 +186,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         qrPayload: signedPayload,
         photoBlob,
         festivalNameFont: theme.festivalNameFont,
-        institutionName: theme.institutionName
+        institutionName: theme.institutionName,
+        registeredCompetitionsCount
       });
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Unable to export Digital ID Card.');
@@ -203,7 +216,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               leftIcon={<Download className="w-4 h-4" />}
               onClick={handleDownload}
               isLoading={exporting}
-              disabled={loading || exporting || !qrDataUrl || !!fetchError}
+              disabled={loading || exporting || !qrDataUrl || registeredCompetitionsCount === null || !!fetchError}
             >
               Download PNG
             </Button>
@@ -213,7 +226,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               className="w-full sm:w-auto"
               leftIcon={<Printer className="w-4 h-4" />}
               onClick={handlePrint}
-              disabled={loading}
+              disabled={loading || registeredCompetitionsCount === null || !!fetchError}
             >
               Print ID Badge
             </Button>
@@ -244,6 +257,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             festivalName={theme.festivalName}
             institutionName={theme.institutionName}
             festivalNameFont={theme.festivalNameFont}
+            registeredCompetitionsCount={registeredCompetitionsCount}
             qrDataUrl={qrDataUrl}
             loadingQr={loading}
             fetchError={fetchError}
