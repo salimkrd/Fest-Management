@@ -87,6 +87,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
     it('generates complete self-contained SVG artwork with all reference elements', () => {
       const cardData: IdCardData = {
         festivalName: 'INSPIRATH 2025',
+        festivalNameFont: 'Cinzel',
         institutionName: 'Suffa University Campus',
         participantName: 'Nihad Mohammed',
         place: 'Pattambi',
@@ -106,6 +107,11 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       // Root viewBox and aspect ratio
       expect(svg).toContain('viewBox="0 0 740 1050"');
       expect(svg).toContain('aspect-ratio:74/105');
+
+      // Sora is the default for every non-festival text; the festival title keeps its selected font.
+      expect(svg).toContain("family=Sora:wght@400;500;600;700;800");
+      expect(svg).toContain("text { font-family: 'Sora', Arial, sans-serif; }");
+      expect(svg).toContain('.festival-title { font-family: Cinzel, Montserrat, Arial, sans-serif; }');
 
       // Header, Halftone, Starbursts & Wave
       expect(svg).toContain('id-header-gradient');
