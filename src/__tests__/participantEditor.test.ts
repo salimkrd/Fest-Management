@@ -9,7 +9,7 @@ const junior = { id: 'junior', name: 'Junior', status: 'ACTIVE' } as Category;
 
 const existing: Participant = {
   id: 'part-1042', bib: '#1042', idStatus: 'GENERATED',
-  name: 'Old Name', email: 'original@example.com', phone: '9876543210',
+  name: 'Old Name', place: 'Pattambi', email: 'original@example.com', phone: '9876543210',
   teamId: teamA.id, teamName: teamA.name, teamCode: teamA.code,
   categoryId: senior.id, categoryName: senior.name,
   classGrade: 'Std 11', division: 'B', dob: '2010-05-12',
@@ -24,11 +24,12 @@ describe('Shared Admin and Team Manager participant editor', () => {
     expect(fields.phone).toBe('');
     expect(fields.email).toBe('');
     expect(fields.photoUrl).toBe('');
+    expect(fields.place).toBe('');
     expect(fields.teamId).toBe(teamA.id);
     expect(() => prepareParticipantPayload(fields, [teamA], [senior], null)).toThrow(/name/i);
     const payload = prepareParticipantPayload({ ...fields, name: ' New Student ', dob: '2010-05-12' }, [teamA], [senior], null);
     expect(payload).toMatchObject({
-      name: 'New Student', email: '', phone: '', photoUrl: '', registeredEventIds: [],
+      name: 'New Student', place: '', email: '', phone: '', photoUrl: '', registeredEventIds: [],
       teamId: teamA.id, categoryId: senior.id, dob: '2010-05-12'
     });
   });
@@ -36,12 +37,13 @@ describe('Shared Admin and Team Manager participant editor', () => {
   it('prefills all previously entered values in BOTH editor contexts', () => {
     const fields = initialParticipantFields(existing, [teamA, teamB], [junior, senior], teamA);
     expect(fields).toMatchObject({
-      name: existing.name, email: existing.email, phone: existing.phone,
+      name: existing.name, place: 'Pattambi', email: existing.email, phone: existing.phone,
       teamId: existing.teamId, categoryId: existing.categoryId,
       classGrade: existing.classGrade, division: existing.division, dob: existing.dob,
       photoUrl: existing.photoUrl, remarks: existing.remarks
     });
     const saved = prepareParticipantPayload(fields, [teamA], [senior], existing, teamA.id);
+    expect(saved.place).toBe('Pattambi');
     expect(saved.email).toBe(existing.email);
     expect(saved.photoUrl).toBe(existing.photoUrl);
     expect(saved.remarks).toBe(existing.remarks);
