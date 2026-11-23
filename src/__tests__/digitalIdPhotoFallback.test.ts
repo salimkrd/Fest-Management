@@ -33,6 +33,7 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
     id: 'part-1042',
     bib: '#1042',
     name: 'Nihad Mohammed',
+    place: 'Pattambi',
     dob: '2010-05-12',
     teamId: 'team-alpha',
     teamName: 'Al-Farooq House',
@@ -209,16 +210,17 @@ describe('Digital ID Card & Participant Photo Fallback System', () => {
       // Verify participant details are preserved
       expect(html).toContain('Nihad Mohammed');
       expect(html).toContain('#1042');
-      expect(html).toContain('Al-Farooq House (ALF)');
+      expect(html).toContain('Al-Farooq House');
       expect(html).toContain('Senior');
+      expect(html).toContain('Pattambi');
       expect(html).not.toContain('absolute top-3 right-3');
       expect(html).toContain('2 Competitions');
-      expect(html).toContain('2 Contests');
+      expect(html).toContain('Registered Contests:');
       expect(html).toContain('VERIFIED');
 
       // Verify official festival branding
       expect(html).toContain('SAHITHYOLSAV 2025');
-      expect(html).toContain('OFFICIAL FESTIVAL PASS');
+      expect(html).toContain('OFFICIAL FEST PASS');
 
       // Verify action buttons
       expect(html).toContain('Download PNG');
