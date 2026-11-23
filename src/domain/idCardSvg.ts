@@ -23,7 +23,7 @@ export interface IdCardData {
   bib: string;
   teamName: string;
   categoryName: string;
-  registeredCompetitionsCount: number;
+  registeredCompetitionsCount: number | null;
 }
 
 export interface IdCardAssets {
@@ -48,6 +48,7 @@ export function extractIdCardData(
     festivalName?: string;
     institutionName?: string;
     festivalNameFont?: string;
+    registeredCompetitionsCount?: number | null;
   }
 ): IdCardData {
   return {
@@ -59,7 +60,9 @@ export function extractIdCardData(
     bib: participant.bib,
     teamName: participant.teamName,
     categoryName: participant.categoryName,
-    registeredCompetitionsCount: participant.registeredEventIds?.length || 0,
+    registeredCompetitionsCount: options && 'registeredCompetitionsCount' in options
+      ? options.registeredCompetitionsCount ?? null
+      : participant.registeredEventIds?.length || 0,
   };
 }
 
@@ -82,7 +85,7 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   const bib = escapeXml(formatCardBib(data.bib));
   const team = escapeXml(data.teamName || '—');
   const category = escapeXml(data.categoryName || '—');
-  const contests = escapeXml(formatRegisteredContests(data.registeredCompetitionsCount || 0));
+  const contests = escapeXml(formatRegisteredContests(data.registeredCompetitionsCount));
   const initials = escapeXml(assets.photoFallbackInitials || getParticipantInitials(data.participantName) || 'P');
 
   const festivalFont = FESTIVAL_NAME_FONTS.find(font => font.name === data.festivalNameFont)

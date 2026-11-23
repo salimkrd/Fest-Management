@@ -3,6 +3,7 @@ import { AuthService } from '@/services/authService';
 import { QrSignerService } from '@/services/qrSignerService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { handleApiError } from '@/lib/apiErrorHelper';
+import { countParticipantRegisteredCompetitions } from '@/domain/registrationCounts';
 
 /**
  * Server-Authoritative Cryptographic Participant QR Issuance Endpoint
@@ -67,7 +68,21 @@ export async function GET(
     // 2. Strict Authorization Guard: Admin or matching Team Manager only
     await AuthService.assertTeamManager(idToken, teamId);
 
-    // 3. Cryptographically sign QR credentials using the private server secret
+    // 3. Count unique active competition registrations from the authoritative registration records.
+    const [soloRegistrations, leaderRegistrations, legacyGroupRegistrations] = await Promise.all([
+      db.collection('registrations').where('participantId', '==', participantId).get(),
+      db.collection('registrations').where('groupLeaderId', '==', participantId).get(),
+      db.collection('registrations').where('groupMembers', 'array-contains', participantId).get()
+    ]);
+    const registrationDocs = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    [...soloRegistrations.docs, ...leaderRegistrations.docs, ...legacyGroupRegistrations.docs]
+      .forEach(registration => registrationDocs.set(registration.id, registration));
+    const registeredCompetitionsCount = countParticipantRegisteredCompetitions(
+      Array.from(registrationDocs.values(), registration => registration.data()),
+      participantId
+    );
+
+    // 4. Cryptographically sign QR credentials using the private server secret
     const { token, payload } = QrSignerService.signParticipantQr(participantId, bib);
 
     return NextResponse.json({
@@ -76,7 +91,8 @@ export async function GET(
       bib,
       token,
       payload,
-      qrPayload: payload
+      qrPayload: payload,
+      registeredCompetitionsCount
     });
   } catch (error) {
     return handleApiError(error);

@@ -88,6 +88,7 @@ export async function exportDigitalIdAsPng(
     logoBlob?: Blob;
     festivalNameFont?: string;
     institutionName?: string;
+    registeredCompetitionsCount?: number;
   }
 ): Promise<void> {
   if (typeof window === 'undefined') return;
@@ -131,7 +132,10 @@ export async function exportDigitalIdAsPng(
   const cardData = extractIdCardData(participant, {
     festivalName,
     institutionName: options?.institutionName,
-    festivalNameFont: options?.festivalNameFont
+    festivalNameFont: options?.festivalNameFont,
+    ...(options?.registeredCompetitionsCount !== undefined
+      ? { registeredCompetitionsCount: options.registeredCompetitionsCount }
+      : {})
   });
 
   const assets: IdCardAssets = {

@@ -10,6 +10,7 @@ export interface IdCardBadgeProps {
   festivalName: string;
   institutionName?: string;
   festivalNameFont?: string;
+  registeredCompetitionsCount?: number | null;
   qrDataUrl?: string;
   loadingQr?: boolean;
   fetchError?: string | null;
@@ -29,6 +30,7 @@ export const IdCardBadge: React.FC<IdCardBadgeProps> = ({
   festivalName,
   institutionName,
   festivalNameFont,
+  registeredCompetitionsCount,
   qrDataUrl,
   className = ''
 }) => {
@@ -36,9 +38,10 @@ export const IdCardBadge: React.FC<IdCardBadgeProps> = ({
     return extractIdCardData(participant, {
       festivalName,
       institutionName,
-      festivalNameFont
+      festivalNameFont,
+      ...(registeredCompetitionsCount !== undefined ? { registeredCompetitionsCount } : {})
     });
-  }, [participant, festivalName, institutionName, festivalNameFont]);
+  }, [participant, festivalName, institutionName, festivalNameFont, registeredCompetitionsCount]);
 
   const assets: IdCardAssets = useMemo(() => {
     const rawPhoto = participant.photoUrl?.trim();

@@ -170,6 +170,13 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(svg).toContain('NM');
     });
 
+    it('prefers the authoritative registration count over the legacy participant mirror', () => {
+      const data = extractIdCardData(sampleParticipant, { registeredCompetitionsCount: 2 });
+      expect(sampleParticipant.registeredEventIds).toHaveLength(3);
+      expect(data.registeredCompetitionsCount).toBe(2);
+      expect(buildIdCardSvg(data)).toContain('2 Competitions');
+    });
+
     it('idCardSvgDataUrl returns properly encoded data URI', () => {
       const cardData: IdCardData = {
         festivalName: 'INSPIRATH 2025',
@@ -193,6 +200,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
           participant: sampleParticipant,
           festivalName: 'INSPIRATH 2025',
           institutionName: "Suffa University Campus",
+          registeredCompetitionsCount: 1,
           qrDataUrl: 'data:image/png;base64,mockQr',
         })
       );
@@ -211,7 +219,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(html).toContain('Al-Farooq House');
       expect(html).toContain('Senior');
       expect(html).toContain('Pattambi');
-      expect(html).toContain('3 Competitions');
+      expect(html).toContain('1 Competitions');
     });
 
     it('strictly omits removed fields such as Class/Grade from the canonical SVG', () => {
@@ -280,6 +288,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
     it('formatRegisteredContests formats count with "Competitions"', () => {
       expect(formatRegisteredContests(0)).toBe('0 Competitions');
       expect(formatRegisteredContests(5)).toBe('5 Competitions');
+      expect(formatRegisteredContests(null)).toBe('— Competitions');
     });
 
     it('formatCardToken remains available for QR credentials but is not printed on the card', () => {

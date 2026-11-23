@@ -82,8 +82,8 @@ export function formatCardBib(bib?: string): string {
   return clean.startsWith('#') ? clean : `#${clean}`;
 }
 
-export function formatRegisteredContests(count: number): string {
-  return `${count} Competitions`;
+export function formatRegisteredContests(count: number | null): string {
+  return count === null ? '— Competitions' : `${count} Competitions`;
 }
 
 export function formatCardToken(token?: string): string {

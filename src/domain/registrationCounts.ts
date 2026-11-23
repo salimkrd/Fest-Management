@@ -1,33 +1,71 @@
 import type { Registration } from '@/types/fest';
 
+export interface RegistrationCountRecord {
+  participantId?: string;
+  groupLeaderId?: string;
+  groupMembers?: string[];
+  competitionId?: string;
+  status?: Registration['status'];
+}
+
 /**
- * Build per-participant counts from the registration records, not the
- * legacy Participant.registeredEventIds mirror (which is not maintained
- * consistently by all registration flows).
- *
- * Individual entries count for participantId. Group entries count for the
- * recorded group leader and any legacy groupMembers IDs. A Set ensures a
- * leader present in both fields is only counted once for that registration.
+ * Count unique registered competitions from registration documents.
+ * Pending and approved registrations are active; rejected and cancelled
+ * entries are excluded. A participant is counted once per competition,
+ * including legacy group-member registrations.
  */
-export function buildParticipantEventRegistrationCounts(
-  registrations: readonly Registration[]
-): Map<string, number> {
-  const counts = new Map<string, number>();
+export function countParticipantRegisteredCompetitions(
+  registrations: readonly RegistrationCountRecord[],
+  participantId: string
+): number {
+  const competitionIds = new Set<string>();
 
   for (const registration of registrations) {
-    const participantIds = new Set<string>();
+    if (registration.status === 'REJECTED' || registration.status === 'CANCELLED') continue;
+    if (!registration.competitionId) continue;
 
+    const belongsToParticipant =
+      registration.participantId === participantId ||
+      registration.groupLeaderId === participantId ||
+      (registration.groupMembers ?? []).includes(participantId);
+
+    if (belongsToParticipant) competitionIds.add(registration.competitionId);
+  }
+
+  return competitionIds.size;
+}
+
+/**
+ * Build one count per participant using the same rules as the ID card and
+ * participant-facing registered-event summary.
+ */
+export function buildParticipantEventRegistrationCounts(
+  registrations: readonly RegistrationCountRecord[]
+): Map<string, number> {
+  const competitionIdsByParticipant = new Map<string, Set<string>>();
+
+  for (const registration of registrations) {
+    if (registration.status === 'REJECTED' || registration.status === 'CANCELLED') continue;
+    if (!registration.competitionId) continue;
+
+    const participantIds = new Set<string>();
     if (registration.participantId) participantIds.add(registration.participantId);
     if (registration.groupLeaderId) participantIds.add(registration.groupLeaderId);
-
     for (const participantId of registration.groupMembers ?? []) {
       if (participantId) participantIds.add(participantId);
     }
 
     for (const participantId of participantIds) {
-      counts.set(participantId, (counts.get(participantId) ?? 0) + 1);
+      const competitionIds = competitionIdsByParticipant.get(participantId) ?? new Set<string>();
+      competitionIds.add(registration.competitionId);
+      competitionIdsByParticipant.set(participantId, competitionIds);
     }
   }
 
-  return counts;
+  return new Map(
+    Array.from(competitionIdsByParticipant, ([participantId, competitionIds]) => [
+      participantId,
+      competitionIds.size
+    ])
+  );
 }
