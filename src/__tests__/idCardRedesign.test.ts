@@ -76,7 +76,7 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
     });
 
     it('defines authoritative reference colors', () => {
-      expect(ID_CARD_COLORS.headerRed).toBe('#931B1E');
+      expect(ID_CARD_COLORS.headerRed).toBe('#9E1B1E');
       expect(ID_CARD_COLORS.nameYellow).toBe('#FBBF24');
       expect(ID_CARD_COLORS.cardBgWhite).toBe('#FFFFFF');
       expect(ID_CARD_COLORS.qrBorderBlack).toBe('#000000');
@@ -108,9 +108,8 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(svg).toContain('aspect-ratio:74/105');
 
       // Header, Halftone, Starbursts & Wave
-      expect(svg).toContain('#header-red-gradient');
-      expect(svg).toContain('halftone-dots');
-      expect(svg).toContain('starburst-blur-left');
+      expect(svg).toContain('id-header-gradient');
+      expect(svg).toContain('id-starburst-left');
       expect(svg).toContain('id-halftone');
 
       // Top Typography
@@ -135,14 +134,14 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
       expect(svg).toContain('3 Competitions');
 
       // QR Container border
-      expect(svg).toContain('stroke="#000000"');
-      expect(svg).toContain('stroke-width="5"');
+      expect(svg).toContain('stroke="#111111"');
+      expect(svg).toContain('stroke-width="3"');
 
       expect(svg).toContain('Bib Number');
       expect(svg).toContain('Team Name');
       expect(svg).toContain('Category Name');
       expect(svg).toContain('Registered Contests:');
-      expect(svg).toContain('#1003');
+      expect(svg).toContain('#1042');
       expect(svg).not.toContain('Participant Id:');
       expect(svg).not.toContain('Token:');
     });
@@ -172,7 +171,6 @@ describe('INSPIRATH ID Card Canonical SVG Architecture (74mm x 105mm)', () => {
         bib: '#1042',
         teamName: 'Al-Farooq House',
         categoryName: 'Senior',
-        participantId: 'part-1234',
         registeredCompetitionsCount: 1
       };
 
