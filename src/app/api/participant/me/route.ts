@@ -19,8 +19,11 @@ export async function GET(req: NextRequest) {
     [...solo.docs, ...leader.docs, ...legacy.docs].forEach(doc => registrationDocs.set(doc.id, doc));
     const registrations = Array.from(registrationDocs.values()).filter(doc => {
       const reg = doc.data();
-      return reg.status !== 'REJECTED' && reg.status !== 'CANCELLED' && (reg.type === 'SOLO' ? reg.participantId === id :
-        reg.groupLeaderId === id || (Array.isArray(reg.groupMembers) && reg.groupMembers.includes(id)));
+      return reg.status !== 'REJECTED' && reg.status !== 'CANCELLED' && (
+        reg.participantId === id ||
+        reg.groupLeaderId === id ||
+        (Array.isArray(reg.groupMembers) && reg.groupMembers.includes(id))
+      );
     });
 
     const competitionIds = [...new Set(registrations.map(doc => doc.data().competitionId).filter((val): val is string => typeof val === 'string' && !!val))];
