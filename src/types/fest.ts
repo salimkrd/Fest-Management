@@ -93,6 +93,8 @@ export interface Participant {
   id: string;
   bib: string; // e.g. #1042
   name: string;
+  /** Participant's place / locality shown below the name on the ID card. */
+  place?: string;
   email: string;
   phone: string;
   teamId: string;
