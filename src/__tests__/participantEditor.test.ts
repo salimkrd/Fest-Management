@@ -50,6 +50,26 @@ describe('Shared Admin and Team Manager participant editor', () => {
     expect(saved.registeredEventIds).toEqual(['competition-one']);
   });
 
+  it('trims and limits the optional Place field while preserving existing values', () => {
+    const fields = initialParticipantFields(null, [teamA], [senior]);
+    const payload = prepareParticipantPayload({
+      ...fields,
+      name: 'New Student',
+      place: '  Pattambi  ',
+      dob: '2010-05-12'
+    }, [teamA], [senior], null);
+    expect(payload.place).toBe('Pattambi');
+
+    const longPlace = 'A'.repeat(120);
+    const limited = prepareParticipantPayload({
+      ...fields,
+      name: 'New Student',
+      place: longPlace,
+      dob: '2010-05-12'
+    }, [teamA], [senior], null);
+    expect(limited.place).toHaveLength(100);
+  });
+
   it('blocks Team Managers from reassigning a participant to another team', () => {
     const fields = initialParticipantFields(existing, [teamA, teamB], [senior], teamA);
     expect(() => prepareParticipantPayload({ ...fields, teamId: teamB.id }, [teamA, teamB], [senior], existing, teamA.id))
