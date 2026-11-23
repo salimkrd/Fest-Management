@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       id,
       bib: data.bib || '',
       name: data.name || '',
+      place: data.place || '',
       teamId: data.teamId || '',
       teamName: data.teamName || '',
       teamCode: data.teamCode || '',
