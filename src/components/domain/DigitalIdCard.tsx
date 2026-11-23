@@ -245,7 +245,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             institutionName={theme.institutionName}
             festivalNameFont={theme.festivalNameFont}
             qrDataUrl={qrDataUrl}
-            signedToken={signedToken}
             loadingQr={loading}
             fetchError={fetchError}
           />
