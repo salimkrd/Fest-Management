@@ -122,8 +122,8 @@ export function buildIdCardSvg(data: IdCardData, assets: IdCardAssets = {}): str
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%" style="display:block;aspect-ratio:74/105;" data-testid="participant-id-card" data-status="VERIFIED" aria-label="Official participant festival pass" role="img">
   <defs>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&amp;display=swap');
-      text { font-family: 'Montserrat', Arial, sans-serif; }
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&amp;family=Sora:wght@100..800&amp;display=swap');
+      text { font-family: 'Sora', Arial, sans-serif; }
       .festival-title { font-family: ${festivalFontFamily}; }
     </style>
     <linearGradient id="id-header-gradient" x1="0" y1="0" x2="0" y2="1">

@@ -21,6 +21,10 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body className="min-h-screen bg-white text-[#111111] font-sans antialiased">
         <FestProvider>
