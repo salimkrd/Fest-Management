@@ -14,6 +14,7 @@ import {
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
 import { buildAdminJudgeScorecard } from '@/domain/judgeScorecard';
+import { isValidJudgeTotalMark } from '@/domain/judgeMarks';
 import { assignCompetitionPositions, calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 import {
   buildGreenRoomRosterSnapshot,
@@ -103,13 +104,15 @@ export class JudgeService {
     db: FirebaseFirestore.Firestore,
     competitionId: string,
     scores: Record<string, Record<string, number> | number>,
-    expectedRosterVersion: string
+    expectedRosterVersion: string,
+    allowPartial = false
   ): Promise<{
     resolvedRegistrations: Map<string, string>;
     rosterEntries: GreenRoomRosterEntry[];
     rosterVersion: string;
   }> {
-    if (!scores || typeof scores !== 'object' || Array.isArray(scores) || Object.keys(scores).length === 0) {
+    if (!scores || typeof scores !== 'object' || Array.isArray(scores) ||
+        (!allowPartial && Object.keys(scores).length === 0)) {
       throw new Error('Validation Error: At least one participant score must be provided.');
     }
     if (!/^[a-f0-9]{64}$/.test(expectedRosterVersion || '')) {
@@ -248,7 +251,7 @@ export class JudgeService {
         `Validation Error: Code Letter "${unexpectedCodes[0]}" is not a valid assigned Green Room Code Letter in the current roster.`
       );
     }
-    if (missingCodes.length > 0 || normalizedScoreKeys.size !== roster.entries.length) {
+    if (!allowPartial && (missingCodes.length > 0 || normalizedScoreKeys.size !== roster.entries.length)) {
       throw new Error(
         `Validation Error: Marks are required for every checked-in Code Letter. Missing: ${missingCodes.join(', ') || 'roster count mismatch'}.`
       );
@@ -279,7 +282,7 @@ export class JudgeService {
 
       const scoreVal = scores[originalScoreKey];
       if (typeof scoreVal === 'number') {
-        if (!Number.isInteger(scoreVal) || scoreVal < 0 || scoreVal > 100) {
+        if (!isValidJudgeTotalMark(scoreVal)) {
           throw new Error(
             `Validation Error: Total mark for Code Letter "${cleanUpperKey}" (${scoreVal}) must be a whole number from 0 to 100.`
           );
@@ -324,9 +327,9 @@ export class JudgeService {
             );
           }
         }
-        if (participantTotal > compMaxMarks) {
+        if (participantTotal > 100 || participantTotal > compMaxMarks) {
           throw new Error(
-            `Validation Error: Criteria total for Code "${cleanUpperKey}" exceeds the competition maximum.`
+            `Validation Error: Criteria total for Code "${cleanUpperKey}" must not exceed 100 or the competition maximum.`
           );
         }
       } else {
@@ -398,7 +401,8 @@ export class JudgeService {
       db,
       params.competitionId,
       params.scores,
-      params.rosterVersion
+      params.rosterVersion,
+      true
     );
     const normalizedScores = Object.fromEntries(
       Object.entries(params.scores).map(([key, value]) => [resolvedRegistrations.get(key) || key, value])

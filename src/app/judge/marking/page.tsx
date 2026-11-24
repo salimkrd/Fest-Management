@@ -1,10 +1,11 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { JudgeLayout } from '@/components/layout/JudgeLayout';
 import { calculateGrade } from '@/domain/scoring';
+import { isValidJudgeMarkText, isValidJudgeTotalMark } from '@/domain/judgeMarks';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -48,6 +49,55 @@ interface StoredJudgeSession {
 }
 
 type LocalScores = Record<string, string>;
+interface DraftSnapshot {
+  scores: LocalScores;
+  remarks: string;
+}
+interface LocalDraftBackup extends DraftSnapshot {
+  rosterVersion: string;
+  updatedAt: string;
+}
+
+function readLocalDraft(key: string): LocalDraftBackup | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalDraftBackup>;
+    if (
+      typeof parsed.rosterVersion !== 'string' ||
+      typeof parsed.updatedAt !== 'string' ||
+      !parsed.scores || typeof parsed.scores !== 'object' ||
+      typeof parsed.remarks !== 'string'
+    ) return null;
+    return parsed as LocalDraftBackup;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(key: string, rosterVersion: string, snapshot: DraftSnapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    const backup: LocalDraftBackup = {
+      ...snapshot,
+      rosterVersion,
+      updatedAt: new Date().toISOString()
+    };
+    window.sessionStorage.setItem(key, JSON.stringify(backup));
+  } catch {
+    // The server-side draft remains authoritative; local recovery is best-effort.
+  }
+}
+
+function clearLocalDraft(key: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable browser storage.
+  }
+}
 
 function readStoredSession(): StoredJudgeSession | null {
   if (typeof window === 'undefined') return null;
@@ -67,6 +117,7 @@ function JudgeMarkingContent() {
   const assignmentId = searchParams.get('assignmentId') || sessionData?.assignment?.id || '';
   const competitionId = searchParams.get('competitionId') || sessionData?.assignment?.competitionId || '';
   const secret = sessionData?.secret || '';
+  const localDraftKey = `judge-mark-draft:${assignmentId}:${competitionId}`;
 
   const [competition, setCompetition] = useState<CompetitionSession | null>(null);
   const [contestants, setContestants] = useState<AnonymousContestant[]>([]);
@@ -85,6 +136,12 @@ function JudgeMarkingContent() {
   const [isDirty, setIsDirty] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const [submissionError, setSubmissionError] = useState('');
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const autoSaveRevisionRef = useRef(0);
+  const latestDraftRef = useRef<DraftSnapshot>({ scores: {}, remarks: '' });
+  latestDraftRef.current = { scores, remarks };
 
   const loadSession = useCallback(async () => {
     if (!assignmentId || !competitionId || !secret) {
@@ -159,15 +216,43 @@ function JudgeMarkingContent() {
         });
       }
 
+      const serverRemarks = typeof result.draftRemarks === 'string' ? result.draftRemarks : '';
+      const serverUpdatedAt = Date.parse(typeof result.draftUpdatedAt === 'string' ? result.draftUpdatedAt : '');
+      const localBackup = readLocalDraft(localDraftKey);
+      let restoredScores = nextScores;
+      let restoredRemarks = serverRemarks;
+      let restoreLocalBackup = false;
+
+      if (localBackup && localBackup.rosterVersion === result.rosterVersion) {
+        const localUpdatedAt = Date.parse(localBackup.updatedAt);
+        if (Number.isFinite(localUpdatedAt) && localUpdatedAt > (Number.isFinite(serverUpdatedAt) ? serverUpdatedAt : 0)) {
+          restoredScores = { ...nextScores };
+          nextContestants.forEach(contestant => {
+            const localValue = localBackup.scores[contestant.codeLetter];
+            if (typeof localValue === 'string' && isValidJudgeMarkText(localValue)) {
+              restoredScores[contestant.codeLetter] = localValue;
+            }
+          });
+          restoredRemarks = localBackup.remarks;
+          restoreLocalBackup = true;
+        } else {
+          clearLocalDraft(localDraftKey);
+        }
+      } else if (localBackup) {
+        clearLocalDraft(localDraftKey);
+      }
+
       setCompetition(result.competition as CompetitionSession);
       setCriteria(nextCriteria);
       setContestants(nextContestants);
-      setScores(nextScores);
+      setScores(restoredScores);
       setRosterVersion(result.rosterVersion);
-      setRemarks(typeof result.draftRemarks === 'string' ? result.draftRemarks : '');
+      setRemarks(restoredRemarks);
+      latestDraftRef.current = { scores: restoredScores, remarks: restoredRemarks };
       setDraftSavedAt(typeof result.draftUpdatedAt === 'string' ? result.draftUpdatedAt : '');
       setStaleDraft(Boolean(result.staleDraft));
-      setIsDirty(false);
+      setIsDirty(restoreLocalBackup);
+      setAutoSaveState(restoreLocalBackup ? 'pending' : 'idle');
       setSyncState('ready');
     } catch (error) {
       setSyncState('error');
@@ -175,7 +260,7 @@ function JudgeMarkingContent() {
     } finally {
       setRefreshing(false);
     }
-  }, [assignmentId, competitionId, secret, router]);
+  }, [assignmentId, competitionId, secret, router, localDraftKey]);
 
   useEffect(() => {
     void loadSession();
@@ -189,7 +274,9 @@ function JudgeMarkingContent() {
   };
 
   const getGrade = (total: number) => {
-    const grade = maxMarksTotal > 0 ? calculateGrade(total, maxMarksTotal) : '—';
+    const grade = Number.isFinite(total) && total >= 0 && total <= maxMarksTotal
+      ? calculateGrade(total, maxMarksTotal)
+      : '—';
     const color = grade === 'A+'
       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
       : grade === 'A'
@@ -201,15 +288,30 @@ function JudgeMarkingContent() {
   };
 
   const adjustScore = (codeLetter: string, nextValue: string) => {
-    setScores(previous => ({
-      ...previous,
-      [codeLetter]: nextValue
-    }));
+    if (!isValidJudgeMarkText(nextValue)) return;
+    const nextScores = { ...latestDraftRef.current.scores, [codeLetter]: nextValue };
+    const snapshot = { scores: nextScores, remarks: latestDraftRef.current.remarks };
+    latestDraftRef.current = snapshot;
+    writeLocalDraft(localDraftKey, rosterVersion, snapshot);
+    setScores(nextScores);
+    setIsDirty(true);
+    setDraftSavedNotice(false);
+    setSubmissionError('');
+  };
+
+  const adjustRemarks = (nextRemarks: string) => {
+    const snapshot = { scores: latestDraftRef.current.scores, remarks: nextRemarks };
+    latestDraftRef.current = snapshot;
+    writeLocalDraft(localDraftKey, rosterVersion, snapshot);
+    setRemarks(nextRemarks);
     setIsDirty(true);
     setDraftSavedNotice(false);
   };
 
-  const saveMarks = async (action: 'DRAFT' | 'SUBMIT') => {
+  const saveMarks = useCallback(async (
+    action: 'DRAFT' | 'SUBMIT',
+    snapshot: DraftSnapshot = latestDraftRef.current
+  ) => {
     if (!assignmentId || !secret || !competition?.id || !rosterVersion) {
       throw new Error('Your verified Green Room roster session is missing. Refresh the judge session before saving.');
     }
@@ -219,12 +321,14 @@ function JudgeMarkingContent() {
 
     const validatedScores: Record<string, number> = {};
     for (const contestant of contestants) {
-      const rawValue = scores[contestant.codeLetter] ?? '';
+      const rawValue = snapshot.scores[contestant.codeLetter] ?? '';
+      if (rawValue.trim() === '') {
+        if (action === 'DRAFT') continue;
+        throw new Error(`Enter a mark from 0 to ${maxMarksTotal} for Code ${contestant.codeLetter}.`);
+      }
       const value = Number(rawValue);
-      if (rawValue.trim() === '' || !Number.isInteger(value) || value < 0 || value > maxMarksTotal) {
-        throw new Error(
-          `Enter a whole-number mark from 0 to ${maxMarksTotal} for Code ${contestant.codeLetter}.`
-        );
+      if (!isValidJudgeTotalMark(value)) {
+        throw new Error(`Mark for Code ${contestant.codeLetter} must be a whole number from 0 to ${maxMarksTotal}.`);
       }
       validatedScores[contestant.codeLetter] = value;
     }
@@ -241,24 +345,81 @@ function JudgeMarkingContent() {
         secret,
         rosterVersion,
         scores: validatedScores,
-        remarks
+        remarks: snapshot.remarks
       })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Could not ${action.toLowerCase()} the scorecard.`);
     return result;
-  };
+  }, [assignmentId, secret, competition?.id, rosterVersion, contestants, maxMarksTotal]);
+
+  useEffect(() => {
+    if (!isDirty || syncState !== 'ready' || contestants.length === 0 || !rosterVersion || submitting) return;
+
+    const revision = ++autoSaveRevisionRef.current;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveState('pending');
+
+    const timer = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      const snapshot: DraftSnapshot = { scores, remarks };
+      autoSaveQueueRef.current = autoSaveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (revision !== autoSaveRevisionRef.current) return;
+          setAutoSaveState('saving');
+          try {
+            const result = await saveMarks('DRAFT', snapshot);
+            if (revision !== autoSaveRevisionRef.current) return;
+            setDraftSavedAt(result.updatedAt || new Date().toISOString());
+            setDraftSavedNotice(true);
+            setSubmissionError('');
+            if (JSON.stringify(latestDraftRef.current) === JSON.stringify(snapshot)) {
+              setIsDirty(false);
+              setAutoSaveState('saved');
+              clearLocalDraft(localDraftKey);
+            } else {
+              setAutoSaveState('pending');
+            }
+          } catch (error) {
+            if (revision === autoSaveRevisionRef.current) {
+              setAutoSaveState('error');
+              setSubmissionError(error instanceof Error
+                ? `Auto-save failed. Your entries are still on this screen. Tap “Save draft” to retry. ${error.message}`
+                : 'Auto-save failed. Your entries are still on this screen. Tap “Save draft” to retry.');
+            }
+          }
+        });
+    }, 650);
+    autoSaveTimerRef.current = timer;
+
+    return () => {
+      clearTimeout(timer);
+      if (autoSaveTimerRef.current === timer) autoSaveTimerRef.current = null;
+    };
+  }, [scores, remarks, isDirty, syncState, contestants.length, rosterVersion, submitting, saveMarks, localDraftKey]);
 
   const handleSaveDraft = async () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = null;
+    const revision = ++autoSaveRevisionRef.current;
+    const snapshot = latestDraftRef.current;
     setSavingDraft(true);
     setSubmissionError('');
     setDraftSavedNotice(false);
     try {
-      const result = await saveMarks('DRAFT');
-      setIsDirty(false);
+      await autoSaveQueueRef.current.catch(() => undefined);
+      if (revision !== autoSaveRevisionRef.current) return;
+      const result = await saveMarks('DRAFT', snapshot);
       setDraftSavedAt(result.updatedAt || new Date().toISOString());
       setDraftSavedNotice(true);
+      setAutoSaveState('saved');
+      if (JSON.stringify(latestDraftRef.current) === JSON.stringify(snapshot)) {
+        setIsDirty(false);
+        clearLocalDraft(localDraftKey);
+      }
     } catch (error) {
+      setAutoSaveState('error');
       setSubmissionError(error instanceof Error ? error.message : 'Could not save the draft scorecard.');
     } finally {
       setSavingDraft(false);
@@ -267,11 +428,18 @@ function JudgeMarkingContent() {
 
   const handleFinalSubmit = async () => {
     if (submitting || savingDraft) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = null;
+    ++autoSaveRevisionRef.current;
+    const snapshot = latestDraftRef.current;
     setSubmitting(true);
     setSubmissionError('');
     try {
-      const result = await saveMarks('SUBMIT');
+      await autoSaveQueueRef.current.catch(() => undefined);
+      const result = await saveMarks('SUBMIT', snapshot);
       setIsDirty(false);
+      setAutoSaveState('saved');
+      clearLocalDraft(localDraftKey);
       setConfirmModalOpen(false);
       const params = new URLSearchParams({
         assignmentId,
@@ -281,6 +449,7 @@ function JudgeMarkingContent() {
       router.push(`/judge/confirmation?${params.toString()}`);
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : 'Could not submit the final scorecard.');
+      setAutoSaveState(isDirty ? 'error' : autoSaveState);
       setSubmitting(false);
     }
   };
@@ -300,20 +469,31 @@ function JudgeMarkingContent() {
     });
   };
 
+  const scoredCount = contestants.filter(contestant =>
+    (scores[contestant.codeLetter] ?? '').trim() !== ''
+  ).length;
+  const allScoresComplete = contestants.length > 0 && contestants.every(contestant => {
+    const rawValue = scores[contestant.codeLetter] ?? '';
+    return rawValue.trim() !== '' && isValidJudgeTotalMark(Number(rawValue));
+  });
   const isReadyToScore = syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && !submitting;
   const statusText = syncState === 'loading'
     ? 'Syncing assignment'
     : syncState === 'error'
       ? 'Session unavailable'
-      : isDirty
-        ? 'Unsaved changes'
-        : draftSavedAt
-          ? `Draft saved ${formatSavedAt(draftSavedAt)}`
-          : 'Ready to evaluate';
+      : autoSaveState === 'saving' || savingDraft
+        ? 'Saving draft…'
+        : autoSaveState === 'pending' || isDirty
+          ? 'Auto-save pending'
+          : autoSaveState === 'error'
+            ? 'Auto-save failed · use Save draft'
+            : draftSavedAt
+              ? `Saved ${formatSavedAt(draftSavedAt)}`
+              : 'Ready to evaluate';
 
   return (
     <JudgeLayout competitionTitle={competition?.name || 'Judge Evaluation'}>
-      <div className="mx-auto w-full max-w-6xl space-y-5 pb-28 sm:space-y-6 sm:pb-8">
+      <div className="mx-auto w-full max-w-6xl space-y-4 pb-36 sm:space-y-6 sm:pb-8">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
@@ -346,7 +526,7 @@ function JudgeMarkingContent() {
               <ShieldCheck className="h-4 w-4 shrink-0 text-blue-600" />
               <span>Blind evaluation · Names, photographs and team identities are hidden.</span>
             </div>
-            <span className={`text-xs font-semibold ${syncState === 'error' ? 'text-red-700' : isDirty ? 'text-amber-700' : 'text-slate-500'}`}>
+            <span aria-live="polite" className={`text-xs font-semibold ${syncState === 'error' || autoSaveState === 'error' ? 'text-red-700' : isDirty || autoSaveState === 'saving' || autoSaveState === 'pending' ? 'text-amber-700' : 'text-emerald-700'}`}>
               {statusText}
             </span>
           </div>
@@ -405,43 +585,43 @@ function JudgeMarkingContent() {
               const { grade, color: gradeColor } = getGrade(total);
               return (
                 <article key={contestant.codeLetter} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 font-mono text-2xl font-black text-white shadow-sm">
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(132px,42%)] items-center gap-3 border-b border-slate-100 p-3 sm:flex sm:justify-between sm:gap-4 sm:px-5 sm:py-4">
+                    <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 font-mono text-xl font-black text-white shadow-sm sm:h-12 sm:w-12 sm:text-2xl">
                         {contestant.codeLetter}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-sm font-extrabold text-slate-950">Code {contestant.codeLetter}</h2>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h2 className="text-xs font-extrabold text-slate-950 sm:text-sm">Code {contestant.codeLetter}</h2>
                           <Badge variant="info" size="sm">ANONYMOUS</Badge>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-500">Stage entry order #{index + 1}</p>
-                        {contestant.status && <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">{contestant.status.replaceAll('_', ' ')}</p>}
+                        <p className="mt-0.5 text-[10px] leading-4 text-slate-500 sm:text-xs">Entry order #{index + 1}</p>
+                        {contestant.status && <p className="mt-0.5 break-words text-[9px] font-medium uppercase tracking-wide text-slate-400">{contestant.status.replaceAll('_', ' ')}</p>}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3.5 sm:w-64 sm:flex-row sm:items-end sm:justify-end sm:bg-transparent sm:p-0">
-                      <div className="min-w-0 flex-1">
-                        <label htmlFor={`score-${contestant.codeLetter}`} className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          Mark out of {maxMarksTotal}
+                    <div className="min-w-0 rounded-xl bg-slate-50 p-2.5 sm:w-64 sm:flex sm:items-end sm:justify-end sm:gap-2 sm:bg-transparent sm:p-0">
+                      <div className="min-w-0 sm:flex-1">
+                        <label htmlFor={`score-${contestant.codeLetter}`} className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1.5 sm:text-[10px]">
+                          Mark / {maxMarksTotal}
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <input
                             id={`score-${contestant.codeLetter}`}
-                            type="number"
-                            min={0}
-                            max={maxMarksTotal}
-                            step={1}
+                            type="text"
                             inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={3}
+                            autoComplete="off"
                             value={scores[contestant.codeLetter] ?? ''}
                             onChange={event => adjustScore(contestant.codeLetter, event.target.value)}
                             disabled={savingDraft || submitting}
                             aria-label={`Enter mark for Code ${contestant.codeLetter}, from 0 to ${maxMarksTotal}`}
-                            className="h-12 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-center font-mono text-xl font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+                            className="h-11 min-w-0 w-full rounded-lg border border-slate-200 bg-white px-2 text-center font-mono text-lg font-extrabold tabular-nums text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:h-12 sm:rounded-xl sm:px-3 sm:text-xl"
                           />
-                          <span className="shrink-0 text-xs font-bold text-slate-500">/ {maxMarksTotal}</span>
+                          <span className="shrink-0 text-[10px] font-bold text-slate-500 sm:text-xs">/100</span>
                         </div>
                       </div>
-                      <span className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold ${hasMark ? gradeColor : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                      <span className={`mt-2 inline-flex w-full justify-center rounded-md border px-2 py-1 text-[10px] font-bold sm:mt-0 sm:w-auto sm:shrink-0 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs ${hasMark ? gradeColor : 'border-slate-200 bg-white text-slate-500'}`}>
                         {hasMark ? `Grade ${grade}` : 'NOT SCORED'}
                       </span>
                     </div>
@@ -457,7 +637,7 @@ function JudgeMarkingContent() {
                 rows={3}
                 maxLength={1500}
                 value={remarks}
-                onChange={event => { setRemarks(event.target.value); setIsDirty(true); }}
+                onChange={event => adjustRemarks(event.target.value)}
                 placeholder="Add a short note for the Chief Adjudicator, if required."
                 disabled={savingDraft || submitting}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
@@ -469,13 +649,17 @@ function JudgeMarkingContent() {
 
         {syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && (
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
+            <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600 sm:hidden">
+              <span>{scoredCount}/{contestants.length} marked</span>
+              <span aria-live="polite" className={autoSaveState === 'error' ? 'text-red-700' : autoSaveState === 'saved' ? 'text-emerald-700' : 'text-slate-500'}>{statusText}</span>
+            </div>
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
               <Gavel className="h-4 w-4 shrink-0 text-blue-600" />
               <span>{contestants.length} anonymous codes · Marks out of 100</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
               <Button variant="outline" size="md" className="w-full sm:w-auto" leftIcon={<Save className="h-4 w-4" />} onClick={handleSaveDraft} disabled={savingDraft || submitting} isLoading={savingDraft}>Save draft</Button>
-              <Button variant="primary" size="md" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<Send className="h-4 w-4" />} onClick={() => setConfirmModalOpen(true)} disabled={!isReadyToScore || savingDraft || submitting}>Finalize &amp; sign</Button>
+              <Button variant="primary" size="md" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<Send className="h-4 w-4" />} onClick={() => setConfirmModalOpen(true)} disabled={!isReadyToScore || !allScoresComplete || savingDraft || submitting}>Finalize &amp; sign</Button>
             </div>
           </div>
         )}
@@ -489,11 +673,16 @@ function JudgeMarkingContent() {
           footer={
             <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:justify-end">
               <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>Back to scoring</Button>
-              <Button variant="primary" size="sm" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<ShieldCheck className="h-4 w-4" />} isLoading={submitting} disabled={submitting || savingDraft || contestants.length === 0} onClick={handleFinalSubmit}>Sign &amp; issue receipt</Button>
+              <Button variant="primary" size="sm" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<ShieldCheck className="h-4 w-4" />} isLoading={submitting} disabled={submitting || savingDraft || !allScoresComplete} onClick={handleFinalSubmit}>Sign &amp; issue receipt</Button>
             </div>
           }
         >
           <div className="space-y-4">
+            {!allScoresComplete && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-900">
+                Complete all code letters before final submission. {contestants.length - scoredCount} mark(s) remaining.
+              </div>
+            )}
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs leading-5 text-amber-950">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every Code Letter and its total mark. After signing, amendments require administrator authorization.</p></div>
