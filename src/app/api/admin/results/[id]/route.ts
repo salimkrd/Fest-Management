@@ -134,10 +134,14 @@ export async function POST(
           : 'Administrative review',
         adminIdToken
       );
+      let resultRecalculated = false;
       if (success && typeof result.competitionId === 'string' && result.competitionId) {
         await JudgeService.refreshResultForCompetition(result.competitionId);
+        const refreshedResult = await resultRef.get();
+        resultRecalculated = refreshedResult.exists &&
+          refreshedResult.data()?.resultStatus === 'READY_FOR_REVIEW';
       }
-      return NextResponse.json({ success, resultRecalculated: success }, { status: 200 });
+      return NextResponse.json({ success, resultRecalculated }, { status: 200 });
     }
 
     return NextResponse.json(
