@@ -48,35 +48,48 @@ export function PosterDownloadDialog({ result, theme }: PosterDownloadDialogProp
   }, [open]);
 
   useEffect(() => {
-    if (!open || templates.length > 0 || loading) return;
+    if (!open || templates.length > 0) return;
     let active = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     setLoading(true);
     setLoadError('');
-    fetch('/api/posters/public-templates', { cache: 'no-store' })
+
+    fetch('/api/posters/public-templates', { cache: 'no-store', signal: controller.signal })
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Could not load released poster templates.');
         return Array.isArray(payload.templates) ? (payload.templates as PosterTemplate[]) : [];
       })
       .then(items => {
-        if (active) {
-          const released = items.filter(template => template.released === true);
-          setTemplates(released);
-          if (released.length > 0) {
-            setSelectedTemplateId(released[0].id);
-          }
+        if (!active) return;
+        const released = items.filter(template => template.released === true);
+        setTemplates(released);
+        if (released.length > 0) {
+          setSelectedTemplateId(released[0].id);
         }
       })
       .catch(error => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Could not load released poster templates.');
+        if (!active) return;
+        setLoadError(
+          error instanceof Error && error.name === 'AbortError'
+            ? 'Loading released poster templates timed out. Close and reopen the poster window to retry.'
+            : error instanceof Error
+              ? error.message
+              : 'Could not load released poster templates.',
+        );
       })
       .finally(() => {
+        window.clearTimeout(timeout);
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
-  }, [open, templates.length, loading]);
+  }, [open, templates.length]);
 
   const activeTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
 
