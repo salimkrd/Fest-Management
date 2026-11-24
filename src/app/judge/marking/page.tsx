@@ -469,6 +469,13 @@ function JudgeMarkingContent() {
     });
   };
 
+  const scoredCount = contestants.filter(contestant =>
+    (scores[contestant.codeLetter] ?? '').trim() !== ''
+  ).length;
+  const allScoresComplete = contestants.length > 0 && contestants.every(contestant => {
+    const rawValue = scores[contestant.codeLetter] ?? '';
+    return rawValue.trim() !== '' && isValidJudgeTotalMark(Number(rawValue));
+  });
   const isReadyToScore = syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && !submitting;
   const statusText = syncState === 'loading'
     ? 'Syncing assignment'
@@ -643,7 +650,7 @@ function JudgeMarkingContent() {
         {syncState === 'ready' && contestants.length > 0 && Boolean(rosterVersion) && (
           <div className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_12px_36px_-16px_rgba(15,23,42,0.4)] backdrop-blur-md sm:sticky sm:bottom-3 sm:inset-x-auto sm:mt-2 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-4">
             <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-600 sm:hidden">
-              <span>{contestants.filter(item => (scores[item.codeLetter] ?? '').trim() !== '').length}/{contestants.length} marked</span>
+              <span>{scoredCount}/{contestants.length} marked</span>
               <span aria-live="polite" className={autoSaveState === 'error' ? 'text-red-700' : autoSaveState === 'saved' ? 'text-emerald-700' : 'text-slate-500'}>{statusText}</span>
             </div>
             <div className="hidden min-w-0 items-center gap-2 text-xs font-semibold text-slate-600 sm:flex">
@@ -652,7 +659,7 @@ function JudgeMarkingContent() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
               <Button variant="outline" size="md" className="w-full sm:w-auto" leftIcon={<Save className="h-4 w-4" />} onClick={handleSaveDraft} disabled={savingDraft || submitting} isLoading={savingDraft}>Save draft</Button>
-              <Button variant="primary" size="md" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<Send className="h-4 w-4" />} onClick={() => setConfirmModalOpen(true)} disabled={!isReadyToScore || savingDraft || submitting}>Finalize &amp; sign</Button>
+              <Button variant="primary" size="md" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<Send className="h-4 w-4" />} onClick={() => setConfirmModalOpen(true)} disabled={!isReadyToScore || !allScoresComplete || savingDraft || submitting}>Finalize &amp; sign</Button>
             </div>
           </div>
         )}
@@ -666,11 +673,16 @@ function JudgeMarkingContent() {
           footer={
             <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:justify-end">
               <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>Back to scoring</Button>
-              <Button variant="primary" size="sm" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<ShieldCheck className="h-4 w-4" />} isLoading={submitting} disabled={submitting || savingDraft || contestants.length === 0} onClick={handleFinalSubmit}>Sign &amp; issue receipt</Button>
+              <Button variant="primary" size="sm" className="w-full bg-slate-950 hover:bg-slate-800 sm:w-auto" leftIcon={<ShieldCheck className="h-4 w-4" />} isLoading={submitting} disabled={submitting || savingDraft || !allScoresComplete} onClick={handleFinalSubmit}>Sign &amp; issue receipt</Button>
             </div>
           }
         >
           <div className="space-y-4">
+            {!allScoresComplete && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-900">
+                Complete all code letters before final submission. {contestants.length - scoredCount} mark(s) remaining.
+              </div>
+            )}
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs leading-5 text-amber-950">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div><p className="font-bold">Final submission is irreversible</p><p className="mt-0.5 text-amber-800">Verify every Code Letter and its total mark. After signing, amendments require administrator authorization.</p></div>
