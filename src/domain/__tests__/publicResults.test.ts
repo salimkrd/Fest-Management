@@ -54,6 +54,6 @@ describe('formatPublicPodiumSummary', () => {
       '🥈 2nd Place: second-a (QHR)',
       '🥈 2nd Place: second-b (QHR)',
       '🥉 3rd Place: third (QHR)'
-    ].join('\\n'));
+    ].join('\n'));
   });
 });
