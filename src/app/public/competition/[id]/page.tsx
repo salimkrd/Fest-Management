@@ -9,6 +9,7 @@ import { useFest } from '@/context/FestContext';
 import { PublicIcon } from '@/components/layout/PublicIcon';
 import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { getPublishedOfficialPoints } from '@/domain/publicChampionship';
+import { formatPublicPodiumSummary, getPodiumResultRanks } from '@/domain/publicResults';
 import { Loader2 } from 'lucide-react';
 
 interface WinnerPhotoProps {
@@ -53,6 +54,110 @@ function WinnerPhoto({ rank, photoUrl = '', className }: WinnerPhotoProps) {
   );
 }
 
+interface PodiumLaureateCardProps {
+  rank: ResultRank;
+  position: 1 | 2 | 3;
+  photoUrl?: string;
+}
+
+/** Renders one laureate card. Multiple cards can share the same official position. */
+function PodiumLaureateCard({ rank, position, photoUrl }: PodiumLaureateCardProps) {
+  const isGold = position === 1;
+  const isSilver = position === 2;
+  const borderClass = isGold
+    ? 'border-2 border-[#FDBF0F] shadow-[0_0_35px_rgba(253,191,15,0.22)] p-6 sm:p-7'
+    : isSilver
+      ? 'border border-white/10 shadow-xl p-5 sm:p-6'
+      : 'border border-[#BA1912]/40 shadow-xl p-5 sm:p-6';
+  const badgeClass = isGold
+    ? 'bg-[#FDBF0F] text-[#1B090B] font-black px-3 py-1'
+    : isSilver
+      ? 'bg-[#D8C8B7] text-[#1B090B] font-bold px-2.5 py-0.5'
+      : 'bg-[#BA1912] text-[#F2F3E6] font-bold px-2.5 py-0.5';
+  const accentClass = isGold ? 'text-[#FDBF0F]' : isSilver ? 'text-[#D8C8B7]' : 'text-[#BA1912]';
+  const photoBorderClass = isGold
+    ? 'border-2 border-[#FDBF0F]/50 shadow-xl'
+    : isSilver
+      ? 'border border-white/10 shadow-md'
+      : 'border border-[#BA1912]/40 shadow-md';
+  const positionTitle = isGold
+    ? 'Rank 01 • Gold Champion'
+    : isSilver
+      ? 'Rank 02 • Silver Laureate'
+      : 'Rank 03 • Bronze Laureate';
+  const laureateTitle = isGold
+    ? 'Festival Grand Laureate'
+    : isSilver
+      ? 'First Runner-Up'
+      : 'Second Runner-Up';
+  const points = getPublishedOfficialPoints(rank);
+
+  return (
+    <article className={`bg-[#230D0F] rounded-2xl flex flex-col justify-between relative transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`text-[10px] font-mono uppercase tracking-widest rounded flex items-center gap-1 shadow-xs ${badgeClass}`}>
+            <PublicIcon name={isGold ? 'stars' : 'workspace_premium'} className={isGold ? 'text-[15px]' : 'text-[14px]'} />
+            <span>{positionTitle}</span>
+          </span>
+          <span className={`text-xs font-mono font-bold uppercase tracking-wider shrink-0 ${accentClass}`}>
+            Bib #{rank.bib}
+          </span>
+        </div>
+
+        <div className={`relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] ${photoBorderClass}`}>
+          <WinnerPhoto
+            key={`${rank.registrationId}:${photoUrl || ''}`}
+            rank={rank}
+            photoUrl={photoUrl}
+            className="w-full h-full"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
+          {isGold && (
+            <div className="absolute top-2 right-2 bg-[#BA1912] text-[#F2F3E6] px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold shadow-sm">
+              Laurel Victor
+            </div>
+          )}
+          <div className="absolute bottom-2.5 left-3">
+            <span className={`text-[10px] font-mono uppercase tracking-wider bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border ${accentClass} ${isGold ? 'border-[#FDBF0F]/40' : isSilver ? 'border-white/10' : 'border-[#BA1912]/40'}`}>
+              {rank.teamName} ({rank.teamCode})
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className={`text-[10px] font-mono uppercase tracking-widest font-semibold flex items-center gap-1 ${accentClass}`}>
+            {isGold && <PublicIcon name="military_tech" className="text-[14px]" />}
+            <span>{laureateTitle}</span>
+          </span>
+          <h3 className={`font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight break-words ${isGold ? 'text-xl font-extrabold' : 'text-lg'}`}>
+            {rank.candidateName}
+          </h3>
+          <p className={`text-xs ${isGold ? 'text-[#F2F3E6]/80 font-semibold' : 'text-[#F2F3E6]/70'}`}>
+            {rank.teamName} Contingent
+          </p>
+        </div>
+
+        <div className={`bg-[#1B090B] p-3 rounded-xl border flex items-center justify-between font-mono ${isGold ? 'p-3.5 border-[#FDBF0F]/40 shadow-inner' : 'border-white/5'}`}>
+          <div>
+            <span className={`text-[9px] uppercase tracking-wider block ${isGold ? 'text-[#FDBF0F] font-bold' : 'text-[#F2F3E6]/60'}`}>Ratified Merit</span>
+            <span className={`font-extrabold ${isGold ? 'text-lg text-[#FDBF0F]' : `text-base ${isSilver ? 'text-[#D8C8B7]' : 'text-[#F2F3E6]'}`}`}>
+              Grade {rank.grade || (isGold ? 'A+' : 'A')}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className={`text-[9px] uppercase tracking-wider block ${isGold ? 'text-[#FDBF0F] font-bold' : 'text-[#F2F3E6]/60'}`}>Accredited Points</span>
+            <span className={`font-black ${isGold ? 'text-lg text-[#FDBF0F]' : `text-base ${isSilver ? 'text-[#D8C8B7]' : 'text-[#FDBF0F]'}`}`}>
+              {points === null ? 'Unavailable' : `+${points} PTS`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+
 function CompetitionDetailContent() {
   const params = useParams<{ id: string }>();
   const compId = params?.id;
@@ -68,12 +173,10 @@ function CompetitionDetailContent() {
     );
   }, [results, compId]);
 
-  const rank1 = result?.ranks.find(r => r.rank === 1);
-  const rank2 = result?.ranks.find(r => r.rank === 2);
-  const rank3 = result?.ranks.find(r => r.rank === 3);
-  const rank1Points = rank1 ? getPublishedOfficialPoints(rank1) : null;
-  const rank2Points = rank2 ? getPublishedOfficialPoints(rank2) : null;
-  const rank3Points = rank3 ? getPublishedOfficialPoints(rank3) : null;
+  const podiumRanks = result ? getPodiumResultRanks(result.ranks) : [];
+  const rank1s = podiumRanks.filter(rank => rank.rank === 1);
+  const rank2s = podiumRanks.filter(rank => rank.rank === 2);
+  const rank3s = podiumRanks.filter(rank => rank.rank === 3);
 
   const [winnerPhotos, setWinnerPhotos] = useState<Record<string, string>>({});
 
@@ -121,7 +224,7 @@ function CompetitionDetailContent() {
   const handleWhatsAppShare = () => {
     if (typeof window !== 'undefined') {
       const text = encodeURIComponent(
-        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n🥇 1st Place: ${rank1?.candidateName || 'N/A'} (${rank1?.teamCode || ''})\n\nView full official scorecard: ${window.location.href}`
+        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\\n${formatPublicPodiumSummary(podiumRanks)}\\n\\nView full official scorecard: ${window.location.href}`
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     }
@@ -318,189 +421,41 @@ function CompetitionDetailContent() {
       </div>
 
       {/* ========================================================= */}
-      {/* LAUREATE PODIUM SPOTLIGHT (TOP 3 WINNERS)                  */}
+      {/* LAUREATE PODIUM SPOTLIGHT (ALL TIED PODIUM RECIPIENTS)     */}
       {/* ========================================================= */}
-      <section className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
-        {/* RANK 2: Silver Laureate (Left) */}
-        {rank2 && (
-          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-xl border border-white/10 relative order-2 md:order-1 transition-all duration-300 hover:-translate-y-1">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#D8C8B7] text-[#1B090B] font-bold flex items-center gap-1 shadow-xs">
-                  <PublicIcon name="workspace_premium" className="text-[14px]" />
-                  <span>Rank 02 • Silver Laureate</span>
-                </span>
-                <span className="text-xs font-mono text-[#D8C8B7] font-bold uppercase tracking-wider">
-                  Bib #{rank2.bib}
-                </span>
-              </div>
+      <section className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+        <div className="md:col-span-4 order-2 md:order-1 space-y-5">
+          {rank2s.map(rank => (
+            <PodiumLaureateCard
+              key={rank.registrationId}
+              rank={rank}
+              position={2}
+              photoUrl={winnerPhotos[rank.registrationId]}
+            />
+          ))}
+        </div>
 
-              {/* Photo Focus */}
-              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border border-white/10 shadow-md">
-                <WinnerPhoto
-                  key={`${rank2.registrationId}:${winnerPhotos[rank2.registrationId] || ''}`}
-                  rank={rank2}
-                  photoUrl={winnerPhotos[rank2.registrationId]}
-                  className="w-full h-full"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
-                <div className="absolute bottom-2.5 left-3">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#D8C8B7] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-white/10">
-                    {rank2.teamName} ({rank2.teamCode})
-                  </span>
-                </div>
-              </div>
+        <div className="md:col-span-4 order-1 md:order-2 space-y-5 md:-translate-y-4">
+          {rank1s.map(rank => (
+            <PodiumLaureateCard
+              key={rank.registrationId}
+              rank={rank}
+              position={1}
+              photoUrl={winnerPhotos[rank.registrationId]}
+            />
+          ))}
+        </div>
 
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono text-[#D8C8B7] uppercase tracking-widest block font-semibold">
-                  First Runner-Up
-                </span>
-                <h3
-                  className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                >
-                  {rank2.candidateName}
-                </h3>
-                <p className="text-xs text-[#F2F3E6]/70">{rank2.teamName} Contingent</p>
-              </div>
-
-              {/* Score Matrix Summary - Strict Grade-Only */}
-              <div className="bg-[#1B090B] p-3 rounded-xl border border-white/5 flex items-center justify-between font-mono">
-                <div>
-                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Ratified Merit</span>
-                  <span className="text-base font-extrabold text-[#D8C8B7]">Grade {rank2.grade || 'A'}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
-                  <span className="text-base font-black text-[#D8C8B7]">
-                    {rank2Points === null ? 'Unavailable' : `+${rank2Points} PTS`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </article>
-        )}
-
-        {/* RANK 1: Gold Laureate (Center Luminary) */}
-        {rank1 && (
-          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-6 sm:p-7 flex flex-col justify-between shadow-[0_0_35px_rgba(253,191,15,0.22)] border-2 border-[#FDBF0F] relative order-1 md:order-2 md:-translate-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-[#FDBF0F] text-[#1B090B] font-black flex items-center gap-1 shadow-md">
-                  <PublicIcon name="stars" className="text-[15px]" />
-                  <span>Rank 01 • Gold Champion</span>
-                </span>
-                <span className="text-xs font-mono text-[#FDBF0F] font-bold uppercase tracking-wider">
-                  Bib #{rank1.bib}
-                </span>
-              </div>
-
-              {/* Photo Focus */}
-              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border-2 border-[#FDBF0F]/50 shadow-xl">
-                <WinnerPhoto
-                  key={`${rank1.registrationId}:${winnerPhotos[rank1.registrationId] || ''}`}
-                  rank={rank1}
-                  photoUrl={winnerPhotos[rank1.registrationId]}
-                  className="w-full h-full"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
-                <div className="absolute top-2 right-2 bg-[#BA1912] text-[#F2F3E6] px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold shadow-sm">
-                  Laurel Victor
-                </div>
-                <div className="absolute bottom-2.5 left-3">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#FDBF0F] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-[#FDBF0F]/40">
-                    {rank1.teamName} ({rank1.teamCode})
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono text-[#FDBF0F] uppercase tracking-widest font-bold flex items-center gap-1">
-                  <PublicIcon name="military_tech" className="text-[14px]" />
-                  <span>Festival Grand Laureate</span>
-                </span>
-                <h3
-                  className="text-xl font-extrabold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                >
-                  {rank1.candidateName}
-                </h3>
-                <p className="text-xs text-[#F2F3E6]/80 font-semibold">{rank1.teamName} Contingent</p>
-              </div>
-
-              {/* Score Matrix Summary - Strict Grade-Only */}
-              <div className="bg-[#1B090B] p-3.5 rounded-xl border border-[#FDBF0F]/40 flex items-center justify-between font-mono shadow-inner">
-                <div>
-                  <span className="text-[9px] uppercase tracking-wider text-[#FDBF0F] block font-bold">Ratified Merit</span>
-                  <span className="text-lg font-black text-[#FDBF0F]">Grade {rank1.grade || 'A+'}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[9px] uppercase tracking-wider text-[#FDBF0F] block font-bold">Accredited Points</span>
-                  <span className="text-lg font-black text-[#FDBF0F]">
-                    {rank1Points === null ? 'Unavailable' : `+${rank1Points} PTS`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </article>
-        )}
-
-        {/* RANK 3: Bronze Laureate (Right) */}
-        {rank3 && (
-          <article className="md:col-span-4 bg-[#230D0F] rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-xl border border-[#BA1912]/40 relative order-3 md:order-3 transition-all duration-300 hover:-translate-y-1">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded bg-[#BA1912] text-[#F2F3E6] font-bold flex items-center gap-1 shadow-xs">
-                  <PublicIcon name="workspace_premium" className="text-[14px]" />
-                  <span>Rank 03 • Bronze Laureate</span>
-                </span>
-                <span className="text-xs font-mono text-[#BA1912] font-bold uppercase tracking-wider">
-                  Bib #{rank3.bib}
-                </span>
-              </div>
-
-              {/* Photo Focus */}
-              <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-[#1B090B] border border-[#BA1912]/40 shadow-md">
-                <WinnerPhoto
-                  key={`${rank3.registrationId}:${winnerPhotos[rank3.registrationId] || ''}`}
-                  rank={rank3}
-                  photoUrl={winnerPhotos[rank3.registrationId]}
-                  className="w-full h-full"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1B090B] via-transparent to-transparent pointer-events-none" />
-                <div className="absolute bottom-2.5 left-3">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#BA1912] bg-[#1B090B]/90 px-2 py-0.5 rounded font-bold border border-[#BA1912]/40">
-                    {rank3.teamName} ({rank3.teamCode})
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono text-[#BA1912] uppercase tracking-widest block font-semibold">
-                  Second Runner-Up
-                </span>
-                <h3
-                  className="text-lg font-bold text-[#F2F3E6] uppercase tracking-wide leading-tight"
-                >
-                  {rank3.candidateName}
-                </h3>
-                <p className="text-xs text-[#F2F3E6]/70">{rank3.teamName} Contingent</p>
-              </div>
-
-              {/* Score Matrix Summary - Strict Grade-Only */}
-              <div className="bg-[#1B090B] p-3 rounded-xl border border-white/5 flex items-center justify-between font-mono">
-                <div>
-                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Ratified Merit</span>
-                  <span className="text-base font-extrabold text-[#F2F3E6]">Grade {rank3.grade || 'A'}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[9px] uppercase tracking-wider text-[#F2F3E6]/60 block">Accredited Points</span>
-                  <span className="text-base font-black text-[#FDBF0F]">
-                    {rank3Points === null ? 'Unavailable' : `+${rank3Points} PTS`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </article>
-        )}
+        <div className="md:col-span-4 order-3 space-y-5">
+          {rank3s.map(rank => (
+            <PodiumLaureateCard
+              key={rank.registrationId}
+              rank={rank}
+              position={3}
+              photoUrl={winnerPhotos[rank.registrationId]}
+            />
+          ))}
+        </div>
       </section>
 
       {/* OFFICIAL RESULT POSTER DOWNLOAD */}
