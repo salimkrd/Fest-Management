@@ -224,7 +224,7 @@ function CompetitionDetailContent() {
   const handleWhatsAppShare = () => {
     if (typeof window !== 'undefined') {
       const text = encodeURIComponent(
-        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\\n${formatPublicPodiumSummary(podiumRanks)}\\n\\nView full official scorecard: ${window.location.href}`
+        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n${formatPublicPodiumSummary(podiumRanks)}\n\nView full official scorecard: ${window.location.href}`
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     }
