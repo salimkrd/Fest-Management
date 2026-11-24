@@ -327,9 +327,9 @@ export class JudgeService {
             );
           }
         }
-        if (participantTotal > compMaxMarks) {
+        if (participantTotal > 100 || participantTotal > compMaxMarks) {
           throw new Error(
-            `Validation Error: Criteria total for Code "${cleanUpperKey}" exceeds the competition maximum.`
+            `Validation Error: Criteria total for Code "${cleanUpperKey}" must not exceed 100 or the competition maximum.`
           );
         }
       } else {
