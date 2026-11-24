@@ -9,6 +9,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 import { AnimatedBrandRibbon } from '@/components/domain/AnimatedBrandRibbon';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
+import { getPodiumResultRanks } from '@/domain/publicResults';
 
 export default function InspirathPublicHomePage() {
   const { theme, teams, results, categories, competitions, teamsSyncState, resultsSyncState } = useFest();
@@ -677,9 +678,7 @@ export default function InspirathPublicHomePage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
                 {filteredLatestResults.slice(0, 6).map(res => {
-                  const rank1 = res.ranks.find(r => r.rank === 1);
-                  const rank2 = res.ranks.find(r => r.rank === 2);
-                  const rank3 = res.ranks.find(r => r.rank === 3);
+                  const podiumRanks = getPodiumResultRanks(res.ranks);
 
                   return (
                     <div
@@ -703,73 +702,34 @@ export default function InspirathPublicHomePage() {
                           {res.competitionName}
                         </h3>
 
-                        {/* Top 3 Ranks Preview */}
+                        {/* Display every recipient in the first three positions, including tied ranks */}
                         <div className="space-y-2 mt-3">
-                          {rank1 && (
-                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/20">
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-[#FDBF0F] text-[#1A080B] font-bold text-xs flex items-center justify-center shrink-0">
-                                  1
+                          {podiumRanks.map(rk => (
+                            <div
+                              key={rk.registrationId}
+                              className={`flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border ${rk.rank === 1 ? 'border-[#FDBF0F]/20' : 'border-[#FDBF0F]/10'}`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${rk.rank === 1 ? 'bg-[#FDBF0F] text-[#1A080B]' : rk.rank === 2 ? 'bg-[#D8C8B7] text-[#1A080B]' : 'bg-[#86152C] text-[#FFF8EE] border border-[#FDBF0F]/30'}`}
+                                >
+                                  {rk.rank}
                                 </span>
-                                <div>
-                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank1.candidateName}</h4>
-                                  <p className="text-xs text-[#FFF8EE]/80">
-                                    Bib #{rank1.bib} • {rank1.teamName}
+                                <div className="min-w-0">
+                                  <h4 className="text-[13px] font-bold text-[#FFF8EE] truncate">{rk.candidateName}</h4>
+                                  <p className="text-xs text-[#FFF8EE]/80 truncate">
+                                    Bib #{rk.bib} • {rk.teamName}
                                   </p>
                                 </div>
                               </div>
-                              <div className="text-right shrink-0">
-                                <span className="text-xs font-bold text-[#FDBF0F] block">
-                                  Grade {rank1.grade || '—'}
+                              <div className="text-right shrink-0 pl-2">
+                                <span className={`text-xs font-bold block ${rk.rank === 1 ? 'text-[#FDBF0F]' : 'text-[#FFF8EE]'}`}>
+                                  Grade {rk.grade || '—'}
                                 </span>
-                                <span className="text-[11px] text-[#FFF8EE]/70 font-medium">Rank 1</span>
+                                <span className="text-[11px] text-[#FFF8EE]/70 font-medium">Rank {rk.rank}</span>
                               </div>
                             </div>
-                          )}
-
-                          {rank2 && (
-                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-[#2D1217] text-[#FFF8EE] border border-[#FDBF0F]/40 font-bold text-xs flex items-center justify-center shrink-0">
-                                  2
-                                </span>
-                                <div>
-                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank2.candidateName}</h4>
-                                  <p className="text-xs text-[#FFF8EE]/80">
-                                    Bib #{rank2.bib} • {rank2.teamName}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <span className="text-xs font-bold text-[#FFF8EE] block">
-                                  Grade {rank2.grade || '—'}
-                                </span>
-                                <span className="text-[11px] text-[#FFF8EE]/70 font-medium">Rank 2</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {rank3 && (
-                            <div className="flex items-center justify-between p-2 rounded bg-[#1A080B]/80 border border-[#FDBF0F]/10">
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-[#2D1217] text-[#FFF8EE] border border-[#FDBF0F]/40 font-bold text-xs flex items-center justify-center shrink-0">
-                                  3
-                                </span>
-                                <div>
-                                  <h4 className="text-[13px] font-bold text-[#FFF8EE]">{rank3.candidateName}</h4>
-                                  <p className="text-xs text-[#FFF8EE]/80">
-                                    Bib #{rank3.bib} • {rank3.teamName}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <span className="text-xs font-bold text-[#FFF8EE] block">
-                                  Grade {rank3.grade || '—'}
-                                </span>
-                                <span className="text-[11px] text-[#FFF8EE]/70 font-medium">Rank 3</span>
-                              </div>
-                            </div>
-                          )}
+                          ))}
                         </div>
                       </div>
 
