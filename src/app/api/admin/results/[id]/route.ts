@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/services/authService';
 import { PointsLedgerService } from '@/services/pointsLedgerService';
+import { JudgeService } from '@/services/judgeService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { calculateGrade, getChampionshipPoints, Grade } from '@/domain/scoring';
 
@@ -133,7 +134,14 @@ export async function POST(
           : 'Administrative review',
         adminIdToken
       );
-      return NextResponse.json({ success }, { status: 200 });
+      let resultRecalculated = false;
+      if (success && typeof result.competitionId === 'string' && result.competitionId) {
+        await JudgeService.refreshResultForCompetition(result.competitionId);
+        const refreshedResult = await resultRef.get();
+        resultRecalculated = refreshedResult.exists &&
+          refreshedResult.data()?.resultStatus === 'READY_FOR_REVIEW';
+      }
+      return NextResponse.json({ success, resultRecalculated }, { status: 200 });
     }
 
     return NextResponse.json(

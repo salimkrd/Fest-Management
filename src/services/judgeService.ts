@@ -14,7 +14,7 @@ import {
 } from '@/domain/judgeAuth';
 import { AuthService } from './authService';
 import { buildAdminJudgeScorecard } from '@/domain/judgeScorecard';
-import { calculateGrade, getChampionshipPoints } from '@/domain/scoring';
+import { assignCompetitionPositions, calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 import {
   buildGreenRoomRosterSnapshot,
   assertGreenRoomEntryMatchesRegistration,
@@ -508,6 +508,18 @@ export class JudgeService {
     };
   }
 
+  /**
+   * Rebuilds a result from the submitted judge scorecards after an Admin unpublishes it.
+   * This ensures corrections to tabulation logic can be applied to an existing result.
+   */
+  static async refreshResultForCompetition(competitionId: string): Promise<void> {
+    const db = getAdminDb();
+    if (!db) {
+      throw new Error('Database Unavailable: Cannot refresh result positions.');
+    }
+    await this.updateResultForCompetition(db, competitionId);
+  }
+
   private static async updateResultForCompetition(
     db: FirebaseFirestore.Firestore,
     competitionId: string
@@ -736,23 +748,13 @@ export class JudgeService {
         score,
         grade: calculateGrade(score, 100)
       }];
-    }).sort((a, b) => b.score - a.score);
-
-    let previousScore: number | undefined;
-    let previousRank: 1 | 2 | 3 | null = null;
-    const ranks = evaluated.map((entry, index) => {
-      const rank: 1 | 2 | 3 | null = entry.score === previousScore
-        ? previousRank
-        : index < 3 ? (index + 1) as 1 | 2 | 3 : null;
-      previousScore = entry.score;
-      previousRank = rank;
-      return {
-        ...entry,
-        rank,
-        officialPoints: getChampionshipPoints(competition.type, entry.grade, rank),
-        totalEarnedPoints: getChampionshipPoints(competition.type, entry.grade, rank)
-      };
     });
+
+    const ranks = assignCompetitionPositions(evaluated).map(entry => ({
+      ...entry,
+      officialPoints: getChampionshipPoints(competition.type, entry.grade, entry.rank),
+      totalEarnedPoints: getChampionshipPoints(competition.type, entry.grade, entry.rank)
+    }));
 
     const resultId = `res-${competitionId}`;
     const resultRef = db.collection('results').doc(resultId);

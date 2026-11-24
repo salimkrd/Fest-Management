@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  assignCompetitionPositions,
   calculateGradeFromPercentage,
   calculateGrade,
   getChampionshipPoints,
@@ -176,4 +177,46 @@ describe('Sahithyolsav Championship Points Engine', () => {
       expect(evaluated[1].officialPoints).toBe(11);
     });
   });
+
+describe('Competition podium position assignment', () => {
+  it('shares tied positions and gives the next distinct score the next podium position', () => {
+    const ranked = assignCompetitionPositions([
+      { id: 'first', score: 80 },
+      { id: 'second-a', score: 56 },
+      { id: 'second-b', score: 56 },
+      { id: 'third', score: 44 }
+    ]);
+
+    expect(ranked.map(entry => [entry.id, entry.rank])).toEqual([
+      ['first', 1],
+      ['second-a', 2],
+      ['second-b', 2],
+      ['third', 3]
+    ]);
+  });
+
+  it('continues dense ranking when the tie is for first place', () => {
+    const ranked = assignCompetitionPositions([
+      { id: 'first-a', score: 95 },
+      { id: 'first-b', score: 95 },
+      { id: 'second', score: 90 },
+      { id: 'third', score: 85 },
+      { id: 'no-prize', score: 80 }
+    ]);
+
+    expect(ranked.map(entry => entry.rank)).toEqual([1, 1, 2, 3, null]);
+  });
+
+  it('does not award a fourth distinct score group a podium position', () => {
+    const ranked = assignCompetitionPositions([
+      { score: 90 },
+      { score: 80 },
+      { score: 70 },
+      { score: 60 }
+    ]);
+
+    expect(ranked.map(entry => entry.rank)).toEqual([1, 2, 3, null]);
+  });
+});
+
 });
