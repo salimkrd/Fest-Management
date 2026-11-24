@@ -22,5 +22,5 @@ export function formatPublicPodiumSummary(ranks: readonly ResultRank[]): string 
 
   return getPodiumResultRanks(ranks)
     .map(rank => `${medals[rank.rank as 1 | 2 | 3]}: ${rank.candidateName} (${rank.teamCode})`)
-    .join('\\n');
+    .join('\n');
 }
