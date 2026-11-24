@@ -45,18 +45,19 @@ describe('Star of the Fest / Pen of the Fest scorer calculation', () => {
       registration('r3', 'e1', 'c'), registration('r4', 'e2', 'a')];
     const results = [
       { ...result('res1', 'e1', 'r1', 80),
-        ranks: [{ registrationId: 'r1', score: 80 }, { registrationId: 'r2', score: 80 },
-          { registrationId: 'r3', score: 80 }] },
-      result('res2', 'e2', 'r4', 90)
+        ranks: [{ registrationId: 'r1', score: 80, officialPoints: 6 },
+          { registrationId: 'r2', score: 80, officialPoints: 6 },
+          { registrationId: 'r3', score: 80, officialPoints: 6 }] },
+      result('res2', 'e2', 'r4', 90, 'SOLO', 'PUBLISHED', 10)
     ] as CompetitionResult[];
     const ranking = calculateTopScorers('OFF_STAGE', events, results, regs, [participant('a'), participant('b'), participant('c')]);
-    expect(ranking[0]).toMatchObject({ participantId: 'a', totalMarks: 190, competitionsCount: 2, position: 1 });
+    expect(ranking[0]).toMatchObject({ participantId: 'a', totalMarks: 190, totalPoints: 16, competitionsCount: 2, position: 1 });
     expect(ranking.slice(1).map(x => x.position)).toEqual([2, 2]);
     const oneEvent = calculateTopScorers('OFF_STAGE', [events[0]], [results[0]], regs, [participant('a'), participant('b'), participant('c')]);
     expect(oneEvent.map(x => x.position)).toEqual([1, 1, 1]);
   });
 
-  it('adds published solo official points to participant totals without changing mark-based ranking', () => {
+  it('adds published solo official points to participant totals', () => {
     const events = [competition('e1', 'STAGE'), competition('e2', 'STAGE')];
     const regs = [
       registration('r1', 'e1', 'a'),
@@ -74,6 +75,49 @@ describe('Star of the Fest / Pen of the Fest scorer calculation', () => {
     expect(ranking).toMatchObject([
       { participantId: 'a', totalMarks: 165, totalPoints: 16, competitionsCount: 2, position: 1 },
       { participantId: 'b', totalMarks: 90, totalPoints: 11, competitionsCount: 1, position: 2 }
+    ]);
+  });
+
+
+  it('ranks by total official points rather than marks and gives tied totals dense positions', () => {
+    const events = [competition('e', 'STAGE')];
+    const regs = [
+      registration('ra', 'e', 'a'),
+      registration('rb', 'e', 'b'),
+      registration('rc', 'e', 'c'),
+      registration('rd', 'e', 'd'),
+      registration('re', 'e', 'e')
+    ];
+    const published = {
+      ...result('res', 'e', 'ra', 99, 'SOLO', 'PUBLISHED', 7),
+      ranks: [
+        { registrationId: 'ra', score: 99, officialPoints: 7 },
+        { registrationId: 'rb', score: 80, officialPoints: 10 },
+        { registrationId: 'rc', score: 75, officialPoints: 8 },
+        { registrationId: 'rd', score: 74, officialPoints: 8 },
+        { registrationId: 're', score: 70, officialPoints: 5 }
+      ]
+    } as CompetitionResult;
+
+    const ranking = calculateTopScorers(
+      'STAGE',
+      events,
+      [published],
+      regs,
+      [participant('a'), participant('b'), participant('c'), participant('d'), participant('e')]
+    );
+
+    expect(ranking.map(row => ({
+      participantId: row.participantId,
+      totalMarks: row.totalMarks,
+      totalPoints: row.totalPoints,
+      position: row.position
+    }))).toEqual([
+      { participantId: 'b', totalMarks: 80, totalPoints: 10, position: 1 },
+      { participantId: 'c', totalMarks: 75, totalPoints: 8, position: 2 },
+      { participantId: 'd', totalMarks: 74, totalPoints: 8, position: 2 },
+      { participantId: 'a', totalMarks: 99, totalPoints: 7, position: 3 },
+      { participantId: 'e', totalMarks: 70, totalPoints: 5, position: 4 }
     ]);
   });
 
