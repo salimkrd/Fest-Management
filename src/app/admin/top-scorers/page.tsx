@@ -63,8 +63,8 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <span className="block text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">Total marks</span>
-                <span className="text-base font-extrabold tabular-nums text-[#1D4ED8]">{row.totalMarks.toFixed(2)}</span>
+                <span className="block text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">Total points</span>
+                <span className="text-base font-extrabold tabular-nums text-emerald-700">{row.totalPoints.toFixed(2)}</span>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 divide-x divide-[#E5EAF1] rounded-lg border border-[#E8EDF3] bg-white">
@@ -92,10 +92,10 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
               <th className="w-24 px-4 py-3.5">Position</th>
               <th className="min-w-[220px] px-4 py-3.5">Participant</th>
               <th className="min-w-[180px] px-4 py-3.5">Team</th>
-              <th className="px-4 py-3.5 text-right">Events</th>
-              <th className="px-4 py-3.5 text-right">Average / 100</th>
-              <th className="px-4 py-3.5 text-right">Total marks</th>
               <th className="px-4 py-3.5 text-right">Total points</th>
+              <th className="px-4 py-3.5 text-right">Events</th>
+              <th className="px-4 py-3.5 text-right">Total marks</th>
+              <th className="px-4 py-3.5 text-right">Average / 100</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF2F6]">
@@ -112,10 +112,10 @@ function ScorerTable({ rows }: { rows: TopScorerRow[] }) {
                   <span className="block font-semibold text-[#334155]">{row.teamName || 'Unassigned team'}</span>
                   <span className="mt-1 block text-[10px] text-[#64748B]">{row.teamCode || '—'}</span>
                 </td>
-                <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.competitionsCount}</td>
-                <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.averagePercentage.toFixed(2)}</td>
-                <td className="px-4 py-4 text-right align-middle text-sm font-extrabold tabular-nums text-[#1D4ED8]">{row.totalMarks.toFixed(2)}</td>
                 <td className="px-4 py-4 text-right align-middle text-sm font-extrabold tabular-nums text-emerald-700">{row.totalPoints.toFixed(2)}</td>
+                <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.competitionsCount}</td>
+                <td className="px-4 py-4 text-right align-middle text-sm font-extrabold tabular-nums text-[#1D4ED8]">{row.totalMarks.toFixed(2)}</td>
+                <td className="px-4 py-4 text-right align-middle font-semibold tabular-nums text-[#334155]">{row.averagePercentage.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -244,7 +244,7 @@ export default function TopScorersPage() {
     competition => competition.type === 'SOLO' && !competition.performanceMode
   ).length;
   const totalEventEntries = activeRows.reduce((sum, row) => sum + row.competitionsCount, 0);
-  const highestTotal = activeRows[0]?.totalMarks;
+  const leadingParticipant = activeRows[0];
   const activeTitle = activeMode === 'STAGE' ? 'Star of the Fest' : 'Pen of the Fest';
 
   const handleSelectMode = (mode: PerformanceMode) => {
@@ -302,9 +302,9 @@ export default function TopScorersPage() {
         <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-3.5 sm:p-4">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
           <p className="text-[11px] leading-5 text-blue-950 sm:text-xs">
-            Each published individual event is normalized to 100 marks and added to the participant&apos;s total.
-            Group results are excluded from individual awards and count only toward the Team Championship.
-            Unpublished results are excluded, and equal totals share the same position.
+            Position is determined by the sum of official points earned in published individual events.
+            Total marks and average are shown for reference only. Group results are excluded from individual awards
+            and count only toward the Team Championship. Equal total points share the same position.
           </p>
         </div>
 
@@ -437,7 +437,7 @@ export default function TopScorersPage() {
                     <h2 className="mt-2 text-base font-extrabold text-[#111827]">{activeTitle} — Rankings</h2>
                     <p className="mt-1 text-xs text-[#64748B]">
                       {totalEventEntries} published individual event entries included
-                      {highestTotal !== undefined ? ' · Leading total ' + highestTotal.toFixed(2) + ' marks · ' + activeRows[0].totalPoints.toFixed(2) + ' points' : ''}
+                      {leadingParticipant ? ' · Top scorer ' + leadingParticipant.totalPoints.toFixed(2) + ' points · ' + leadingParticipant.totalMarks.toFixed(2) + ' marks' : ''}
                     </p>
                   </div>
 

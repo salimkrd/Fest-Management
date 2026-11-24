@@ -16,9 +16,9 @@ export interface TopScorerRow {
 
 /**
  * Individual-only award ranking, kept entirely separate from the team championship
- * points ledger. Each published solo score is normalized to /100 so that competitions
- * with different total marks remain comparable. Only explicitly classified events
- * qualify for these awards. Tied totals share the same position.
+ * points ledger. Official points from each published solo result determine ranking
+ * and position. Normalized marks and averages are retained as reference statistics.
+ * Only explicitly classified events qualify. Equal point totals share a dense position.
  */
 export function calculateTopScorers(
   mode: CompetitionPerformanceMode,
@@ -83,12 +83,12 @@ export function calculateTopScorers(
     totalMarks: Math.round(row.totalMarks * 100) / 100,
     totalPoints: Math.round(row.totalPoints * 100) / 100,
     averagePercentage: Math.round((row.totalMarks / row.competitionsCount) * 100) / 100
-  })).sort((a, b) => b.totalMarks - a.totalMarks || a.name.localeCompare(b.name));
+  })).sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
 
-  let position = 1;
+  let position = 0;
   return ordered.map((row, index) => {
-    if (index > 0 && row.totalMarks !== ordered[index - 1].totalMarks) {
-      position = index + 1;
+    if (index === 0 || row.totalPoints !== ordered[index - 1].totalPoints) {
+      position += 1;
     }
     return { ...row, position };
   });
