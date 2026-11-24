@@ -172,3 +172,33 @@ export function evaluateCompetitionEntries(
     };
   });
 }
+
+
+/**
+ * Assigns podium positions by distinct score groups (dense ranking).
+ * Entries are sorted by score descending; equal scores share a position,
+ * and the next distinct score receives the next position.
+ * Only the first three distinct score groups receive podium positions.
+ */
+export function assignCompetitionPositions<T extends { score: number }>(
+  entries: readonly T[]
+): Array<T & { rank: 1 | 2 | 3 | null }> {
+  const sorted = entries
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => b.entry.score - a.entry.score || a.index - b.index);
+
+  let previousScore: number | undefined;
+  let position = 0;
+
+  return sorted.map(({ entry }) => {
+    if (previousScore === undefined || entry.score !== previousScore) {
+      position += 1;
+      previousScore = entry.score;
+    }
+
+    return {
+      ...entry,
+      rank: position <= 3 ? position as 1 | 2 | 3 : null
+    };
+  });
+}
