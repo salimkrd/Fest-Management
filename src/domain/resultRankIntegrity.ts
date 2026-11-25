@@ -73,7 +73,6 @@ function identityMatches(
 function sameRankOutcome(left: ResultRank, right: ResultRank): boolean {
   return left.score === right.score &&
     left.rank === right.rank &&
-    left.grade === right.grade &&
     left.teamId === right.teamId;
 }
 
