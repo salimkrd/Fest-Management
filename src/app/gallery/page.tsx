@@ -151,7 +151,7 @@ export default function PublicGalleryPage() {
                   key={image.id}
                   type="button"
                   onClick={() => setActiveIndex(index)}
-                  aria-label={`View photo: ${image.title}`}
+                  aria-label={`Open photo ${index + 1}`}
                   className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-xl border border-[#FDBF0F]/10 bg-[#230D0F] text-left shadow-lg shadow-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FDBF0F]"
                 >
                   <img
@@ -161,11 +161,6 @@ export default function PublicGalleryPage() {
                     decoding="async"
                     className="block h-auto max-h-[560px] w-full object-cover transition duration-500 group-hover:scale-[1.025]"
                   />
-                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#120507]/90 via-transparent to-transparent opacity-90 transition-opacity group-hover:opacity-100" />
-                  <span className="absolute inset-x-0 bottom-0 p-4">
-                    <span className="block text-sm font-bold text-white">{image.title}</span>
-                    {image.caption && <span className="mt-1 block line-clamp-2 text-xs leading-5 text-white/75">{image.caption}</span>}
-                  </span>
                 </button>
               ))}
             </div>
@@ -230,13 +225,6 @@ export default function PublicGalleryPage() {
               className="max-h-[76vh] max-w-full object-contain"
               decoding="async"
             />
-            <div className="max-w-3xl text-center">
-              <p className="text-sm font-bold text-white sm:text-base">{activeImage.title}</p>
-              {activeImage.caption && <p className="mt-1 text-xs leading-6 text-white/65 sm:text-sm">{activeImage.caption}</p>}
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-[#FDBF0F]/70">
-                {activeIndex + 1} / {images.length}
-              </p>
-            </div>
           </div>
         </div>
       )}
