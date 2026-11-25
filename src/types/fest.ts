@@ -213,16 +213,6 @@ export interface ResultRank {
   officialPoints: number; // Exact matrix lookup points
   totalEarnedPoints: number; // Backward compatibility alias
 }
-  candidateName: string;
-  teamId: string;
-  teamCode: string;
-  teamName: string;
-  teamColor: string;
-  score: number;
-  grade: Grade; // 'A+' | 'A' | 'B' | 'C' | 'NO_GRADE'
-  officialPoints: number; // Exact matrix lookup points
-  totalEarnedPoints: number; // Backward compatibility alias
-}
 
 export interface CompetitionResult {
   id: string;
