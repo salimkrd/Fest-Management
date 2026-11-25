@@ -15,6 +15,7 @@ import {
 import { AuthService } from './authService';
 import { buildAdminJudgeScorecard } from '@/domain/judgeScorecard';
 import { isValidJudgeTotalMark } from '@/domain/judgeMarks';
+import { findDuplicateRegistrationGroups } from '@/domain/registrationIntegrity';
 import { assignCompetitionPositions, calculateGrade, getChampionshipPoints } from '@/domain/scoring';
 import {
   buildGreenRoomRosterSnapshot,
@@ -715,6 +716,22 @@ export class JudgeService {
     const registrations = registrationSnapshot.docs.filter(doc =>
       String(doc.data().status || '').trim().toUpperCase() === 'APPROVED'
     );
+    const duplicateEntrants = findDuplicateRegistrationGroups(
+      registrations.map(doc => ({ id: doc.id, ...doc.data() })),
+      competition.type === 'GROUP' ? 'GROUP' : 'SOLO'
+    );
+    if (duplicateEntrants.length > 0) {
+      const details = duplicateEntrants.map(group => {
+        const records = group.records.map(record =>
+          `${record.participantName || record.id} [${record.code || record.id}]`
+        );
+        return `${group.identityId}: ${records.join(' / ')}`;
+      });
+      throw new Error(
+        `Duplicate Registration Error: Result generation for "${competition.name || competitionId}" is blocked because the following entrant identities have multiple active registrations: ${details.join('; ')}. Keep one approved registration per entrant, then refresh the result.`
+      );
+    }
+
     const evaluated = registrations.flatMap(doc => {
       const criterionMap = criterionMarksByRegistration.get(doc.id);
       const criterionScorecardTotals = criterionScorecardTotalsByRegistration.get(doc.id) || [];
