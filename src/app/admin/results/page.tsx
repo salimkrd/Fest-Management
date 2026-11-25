@@ -513,7 +513,7 @@ export default function ResultManagementPage() {
                           <td className="py-3 px-4 text-center font-bold text-[#2563EB]">
                             Grade {rk.grade}
                           </td>
-                          <td className="py-3 px-4 text-right font-extrabold text-emerald-600 text-sm>
+                          <td className="py-3 px-4 text-right font-extrabold text-emerald-600 text-sm">
                             +{rk.officialPoints ?? rk.totalEarnedPoints} pts
                             {selectedResult.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
                           </td>
