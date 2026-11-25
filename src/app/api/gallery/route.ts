@@ -145,6 +145,10 @@ export async function PATCH(request: NextRequest) {
     await syncWorkloadIdentityToken();
     const token = adminToken(request);
     const body = await request.json() as Record<string, unknown>;
+    if (body.action === 'PUBLISH_ALL_DRAFTS') {
+      const publishedCount = await GalleryService.publishAllDrafts(token);
+      return NextResponse.json({ success: true, publishedCount }, { headers: noStore });
+    }
     const image = await GalleryService.update(token, body.id, body);
     return NextResponse.json({ image }, { headers: noStore });
   } catch (error) {
