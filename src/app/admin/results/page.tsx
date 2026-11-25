@@ -371,7 +371,7 @@ export default function ResultManagementPage() {
           isOpen={!!selectedResult}
           onClose={() => setSelectedResult(null)}
           title={`Tabulation Audit: ${selectedResult?.competitionName}`}
-          description="Detailed breakdown of participant marks, assigned grades, and official championship points"
+          description="Review participant rankings and official championship points"
           maxWidth="4xl"
           footer={
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -401,7 +401,7 @@ export default function ResultManagementPage() {
                     isLoading={savingResult}
                     className="w-full sm:w-auto"
                   >
-                    Confirm Positions &amp; Grades
+                    Confirm Positions
                   </Button>
                 )}
                 {selectedResult && selectedResult.resultStatus === 'READY_TO_PUBLISH' && (
@@ -456,7 +456,7 @@ export default function ResultManagementPage() {
               {selectedResult.ranks.length === 0 ? (
                 <div className="p-8 text-center bg-[#F8FAFC] rounded-xl border border-[#E1E7EF]">
                   <Clock className="w-8 h-8 text-[#526070] mx-auto mb-2" />
-                  <h4 className="text-sm font-bold text-[#111111]">Scores Pending Juror Submission</h4>
+                  <h4 className="text-sm font-bold text-[#111111]">Results Pending Adjudication</h4>
                   <p className="text-xs text-[#526070] mt-1">
                     Jury evaluation sheet has not been submitted or finalized for this event.
                   </p>
@@ -474,10 +474,6 @@ export default function ResultManagementPage() {
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
-                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">House</span><span className="mt-0.5 block text-xs font-semibold text-[#0F172A]">{rk.teamName} <span className="font-normal text-[#64748B]">({rk.teamCode})</span></span></div>
-                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Score</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-[#0F172A]">{rk.score}</span></div>
-                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Grade</span><span className="mt-0.5 block text-xs font-bold text-blue-700">Grade {rk.grade}</span></div>
-                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">{selectedResult.type === 'GROUP' ? 'Team points' : 'Points'}</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-emerald-700">+{rk.officialPoints ?? rk.totalEarnedPoints} pts</span></div>
                       </div>
                       {selectedResult.type === 'GROUP' && <p className="mt-2 text-[10px] font-medium text-[#64748B]">Points are awarded to the team only.</p>}
                     </article>
@@ -485,14 +481,12 @@ export default function ResultManagementPage() {
                 </div>
                 {/* Desktop audit table */}
                 <div className="hidden overflow-x-auto rounded-xl border border-[#E2E8F0] md:block">
-                  <table className="w-full min-w-[780px] text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead>
                       <tr className="bg-[#F8FAFC] border-b border-[#E1E7EF] text-[#526070] font-bold uppercase text-[10px]">
                         <th className="py-2.5 px-4">Rank</th>
                         <th className="py-2.5 px-4">Candidate / Troupe</th>
                         <th className="py-2.5 px-4">House</th>
-                        <th className="py-2.5 px-4 text-center">Score</th>
-                        <th className="py-2.5 px-4 text-center">Grade</th>
                         <th className="py-2.5 px-4 text-right">Team Points</th>
                       </tr>
                     </thead>
@@ -512,12 +506,6 @@ export default function ResultManagementPage() {
                           <td className="py-3 px-4">
                             <span className="font-semibold text-[#111111]">{rk.teamName}</span> ({rk.teamCode})
                           </td>
-                          <td className="py-3 px-4 text-center font-black text-sm text-[#111111]">
-                            {rk.score}
-                          </td>
-                          <td className="py-3 px-4 text-center font-bold text-[#2563EB]">
-                            Grade {rk.grade}
-                          </td>
                           <td className="py-3 px-4 text-right font-extrabold text-emerald-600 text-sm">
                             +{rk.officialPoints ?? rk.totalEarnedPoints} pts
                             {selectedResult.type === 'GROUP' && <span className="block text-[10px] font-medium text-[#526070]">Team only</span>}
@@ -533,7 +521,7 @@ export default function ResultManagementPage() {
               {/* Official Point Rule Reference */}
               <div className="flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-[11px] leading-5 text-blue-900 sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                  <strong>Official points matrix:</strong> Exact lookup from ({selectedResult.type}, Grade, Position). Points commit to championship ledger exclusively upon publication.
+                  <strong>Official points:</strong> Awarded points are finalized from the verified result and committed to the championship ledger upon publication.
                 </span>
                 <span className="font-bold text-[#2563EB]">Idempotent Ledger</span>
               </div>
