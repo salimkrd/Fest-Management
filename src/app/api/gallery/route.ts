@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { GalleryService } from '@/services/galleryService';
+import { AuthService } from '@/services/authService';
 import { isGalleryAlbumId } from '@/domain/gallery';
 
 export const runtime = 'nodejs';
@@ -69,13 +70,13 @@ export async function GET(request: NextRequest) {
     }
     if (manage) {
       const token = adminToken(request);
+      // Verify administrator privileges before reading draft or archived records.
+      await AuthService.assertAdmin(token);
       const result = await GalleryService.list({
         includeUnpublished: true,
         ...(albumValue ? { albumId: albumValue } : {}),
-        limit: 48,
+        limit: 1000,
       });
-      // Admin listings are intentionally private and include draft and archived items.
-      await import('@/services/authService').then(({ AuthService }) => AuthService.assertAdmin(token));
       return NextResponse.json(result, { headers: noStore });
     }
 

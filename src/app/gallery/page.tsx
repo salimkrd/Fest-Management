@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { GALLERY_ALBUMS, type PublicGalleryImage } from '@/domain/gallery';
-import { ArrowLeft, ArrowRight, Camera, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, X } from 'lucide-react';
+import { ArrowDown, Camera, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, X } from 'lucide-react';
 
 interface GalleryResponse {
   images: PublicGalleryImage[];
@@ -245,5 +245,5 @@ export default function PublicGalleryPage() {
 }
 
 function ArrowDownIcon() {
-  return <ArrowRight className="h-4 w-4" />;
+  return <ArrowDown className="h-4 w-4" />;
 }

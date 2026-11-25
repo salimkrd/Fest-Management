@@ -17,7 +17,7 @@ function cleanText(value: unknown, label: string, maxLength: number, required = 
   return text;
 }
 
-function toGalleryImage(id: string, data: FirebaseFirestore.DocumentData): GalleryImage | null {
+function toGalleryImage(id: string, data: Record<string, unknown>): GalleryImage | null {
   if (
     !isGalleryAlbumId(data.albumId) ||
     !isGalleryStatus(data.status) ||
@@ -63,7 +63,7 @@ export class GalleryService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     const offset = Math.max(0, options.offset || 0);
-    const limit = Math.max(1, Math.min(48, options.limit || 12));
+    const limit = Math.max(1, Math.min(1000, options.limit || 12));
     const images = all.slice(offset, offset + limit);
     const nextOffset = offset + images.length;
 
