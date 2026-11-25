@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { MarkEntry } from '@/types/fest';
+import { getJudgeAssignmentDisplayStatus } from '@/domain/judgeAssignmentStatus';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -96,6 +97,16 @@ export default function MarkEntryPage() {
   const [purging, setPurging] = useState(false);
   const [inspectResult, setInspectResult] = useState<OrphanCleanupResult | null>(null);
   const [inspectError, setInspectError] = useState<string | null>(null);
+  const [statusAsOf, setStatusAsOf] = useState<number | null>(null);
+
+  // Expiry is derived from the authoritative expiresAt timestamp. Refresh periodically
+  // so an open Mark Entry page updates automatically when an assignment expires.
+  useEffect(() => {
+    const refreshStatusClock = () => setStatusAsOf(Date.now());
+    refreshStatusClock();
+    const intervalId = window.setInterval(refreshStatusClock, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const handleInspectDryRun = async () => {
     setInspecting(true);
@@ -132,13 +143,20 @@ export default function MarkEntryPage() {
     return markEntries.filter(m => activeCompIds.has(m.competitionId));
   }, [markEntries, competitions]);
 
+  const displayEntries = useMemo(() => validMarkEntries.map(entry => ({
+    ...entry,
+    status: statusAsOf === null
+      ? entry.status
+      : getJudgeAssignmentDisplayStatus(entry, statusAsOf)
+  })), [validMarkEntries, statusAsOf]);
+
   // Assignment Form State
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [judgeName, setJudgeName] = useState('');
   const [judgePhone, setJudgePhone] = useState('+91 9847');
   const [error, setError] = useState('');
 
-  const filteredEntries = validMarkEntries.filter(m => {
+  const filteredEntries = displayEntries.filter(m => {
     const matchesSearch = m.competitionName.toLowerCase().includes(search.toLowerCase()) ||
                           m.competitionCode.toLowerCase().includes(search.toLowerCase()) ||
                           m.judgeName.toLowerCase().includes(search.toLowerCase());
@@ -146,11 +164,11 @@ export default function MarkEntryPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const notStartedCount = validMarkEntries.filter(m => m.status === 'NOT_STARTED').length;
-  const inProgressCount = validMarkEntries.filter(m => m.status === 'IN_PROGRESS').length;
-  const submittedCount = validMarkEntries.filter(m => m.status === 'SUBMITTED').length;
-  const expiredCount = validMarkEntries.filter(m => m.status === 'EXPIRED').length;
-  const revokedCount = validMarkEntries.filter(m => m.status === 'REVOKED' || m.revoked).length;
+  const notStartedCount = displayEntries.filter(m => m.status === 'NOT_STARTED').length;
+  const inProgressCount = displayEntries.filter(m => m.status === 'IN_PROGRESS').length;
+  const submittedCount = displayEntries.filter(m => m.status === 'SUBMITTED').length;
+  const expiredCount = displayEntries.filter(m => m.status === 'EXPIRED').length;
+  const revokedCount = displayEntries.filter(m => m.status === 'REVOKED' || m.revoked).length;
 
   const handleOpenAssign = () => {
     setCompetitionId(competitions[0]?.id || '');
