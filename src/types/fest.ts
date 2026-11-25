@@ -201,6 +201,7 @@ export interface MarkEntry {
 export interface ResultRank {
   rank: 1 | 2 | 3 | null;
   registrationId: string;
+  codeLetter?: string;
   bib: string;
   candidateName: string;
   teamId: string;
