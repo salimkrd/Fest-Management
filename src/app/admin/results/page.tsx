@@ -503,7 +503,7 @@ export default function ResultManagementPage() {
                   {selectedResult.ranks.map(rk => (
                     <article key={rk.registrationId} className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0"><p className="break-words text-sm font-bold text-[#0F172A]">{rk.candidateName}</p><p className="mt-0.5 font-mono text-[10px] text-[#64748B]">{rk.bib}</p><p className="mt-1 text-[10px] font-semibold text-blue-700">Code Letter: <span className="font-mono font-black">{codeLettersByRegistration[rk.registrationId] || '—'}</span></p></div>
+                        <div className="min-w-0"><p className="break-words text-sm font-bold text-[#0F172A]">{rk.candidateName}</p><p className="mt-0.5 font-mono text-[10px] text-[#64748B]">{rk.bib}</p><p className="mt-1 text-[10px] font-semibold text-blue-700">Code Letter: <span className="font-mono font-black">{rk.codeLetter || codeLettersByRegistration[rk.registrationId] || '—'}</span></p></div>
                         <div className="shrink-0 text-right">
                           {rk.rank === 1 ? <Badge variant="warning" size="sm">1st Place</Badge> : rk.rank === 2 ? <Badge variant="default" size="sm">2nd Place</Badge> : rk.rank === 3 ? <Badge variant="info" size="sm">3rd Place</Badge> : <Badge variant="default" size="sm">No Prize</Badge>}
                         </div>
@@ -545,7 +545,7 @@ export default function ResultManagementPage() {
                           </td>
                           <td className="py-3 px-4 text-center">
                             <span className="inline-flex min-w-10 items-center justify-center rounded-lg bg-blue-50 px-2.5 py-1.5 font-mono text-sm font-black text-blue-700 ring-1 ring-inset ring-blue-100">
-                              {codeLettersByRegistration[rk.registrationId] || '—'}
+                              {rk.codeLetter || codeLettersByRegistration[rk.registrationId] || '—'}
                             </span>
                           </td>
                           <td className="py-3 px-4">
