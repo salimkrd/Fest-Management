@@ -36,6 +36,10 @@ export default function PublicChampionshipPage() {
     return displayedTeams.reduce((acc, team) => acc + (team.totalPoints || 0), 0);
   }, [displayedTeams, divisionRankingUnavailable]);
 
+  if (theme.showHouseChampionshipLeaderboard === false) {
+    return <PublicLayout><div className="max-w-3xl mx-auto py-20 text-center"><h1 className="text-xl font-bold text-[#F2F3E6]">Team Championship Standings Unavailable</h1><p className="text-sm text-[#F2F3E6]/70 mt-2">The public leaderboard is currently hidden by the festival administrator.</p></div></PublicLayout>;
+  }
+
   return (
     <PublicLayout>
       <div className="public-page-stack space-y-8 max-w-7xl mx-auto">

@@ -318,6 +318,8 @@ export interface PosterTemplate {
 }
 
 export interface PublicThemeSettings {
+  /** Public visibility for house-wise championship standings; missing legacy values default to visible. */
+  showHouseChampionshipLeaderboard?: boolean;
   festivalName: string;
   /** Only the official festival name text uses this font. */
   festivalNameFont?: string;

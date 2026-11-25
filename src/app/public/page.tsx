@@ -214,14 +214,14 @@ export default function InspirathPublicHomePage() {
                     <span className="tracking-wide">Explore Results</span>
                   </Link>
 
-                  <Link
+                  {theme.showHouseChampionshipLeaderboard !== false && <Link
                     className="btn-hero-secondary px-7 py-3.5 rounded text-[#FFF8EE] font-body text-sm sm:text-base uppercase tracking-wider font-bold backdrop-blur-md inline-flex items-center justify-center gap-2.5 group shadow-lg cursor-pointer leading-none whitespace-nowrap w-full sm:w-auto"
                     data-path="team-championship"
                     href="#team-championship"
                   >
                     <PublicIcon name="leaderboard" className="text-[20px] group-hover:translate-x-0.5 transition-transform text-[#FDBF0F]" />
                     <span className="tracking-wide">Team Championship</span>
-                  </Link>
+                  </Link>}
                 </div>
               </div>
 
@@ -307,6 +307,7 @@ export default function InspirathPublicHomePage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {theme.showHouseChampionshipLeaderboard !== false && (
               {/* LEFT COLUMN: House Championship Standings (From Live Firebase Teams) */}
               <div className="lg:col-span-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between mb-1">
@@ -414,8 +415,9 @@ export default function InspirathPublicHomePage() {
                 )}
               </div>
 
+              )}
               {/* RIGHT COLUMN: Quick Competition Result Finder with Real Searchable Dropdowns/Filters */}
-              <div className="lg:col-span-6 flex flex-col">
+              <div className={`${theme.showHouseChampionshipLeaderboard === false ? "lg:col-span-12" : "lg:col-span-6"} flex flex-col`}>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-cinematic-editorial text-lg sm:text-lg font-bold text-[#FFF8EE] flex items-center gap-2 tracking-[0.12em] uppercase">
                     <PublicIcon name="manage_search" className="text-[#FDBF0F] text-[24px]" />
