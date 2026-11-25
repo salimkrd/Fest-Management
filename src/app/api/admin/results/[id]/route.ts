@@ -4,7 +4,11 @@ import { PointsLedgerService } from '@/services/pointsLedgerService';
 import { JudgeService } from '@/services/judgeService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { calculateGrade, getChampionshipPoints, Grade } from '@/domain/scoring';
-import { recoverResultRankIntegrity, type RegistrationIdentityRecord } from '@/domain/resultRankIntegrity';
+import {
+  recoverResultRankIntegrity,
+  type RegistrationIdentityRecord,
+  type GreenRoomAssignmentIdentityRecord
+} from '@/domain/resultRankIntegrity';
 
 export async function POST(
   req: NextRequest,
@@ -66,16 +70,25 @@ export async function POST(
         throw new Error('Validation Error: Result ranks contain invalid registration, mark or position data.');
       }
 
-      const sourceSnapshots = await Promise.all(
-        rawRanks.map(rank => db.collection('registrations').doc(String(rank.registrationId)).get())
-      );
-      const targetRegistrationsSnapshot = await db.collection('registrations')
-        .where('competitionId', '==', result.competitionId)
-        .get();
+      const [sourceSnapshots, targetRegistrationsSnapshot, greenRoomAssignmentsSnapshot] = await Promise.all([
+        Promise.all(rawRanks.map(rank =>
+          db.collection('registrations').doc(String(rank.registrationId)).get()
+        )),
+        db.collection('registrations')
+          .where('competitionId', '==', result.competitionId)
+          .get(),
+        db.collection('greenRoomAssignments')
+          .where('competitionId', '==', result.competitionId)
+          .get()
+      ]);
       const targetRegistrations = targetRegistrationsSnapshot.docs.map(document => ({
         ...document.data(),
         id: document.id
       } as RegistrationIdentityRecord));
+      const greenRoomAssignments = greenRoomAssignmentsSnapshot.docs.map(document => ({
+        ...document.data(),
+        id: document.id
+      } as GreenRoomAssignmentIdentityRecord));
 
       const currentCompetition = competitionSnapshot.data()!;
       const foreignCompetitionIds = Array.from(new Set(
@@ -88,7 +101,7 @@ export async function POST(
         foreignCompetitionIds.map(competitionId => db.collection('competitions').doc(competitionId).get())
       );
       const normalizeIdentity = (value: unknown) =>
-        String(value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+        String(value ?? '').trim().toLocaleLowerCase().replace(/\\s+/g, ' ');
       const duplicateCompetitionIds = new Set<string>();
       foreignCompetitionSnapshots.forEach(snapshot => {
         if (!snapshot.exists) return;
@@ -101,7 +114,7 @@ export async function POST(
         if (isExactDuplicate) duplicateCompetitionIds.add(snapshot.id);
       });
 
-      const { ranks: recoveredRanks, remappedRegistrations, duplicateRowsRemoved } = recoverResultRankIntegrity({
+      const { ranks: recoveredRanks, remappedRegistrations, recoveredFromGreenRoomAssignments, duplicateRowsRemoved } = recoverResultRankIntegrity({
         competitionId: result.competitionId,
         ranks: rawRanks.map(rank => ({
           rank: rank.rank as 1 | 2 | 3 | null,
@@ -115,13 +128,15 @@ export async function POST(
           score: rank.score as number,
           grade: typeof rank.grade === 'string' ? rank.grade as Grade : 'NO_GRADE',
           officialPoints: 0,
-          totalEarnedPoints: 0
+          totalEarnedPoints: 0,
+          codeLetter: typeof rank.codeLetter === 'string' ? rank.codeLetter : undefined
         })),
         sourceRegistrations: sourceSnapshots.map(snapshot => snapshot.exists
           ? { ...snapshot.data(), id: snapshot.id } as RegistrationIdentityRecord
           : undefined),
         targetRegistrations,
-        duplicateCompetitionIds
+        duplicateCompetitionIds,
+        greenRoomAssignments
       });
 
       const ranks = recoveredRanks.map(rank => {
@@ -140,16 +155,23 @@ export async function POST(
         ranks,
         resultStatus: 'READY_TO_PUBLISH',
         marksStatus: 'COMPLETE',
-        ...(remappedRegistrations.length > 0 || duplicateRowsRemoved > 0 ? {
+        ...(remappedRegistrations.length > 0 ||
+          recoveredFromGreenRoomAssignments.length > 0 ||
+          duplicateRowsRemoved > 0 ? {
           integrityRecovery: {
             remappedRegistrations,
+            recoveredFromGreenRoomAssignments,
             duplicateRowsRemoved,
             recoveredAt: new Date().toISOString()
           }
         } : {}),
         updatedAt: new Date().toISOString()
       });
-      return NextResponse.json({ success: true, ranks }, { status: 200 });
+      return NextResponse.json({
+        success: true,
+        ranks,
+        recoveredFromGreenRoomAssignments
+      }, { status: 200 });
     }
 
     if (body.action === 'PUBLISH') {
