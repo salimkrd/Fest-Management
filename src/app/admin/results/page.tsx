@@ -474,6 +474,8 @@ export default function ResultManagementPage() {
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">House</span><span className="mt-0.5 block text-xs font-semibold text-[#0F172A]">{rk.teamName} <span className="font-normal text-[#64748B]">({rk.teamCode})</span></span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">{selectedResult.type === 'GROUP' ? 'Team points' : 'Points'}</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-emerald-700">+{rk.officialPoints ?? rk.totalEarnedPoints} pts</span></div>
                       </div>
                       {selectedResult.type === 'GROUP' && <p className="mt-2 text-[10px] font-medium text-[#64748B]">Points are awarded to the team only.</p>}
                     </article>
