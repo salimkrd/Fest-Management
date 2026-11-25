@@ -3,6 +3,7 @@ import { AuthService } from '@/services/authService';
 import { PointsLedgerService } from '@/services/pointsLedgerService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import type { CompetitionRankInput } from '@/domain/ledger';
+import { findDuplicateRegistrationGroups } from '@/domain/registrationIntegrity';
 import type { CompetitionType } from '@/domain/scoring';
 
 export async function POST(req: NextRequest) {
@@ -46,6 +47,12 @@ export async function POST(req: NextRequest) {
       if (!Array.isArray(result.ranks) || !result.competitionId || !['SOLO', 'GROUP'].includes(result.type)) {
         throw new Error(`Validation Error: Result "${snapshot.id}" is incomplete.`);
       }
+      const ranks = result.ranks as CompetitionRankInput[];
+      const registrationIds = ranks.map(rank => rank.registrationId);
+      if (registrationIds.some(id => typeof id !== 'string' || !id.trim()) ||
+          new Set(registrationIds).size !== registrationIds.length) {
+        throw new Error(`Duplicate Registration Error: Result "${snapshot.id}" contains missing or repeated registration IDs. Reconfirm the ranks before publishing.`);
+      }
       return {
         resultId: snapshot.id,
         competition: {
@@ -54,9 +61,42 @@ export async function POST(req: NextRequest) {
           name: result.competitionName || '',
           type: result.type as CompetitionType
         },
-        ranks: result.ranks as CompetitionRankInput[]
+        ranks
       };
     });
+
+    for (const result of results) {
+      const registrationSnapshots = await Promise.all(
+        result.ranks.map(rank => db.collection('registrations').doc(rank.registrationId).get())
+      );
+      const identities = registrationSnapshots.map((registrationSnapshot, index) => {
+        const registration = registrationSnapshot.data();
+        if (!registrationSnapshot.exists ||
+            registration?.competitionId !== result.competition.id ||
+            String(registration?.status || '').trim().toUpperCase() !== 'APPROVED') {
+          throw new Error(`Validation Error: Registration "${result.ranks[index].registrationId}" is no longer approved for "${result.competition.name}". Reconfirm the result before publishing.`);
+        }
+        return {
+          id: registrationSnapshot.id,
+          participantId: typeof registration.participantId === 'string' ? registration.participantId : undefined,
+          groupLeaderId: typeof registration.groupLeaderId === 'string' ? registration.groupLeaderId : undefined,
+          groupMembers: Array.isArray(registration.groupMembers) ? registration.groupMembers.filter((id: unknown): id is string => typeof id === 'string') : [],
+          participantName: typeof registration.participantName === 'string' ? registration.participantName : undefined,
+          code: typeof registration.code === 'string' ? registration.code : undefined,
+          teamCode: typeof registration.teamCode === 'string' ? registration.teamCode : undefined,
+          status: typeof registration.status === 'string' ? registration.status : undefined
+        };
+      });
+      const duplicates = findDuplicateRegistrationGroups(identities, result.competition.type);
+      if (duplicates.length > 0) {
+        const details = duplicates.map(group =>
+          group.records.map(record => `${record.participantName || record.id} [${record.code || record.id}]`).join(' / ')
+        );
+        throw new Error(
+          `Duplicate Registration Error: "${result.competition.name}" has repeated entrants: ${details.join('; ')}. Cancel or reject the extra registration, then refresh and reconfirm the result.`
+        );
+      }
+    }
 
     const outcome = await PointsLedgerService.publishResultsPoints({ results, adminIdToken });
     return NextResponse.json(outcome, { status: 200 });
