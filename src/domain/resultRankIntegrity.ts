@@ -100,7 +100,7 @@ export function recoverResultRankIntegrity(params: {
     );
 
     let target: RegistrationIdentityRecord | undefined;
-    if (sourceIsValid) {
+    if (source && source.competitionId === params.competitionId && isApproved(source)) {
       target = source;
     } else {
       const mayRecoverAcrossCompetition = Boolean(
@@ -134,10 +134,21 @@ export function recoverResultRankIntegrity(params: {
         );
       }
       target = candidates[0];
+      if (!target) {
+        throw new Error(
+          `Validation Error: No approved registration could be resolved for "${rank.registrationId}". No result data was changed.`
+        );
+      }
       remappedRegistrations.push({
         fromRegistrationId: rank.registrationId,
         toRegistrationId: target.id
       });
+    }
+
+    if (!target) {
+      throw new Error(
+        `Validation Error: No approved registration could be resolved for "${rank.registrationId}". No result data was changed.`
+      );
     }
 
     recovered.push({
