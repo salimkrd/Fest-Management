@@ -140,8 +140,14 @@ function PodiumLaureateCard({ rank, position, photoUrl }: PodiumLaureateCardProp
 
         <div className={`bg-[#1B090B] p-3 rounded-xl border flex items-center justify-between font-mono ${isGold ? 'p-3.5 border-[#FDBF0F]/40 shadow-inner' : 'border-white/5'}`}>
           <div>
-            <span className={`text-[9px] uppercase tracking-wider block ${isGold ? 'text-[#FDBF0F] font-bold' : 'text-[#F2F3E6]/60'}`}>Points Awarded</span>
-            <span className={`font-black ${isGold ? 'text-lg text-[#FDBF0F]' : `text-base ${isSilver ? 'text-[#D8C8B7]' : 'text-[#FDBF0F]'}`}>
+            <span className={`text-[9px] uppercase tracking-wider block ${isGold ? 'text-[#FDBF0F] font-bold' : 'text-[#F2F3E6]/60'}`}>Ratified Merit</span>
+            <span className={`font-extrabold ${isGold ? 'text-lg text-[#FDBF0F]' : `text-base ${isSilver ? 'text-[#D8C8B7]' : 'text-[#F2F3E6]'}`}`}>
+              Grade {rank.grade || (isGold ? 'A+' : 'A')}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className={`text-[9px] uppercase tracking-wider block ${isGold ? 'text-[#FDBF0F] font-bold' : 'text-[#F2F3E6]/60'}`}>Accredited Points</span>
+            <span className={`font-black ${isGold ? 'text-lg text-[#FDBF0F]' : `text-base ${isSilver ? 'text-[#D8C8B7]' : 'text-[#FDBF0F]'}`}`}>
               {points === null ? 'Unavailable' : `+${points} PTS`}
             </span>
           </div>
@@ -218,7 +224,7 @@ function CompetitionDetailContent() {
   const handleWhatsAppShare = () => {
     if (typeof window !== 'undefined') {
       const text = encodeURIComponent(
-        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n${formatPublicPodiumSummary(podiumRanks)}\n\nView official results: ${window.location.href}`
+        `*${theme.festivalName?.trim() || 'Official Festival'} — Official Ratified Result*\n🏆 *${result?.competitionName}* (${result?.categoryName} Division)\n${formatPublicPodiumSummary(podiumRanks)}\n\nView full official scorecard: ${window.location.href}`
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     }
@@ -228,7 +234,7 @@ function CompetitionDetailContent() {
     return (
       <div className="p-12 text-center rounded-2xl bg-[#230D0F] border border-[#BA1912]/30 max-w-xl mx-auto my-8">
         <Loader2 className="w-8 h-8 text-[#FDBF0F] animate-spin mx-auto mb-3" />
-        <h3 className="text-sm font-bold text-[#F2F3E6]">Loading Competition Results…</h3>
+        <h3 className="text-sm font-bold text-[#F2F3E6]">Loading Competition Scorecard…</h3>
         <p className="text-xs text-[#F2F3E6]/60 mt-1">Fetching official ratified adjudication records</p>
       </div>
     );
@@ -332,7 +338,7 @@ function CompetitionDetailContent() {
             </h1>
 
             <p className="text-xs sm:text-sm text-[#F2F3E6]/75 max-w-2xl leading-relaxed font-sora">
-              Official competition results and points awarded to each participant.
+              Rules of Tajweed, Maqamat &amp; Vocal Cadence. Official convocation adjudication and ratified merit scores.
             </p>
           </div>
 
@@ -507,6 +513,7 @@ function CompetitionDetailContent() {
                 <th className="py-3.5 px-4">Candidate / Ensemble</th>
                 <th className="py-3.5 px-4 font-mono">Bib #</th>
                 <th className="py-3.5 px-4">Contingent Delegation</th>
+                <th className="py-3.5 px-4 text-center">Ratified Grade</th>
                 <th className="py-3.5 px-4 text-right">Points Accredited</th>
               </tr>
             </thead>
@@ -551,6 +558,13 @@ function CompetitionDetailContent() {
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-[#F2F3E6]">{rk.teamName}</span>{' '}
                     <span className="text-[10px] text-[#F2F3E6]/60 font-mono">({rk.teamCode})</span>
+                  </td>
+
+                  {/* Ratified Grade */}
+                  <td className="py-3.5 px-4 text-center">
+                    <span className="px-2.5 py-1 rounded bg-[#1B090B] text-[#FDBF0F] border border-[#FDBF0F]/30 font-bold text-xs font-mono">
+                      Grade {rk.grade || '—'}
+                    </span>
                   </td>
 
                   {/* Points Accredited */}
@@ -608,6 +622,12 @@ function CompetitionDetailContent() {
                 </p>
               </div>
 
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs font-mono">
+                <span className="text-[#F2F3E6]/60">Official Grade:</span>
+                <span className="px-2 py-0.5 rounded bg-[#230D0F] text-[#FDBF0F] font-bold border border-[#FDBF0F]/30">
+                  Grade {rk.grade || '—'}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -628,7 +648,7 @@ function CompetitionDetailContent() {
               Jury Bench Ratification &amp; Validation
             </h4>
             <p className="text-xs text-[#F2F3E6]/70 mt-0.5 leading-relaxed font-sora">
-              Official results and point allocations are ratified by the Central Directorate of Examination.
+              Ratified under the authority of the Central Directorate of Examination. Scores and placings are permanent and sealed for official convocation records.
             </p>
           </div>
         </div>
