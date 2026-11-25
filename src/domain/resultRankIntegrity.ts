@@ -21,7 +21,7 @@ export interface ResultRankRecovery {
 }
 
 function normalize(value: unknown): string {
-  return String(value ?? '').trim().toLocaleLowerCase().replace(/\\s+/g, ' ');
+  return String(value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 }
 
 function isApproved(record: RegistrationIdentityRecord): boolean {
