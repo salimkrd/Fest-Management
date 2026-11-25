@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useFest } from '@/context/FestContext';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
-import { Trophy, Sparkles, FileText, UserRound } from 'lucide-react';
+import { Trophy, Sparkles, FileText, UserRound, Image as ImageIcon } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -18,6 +18,7 @@ function PublicNavLinks() {
 
   const navLinks = [
     { name: 'Latest Results', href: '/', icon: Sparkles, label: 'HOME' },
+    { name: 'Gallery', href: '/gallery', icon: ImageIcon, label: 'GALLERY' },
     { name: 'Results Directory', href: '/public/directory', icon: FileText, label: 'RESULTS DIRECTORY' },
     { name: 'Team Championship', href: '/public/championship', icon: Trophy, label: 'TEAM CHAMPIONSHIP' },
   ];
@@ -52,6 +53,7 @@ function MobileBottomNav() {
 
   const mobileTabs = [
     { name: 'Home', href: '/', icon: 'home' },
+    { name: 'Gallery', href: '/gallery', icon: 'photo_library' },
     { name: 'Results', href: '/public/directory', icon: 'menu_book' },
     { name: 'Teams', href: '/public/championship', icon: 'military_tech' },
   ];
