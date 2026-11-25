@@ -231,7 +231,16 @@ export interface FirestoreMarkEntry {
 export interface FirestoreResultRank {
   rank: 1 | 2 | 3 | null;
   registrationId: string;
+  codeLetter?: string;
   bib: string;
+  candidateName: string;
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  score: number;
+  grade: Grade;
+  officialPoints: number;
+}
   candidateName: string;
   teamId: string;
   teamCode: string;
