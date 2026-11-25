@@ -2124,13 +2124,32 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCompetition = async (compData: Omit<Competition, 'id' | 'entriesCount'>) => {
+    const normalizedCode = compData.code.trim().toLocaleUpperCase();
+    if (!normalizedCode) throw new Error('Validation Error: Competition code is required.');
+
+    const duplicateInState = competitions.find(comp =>
+      comp.code.trim().toLocaleUpperCase() === normalizedCode
+    );
+    if (duplicateInState) {
+      throw new Error(`Duplicate Competition Code: "${normalizedCode}" is already assigned to "${duplicateInState.name}". Edit the existing competition instead of creating another copy.`);
+    }
+
     const newId = 'cmp-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
     const newComp: Competition = {
       ...compData,
+      code: normalizedCode,
       id: newId,
       entriesCount: 0
     };
     if (!isIsolatedDemoOrTest && db) {
+      const existingCompetitions = await getDocs(collection(db, 'competitions'));
+      const duplicate = existingCompetitions.docs.find(document =>
+        String(document.data().code || '').trim().toLocaleUpperCase() === normalizedCode
+      );
+      if (duplicate) {
+        const duplicateName = String(duplicate.data().name || 'an existing competition');
+        throw new Error(`Duplicate Competition Code: "${normalizedCode}" is already assigned to "${duplicateName}". No new competition was created.`);
+      }
       await setDoc(doc(db, 'competitions', newId), sanitizeForFirestore(newComp));
     }
     setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
