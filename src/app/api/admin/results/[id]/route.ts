@@ -141,18 +141,24 @@ export async function POST(
       if (resultRanks.length === 0) {
         throw new Error('Validation Error: A result must contain at least one verified rank before publication.');
       }
-      const registrationIds = resultRanks.map((rank: Record<string, unknown>) => rank.registrationId);
-      if (registrationIds.some((id: unknown) => typeof id !== 'string' || !id.trim()) ||
-          new Set(registrationIds).size !== registrationIds.length) {
-        throw new Error('Duplicate Registration Error: The saved result contains missing or repeated registration IDs. Reconfirm the ranks before publishing.');
+      const rawRegistrationIds: unknown[] = resultRanks.map((rank: Record<string, unknown>) => rank.registrationId);
+      if (rawRegistrationIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+        throw new Error('Validation Error: The saved result contains a missing registration ID. Reconfirm the ranks before publishing.');
+      }
+      const registrationIds = rawRegistrationIds as string[];
+      if (new Set(registrationIds).size !== registrationIds.length) {
+        throw new Error('Duplicate Registration Error: The saved result contains repeated registration IDs. Reconfirm the ranks before publishing.');
       }
       const savedRegistrationSnapshots = await Promise.all(
-        registrationIds.map((registrationId: string) => db.collection('registrations').doc(registrationId).get())
+        registrationIds.map(registrationId => db.collection('registrations').doc(registrationId).get())
       );
       const savedRegistrationIdentities = savedRegistrationSnapshots.map((snapshot, index) => {
+        if (!snapshot.exists) {
+          throw new Error(`Validation Error: Registration "${registrationIds[index]}" no longer exists. Reconfirm the result before publishing.`);
+        }
         const registration = snapshot.data();
-        if (!snapshot.exists || registration?.competitionId !== result.competitionId ||
-            String(registration?.status || '').trim().toUpperCase() !== 'APPROVED') {
+        if (!registration || registration.competitionId !== result.competitionId ||
+            String(registration.status || '').trim().toUpperCase() !== 'APPROVED') {
           throw new Error(`Validation Error: Registration "${registrationIds[index]}" is no longer approved for this competition. Reconfirm the result before publishing.`);
         }
         return {
