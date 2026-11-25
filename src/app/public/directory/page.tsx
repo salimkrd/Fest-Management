@@ -8,6 +8,7 @@ import { PosterDownloadDialog } from '@/components/domain/PosterDownloadDialog';
 import { useFest } from '@/context/FestContext';
 import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/PublicIcon';
 import { getPodiumResultRanks } from '@/domain/publicResults';
+import { getPublishedOfficialPoints } from '@/domain/publicChampionship';
 
 function DirectoryContent() {
   const searchParams = useSearchParams();
@@ -103,7 +104,7 @@ function DirectoryContent() {
 
           {/* Subtitle Description */}
           <p className="text-xs sm:text-sm text-[#F2F3E6]/75 max-w-2xl leading-relaxed mb-6">
-            Official merit ledger, ratified scorecards, and commemorative gazette records across all individual items and group ensembles.
+            Official published results and awarded points across all individual items and group ensembles.
           </p>
 
           {/* Live Results Counter & Metadata Ribbon */}
@@ -255,7 +256,7 @@ function DirectoryContent() {
               Festival Dates: {formatPublicFestivalDates(theme.festivalStartDate, theme.festivalEndDate)}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1B090B] text-[#F2F3E6] rounded border border-white/5">
-              Status: Ratified Scorecards Only
+              Status: Published Results Only
             </span>
             {selectedCategory !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#BA1912]/30 text-[#FDBF0F] rounded border border-[#BA1912]/60 font-semibold">
@@ -396,7 +397,7 @@ function DirectoryContent() {
                         </div>
                         <div className="text-right shrink-0">
                           <span className={`px-2 py-0.5 rounded bg-[#230D0F] text-[10px] font-semibold uppercase block ${rk.rank === 1 ? 'text-[#FDBF0F] border border-[#FDBF0F]/30' : 'text-[#F2F3E6]/80'}`}>
-                            Grade {rk.grade || '—'}
+                            {getPublishedOfficialPoints(rk) === null ? 'Points unavailable' : `${getPublishedOfficialPoints(rk)} PTS`}
                           </span>
                         </div>
                       </div>
