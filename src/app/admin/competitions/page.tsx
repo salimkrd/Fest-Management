@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle, FileDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Trophy, MapPin, AlertCircle, FileDown, Printer } from 'lucide-react';
 
 export default function CompetitionsPage() {
   const { competitions, categories, schedules, registrations, participants, results, markEntries, addCompetition, updateCompetition, deleteCompetition } = useFest();
@@ -436,7 +436,7 @@ export default function CompetitionsPage() {
   return (
     <AdminLayout>
       <>
-      <div className="w-full max-w-[1600px] space-y-6 lg:space-y-8">
+      <div className="w-full max-w-[1600px] space-y-6 lg:space-y-8 print:hidden">
         {/* Header */}
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -447,14 +447,25 @@ export default function CompetitionsPage() {
               Configure festival artistic, literary, and stage events with judging criteria
             </p>
           </div>
-          <Button
-            variant="primary"
-            size="md"
-            leftIcon={<Plus className="w-4 h-4" />}
-            onClick={handleOpenAdd}
-          >
-            Create Competition
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<Printer className="w-4 h-4" />}
+              onClick={() => window.print()}
+              disabled={filteredCompetitions.length === 0}
+            >
+              Print Competition List
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={handleOpenAdd}
+            >
+              Create Competition
+            </Button>
+          </div>
         </div>
 
         {/* Action Error Banner */}
@@ -736,6 +747,139 @@ export default function CompetitionsPage() {
           </form>
         </Modal>
       </div>
+
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 12mm;
+          }
+
+          html,
+          body {
+            background: #ffffff !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          #competition-print-area,
+          #competition-print-area * {
+            visibility: visible !important;
+          }
+
+          #competition-print-area {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            background: #ffffff !important;
+            color: #111827 !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+          }
+
+          #competition-print-area table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 8.5pt;
+          }
+
+          #competition-print-area thead {
+            display: table-header-group;
+          }
+
+          #competition-print-area tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          #competition-print-area th,
+          #competition-print-area td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 7px;
+            text-align: left;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+          }
+
+          #competition-print-area th {
+            background: #eaf0f8 !important;
+            color: #1e293b !important;
+            font-size: 7.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          #competition-print-area .print-muted {
+            color: #475569 !important;
+          }
+        }
+      `}</style>
+
+      <section id="competition-print-area" className="hidden">
+        <div className="mb-5 flex items-end justify-between border-b-2 border-slate-800 pb-3">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-wide text-slate-950">INSPIRATH</h1>
+            <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-slate-700">Competition Directory</p>
+            <p className="mt-1 text-xs text-slate-500">Official competition list</p>
+          </div>
+          <div className="text-right text-xs text-slate-600">
+            <p>Printed: {new Date().toLocaleString('en-IN')}</p>
+            <p className="mt-1 font-semibold">{filteredCompetitions.length} of {competitions.length} competitions</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '7%' }}>Code</th>
+              <th style={{ width: '19%' }}>Competition</th>
+              <th style={{ width: '12%' }}>Category</th>
+              <th style={{ width: '8%' }}>Type</th>
+              <th style={{ width: '8%' }}>Performance</th>
+              <th style={{ width: '6%' }}>Group Size</th>
+              <th style={{ width: '6%' }}>Entries</th>
+              <th style={{ width: '12%' }}>Stage</th>
+              <th style={{ width: '14%' }}>Assigned Judges</th>
+              <th style={{ width: '8%' }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCompetitions.map((comp, index) => {
+              const stageNames = [...new Set(
+                schedules
+                  .filter(slot => slot.competitionId === comp.id)
+                  .map(slot => slot.stageName)
+                  .filter(Boolean)
+              )];
+              const judges = getAssignedJudgeNames(comp.id);
+              return (
+                <tr key={comp.id}>
+                  <td>{comp.code || '—'}</td>
+                  <td>{index + 1}. {comp.name}</td>
+                  <td>{comp.categoryName || '—'}</td>
+                  <td>{comp.type === 'GROUP' ? 'Group' : 'Individual'}</td>
+                  <td>{comp.performanceMode === 'STAGE' ? 'Stage' : comp.performanceMode === 'OFF_STAGE' ? 'Off Stage' : 'Unclassified'}</td>
+                  <td>{comp.type === 'GROUP' ? (comp.groupSize || 'Not set') : '—'}</td>
+                  <td>{comp.entriesCount ?? 0}</td>
+                  <td>{stageNames.join(', ') || 'Not scheduled'}</td>
+                  <td>{judges.length > 0 ? judges.join(', ') : 'Pending Assignment'}</td>
+                  <td>{(comp.scheduleStatus || 'SCHEDULED').replace('_', ' ')}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <p className="print-muted mt-3 text-right text-xs">
+          INSPIRATH Fest Management · Competition Directory
+        </p>
+      </section>
       </>
     </AdminLayout>
   );
