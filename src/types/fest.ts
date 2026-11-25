@@ -201,7 +201,18 @@ export interface MarkEntry {
 export interface ResultRank {
   rank: 1 | 2 | 3 | null;
   registrationId: string;
+  codeLetter?: string;
   bib: string;
+  candidateName: string;
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  teamColor: string;
+  score: number;
+  grade: Grade; // 'A+' | 'A' | 'B' | 'C' | 'NO_GRADE'
+  officialPoints: number; // Exact matrix lookup points
+  totalEarnedPoints: number; // Backward compatibility alias
+}
   candidateName: string;
   teamId: string;
   teamCode: string;
