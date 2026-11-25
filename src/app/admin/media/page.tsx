@@ -35,6 +35,12 @@ export default function MediaManagementPage() {
             >
               <Globe className="h-4 w-4" /> Preview public gallery <ArrowUpRight className="h-4 w-4" />
             </Link>
+            <Link
+              href="/admin/media/gallery"
+              className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-auto"
+            >
+              <ArrowUpRight className="h-4 w-4" /> Open Gallery Manager
+            </Link>
           </div>
           <div className="relative mt-6 grid grid-cols-1 gap-3 border-t border-slate-100 pt-5 sm:grid-cols-3">
             <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3.5">
