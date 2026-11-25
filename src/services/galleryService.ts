@@ -180,6 +180,29 @@ export class GalleryService {
     return image;
   }
 
+  static async publishAllDrafts(adminIdToken: string): Promise<number> {
+    const admin = await AuthService.assertAdmin(adminIdToken);
+    const db = database();
+    const drafts = await db.collection('galleryImages').where('status', '==', 'DRAFT').get();
+    if (drafts.empty) return 0;
+
+    const now = new Date().toISOString();
+    const batchSize = 450;
+    for (let offset = 0; offset < drafts.docs.length; offset += batchSize) {
+      const batch = db.batch();
+      drafts.docs.slice(offset, offset + batchSize).forEach(document => {
+        batch.update(document.ref, {
+          status: 'PUBLISHED',
+          updatedAt: now,
+          updatedBy: admin.uid,
+        });
+      });
+      await batch.commit();
+    }
+
+    return drafts.docs.length;
+  }
+
   static async delete(adminIdToken: string, idValue: unknown): Promise<void> {
     await AuthService.assertAdmin(adminIdToken);
     if (typeof idValue !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(idValue)) {
