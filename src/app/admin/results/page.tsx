@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { PosterStudioModal } from '@/components/domain/PosterStudioModal';
+import { db } from '@/lib/firebase/client';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
   CheckCircle2,
   Clock,
@@ -33,6 +35,7 @@ export default function ResultManagementPage() {
   const [posterStudioResult, setPosterStudioResult] = useState<CompetitionResult | null>(null);
   const [actionError, setActionError] = useState('');
   const [savingResult, setSavingResult] = useState(false);
+  const [codeLettersByRegistration, setCodeLettersByRegistration] = useState<Record<string, string>>({});
 
   const filteredResults = results.filter(r => {
     const term = search.trim().toLowerCase();
@@ -52,6 +55,38 @@ export default function ResultManagementPage() {
     setPublishConfirmResult(current => current ? results.find(result => result.id === current.id) || null : null);
     setPosterStudioResult(current => current ? results.find(result => result.id === current.id) || null : null);
   }, [results]);
+
+  // Load the Green Room Code Letters for the competition currently being audited.
+  // Match by registrationId so letters remain correct even if result ranks are reordered.
+  useEffect(() => {
+    setCodeLettersByRegistration({});
+    if (!selectedResult?.competitionId || !db) return;
+
+    const assignmentsQuery = query(
+      collection(db, 'greenRoomAssignments'),
+      where('competitionId', '==', selectedResult.competitionId)
+    );
+
+    const unsubscribe = onSnapshot(
+      assignmentsQuery,
+      snapshot => {
+        const next: Record<string, string> = {};
+        snapshot.docs.forEach(assignmentDoc => {
+          const assignment = assignmentDoc.data() as { registrationId?: string; codeLetter?: string };
+          if (assignment.registrationId && assignment.codeLetter) {
+            next[assignment.registrationId] = assignment.codeLetter;
+          }
+        });
+        setCodeLettersByRegistration(next);
+      },
+      error => {
+        console.warn('[ResultsPage] Could not load Green Room Code Letters:', error);
+        setCodeLettersByRegistration({});
+      }
+    );
+
+    return () => unsubscribe();
+  }, [selectedResult?.competitionId]);
 
   const handleConfirmPublish = async () => {
     if (publishConfirmResult) {
@@ -468,7 +503,7 @@ export default function ResultManagementPage() {
                   {selectedResult.ranks.map(rk => (
                     <article key={rk.registrationId} className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0"><p className="break-words text-sm font-bold text-[#0F172A]">{rk.candidateName}</p><p className="mt-0.5 font-mono text-[10px] text-[#64748B]">{rk.bib}</p></div>
+                        <div className="min-w-0"><p className="break-words text-sm font-bold text-[#0F172A]">{rk.candidateName}</p><p className="mt-0.5 font-mono text-[10px] text-[#64748B]">{rk.bib}</p><p className="mt-1 text-[10px] font-semibold text-blue-700">Code Letter: <span className="font-mono font-black">{codeLettersByRegistration[rk.registrationId] || '—'}</span></p></div>
                         <div className="shrink-0 text-right">
                           {rk.rank === 1 ? <Badge variant="warning" size="sm">1st Place</Badge> : rk.rank === 2 ? <Badge variant="default" size="sm">2nd Place</Badge> : rk.rank === 3 ? <Badge variant="info" size="sm">3rd Place</Badge> : <Badge variant="default" size="sm">No Prize</Badge>}
                         </div>
@@ -489,6 +524,7 @@ export default function ResultManagementPage() {
                       <tr className="bg-[#F8FAFC] border-b border-[#E1E7EF] text-[#526070] font-bold uppercase text-[10px]">
                         <th className="py-2.5 px-4">Rank</th>
                         <th className="py-2.5 px-4">Candidate / Troupe</th>
+                        <th className="py-2.5 px-4 text-center">Code Letter</th>
                         <th className="py-2.5 px-4">House</th>
                         <th className="py-2.5 px-4 text-center">Grade</th>
                         <th className="py-2.5 px-4 text-right">Team Points</th>
@@ -506,6 +542,11 @@ export default function ResultManagementPage() {
                           <td className="py-3 px-4">
                             <span className="font-bold text-[#111111] block">{rk.candidateName}</span>
                             <span className="text-[10px] font-mono text-[#526070]">{rk.bib}</span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex min-w-10 items-center justify-center rounded-lg bg-blue-50 px-2.5 py-1.5 font-mono text-sm font-black text-blue-700 ring-1 ring-inset ring-blue-100">
+                              {codeLettersByRegistration[rk.registrationId] || '—'}
+                            </span>
                           </td>
                           <td className="py-3 px-4">
                             <span className="font-semibold text-[#111111]">{rk.teamName}</span> ({rk.teamCode})
