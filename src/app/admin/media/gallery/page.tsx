@@ -32,6 +32,7 @@ export default function GalleryManagerPage() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [savingId, setSavingId] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [publishingAll, setPublishingAll] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -192,6 +193,33 @@ export default function GalleryManagerPage() {
     }
   };
 
+  const publishAllDrafts = async () => {
+    const draftCount = images.filter(image => image.status === 'DRAFT').length;
+    if (!draftCount || publishingAll) return;
+    if (!window.confirm(`Publish all ${draftCount} draft photos across every album? They will become visible on the public gallery.`)) return;
+
+    setPublishingAll(true);
+    setError('');
+    setNotice('');
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/gallery', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'PUBLISH_ALL_DRAFTS' }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not publish draft photos.');
+      await loadImages();
+      const count = Number(payload.publishedCount || 0);
+      setNotice(`${count} draft photo${count === 1 ? '' : 's'} published successfully. They are now visible on the public gallery.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not publish draft photos.');
+    } finally {
+      setPublishingAll(false);
+    }
+  };
+
   const deleteImage = async (image: GalleryImage) => {
     if (!window.confirm(`Delete "${image.title}" permanently? This also removes the image file from storage.`)) return;
     setDeletingId(image.id);
@@ -213,6 +241,8 @@ export default function GalleryManagerPage() {
       setDeletingId('');
     }
   };
+
+  const draftCount = images.filter(image => image.status === 'DRAFT').length;
 
   const visibleImages = images.filter(image =>
     (filterAlbum === 'ALL' || image.albumId === filterAlbum) &&
@@ -315,19 +345,30 @@ export default function GalleryManagerPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-950">Photo library <span className="ml-1 text-xs font-medium text-slate-400">({images.length})</span></h2>
-              <p className="mt-1 text-xs text-slate-500">Edit details, publish, archive or permanently delete an image.</p>
+              <p className="mt-1 text-xs text-slate-500">Edit individual photos or publish all draft photos across every album at once.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <select value={filterAlbum} onChange={event => setFilterAlbum(event.target.value)} aria-label="Filter by album" className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                <option value="ALL">All albums</option>
-                {GALLERY_ALBUMS.map(album => <option key={album.id} value={album.id}>{album.name}</option>)}
-              </select>
-              <select value={filterStatus} onChange={event => setFilterStatus(event.target.value)} aria-label="Filter by status" className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                <option value="ALL">All statuses</option>
-                <option value="DRAFT">Draft</option>
-                <option value="PUBLISHED">Published</option>
-                <option value="ARCHIVED">Archived</option>
-              </select>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={filterAlbum} onChange={event => setFilterAlbum(event.target.value)} aria-label="Filter by album" className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                  <option value="ALL">All albums</option>
+                  {GALLERY_ALBUMS.map(album => <option key={album.id} value={album.id}>{album.name}</option>)}
+                </select>
+                <select value={filterStatus} onChange={event => setFilterStatus(event.target.value)} aria-label="Filter by status" className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                  <option value="ALL">All statuses</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="PUBLISHED">Published</option>
+                  <option value="ARCHIVED">Archived</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={publishAllDrafts}
+                disabled={loading || publishingAll || draftCount === 0}
+                className="inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {publishingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {publishingAll ? 'Publishing…' : `Publish All Drafts (${draftCount})`}
+              </button>
             </div>
           </div>
 
