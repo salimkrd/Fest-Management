@@ -1702,6 +1702,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   secretHash: dt.secretHash || '',
                   salt: dt.salt || '',
                   expiresAt: dt.expiresAt || '',
+                  issuedAt: dt.issuedAt || '',
                   revoked: dt.revoked || false,
                   status: dt.status === 'ACTIVE' ? 'NOT_STARTED' : (dt.status || 'NOT_STARTED'),
                   scores: dt.scores || [],
@@ -2829,6 +2830,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         secretHash: creds.assignment.secretHash,
         salt: creds.assignment.salt,
         expiresAt: creds.assignment.expiresAt,
+        issuedAt: creds.assignment.issuedAt,
         revoked: false,
         status: 'NOT_STARTED',
         scores: []

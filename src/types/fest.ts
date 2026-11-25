@@ -190,6 +190,7 @@ export interface MarkEntry {
   secretHash: string; // SHA-256 hash (never plaintext)
   salt: string;
   expiresAt?: string;
+  issuedAt?: string;
   revoked?: boolean;
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'EXPIRED' | 'REVOKED';
   submittedAt?: string;

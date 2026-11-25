@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useFest } from '@/context/FestContext';
 import { MarkEntry } from '@/types/fest';
+import { getJudgeAssignmentDisplayStatus } from '@/domain/judgeAssignmentStatus';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -56,6 +57,21 @@ interface OrphanCleanupResult {
   orphanedMarkDetails?: Array<{ id: string; competitionId: string }>;
 }
 
+const formatAssignmentCreatedAt = (value?: string) => {
+  if (!value) return 'Unavailable';
+  const createdAt = new Date(value);
+  if (Number.isNaN(createdAt.getTime())) return 'Unavailable';
+
+  return createdAt.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 export default function MarkEntryPage() {
   const { markEntries, markEntriesSyncState, competitions, addOrUpdateJudgeAssignment, revokeJudgeAssignment, cleanupOrphanedJudgeAssignments } = useFest();
 
@@ -81,6 +97,16 @@ export default function MarkEntryPage() {
   const [purging, setPurging] = useState(false);
   const [inspectResult, setInspectResult] = useState<OrphanCleanupResult | null>(null);
   const [inspectError, setInspectError] = useState<string | null>(null);
+  const [statusAsOf, setStatusAsOf] = useState<number | null>(null);
+
+  // Expiry is derived from the authoritative expiresAt timestamp. Refresh periodically
+  // so an open Mark Entry page updates automatically when an assignment expires.
+  useEffect(() => {
+    const refreshStatusClock = () => setStatusAsOf(Date.now());
+    refreshStatusClock();
+    const intervalId = window.setInterval(refreshStatusClock, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const handleInspectDryRun = async () => {
     setInspecting(true);
@@ -117,13 +143,20 @@ export default function MarkEntryPage() {
     return markEntries.filter(m => activeCompIds.has(m.competitionId));
   }, [markEntries, competitions]);
 
+  const displayEntries = useMemo(() => validMarkEntries.map(entry => ({
+    ...entry,
+    status: statusAsOf === null
+      ? entry.status
+      : getJudgeAssignmentDisplayStatus(entry, statusAsOf)
+  })), [validMarkEntries, statusAsOf]);
+
   // Assignment Form State
   const [competitionId, setCompetitionId] = useState(competitions[0]?.id || '');
   const [judgeName, setJudgeName] = useState('');
   const [judgePhone, setJudgePhone] = useState('+91 9847');
   const [error, setError] = useState('');
 
-  const filteredEntries = validMarkEntries.filter(m => {
+  const filteredEntries = displayEntries.filter(m => {
     const matchesSearch = m.competitionName.toLowerCase().includes(search.toLowerCase()) ||
                           m.competitionCode.toLowerCase().includes(search.toLowerCase()) ||
                           m.judgeName.toLowerCase().includes(search.toLowerCase());
@@ -131,11 +164,11 @@ export default function MarkEntryPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const notStartedCount = validMarkEntries.filter(m => m.status === 'NOT_STARTED').length;
-  const inProgressCount = validMarkEntries.filter(m => m.status === 'IN_PROGRESS').length;
-  const submittedCount = validMarkEntries.filter(m => m.status === 'SUBMITTED').length;
-  const expiredCount = validMarkEntries.filter(m => m.status === 'EXPIRED').length;
-  const revokedCount = validMarkEntries.filter(m => m.status === 'REVOKED' || m.revoked).length;
+  const notStartedCount = displayEntries.filter(m => m.status === 'NOT_STARTED').length;
+  const inProgressCount = displayEntries.filter(m => m.status === 'IN_PROGRESS').length;
+  const submittedCount = displayEntries.filter(m => m.status === 'SUBMITTED').length;
+  const expiredCount = displayEntries.filter(m => m.status === 'EXPIRED').length;
+  const revokedCount = displayEntries.filter(m => m.status === 'REVOKED' || m.revoked).length;
 
   const handleOpenAssign = () => {
     setCompetitionId(competitions[0]?.id || '');
@@ -367,7 +400,7 @@ export default function MarkEntryPage() {
             {filteredEntries.length === 0 ? <div className="px-4 py-10 text-center"><FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-[#0F172A]">{markEntriesSyncState === 'loading' ? 'Loading assignments…' : 'No mark entries found'}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#64748B]">{competitions.length === 0 ? 'Create a competition before assigning a judge.' : 'No judge assignments match the current search or status filter.'}</p></div> : filteredEntries.map(entry => (
               <article key={entry.id} className="space-y-3 p-4">
                 <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><span className="inline-flex rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700">{entry.competitionCode}</span><h4 className="mt-1.5 break-words text-sm font-bold leading-5 text-[#0F172A]">{entry.competitionName}</h4><p className="mt-1 text-xs text-[#64748B]">{entry.categoryName} · {entry.type === 'SOLO' ? 'Individual' : 'Group'}</p></div><div className="shrink-0">{getStatusBadge(entry.status)}</div></div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2.5"><p className="text-sm font-semibold text-[#0F172A]">{entry.judgeName}</p><p className="mt-0.5 text-xs text-[#64748B]">{entry.judgePhone}</p>{entry.submittedAt && <p className="mt-1 text-[11px] text-emerald-700">Submitted: {entry.submittedAt}</p>}</div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2.5"><p className="text-sm font-semibold text-[#0F172A]">{entry.judgeName}</p><p className="mt-0.5 text-xs text-[#64748B]">{entry.judgePhone}</p><p className="mt-1 text-[11px] text-[#64748B]">Link created: {formatAssignmentCreatedAt(entry.issuedAt)}</p>{entry.submittedAt && <p className="mt-1 text-[11px] text-emerald-700">Submitted: {entry.submittedAt}</p>}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button variant="outline" size="sm" className="w-full" leftIcon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => { setDispatchCredentials(null); setSelectedForDispatch(entry); }}>Dispatch details</Button>
                   <Button variant="secondary" size="sm" className="w-full" leftIcon={<FileSpreadsheet className="h-3.5 w-3.5" />} onClick={() => void handleOpenScorecard(entry)}>Open Sheet</Button>
@@ -437,6 +470,7 @@ export default function MarkEntryPage() {
                       <td className="py-4 px-6">
                         <span className="font-semibold text-[#111111] block">{entry.judgeName}</span>
                         <span className="text-[11px] text-[#526070]">{entry.judgePhone}</span>
+                        <span className="mt-1 block text-[11px] font-normal text-[#64748B]">Link created: {formatAssignmentCreatedAt(entry.issuedAt)}</span>
                       </td>
                       <td className="px-5 py-4 text-center">
                         {getStatusBadge(entry.status)}
