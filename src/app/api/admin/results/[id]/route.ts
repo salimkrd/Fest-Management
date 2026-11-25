@@ -4,6 +4,7 @@ import { PointsLedgerService } from '@/services/pointsLedgerService';
 import { JudgeService } from '@/services/judgeService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { calculateGrade, getChampionshipPoints, Grade } from '@/domain/scoring';
+import { recoverResultRankIntegrity } from '@/domain/resultRankIntegrity';
 
 export async function POST(
   req: NextRequest,
@@ -50,55 +51,102 @@ export async function POST(
         return NextResponse.json({ error: 'Validation Error: Competition no longer exists.' }, { status: 400 });
       }
       const maxMarks = 100;
+      const rawRanks = body.ranks as Array<Record<string, unknown>>;
+      if (rawRanks.some(rank =>
+        !rank ||
+        typeof rank !== 'object' ||
+        typeof rank.registrationId !== 'string' ||
+        !rank.registrationId.trim() ||
+        typeof rank.score !== 'number' ||
+        !Number.isFinite(rank.score) ||
+        rank.score < 0 ||
+        rank.score > maxMarks ||
+        !([1, 2, 3, null].includes(rank.rank as number | null))
+      )) {
+        throw new Error('Validation Error: Result ranks contain invalid registration, mark or position data.');
+      }
 
-      const seen = new Set<string>();
-      const ranks = await Promise.all(body.ranks.map(async (rank: Record<string, unknown>) => {
-        if (
-          typeof rank.registrationId !== 'string' ||
-          !rank.registrationId ||
-          seen.has(rank.registrationId) ||
-          typeof rank.score !== 'number' ||
-          !Number.isFinite(rank.score) ||
-          rank.score < 0 ||
-          rank.score > maxMarks ||
-          !([1, 2, 3, null].includes(rank.rank as number | null))
-        ) {
-          throw new Error('Validation Error: Result ranks contain invalid or duplicate entries.');
-        }
-        seen.add(rank.registrationId);
-
-        const registrationSnapshot = await db.collection('registrations').doc(rank.registrationId).get();
-        const registration = registrationSnapshot.data();
-        if (
-          !registrationSnapshot.exists ||
-          registration?.competitionId !== result.competitionId ||
-          registration?.status !== 'APPROVED'
-        ) {
-          throw new Error(`Validation Error: Registration "${rank.registrationId}" is not approved for this competition.`);
-        }
-
-        const grade = calculateGrade(rank.score, maxMarks);
-        const position = rank.rank as 1 | 2 | 3 | null;
-        return {
-          rank: position,
-          registrationId: rank.registrationId,
-          bib: registration.chestNumber || '',
-          candidateName: registration.participantName || '',
-          teamId: registration.teamId || '',
-          teamCode: registration.teamCode || '',
-          teamName: registration.teamName || '',
-          teamColor: rank.teamColor || '#2563EB',
-          score: rank.score,
-          grade,
-          officialPoints: getChampionshipPoints(result.type, grade as Grade, position),
-          totalEarnedPoints: getChampionshipPoints(result.type, grade as Grade, position)
-        };
+      const sourceSnapshots = await Promise.all(
+        rawRanks.map(rank => db.collection('registrations').doc(String(rank.registrationId)).get())
+      );
+      const targetRegistrationsSnapshot = await db.collection('registrations')
+        .where('competitionId', '==', result.competitionId)
+        .get();
+      const targetRegistrations = targetRegistrationsSnapshot.docs.map(document => ({
+        id: document.id,
+        ...document.data()
       }));
+
+      const currentCompetition = competitionSnapshot.data()!;
+      const foreignCompetitionIds = Array.from(new Set(
+        sourceSnapshots
+          .filter(snapshot => snapshot.exists && snapshot.data()?.competitionId !== result.competitionId)
+          .map(snapshot => String(snapshot.data()?.competitionId || ''))
+          .filter(Boolean)
+      ));
+      const foreignCompetitionSnapshots = await Promise.all(
+        foreignCompetitionIds.map(competitionId => db.collection('competitions').doc(competitionId).get())
+      );
+      const normalizeIdentity = (value: unknown) =>
+        String(value ?? '').trim().toLocaleLowerCase().replace(/\\s+/g, ' ');
+      const duplicateCompetitionIds = new Set<string>();
+      foreignCompetitionSnapshots.forEach(snapshot => {
+        if (!snapshot.exists) return;
+        const candidate = snapshot.data()!;
+        const isExactDuplicate =
+          normalizeIdentity(candidate.code) === normalizeIdentity(currentCompetition.code) &&
+          normalizeIdentity(candidate.name) === normalizeIdentity(currentCompetition.name) &&
+          normalizeIdentity(candidate.categoryId) === normalizeIdentity(currentCompetition.categoryId) &&
+          normalizeIdentity(candidate.type) === normalizeIdentity(currentCompetition.type);
+        if (isExactDuplicate) duplicateCompetitionIds.add(snapshot.id);
+      });
+
+      const { ranks: recoveredRanks, remappedRegistrations, duplicateRowsRemoved } = recoverResultRankIntegrity({
+        competitionId: result.competitionId,
+        ranks: rawRanks.map(rank => ({
+          rank: rank.rank as 1 | 2 | 3 | null,
+          registrationId: String(rank.registrationId),
+          bib: typeof rank.bib === 'string' ? rank.bib : '',
+          candidateName: typeof rank.candidateName === 'string' ? rank.candidateName : '',
+          teamId: typeof rank.teamId === 'string' ? rank.teamId : '',
+          teamCode: typeof rank.teamCode === 'string' ? rank.teamCode : '',
+          teamName: typeof rank.teamName === 'string' ? rank.teamName : '',
+          teamColor: typeof rank.teamColor === 'string' ? rank.teamColor : '#2563EB',
+          score: rank.score as number,
+          grade: typeof rank.grade === 'string' ? rank.grade as Grade : 'NO_GRADE',
+          officialPoints: 0,
+          totalEarnedPoints: 0
+        })),
+        sourceRegistrations: sourceSnapshots.map(snapshot => snapshot.exists
+          ? { id: snapshot.id, ...snapshot.data() }
+          : undefined),
+        targetRegistrations,
+        duplicateCompetitionIds
+      });
+
+      const ranks = recoveredRanks.map(rank => {
+        const grade = calculateGrade(rank.score, maxMarks);
+        const position = rank.rank;
+        const points = getChampionshipPoints(result.type, grade as Grade, position);
+        return {
+          ...rank,
+          grade,
+          officialPoints: points,
+          totalEarnedPoints: points
+        };
+      });
 
       await resultRef.update({
         ranks,
         resultStatus: 'READY_TO_PUBLISH',
         marksStatus: 'COMPLETE',
+        ...(remappedRegistrations.length > 0 || duplicateRowsRemoved > 0 ? {
+          integrityRecovery: {
+            remappedRegistrations,
+            duplicateRowsRemoved,
+            recoveredAt: new Date().toISOString()
+          }
+        } : {}),
         updatedAt: new Date().toISOString()
       });
       return NextResponse.json({ success: true, ranks }, { status: 200 });
