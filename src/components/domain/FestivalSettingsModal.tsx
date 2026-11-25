@@ -19,6 +19,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
     institutionName: theme.institutionName, logoUrl: theme.logoUrl || '', festivalStartDate: theme.festivalStartDate || '',
     festivalEndDate: theme.festivalEndDate || ''
   });
+  const [showHouseChampionshipLeaderboard, setShowHouseChampionshipLeaderboard] = useState(theme.showHouseChampionshipLeaderboard !== false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -40,6 +41,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       festivalEndDate: theme.festivalEndDate || ''
     });
     setLogoFile(null);
+    setShowHouseChampionshipLeaderboard(theme.showHouseChampionshipLeaderboard !== false);
     setError(themeSyncState === 'error' ? 'Live festival settings could not be loaded. Refresh before editing.' : '');
     setSaved(false);
   }, [isOpen, themeSyncState]); // Initialize only after the authoritative settings snapshot has loaded
@@ -52,7 +54,7 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
     event.preventDefault();
     if (saving) return;
     try {
-      const changes = normalizeFestivalSettings(logoFile ? { ...form, logoUrl: '' } : form);
+      const changes = { ...normalizeFestivalSettings(logoFile ? { ...form, logoUrl: '' } : form), showHouseChampionshipLeaderboard };
       setSaving(true); setError(''); setSaved(false);
       if (logoFile) {
         if (!auth?.currentUser) throw new Error('Sign in as Chief Administrator to upload the logo.');
@@ -119,6 +121,11 @@ export function FestivalSettingsModal({ isOpen, onClose }: Props) {
       </p>
       {error && <p role="alert" className="rounded-lg bg-red-50 text-red-700 p-3 text-xs font-semibold">{error}</p>}
       {saved && <p role="status" className="rounded-lg bg-emerald-50 text-emerald-700 p-3 text-xs font-semibold">Festival settings saved successfully.</p>}
+      <section className="rounded-xl border border-[#E1E7EF] bg-[#F8FAFC] p-4 space-y-3">
+        <div><h3 className="text-sm font-bold text-[#111827]">Public Leaderboard Visibility</h3><p className="text-xs text-[#526070] mt-1">Control whether house-wise points and rankings appear on the public website. Admin standings and all points data remain unchanged.</p></div>
+        <label className="flex items-center justify-between gap-4 cursor-pointer"><span className="text-sm font-semibold text-[#111827]">Show House Championship Leaderboard</span><input type="checkbox" checked={showHouseChampionshipLeaderboard} onChange={event => { setShowHouseChampionshipLeaderboard(event.target.checked); setSaved(false); }} className="h-5 w-5 accent-[#86152C]" /></label>
+        <p className="text-[11px] text-[#526070]">{showHouseChampionshipLeaderboard ? 'Visible on public pages.' : 'Hidden from all public pages.'}</p>
+      </section>
       <Input label="Festival Name" value={form.festivalName} required maxLength={100}
         onChange={e => change('festivalName', e.target.value)} placeholder="INSPIRAATH 26" />
       <FestivalFontPicker value={form.festivalNameFont} previewName={form.festivalName}

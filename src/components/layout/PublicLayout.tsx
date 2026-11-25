@@ -15,12 +15,13 @@ interface PublicLayoutProps {
 
 function PublicNavLinks() {
   const pathname = usePathname();
+  const { theme } = useFest();
 
   const navLinks = [
     { name: 'Latest Results', href: '/', icon: Sparkles, label: 'HOME' },
     { name: 'Gallery', href: '/gallery', icon: ImageIcon, label: 'GALLERY' },
     { name: 'Results Directory', href: '/public/directory', icon: FileText, label: 'RESULTS DIRECTORY' },
-    { name: 'Team Championship', href: '/public/championship', icon: Trophy, label: 'TEAM CHAMPIONSHIP' },
+    ...(theme.showHouseChampionshipLeaderboard !== false ? [{ name: 'Team Championship', href: '/public/championship', icon: Trophy, label: 'TEAM CHAMPIONSHIP' }] : []),
   ];
 
   return (
@@ -50,12 +51,13 @@ function PublicNavLinks() {
 
 function MobileBottomNav() {
   const pathname = usePathname();
+  const { theme } = useFest();
 
   const mobileTabs = [
     { name: 'Home', href: '/', icon: 'home' },
     { name: 'Gallery', href: '/gallery', icon: 'photo_library' },
     { name: 'Results', href: '/public/directory', icon: 'menu_book' },
-    { name: 'Teams', href: '/public/championship', icon: 'military_tech' },
+    ...(theme.showHouseChampionshipLeaderboard !== false ? [{ name: 'Teams', href: '/public/championship', icon: 'military_tech' }] : []),
   ];
 
   return (
