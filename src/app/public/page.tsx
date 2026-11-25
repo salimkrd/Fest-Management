@@ -10,7 +10,6 @@ import { PublicIcon, formatPublicFestivalDates } from '@/components/layout/Publi
 import { AnimatedBrandRibbon } from '@/components/domain/AnimatedBrandRibbon';
 import type { CompetitionResult, ResultRank } from '@/types/fest';
 import { getPodiumResultRanks } from '@/domain/publicResults';
-import { getPublishedOfficialPoints } from '@/domain/publicChampionship';
 
 export default function InspirathPublicHomePage() {
   const { theme, teams, results, categories, competitions, teamsSyncState, resultsSyncState } = useFest();
@@ -435,7 +434,7 @@ export default function InspirathPublicHomePage() {
                   }}
                 >
                   <p className="text-[13px] text-[#FFF8EE]/90 mb-4">
-                    Find published results by festival category, competition event, or candidate bib number:
+                    Filter ratified scores by official festival category, competition event, or enter candidate bib number:
                   </p>
 
                   <form className="space-y-4" onSubmit={handleQuickSearch}>
@@ -536,7 +535,7 @@ export default function InspirathPublicHomePage() {
                           </div>
                           <div className="text-right shrink-0">
                             <span className="inline-block px-3 py-1 bg-[#FDBF0F] text-[#1A080B] text-sm font-bold rounded shadow-sm">
-                              {matchedRecord.rank.rank ? `Rank ${matchedRecord.rank.rank}` : 'Contestant'} • {getPublishedOfficialPoints(matchedRecord.rank) === null ? 'Points unavailable' : `${getPublishedOfficialPoints(matchedRecord.rank)} Points`}
+                              {matchedRecord.rank.rank ? `Rank ${matchedRecord.rank.rank}` : 'Contestant'} • Grade {matchedRecord.rank.grade || '—'}
                             </span>
                             <span className="block text-xs text-[#FFF8EE]/70 mt-1 font-medium">
                               Status: Ratified
@@ -583,7 +582,7 @@ export default function InspirathPublicHomePage() {
               </h2>
               <div className="w-16 h-1 bg-[#4A0A1C] mx-auto my-3 rounded-full opacity-30" />
               <p className="font-body text-sm sm:text-base text-[#2D1217] font-medium leading-relaxed">
-                Published results ratified by the Convocation Grand Jury. Live updates across Senior, General,
+                Authenticated scorecards ratified by the Convocation Grand Jury. Live updates across Senior, General,
                 and Sub-Junior divisions.
               </p>
 
@@ -672,7 +671,7 @@ export default function InspirathPublicHomePage() {
                 <h4 className="text-lg font-bold text-[#1A080B]">No Ratified Results Published Yet</h4>
                 <p className="text-sm text-[#2D1217] mt-1 font-medium">
                   {activeDivisionTab === 'ALL'
-                    ? 'Published competition results will appear here as soon as jury panels ratify them.'
+                    ? 'Published competition results will appear here as soon as jury panels ratify scorecards.'
                     : `No results published for the ${activeDivisionTab} division yet.`}
                 </p>
               </div>
@@ -725,7 +724,7 @@ export default function InspirathPublicHomePage() {
                               </div>
                               <div className="text-right shrink-0 pl-2">
                                 <span className={`text-xs font-bold block ${rk.rank === 1 ? 'text-[#FDBF0F]' : 'text-[#FFF8EE]'}`}>
-{getPublishedOfficialPoints(rk) === null ? 'Points unavailable' : `${getPublishedOfficialPoints(rk)} Points`}
+                                  Grade {rk.grade || '—'}
                                 </span>
                                 <span className="text-[11px] text-[#FFF8EE]/70 font-medium">Rank {rk.rank}</span>
                               </div>
@@ -792,7 +791,7 @@ export default function InspirathPublicHomePage() {
                   Explore the Results Directory
                 </h3>
                 <p className="text-xs sm:text-[13px] text-[#FFF8EE]/90 font-normal mt-1 max-w-xl leading-relaxed">
-                  Browse officially published competition results, view awarded points, and access released result posters through the public directory.
+                  Browse officially published competition results, view awarded grades, and access released result posters through the public directory.
                 </p>
               </div>
 
