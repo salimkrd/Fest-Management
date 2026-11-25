@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams;
     const manage = params.get('manage') === '1';
     const albumValue = params.get('albumId') || '';
-    if (albumValue && !isGalleryAlbumId(albumValue)) {
+    const albumId = albumValue && isGalleryAlbumId(albumValue) ? albumValue : undefined;
+    if (albumValue && !albumId) {
       return NextResponse.json({ error: 'Choose a valid gallery album.' }, { status: 400, headers: noStore });
     }
     if (manage) {
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       await AuthService.assertAdmin(token);
       const result = await GalleryService.list({
         includeUnpublished: true,
-        ...(albumValue ? { albumId: albumValue } : {}),
+        ...(albumId ? { albumId } : {}),
         limit: 1000,
       });
       return NextResponse.json(result, { headers: noStore });
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     const limit = Number.isSafeInteger(limitValue) && limitValue > 0 ? Math.min(48, limitValue) : 12;
     const result = await GalleryService.list({
       includeUnpublished: false,
-      ...(albumValue ? { albumId: albumValue } : {}),
+      ...(albumId ? { albumId } : {}),
       offset,
       limit,
     });
