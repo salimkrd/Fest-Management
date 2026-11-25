@@ -101,7 +101,7 @@ export async function POST(
         foreignCompetitionIds.map(competitionId => db.collection('competitions').doc(competitionId).get())
       );
       const normalizeIdentity = (value: unknown) =>
-        String(value ?? '').trim().toLocaleLowerCase().replace(/\\s+/g, ' ');
+        String(value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
       const duplicateCompetitionIds = new Set<string>();
       foreignCompetitionSnapshots.forEach(snapshot => {
         if (!snapshot.exists) return;
