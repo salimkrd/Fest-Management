@@ -73,8 +73,8 @@ export async function POST(
         .where('competitionId', '==', result.competitionId)
         .get();
       const targetRegistrations = targetRegistrationsSnapshot.docs.map(document => ({
-        id: document.id,
-        ...document.data()
+        ...document.data(),
+        id: document.id
       }));
 
       const currentCompetition = competitionSnapshot.data()!;
@@ -118,7 +118,7 @@ export async function POST(
           totalEarnedPoints: 0
         })),
         sourceRegistrations: sourceSnapshots.map(snapshot => snapshot.exists
-          ? { id: snapshot.id, ...snapshot.data() }
+          ? { ...snapshot.data(), id: snapshot.id }
           : undefined),
         targetRegistrations,
         duplicateCompetitionIds
