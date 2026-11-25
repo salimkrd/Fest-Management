@@ -93,12 +93,6 @@ export function recoverResultRankIntegrity(params: {
 
   params.ranks.forEach((rank, index) => {
     const source = params.sourceRegistrations[index];
-    const sourceIsValid = Boolean(
-      source &&
-      source.competitionId === params.competitionId &&
-      isApproved(source)
-    );
-
     let target: RegistrationIdentityRecord | undefined;
     if (source && source.competitionId === params.competitionId && isApproved(source)) {
       target = source;
