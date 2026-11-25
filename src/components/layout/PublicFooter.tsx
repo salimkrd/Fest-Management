@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { useFest } from '@/context/FestContext';
 import { formatPublicFestivalDates } from '@/components/layout/PublicIcon';
-import { Instagram, Youtube } from 'lucide-react';
 
 export const PublicFooter: React.FC = () => {
   const { theme } = useFest();
@@ -55,7 +54,11 @@ export const PublicFooter: React.FC = () => {
                 aria-label="Open Ma'din Suffa Campus on Instagram in a new tab"
                 className="inline-flex items-center gap-1.5 text-[#F2F3E6]/75 transition-colors hover:text-[#FDBF0F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FDBF0F] focus-visible:ring-offset-2 focus-visible:ring-offset-[#120507] rounded"
               >
-                <Instagram className="h-4 w-4" aria-hidden="true" />
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
                 <span>Instagram</span>
               </a>
               <a
@@ -65,7 +68,9 @@ export const PublicFooter: React.FC = () => {
                 aria-label="Open Ma'din Suffa Campus on YouTube in a new tab"
                 className="inline-flex items-center gap-1.5 text-[#F2F3E6]/75 transition-colors hover:text-[#FDBF0F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FDBF0F] focus-visible:ring-offset-2 focus-visible:ring-offset-[#120507] rounded"
               >
-                <Youtube className="h-4 w-4" aria-hidden="true" />
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                  <path d="M23.2 7a3 3 0 0 0-2.1-2.1C19.3 4.4 12 4.4 12 4.4s-7.3 0-9.1.5A3 3 0 0 0 .8 7 31 31 0 0 0 .3 12a31 31 0 0 0 .5 5 3 3 0 0 0 2.1 2.1c1.8.5 9.1.5 9.1.5s7.3 0 9.1-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-5 31 31 0 0 0-.5-5ZM9.6 15.8V8.2l6.3 3.8-6.3 3.8Z"/>
+                </svg>
                 <span>YouTube</span>
               </a>
             </nav>
