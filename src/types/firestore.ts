@@ -241,14 +241,6 @@ export interface FirestoreResultRank {
   grade: Grade;
   officialPoints: number;
 }
-  candidateName: string;
-  teamId: string;
-  teamCode: string;
-  teamName: string;
-  score: number;
-  grade: Grade;
-  officialPoints: number;
-}
 
 export interface FirestoreResult {
   id: string;
