@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
     const isAuthError = message.toLowerCase().includes('unauthorized');
     const isConflictError = message.toLowerCase().includes('lock conflict') ||
       message.toLowerCase().includes('stale mapping') ||
-      message.toLowerCase().includes('roster integrity');
+      message.toLowerCase().includes('roster integrity') ||
+      message.toLowerCase().includes('duplicate registration');
     const isValidationError = message.toLowerCase().includes('validation error');
     const status = isAuthError ? 401 : isConflictError ? 409 : isValidationError ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

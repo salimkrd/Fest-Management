@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { AuthService } from '@/services/authService';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { isParticipantEligibleForCategory } from '@/domain/eligibility';
+import { findExistingRegistrationConflicts } from '@/domain/registrationIntegrity';
 import { Category, Participant } from '@/types/fest';
 import { FirestoreRegistration } from '@/types/firestore';
 
@@ -119,39 +120,34 @@ export class RegistrationService {
         return participant;
       });
 
-      const currentTeamEntries = existingRegistrations.docs.filter(doc => doc.data().teamId === teamId);
-      const activeTeamEntries = currentTeamEntries.filter(
-        doc => doc.data().status !== 'REJECTED' && doc.data().status !== 'CANCELLED'
+      // Enforce entrant uniqueness across the entire competition, not only
+      // within the current team. This prevents the same participant/group
+      // leader from receiving multiple registrations through another team.
+      const activeCompetitionEntries = existingRegistrations.docs.filter(doc =>
+        !['REJECTED', 'CANCELLED'].includes(String(doc.data().status || '').trim().toUpperCase())
       );
-      const selectedSet = new Set(selectedIds);
+      const currentTeamEntries = activeCompetitionEntries.filter(doc => doc.data().teamId === teamId);
+      const activeTeamEntries = currentTeamEntries;
+
       if (!isGroup) {
         const maximumEntries = Number(competition.maxEntriesPerTeam) || 1;
         if (activeTeamEntries.length + selectedIds.length > maximumEntries) {
           throw new Error(`Validation Error: This team can register ${maximumEntries} entr${maximumEntries === 1 ? 'y' : 'ies'} for this competition; ${activeTeamEntries.length} already registered.`);
         }
-        const alreadyRegistered = activeTeamEntries
-          .map(doc => doc.data().participantId)
-          .filter((id): id is string => typeof id === 'string' && selectedSet.has(id));
-        if (alreadyRegistered.length) {
-          const names = participants.filter(p => alreadyRegistered.includes(p.id)).map(p => p.name).join(', ');
-          throw new Error(`Validation Error: Already registered: ${names}.`);
-        }
-      } else {
-        const existingLeaderIds = new Set<string>();
-        for (const doc of activeTeamEntries) {
-          const data = doc.data();
-          if (data.groupLeaderId) existingLeaderIds.add(data.groupLeaderId);
-          // Retain protection against overlap with legacy full-roster group records.
-          if (Array.isArray(data.groupMembers)) {
-            for (const memberId of data.groupMembers) {
-              if (typeof memberId === 'string') existingLeaderIds.add(memberId);
-            }
-          }
-        }
-        const duplicates = participants.filter(p => existingLeaderIds.has(p.id));
-        if (duplicates.length) {
-          throw new Error(`Validation Error: Already registered as a group leader or legacy group member: ${duplicates.map(p => p.name).join(', ')}.`);
-        }
+      }
+
+      const conflicts = findExistingRegistrationConflicts(
+        activeCompetitionEntries.map(doc => ({ id: doc.id, ...doc.data() })),
+        selectedIds,
+        isGroup ? 'GROUP' : 'SOLO'
+      );
+      if (conflicts.length > 0) {
+        const details = Array.from(new Set(conflicts.map(({ identityId, record }) =>
+          `${record.participantName || identityId} (${record.code || record.id}${record.teamCode ? `, team ${record.teamCode}` : ''})`
+        )));
+        throw new Error(
+          `Validation Error: Duplicate registration found in this competition: ${details.join('; ')}. Cancel or reject the existing registration before adding this entrant again.`
+        );
       }
 
       let lastCodeNumber = Number(counterSnapshot.data()?.value);
