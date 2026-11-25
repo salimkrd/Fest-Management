@@ -336,7 +336,18 @@ export default function CompetitionsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setError('');
+
+    const normalizedCode = code.trim().toLocaleUpperCase();
+    const duplicateCode = competitions.find(comp =>
+      comp.id !== editingComp?.id &&
+      comp.code.trim().toLocaleUpperCase() === normalizedCode
+    );
+    if (duplicateCode) {
+      setError(`Competition code "${normalizedCode}" is already used by "${duplicateCode.name}". Use the existing competition or choose a unique code.`);
+      return;
+    }
 
     if (!name || !code) {
       setError('Please provide competition name and code.');
