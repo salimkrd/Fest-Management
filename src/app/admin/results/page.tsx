@@ -371,7 +371,7 @@ export default function ResultManagementPage() {
           isOpen={!!selectedResult}
           onClose={() => setSelectedResult(null)}
           title={`Tabulation Audit: ${selectedResult?.competitionName}`}
-          description="Detailed breakdown of participant marks, assigned grades, and official championship points"
+          description="Detailed breakdown of participant grades and official championship points"
           maxWidth="4xl"
           footer={
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -475,7 +475,6 @@ export default function ResultManagementPage() {
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
                         <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">House</span><span className="mt-0.5 block text-xs font-semibold text-[#0F172A]">{rk.teamName} <span className="font-normal text-[#64748B]">({rk.teamCode})</span></span></div>
-                        <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Score</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-[#0F172A]">{rk.score}</span></div>
                         <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">Grade</span><span className="mt-0.5 block text-xs font-bold text-blue-700">Grade {rk.grade}</span></div>
                         <div><span className="block text-[10px] font-semibold uppercase text-[#64748B]">{selectedResult.type === 'GROUP' ? 'Team points' : 'Points'}</span><span className="mt-0.5 block text-sm font-bold tabular-nums text-emerald-700">+{rk.officialPoints ?? rk.totalEarnedPoints} pts</span></div>
                       </div>
@@ -485,13 +484,12 @@ export default function ResultManagementPage() {
                 </div>
                 {/* Desktop audit table */}
                 <div className="hidden overflow-x-auto rounded-xl border border-[#E2E8F0] md:block">
-                  <table className="w-full min-w-[780px] text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead>
                       <tr className="bg-[#F8FAFC] border-b border-[#E1E7EF] text-[#526070] font-bold uppercase text-[10px]">
                         <th className="py-2.5 px-4">Rank</th>
                         <th className="py-2.5 px-4">Candidate / Troupe</th>
                         <th className="py-2.5 px-4">House</th>
-                        <th className="py-2.5 px-4 text-center">Score</th>
                         <th className="py-2.5 px-4 text-center">Grade</th>
                         <th className="py-2.5 px-4 text-right">Team Points</th>
                       </tr>
@@ -511,9 +509,6 @@ export default function ResultManagementPage() {
                           </td>
                           <td className="py-3 px-4">
                             <span className="font-semibold text-[#111111]">{rk.teamName}</span> ({rk.teamCode})
-                          </td>
-                          <td className="py-3 px-4 text-center font-black text-sm text-[#111111]">
-                            {rk.score}
                           </td>
                           <td className="py-3 px-4 text-center font-bold text-[#2563EB]">
                             Grade {rk.grade}
