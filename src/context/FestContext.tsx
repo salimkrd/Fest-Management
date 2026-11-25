@@ -2142,18 +2142,15 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
       entriesCount: 0
     };
     if (!isIsolatedDemoOrTest && db) {
-      const competitionRef = doc(db, 'competitions', newId);
-      await runTransaction(db, async transaction => {
-        const existingCompetitions = await transaction.get(collection(db, 'competitions'));
-        const duplicate = existingCompetitions.docs.find(document =>
-          String(document.data().code || '').trim().toLocaleUpperCase() === normalizedCode
-        );
-        if (duplicate) {
-          const duplicateName = String(duplicate.data().name || 'an existing competition');
-          throw new Error(`Duplicate Competition Code: "${normalizedCode}" is already assigned to "${duplicateName}". No new competition was created.`);
-        }
-        transaction.set(competitionRef, sanitizeForFirestore(newComp));
-      });
+      const existingCompetitions = await getDocs(collection(db, 'competitions'));
+      const duplicate = existingCompetitions.docs.find(document =>
+        String(document.data().code || '').trim().toLocaleUpperCase() === normalizedCode
+      );
+      if (duplicate) {
+        const duplicateName = String(duplicate.data().name || 'an existing competition');
+        throw new Error(`Duplicate Competition Code: "${normalizedCode}" is already assigned to "${duplicateName}". No new competition was created.`);
+      }
+      await setDoc(doc(db, 'competitions', newId), sanitizeForFirestore(newComp));
     }
     setCompetitions(prev => [...prev.filter(c => c.id !== newId), newComp]);
   };
