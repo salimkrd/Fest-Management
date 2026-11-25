@@ -433,6 +433,17 @@ export default function CompetitionsPage() {
     }
   };
 
+  // Publishing an official result completes the competition even when its
+  // operational schedule status was not manually moved to COMPLETED.
+  const getCompetitionStatusBadge = (competition: Competition) => {
+    const hasPublishedResult = results.some(result =>
+      result.competitionId === competition.id && result.resultStatus === 'PUBLISHED'
+    );
+    return getScheduleStatusBadge(
+      hasPublishedResult ? 'COMPLETED' : competition.scheduleStatus
+    );
+  };
+
   return (
     <AdminLayout>
       <>
@@ -596,7 +607,7 @@ export default function CompetitionsPage() {
                         {getAssignedJudgeNames(comp.id).length > 0 ? getAssignedJudgeNames(comp.id).join(', ') : 'Pending Assignment'}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        {getScheduleStatusBadge(comp.scheduleStatus)}
+                        {getCompetitionStatusBadge(comp)}
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
