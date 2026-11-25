@@ -138,6 +138,47 @@ export async function POST(
         return NextResponse.json({ error: 'Validation Error: Result is not ready for publication.' }, { status: 400 });
       }
       const resultRanks = Array.isArray(result.ranks) ? result.ranks : [];
+      if (resultRanks.length === 0) {
+        throw new Error('Validation Error: A result must contain at least one verified rank before publication.');
+      }
+      const registrationIds = resultRanks.map((rank: Record<string, unknown>) => rank.registrationId);
+      if (registrationIds.some((id: unknown) => typeof id !== 'string' || !id.trim()) ||
+          new Set(registrationIds).size !== registrationIds.length) {
+        throw new Error('Duplicate Registration Error: The saved result contains missing or repeated registration IDs. Reconfirm the ranks before publishing.');
+      }
+      const savedRegistrationSnapshots = await Promise.all(
+        registrationIds.map((registrationId: string) => db.collection('registrations').doc(registrationId).get())
+      );
+      const savedRegistrationIdentities = savedRegistrationSnapshots.map((snapshot, index) => {
+        const registration = snapshot.data();
+        if (!snapshot.exists || registration?.competitionId !== result.competitionId ||
+            String(registration?.status || '').trim().toUpperCase() !== 'APPROVED') {
+          throw new Error(`Validation Error: Registration "${registrationIds[index]}" is no longer approved for this competition. Reconfirm the result before publishing.`);
+        }
+        return {
+          id: snapshot.id,
+          participantId: typeof registration.participantId === 'string' ? registration.participantId : undefined,
+          groupLeaderId: typeof registration.groupLeaderId === 'string' ? registration.groupLeaderId : undefined,
+          groupMembers: Array.isArray(registration.groupMembers) ? registration.groupMembers.filter((id: unknown): id is string => typeof id === 'string') : [],
+          participantName: typeof registration.participantName === 'string' ? registration.participantName : undefined,
+          code: typeof registration.code === 'string' ? registration.code : undefined,
+          teamCode: typeof registration.teamCode === 'string' ? registration.teamCode : undefined,
+          status: typeof registration.status === 'string' ? registration.status : undefined
+        };
+      });
+      const duplicateEntrants = findDuplicateRegistrationGroups(
+        savedRegistrationIdentities,
+        result.type === 'GROUP' ? 'GROUP' : 'SOLO'
+      );
+      if (duplicateEntrants.length > 0) {
+        const details = duplicateEntrants.map(group =>
+          group.records.map(record => `${record.participantName || record.id} [${record.code || record.id}]`).join(' / ')
+        );
+        throw new Error(
+          `Duplicate Registration Error: Publication blocked because the saved result contains repeated entrants: ${details.join('; ')}. Cancel or reject the extra registration, then refresh and reconfirm the result.`
+        );
+      }
+
       const outcome = await PointsLedgerService.publishResultPoints({
         resultId: id,
         competition: {
