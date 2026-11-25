@@ -4,7 +4,7 @@ import { PointsLedgerService } from '@/services/pointsLedgerService';
 import { JudgeService } from '@/services/judgeService';
 import { getAdminDb, syncWorkloadIdentityToken } from '@/lib/firebase/admin';
 import { calculateGrade, getChampionshipPoints, Grade } from '@/domain/scoring';
-import { recoverResultRankIntegrity } from '@/domain/resultRankIntegrity';
+import { recoverResultRankIntegrity, type RegistrationIdentityRecord } from '@/domain/resultRankIntegrity';
 
 export async function POST(
   req: NextRequest,
@@ -75,7 +75,7 @@ export async function POST(
       const targetRegistrations = targetRegistrationsSnapshot.docs.map(document => ({
         ...document.data(),
         id: document.id
-      }));
+      } as RegistrationIdentityRecord));
 
       const currentCompetition = competitionSnapshot.data()!;
       const foreignCompetitionIds = Array.from(new Set(
@@ -118,7 +118,7 @@ export async function POST(
           totalEarnedPoints: 0
         })),
         sourceRegistrations: sourceSnapshots.map(snapshot => snapshot.exists
-          ? { ...snapshot.data(), id: snapshot.id }
+          ? { ...snapshot.data(), id: snapshot.id } as RegistrationIdentityRecord
           : undefined),
         targetRegistrations,
         duplicateCompetitionIds
