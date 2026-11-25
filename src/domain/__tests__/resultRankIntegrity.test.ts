@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ResultRank } from '@/types/fest';
-import { recoverResultRankIntegrity, type RegistrationIdentityRecord } from '../resultRankIntegrity';
+import {
+  recoverResultRankIntegrity,
+  type GreenRoomAssignmentIdentityRecord,
+  type RegistrationIdentityRecord
+} from '../resultRankIntegrity';
 
 const makeRank = (overrides: Partial<ResultRank> = {}): ResultRank => ({
   rank: 1,
@@ -30,6 +34,22 @@ const registration = (
   teamCode: 'T1',
   teamName: 'Team One',
   chestNumber: '1042',
+  ...overrides
+});
+
+const greenRoomAssignment = (
+  overrides: Partial<GreenRoomAssignmentIdentityRecord> = {}
+): GreenRoomAssignmentIdentityRecord => ({
+  id: 'cmp-main_reg-old',
+  competitionId: 'cmp-main',
+  registrationId: 'reg-old',
+  participantName: 'Aisha',
+  participantNameSnapshot: 'Aisha',
+  teamId: 'team-1',
+  teamCode: 'T1',
+  teamName: 'Team One',
+  chestNumber: '1042',
+  codeLetter: 'B',
   ...overrides
 });
 
@@ -69,6 +89,55 @@ describe('recoverResultRankIntegrity', () => {
     expect(result.ranks[0].registrationId).toBe('reg-canonical');
   });
 
+  it('uses the frozen Green Room assignment when registration was deleted after Code Letter assignment', () => {
+    const assignment = greenRoomAssignment();
+    const result = recoverResultRankIntegrity({
+      competitionId: 'cmp-main',
+      ranks: [makeRank()],
+      sourceRegistrations: [undefined],
+      targetRegistrations: [],
+      duplicateCompetitionIds: new Set(),
+      greenRoomAssignments: [assignment]
+    });
+
+    expect(result.ranks[0].registrationId).toBe('reg-old');
+    expect(result.ranks[0].candidateName).toBe('Aisha');
+    expect(result.ranks[0].codeLetter).toBe('B');
+    expect(result.recoveredFromGreenRoomAssignments).toEqual([{
+      registrationId: 'reg-old',
+      codeLetter: 'B',
+      candidateName: 'Aisha',
+      bib: '1042'
+    }]);
+  });
+
+  it('uses a same-competition Code Letter snapshot if source registration now belongs to another competition', () => {
+    const source = registration({ id: 'reg-old', competitionId: 'cmp-unrelated' });
+    const result = recoverResultRankIntegrity({
+      competitionId: 'cmp-main',
+      ranks: [makeRank()],
+      sourceRegistrations: [source],
+      targetRegistrations: [],
+      duplicateCompetitionIds: new Set(),
+      greenRoomAssignments: [greenRoomAssignment()]
+    });
+
+    expect(result.ranks[0].registrationId).toBe('reg-old');
+    expect(result.ranks[0].codeLetter).toBe('B');
+    expect(result.recoveredFromGreenRoomAssignments).toHaveLength(1);
+  });
+
+  it('rejects a Green Room snapshot if the participant identity does not match the result rank', () => {
+    expect(() => recoverResultRankIntegrity({
+      competitionId: 'cmp-main',
+      ranks: [makeRank()],
+      sourceRegistrations: [undefined],
+      targetRegistrations: [],
+      duplicateCompetitionIds: new Set(),
+      greenRoomAssignments: [greenRoomAssignment({ participantNameSnapshot: 'Someone Else' })]
+    })).toThrow(/no unique approved replacement or matching same-competition green room code letter snapshot/i);
+  });
+
   it('removes repeated identical rows after they resolve to the same registration', () => {
     const source = registration({ id: 'reg-old', status: 'PENDING' });
     const target = registration();
@@ -99,20 +168,19 @@ describe('recoverResultRankIntegrity', () => {
     })).toThrow(/conflicting duplicate result rows/i);
   });
 
-  it('does not remap a registration from a different, non-duplicate competition', () => {
+  it('does not remap a registration from a different, non-duplicate competition without a matching Green Room snapshot', () => {
     const source = registration({ id: 'reg-old', competitionId: 'cmp-unrelated' });
-    const target = registration();
 
     expect(() => recoverResultRankIntegrity({
       competitionId: 'cmp-main',
       ranks: [makeRank()],
       sourceRegistrations: [source],
-      targetRegistrations: [target],
+      targetRegistrations: [registration()],
       duplicateCompetitionIds: new Set()
-    })).toThrow(/not an exact duplicate/i);
+    })).toThrow(/source competition is not an exact duplicate/i);
   });
 
-  it('recovers a deleted legacy registration only with an exact team, bib and name match', () => {
+  it('recovers a deleted legacy registration from an approved entry only with an exact team, bib and name match', () => {
     const target = registration();
     const result = recoverResultRankIntegrity({
       competitionId: 'cmp-main',
@@ -125,7 +193,7 @@ describe('recoverResultRankIntegrity', () => {
     expect(result.ranks[0].registrationId).toBe('reg-canonical');
   });
 
-  it('fails closed when the replacement registration is ambiguous or missing', () => {
+  it('fails closed when the replacement registration is ambiguous or missing and no roster snapshot exists', () => {
     const source = registration({ id: 'reg-old', status: 'PENDING' });
     expect(() => recoverResultRankIntegrity({
       competitionId: 'cmp-main',
@@ -133,6 +201,17 @@ describe('recoverResultRankIntegrity', () => {
       sourceRegistrations: [source],
       targetRegistrations: [],
       duplicateCompetitionIds: new Set()
-    })).toThrow(/no unique approved replacement/i);
+    })).toThrow(/no unique approved replacement or matching same-competition green room code letter snapshot/i);
+  });
+
+  it('rejects duplicate same-competition Code Letter snapshots for one registration', () => {
+    expect(() => recoverResultRankIntegrity({
+      competitionId: 'cmp-main',
+      ranks: [makeRank()],
+      sourceRegistrations: [undefined],
+      targetRegistrations: [],
+      duplicateCompetitionIds: new Set(),
+      greenRoomAssignments: [greenRoomAssignment(), greenRoomAssignment({ codeLetter: 'C' })]
+    })).toThrow(/multiple green room code letter records/i);
   });
 });
