@@ -13,14 +13,17 @@ import {
 import Link from 'next/link';
 import { ExportService } from '@/services/exportService';
 import { DataBackupMigrationModal } from '@/components/domain/DataBackupMigrationModal';
+import { buildParticipantAchievements } from '@/domain/participantAchievements';
 
 type ExportNotice = { tone: 'success' | 'error'; message: string };
 
 export default function ExportManagementPage() {
-  const { results, theme, categories, resultsSyncState } = useFest();
+  const { results, theme, categories, resultsSyncState, participants, participantsSyncState, registrations, registrationsSyncState } = useFest();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER'>('WINNERS');
+  const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER' | 'PARTICIPANT_AWARDS'>('WINNERS');
+  const [participantAwardSearch, setParticipantAwardSearch] = useState('');
+  const [participantAwardTeamFilter, setParticipantAwardTeamFilter] = useState('ALL');
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<ExportNotice | null>(null);
@@ -35,6 +38,45 @@ export default function ExportManagementPage() {
     [results]
   );
   const publishedIds = useMemo(() => publishedResults.map(result => result.id), [publishedResults]);
+  const participantAchievements = useMemo(
+    () => buildParticipantAchievements(participants, registrations, publishedResults),
+    [participants, registrations, publishedResults]
+  );
+  const participantAwardTeamOptions = useMemo(
+    () => Array.from(new Set(participants.map(participant => participant.teamName).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [participants]
+  );
+  const filteredParticipantAchievements = useMemo(() => {
+    const term = participantAwardSearch.trim().toLowerCase();
+    return participantAchievements.filter(entry => {
+      const participant = entry.participant;
+      const matchesSearch = !term ||
+        participant.name.toLowerCase().includes(term) ||
+        participant.bib.toLowerCase().includes(term) ||
+        participant.teamName.toLowerCase().includes(term) ||
+        participant.teamCode.toLowerCase().includes(term);
+      return matchesSearch && (participantAwardTeamFilter === 'ALL' || participant.teamName === participantAwardTeamFilter);
+    }).sort((a, b) =>
+      b.firstCount - a.firstCount ||
+      b.secondCount - a.secondCount ||
+      b.thirdCount - a.thirdCount ||
+      a.participant.name.localeCompare(b.participant.name)
+    );
+  }, [participantAchievements, participantAwardSearch, participantAwardTeamFilter]);
+  const participantAwardTotals = useMemo(
+    () => filteredParticipantAchievements.reduce((totals, entry) => ({
+      first: totals.first + entry.firstCount,
+      second: totals.second + entry.secondCount,
+      third: totals.third + entry.thirdCount,
+      medals: totals.medals + entry.totalAwards
+    }), { first: 0, second: 0, third: 0, medals: 0 }),
+    [filteredParticipantAchievements]
+  );
+  const participantAwardsSyncReady = resultsSyncState === 'ready' &&
+    participantsSyncState === 'ready' && registrationsSyncState === 'ready';
+  const participantAwardsSyncError = [resultsSyncState, participantsSyncState, registrationsSyncState]
+    .some(state => state === 'error' || state === 'idle');
+
 
   useEffect(() => {
     if (resultsSyncState !== 'ready') return;
@@ -156,6 +198,27 @@ export default function ExportManagementPage() {
       notifyExport('The print dialog could not be opened. Please try again.', 'error');
     }
   };
+
+  const handlePrintParticipantAwards = () => {
+    if (!participantAwardsSyncReady) {
+      notifyExport('Participants, registrations and published results must all be synchronized before printing this report.', 'error');
+      return;
+    }
+    if (filteredParticipantAchievements.length === 0) {
+      notifyExport('No participants match the current search or team filter.', 'error');
+      return;
+    }
+    const cleanup = () => document.body.classList.remove('print-participant-awards-mode');
+    document.body.classList.add('print-participant-awards-mode');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    try {
+      window.print();
+    } catch {
+      cleanup();
+      notifyExport('The print dialog could not be opened. Please try again.', 'error');
+    }
+  };
+
   const handleRetrySync = () => window.location.reload();
 
   return (
@@ -295,9 +358,91 @@ export default function ExportManagementPage() {
               (activeTab === 'SCORE_REGISTER' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-transparent text-[#64748B] hover:border-[#E1E7EF] hover:bg-white hover:text-[#111827]')}>
             <FileText className="h-4 w-4" /> Full Results Register
           </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'PARTICIPANT_AWARDS'} onClick={() => setActiveTab('PARTICIPANT_AWARDS')}
+            className={'inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ' +
+              (activeTab === 'PARTICIPANT_AWARDS' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-transparent text-[#64748B] hover:border-[#E1E7EF] hover:bg-white hover:text-[#111827]')}>
+            <Award className="h-4 w-4" /> Participant Achievements
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] tabular-nums text-blue-700">{participantAchievements.length}</span>
+          </button>
         </div>
 
-        {activeTab === 'WINNERS' ? (
+        {activeTab === 'PARTICIPANT_AWARDS' ? (
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-[#111827]">Participant Achievement Summary</h2>
+                <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#64748B]">Counts every 1st, 2nd and 3rd position in officially published competitions. Participants without podium positions remain in the report with zero counts.</p>
+              </div>
+              <Button variant="primary" size="sm" leftIcon={<Printer className="h-4 w-4" />} onClick={handlePrintParticipantAwards} disabled={!participantAwardsSyncReady || filteredParticipantAchievements.length === 0}>
+                Print A4 Report
+              </Button>
+            </div>
+
+            {!participantAwardsSyncReady && (
+              <div role={participantAwardsSyncError ? 'alert' : 'status'} className={'rounded-xl border px-4 py-3 text-xs ' + (participantAwardsSyncError ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-200 bg-blue-50 text-blue-800')}>
+                {participantAwardsSyncError ? 'Participant achievement data could not be synchronized. Retry the page before printing.' : 'Synchronizing participants, registrations and published results… The report will be available when all three feeds are ready.'}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-[#E1E7EF] bg-white p-3"><span className="block text-[10px] font-semibold text-[#64748B]">Participants listed</span><strong className="mt-1 block text-xl tabular-nums text-[#111827]">{filteredParticipantAchievements.length}</strong></div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3"><span className="block text-[10px] font-semibold text-amber-800">1st positions</span><strong className="mt-1 block text-xl tabular-nums text-amber-900">{participantAwardTotals.first}</strong></div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><span className="block text-[10px] font-semibold text-slate-700">2nd positions</span><strong className="mt-1 block text-xl tabular-nums text-slate-900">{participantAwardTotals.second}</strong></div>
+              <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-3"><span className="block text-[10px] font-semibold text-orange-800">3rd positions</span><strong className="mt-1 block text-xl tabular-nums text-orange-900">{participantAwardTotals.third}</strong></div>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+              <div className="relative min-w-0 flex-1 md:max-w-lg">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                <input type="search" placeholder="Search participant name or bib number…" value={participantAwardSearch} onChange={event => setParticipantAwardSearch(event.target.value)} className="h-10 w-full rounded-lg border border-[#DCE3EC] bg-[#F8FAFC] pl-9 pr-3 text-xs text-[#111827] outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+                <label className="sr-only" htmlFor="participant-award-team-filter">Filter by team</label>
+                <select id="participant-award-team-filter" value={participantAwardTeamFilter} onChange={event => setParticipantAwardTeamFilter(event.target.value)} className="h-10 w-full rounded-lg border border-[#DCE3EC] bg-[#F8FAFC] px-3 text-xs font-semibold text-[#334155] sm:w-auto sm:min-w-[190px]">
+                  <option value="ALL">All teams / houses</option>
+                  {participantAwardTeamOptions.map(team => <option key={team} value={team}>{team}</option>)}
+                </select>
+                <button type="button" onClick={() => { setParticipantAwardSearch(''); setParticipantAwardTeamFilter('ALL'); }} className="inline-flex h-10 items-center justify-center rounded-lg border border-[#DCE3EC] bg-white px-3 text-xs font-bold text-[#475569] hover:bg-[#F8FAFC]">Clear filters</button>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-[#E1E7EF] bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-[#E1E7EF] px-4 py-3">
+                <div><h3 className="text-xs font-bold text-[#111827]">Participant medal counts</h3><p className="mt-0.5 text-[10px] text-[#64748B]">Sorted by 1st, then 2nd and 3rd positions</p></div>
+                <span className="text-[10px] font-semibold text-[#64748B]">{filteredParticipantAchievements.length} records</span>
+              </div>
+              {!participantAwardsSyncReady ? (
+                <div className="px-4 py-12 text-center text-xs text-[#64748B]">Waiting for synchronized participant records…</div>
+              ) : filteredParticipantAchievements.length === 0 ? (
+                <div className="px-4 py-12 text-center"><p className="text-sm font-bold text-[#111827]">No participants found</p><p className="mt-1 text-xs text-[#64748B]">Try another name, bib number or team filter.</p></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-xs">
+                    <thead><tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
+                      <th className="px-4 py-3">No.</th><th className="px-4 py-3">Bib</th><th className="px-4 py-3">Participant</th><th className="px-4 py-3">Team / House</th><th className="px-4 py-3 text-center">1st</th><th className="px-4 py-3 text-center">2nd</th><th className="px-4 py-3 text-center">3rd</th><th className="px-4 py-3 text-center">Total</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-[#EEF2F6]">
+                      {filteredParticipantAchievements.map((entry, index) => (
+                        <tr key={entry.participant.id} className="hover:bg-[#FAFBFD]">
+                          <td className="px-4 py-3 text-[#94A3B8]">{index + 1}</td>
+                          <td className="px-4 py-3 font-mono text-[11px] font-bold text-blue-700">{entry.participant.bib}</td>
+                          <td className="px-4 py-3"><strong className="block text-[#111827]">{entry.participant.name}</strong><span className="mt-0.5 block text-[10px] text-[#64748B]">{entry.participant.categoryName || '—'}</span></td>
+                          <td className="px-4 py-3 text-[#475569]">{entry.participant.teamName || entry.participant.teamCode || '—'}</td>
+                          <td className="px-4 py-3 text-center font-bold tabular-nums text-amber-700">{entry.firstCount}</td>
+                          <td className="px-4 py-3 text-center font-bold tabular-nums text-slate-700">{entry.secondCount}</td>
+                          <td className="px-4 py-3 text-center font-bold tabular-nums text-orange-700">{entry.thirdCount}</td>
+                          <td className="px-4 py-3 text-center font-extrabold tabular-nums text-[#111827]">{entry.totalAwards}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr className="border-t-2 border-[#CBD5E1] bg-[#F8FAFC] font-bold text-[#111827]"><td className="px-4 py-3" colSpan={4}>Total awards in current view</td><td className="px-4 py-3 text-center">{participantAwardTotals.first}</td><td className="px-4 py-3 text-center">{participantAwardTotals.second}</td><td className="px-4 py-3 text-center">{participantAwardTotals.third}</td><td className="px-4 py-3 text-center">{participantAwardTotals.medals}</td></tr></tfoot>
+                  </table>
+                </div>
+              )}
+              <div className="border-t border-[#E1E7EF] bg-[#FAFBFD] px-4 py-2.5 text-[10px] leading-4 text-[#64748B]">Only published results are counted. Group event results are credited to the registered group leader; stored legacy group member IDs are also credited where available.</div>
+            </div>
+          </section>
+        ) : activeTab === 'WINNERS' ? (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm shadow-slate-900/[0.02] md:flex-row md:items-center md:justify-between">
               <div className="relative min-w-0 flex-1 md:max-w-lg">
@@ -584,8 +729,48 @@ export default function ExportManagementPage() {
         </footer>
       </div>
 
+
+      <div id="participant-achievements-print" className="participant-achievements-print">
+        <header className="participant-award-print-header">
+          <div className="participant-award-print-kicker">OFFICIAL FESTIVAL RECORDS</div>
+          <h1>{theme.festivalName || 'Festival'}</h1>
+          <p>{theme.institutionName}</p>
+          <div className="participant-award-print-meta">
+            <span>Participant Achievement Report</span>
+            <span>{filteredParticipantAchievements.length} participants</span>
+            <span>Generated {new Date().toLocaleDateString('en-GB')}</span>
+          </div>
+        </header>
+        <div className="participant-award-print-summary">
+          <span>1st Positions: <strong>{participantAwardTotals.first}</strong></span>
+          <span>2nd Positions: <strong>{participantAwardTotals.second}</strong></span>
+          <span>3rd Positions: <strong>{participantAwardTotals.third}</strong></span>
+          <span>Total Awards: <strong>{participantAwardTotals.medals}</strong></span>
+        </div>
+        <table className="participant-award-print-table">
+          <thead><tr><th>No.</th><th>Bib</th><th>Participant Name</th><th>Team / House</th><th>1st</th><th>2nd</th><th>3rd</th><th>Total</th></tr></thead>
+          <tbody>
+            {filteredParticipantAchievements.map((entry, index) => (
+              <tr key={entry.participant.id}>
+                <td>{index + 1}</td>
+                <td className="award-print-bib">{entry.participant.bib}</td>
+                <td><strong>{entry.participant.name}</strong><small>{entry.participant.categoryName || ''}</small></td>
+                <td>{entry.participant.teamName || entry.participant.teamCode || '—'}</td>
+                <td className="award-print-count">{entry.firstCount}</td>
+                <td className="award-print-count">{entry.secondCount}</td>
+                <td className="award-print-count">{entry.thirdCount}</td>
+                <td className="award-print-total">{entry.totalAwards}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><th colSpan={4}>Total awards</th><th>{participantAwardTotals.first}</th><th>{participantAwardTotals.second}</th><th>{participantAwardTotals.third}</th><th>{participantAwardTotals.medals}</th></tr></tfoot>
+        </table>
+        <p className="participant-award-print-note">Only officially published competition results are included. Group competition awards are credited to the registered group leader; stored legacy group member IDs are also credited where available.</p>
+        <footer className="participant-award-print-footer"><span>{theme.festivalName} | Participant Achievement Report</span><span>Generated from official published results</span></footer>
+      </div>
+
       <style jsx global>{`
-        .official-winners-print { display: none; }
+        .official-winners-print, .participant-achievements-print { display: none; }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
           body.print-winners-mode, body.print-winners-mode * { visibility: hidden !important; }
@@ -689,6 +874,45 @@ export default function ExportManagementPage() {
             color: #64748b;
             font-size: 6.5pt;
           }
+          body.print-participant-awards-mode,
+          body.print-participant-awards-mode * { visibility: hidden !important; }
+          body.print-participant-awards-mode #participant-achievements-print,
+          body.print-participant-awards-mode #participant-achievements-print * { visibility: visible !important; }
+          body.print-participant-awards-mode { background: #fff !important; }
+          body.print-participant-awards-mode #participant-achievements-print {
+            display: block !important; position: absolute !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; margin: 0 !important; padding: 0 !important;
+            background: #fff !important; color: #111827 !important;
+            font-family: Arial, Helvetica, sans-serif !important; font-size: 8pt !important; z-index: 999999 !important;
+          }
+          .participant-award-print-header { border-bottom: 2px solid #1d4ed8; padding-bottom: 8px; margin-bottom: 10px; }
+          .participant-award-print-kicker { color: #1d4ed8; font-size: 7pt; font-weight: 800; letter-spacing: 1.4px; }
+          .participant-award-print-header h1 { margin: 4px 0 2px; font-size: 18pt; font-weight: 800; text-transform: uppercase; }
+          .participant-award-print-header p { margin: 0; color: #475569; font-size: 9pt; }
+          .participant-award-print-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; color: #475569; font-size: 7pt; }
+          .participant-award-print-summary { display: flex; justify-content: space-between; gap: 12px; padding: 7px 9px; margin-bottom: 10px; border: 1px solid #cbd5e1; background: #f8fafc !important; font-size: 7.5pt; }
+          .participant-award-print-summary strong { font-size: 9pt; color: #111827; }
+          .participant-award-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .participant-award-print-table thead { display: table-header-group; }
+          .participant-award-print-table tr { break-inside: avoid; page-break-inside: avoid; }
+          .participant-award-print-table th { background: #e2e8f0 !important; color: #334155 !important; text-transform: uppercase; font-size: 6.8pt; font-weight: 800; }
+          .participant-award-print-table th,
+          .participant-award-print-table td { border: 1px solid #cbd5e1; padding: 5px 6px; vertical-align: middle; overflow-wrap: anywhere; }
+          .participant-award-print-table td { font-size: 7.5pt; line-height: 1.2; }
+          .participant-award-print-table tbody tr:nth-child(even) { background: #f8fafc !important; }
+          .participant-award-print-table th:nth-child(1) { width: 5%; }
+          .participant-award-print-table th:nth-child(2) { width: 9%; }
+          .participant-award-print-table th:nth-child(3) { width: 28%; }
+          .participant-award-print-table th:nth-child(4) { width: 24%; }
+          .participant-award-print-table th:nth-child(n+5) { width: 8.5%; text-align: center; }
+          .participant-award-print-table td:nth-child(n+5) { text-align: center; font-weight: 700; }
+          .participant-award-print-table td small { display: block; color: #64748b; margin-top: 2px; font-size: 6.5pt; }
+          .award-print-bib { color: #1d4ed8; font-family: monospace; font-weight: 800; }
+          .award-print-count { color: #334155; }
+          .award-print-total { color: #111827; font-weight: 900; }
+          .participant-award-print-table tfoot th { border-top: 2px solid #94a3b8; font-size: 7.5pt; }
+          .participant-award-print-note { margin-top: 8px; color: #475569; font-size: 6.5pt; line-height: 1.3; }
+          .participant-award-print-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; border-top: 1px solid #cbd5e1; padding-top: 5px; color: #64748b; font-size: 6.5pt; }
         }
 `}</style>
 
