@@ -24,6 +24,7 @@ export default function ExportManagementPage() {
   const [activeTab, setActiveTab] = useState<'WINNERS' | 'SCORE_REGISTER' | 'PARTICIPANT_AWARDS'>('WINNERS');
   const [participantAwardSearch, setParticipantAwardSearch] = useState('');
   const [participantAwardTeamFilter, setParticipantAwardTeamFilter] = useState('ALL');
+  const [excludeGroupCompetitions, setExcludeGroupCompetitions] = useState(false);
   const [printScoreRegisterOpen, setPrintScoreRegisterOpen] = useState(false);
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<ExportNotice | null>(null);
@@ -38,9 +39,13 @@ export default function ExportManagementPage() {
     [results]
   );
   const publishedIds = useMemo(() => publishedResults.map(result => result.id), [publishedResults]);
+  const achievementSourceResults = useMemo(
+    () => excludeGroupCompetitions ? publishedResults.filter(result => result.type !== 'GROUP') : publishedResults,
+    [publishedResults, excludeGroupCompetitions]
+  );
   const participantAchievements = useMemo(
-    () => buildParticipantAchievements(participants, registrations, publishedResults),
-    [participants, registrations, publishedResults]
+    () => buildParticipantAchievements(participants, registrations, achievementSourceResults),
+    [participants, registrations, achievementSourceResults]
   );
   const participantAwardTeamOptions = useMemo(
     () => Array.from(new Set(participants.map(participant => participant.teamName).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -371,7 +376,7 @@ export default function ExportManagementPage() {
             <div className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="text-sm font-bold text-[#111827]">Participant Achievement Summary</h2>
-                <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#64748B]">Counts every 1st, 2nd and 3rd position in officially published competitions. Participants without podium positions remain in the report with zero counts.</p>
+                <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#64748B]">Counts every 1st, 2nd and 3rd position in officially published competitions. Participants without podium positions remain in the report with zero counts. Use “Without Group Competitions” to exclude group-event awards.</p>
               </div>
               <Button variant="primary" size="sm" leftIcon={<Printer className="h-4 w-4" />} onClick={handlePrintParticipantAwards} disabled={!participantAwardsSyncReady || filteredParticipantAchievements.length === 0}>
                 Print A4 Report
@@ -402,7 +407,8 @@ export default function ExportManagementPage() {
                   <option value="ALL">All teams / houses</option>
                   {participantAwardTeamOptions.map(team => <option key={team} value={team}>{team}</option>)}
                 </select>
-                <button type="button" onClick={() => { setParticipantAwardSearch(''); setParticipantAwardTeamFilter('ALL'); }} className="inline-flex h-10 items-center justify-center rounded-lg border border-[#DCE3EC] bg-white px-3 text-xs font-bold text-[#475569] hover:bg-[#F8FAFC]">Clear filters</button>
+                <button type="button" aria-pressed={excludeGroupCompetitions} onClick={() => setExcludeGroupCompetitions(value => !value)} className={'inline-flex h-10 items-center justify-center rounded-lg border px-3 text-xs font-bold transition-colors ' + (excludeGroupCompetitions ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-[#DCE3EC] bg-white text-[#475569] hover:bg-[#F8FAFC]')}>Without Group Competitions</button>
+                <button type="button" onClick={() => { setParticipantAwardSearch(''); setParticipantAwardTeamFilter('ALL'); setExcludeGroupCompetitions(false); }} className="inline-flex h-10 items-center justify-center rounded-lg border border-[#DCE3EC] bg-white px-3 text-xs font-bold text-[#475569] hover:bg-[#F8FAFC]">Clear filters</button>
               </div>
             </div>
 
@@ -736,7 +742,7 @@ export default function ExportManagementPage() {
           <h1>{theme.festivalName || 'Festival'}</h1>
           <p>{theme.institutionName}</p>
           <div className="participant-award-print-meta">
-            <span>Participant Achievement Report</span>
+            <span>Participant Achievement Report{excludeGroupCompetitions ? ' — Without Group Competitions' : ''}</span>
             <span>{filteredParticipantAchievements.length} participants</span>
             <span>Generated {new Date().toLocaleDateString('en-GB')}</span>
           </div>
@@ -765,7 +771,7 @@ export default function ExportManagementPage() {
           </tbody>
           <tfoot><tr><th colSpan={4}>Total awards</th><th>{participantAwardTotals.first}</th><th>{participantAwardTotals.second}</th><th>{participantAwardTotals.third}</th><th>{participantAwardTotals.medals}</th></tr></tfoot>
         </table>
-        <p className="participant-award-print-note">Only officially published competition results are included. Group competition awards are credited to the registered group leader; stored legacy group member IDs are also credited where available.</p>
+        <p className="participant-award-print-note">Only officially published competition results are included.{excludeGroupCompetitions ? ' Group competitions are excluded from this report.' : ' Group competition awards are credited to the registered group leader; stored legacy group member IDs are also credited where available.'}</p>
         <footer className="participant-award-print-footer"><span>{theme.festivalName} | Participant Achievement Report</span><span>Generated from official published results</span></footer>
       </div>
 
