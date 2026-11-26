@@ -80,6 +80,7 @@ interface FestContextType {
     groupLeaderId?: string;
     participantIds?: string[];
     groupLeaderIds?: string[];
+    groupMemberIds?: string[];
   }) => Promise<void>;
   updateRegistrationStatus: (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED') => Promise<void>;
   deleteRegistration: (id: string) => Promise<void>;
@@ -1664,6 +1665,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   chestNumber: dt.chestNumber || '',
                   status: dt.status || 'PENDING',
                   groupMembers: dt.groupMembers,
+                  groupMemberIds: Array.isArray(dt.groupMemberIds) ? dt.groupMemberIds : [],
+                  groupMemberSnapshots: Array.isArray(dt.groupMemberSnapshots) ? dt.groupMemberSnapshots : [],
                   registeredAt: dt.registeredAt || ''
                 };
               });
@@ -1752,6 +1755,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   chestNumber: dt.chestNumber || '',
                   status: dt.status || 'PENDING',
                   groupMembers: dt.groupMembers,
+                  groupMemberIds: Array.isArray(dt.groupMemberIds) ? dt.groupMemberIds : [],
+                  groupMemberSnapshots: Array.isArray(dt.groupMemberSnapshots) ? dt.groupMemberSnapshots : [],
                   registeredAt: dt.registeredAt || ''
                 };
               });
@@ -1825,6 +1830,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
                   chestNumber: dt.chestNumber || '',
                   status: dt.status || 'PENDING',
                   groupMembers: dt.groupMembers,
+                  groupMemberIds: Array.isArray(dt.groupMemberIds) ? dt.groupMemberIds : [],
+                  groupMemberSnapshots: Array.isArray(dt.groupMemberSnapshots) ? dt.groupMemberSnapshots : [],
                   registeredAt: dt.registeredAt || ''
                 };
               });
@@ -2418,6 +2425,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     groupLeaderId?: string;
     participantIds?: string[];
     groupLeaderIds?: string[];
+    groupMemberIds?: string[];
   }) => {
     let newRegistrations: Registration[];
     if (!isIsolatedDemoOrTest && db) {
@@ -2437,6 +2445,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           participantIds: regData.participantIds,
           groupLeaderId: regData.groupLeaderId,
           groupLeaderIds: regData.groupLeaderIds,
+          groupMemberIds: regData.groupMemberIds,
           groupMembers: regData.groupMembers
         })
       });
@@ -2460,6 +2469,24 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         if (!isNaN(num) && num > maxRegNum) maxRegNum = num;
       }
       const selectedIsGroup = regData.type === 'GROUP';
+      const selectedGroupMembers = selectedIsGroup ? Array.from(new Set(regData.groupMemberIds || [])) : [];
+      const groupMemberParticipants = selectedGroupMembers.map(memberId => {
+        const member = participants.find(item => item.id === memberId);
+        if (!member || member.teamId !== regData.teamId) {
+          throw new Error('A selected group member could not be found in the current team roster.');
+        }
+        return member;
+      });
+      if (selectedIsGroup && regData.groupMemberIds !== undefined) {
+        const competition = competitions.find(item => item.id === regData.competitionId);
+        const leaderId = selectedIds[0];
+        if (selectedIds.length !== 1 || selectedGroupMembers.length !== Number(competition?.groupSize) - 1) {
+          throw new Error(`Select one group leader and exactly ${Math.max(0, Number(competition?.groupSize || 0) - 1)} additional member(s).`);
+        }
+        if (selectedGroupMembers.includes(leaderId)) {
+          throw new Error('The group leader cannot also be selected as an additional member.');
+        }
+      }
       newRegistrations = selectedIds.map((selectedId, index) => {
         const participant = participants.find(item => item.id === selectedId);
         if (!participant) throw new Error('A selected participant could not be found.');
@@ -2467,6 +2494,10 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           ...regData,
           participantId: selectedIsGroup ? undefined : selectedId,
           groupLeaderId: selectedIsGroup ? selectedId : undefined,
+          groupMemberIds: selectedIsGroup ? selectedGroupMembers : undefined,
+          groupMemberSnapshots: selectedIsGroup ? groupMemberParticipants.map(member => ({
+            id: member.id, name: member.name, bib: member.bib || ''
+          })) : undefined,
           participantName: selectedIsGroup ? `${participant.name} & Team` : participant.name,
           id: 'reg-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6) + '-' + index,
           code: `REG-${maxRegNum + index + 1}`,
@@ -2474,6 +2505,13 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           registeredAt: new Date().toISOString()
         };
       });
+      if (selectedIsGroup) {
+        setParticipants(prev => prev.map(participant =>
+          selectedGroupMembers.includes(participant.id)
+            ? { ...participant, registeredEventIds: Array.from(new Set([...(participant.registeredEventIds || []), regData.competitionId])) }
+            : participant
+        ));
+      }
     }
 
     setRegistrations(prev => [...prev, ...newRegistrations]);
@@ -2524,7 +2562,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         prevStatus = regData.status;
         targetCompId = regData.competitionId;
         targetPartId = regData.participantId || regData.groupLeaderId;
-        targetGroupMembers = Array.isArray(regData.groupMembers) ? regData.groupMembers : [];
+        targetGroupMembers = Array.from(new Set([...(Array.isArray(regData.groupMembers) ? regData.groupMembers : []), ...(Array.isArray(regData.groupMemberIds) ? regData.groupMemberIds : [])]));
 
         if (prevStatus === status) return;
 
@@ -2561,7 +2599,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
               const hasOtherActive = otherActiveCompRegs.some(r =>
                 r.participantId === pId ||
                 r.groupLeaderId === pId ||
-                (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId))
+                (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId)) ||
+                (Array.isArray(r.groupMemberIds) && r.groupMemberIds.includes(pId))
               );
               if (!hasOtherActive) {
                 const existingEvents: string[] = Array.isArray(pSnap.data().registeredEventIds)
@@ -2615,7 +2654,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             const hasOtherActive = otherActiveLocal.some(r =>
               r.participantId === p.id ||
               r.groupLeaderId === p.id ||
-              (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id))
+              (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id)) ||
+            (Array.isArray(r.groupMemberIds) && r.groupMemberIds.includes(p.id))
             );
             if (!hasOtherActive) {
               const existingEvents = p.registeredEventIds || [];
@@ -2640,7 +2680,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     const regToDelete = registrations.find(r => r.id === id);
     let targetCompId = regToDelete?.competitionId;
     let targetPartId = regToDelete?.participantId || regToDelete?.groupLeaderId;
-    let targetGroupMembers: string[] = Array.isArray(regToDelete?.groupMembers) ? regToDelete.groupMembers : [];
+    let targetGroupMembers: string[] = Array.from(new Set([...(Array.isArray(regToDelete?.groupMembers) ? regToDelete.groupMembers : []), ...(Array.isArray(regToDelete?.groupMemberIds) ? regToDelete.groupMemberIds : [])]));
     let wasApproved = regToDelete ? (regToDelete.status === 'APPROVED' || !regToDelete.status) : false;
 
     if (!isIsolatedDemoOrTest && db) {
@@ -2677,7 +2717,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         const regData = regSnap.data();
         targetCompId = regData.competitionId || targetCompId;
         targetPartId = regData.participantId || regData.groupLeaderId || targetPartId;
-        targetGroupMembers = Array.isArray(regData.groupMembers) ? regData.groupMembers : targetGroupMembers;
+        targetGroupMembers = Array.from(new Set([...(Array.isArray(regData.groupMembers) ? regData.groupMembers : []), ...(Array.isArray(regData.groupMemberIds) ? regData.groupMemberIds : [])]));
         wasApproved = regData.status === 'APPROVED' || !regData.status;
 
         const allAffectedPartIds = Array.from(new Set([targetPartId, ...targetGroupMembers])).filter(Boolean) as string[];
@@ -2708,7 +2748,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
             const hasOtherActive = otherActiveCompRegs.some(r =>
               r.participantId === pId ||
               r.groupLeaderId === pId ||
-              (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId))
+              (Array.isArray(r.groupMembers) && r.groupMembers.includes(pId)) ||
+                (Array.isArray(r.groupMemberIds) && r.groupMemberIds.includes(pId))
             );
             if (!hasOtherActive) {
               const existingEvents: string[] = Array.isArray(pSnap.data().registeredEventIds)
@@ -2741,7 +2782,8 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
           const hasOtherActive = otherActiveLocal.some(r =>
             r.participantId === p.id ||
             r.groupLeaderId === p.id ||
-            (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id))
+            (Array.isArray(r.groupMembers) && r.groupMembers.includes(p.id)) ||
+            (Array.isArray(r.groupMemberIds) && r.groupMemberIds.includes(p.id))
           );
           if (!hasOtherActive) {
             const existingEvents = p.registeredEventIds || [];
