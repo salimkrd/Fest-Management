@@ -23,7 +23,7 @@ function normalizeBib(value: string | undefined): string {
 }
 
 function normalizeName(value: string | undefined): string {
-  return (value || '').trim().replace(/\\s*&\\s*team$/i, '').replace(/\\s+/g, ' ').toLocaleLowerCase();
+  return (value || '').trim().replace(/\s*&\s*team$/i, '').replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 function belongsToRankedTeam(participant: Participant, rank: CompetitionResult['ranks'][number]): boolean {
