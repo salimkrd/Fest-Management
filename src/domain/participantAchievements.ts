@@ -92,25 +92,26 @@ export function buildParticipantAchievements(
   results.forEach(result => {
     if (result.resultStatus !== 'PUBLISHED') return;
     result.ranks.forEach(rank => {
-      if (rank.rank !== 1 && rank.rank !== 2 && rank.rank !== 3) return;
+      const position = rank.rank;
+      if (position !== 1 && position !== 2 && position !== 3) return;
       const recipients = resolveRecipients(rank, registrationById.get(rank.registrationId));
       recipients.forEach(participantId => {
         const entry = entries.get(participantId);
         if (!entry) return;
-        const key = [result.id, rank.registrationId, rank.rank, participantId].join(':');
+        const key = [result.id, rank.registrationId, position, participantId].join(':');
         if (countedAwards.has(key)) return;
         countedAwards.add(key);
 
-        if (rank.rank === 1) entry.firstCount += 1;
-        if (rank.rank === 2) entry.secondCount += 1;
-        if (rank.rank === 3) entry.thirdCount += 1;
+        if (position === 1) entry.firstCount += 1;
+        if (position === 2) entry.secondCount += 1;
+        if (position === 3) entry.thirdCount += 1;
         entry.totalAwards += 1;
         entry.events.push({
           resultId: result.id,
           competitionName: result.competitionName,
           competitionCode: result.competitionCode,
           categoryName: result.categoryName,
-          rank: rank.rank,
+          rank: position,
           type: result.type
         });
       });
