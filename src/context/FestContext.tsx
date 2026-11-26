@@ -2287,11 +2287,12 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
     if (!isIsolatedDemoOrTest && db) {
       const firestore = db;
       try {
-        const [catsSnap, compsSnap, regsSnap, grpRegsSnap] = await Promise.all([
+        const [catsSnap, compsSnap, regsSnap, grpRegsSnap, memberRegsSnap] = await Promise.all([
           getDocs(collection(firestore, 'categories')),
           getDocs(collection(firestore, 'competitions')),
           getDocs(query(collection(firestore, 'registrations'), where('participantId', '==', participantId))),
-          getDocs(query(collection(firestore, 'registrations'), where('groupLeaderId', '==', participantId)))
+          getDocs(query(collection(firestore, 'registrations'), where('groupLeaderId', '==', participantId))),
+          getDocs(query(collection(firestore, 'registrations'), where('groupMemberIds', 'array-contains', participantId)))
         ]);
 
         allCats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
@@ -2300,7 +2301,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
 
         const seenRegIds = new Set<string>();
         const fetchedRegs: Registration[] = [];
-        for (const snap of [...regsSnap.docs, ...grpRegsSnap.docs]) {
+        for (const snap of [...regsSnap.docs, ...grpRegsSnap.docs, ...memberRegsSnap.docs]) {
           if (!seenRegIds.has(snap.id)) {
             seenRegIds.add(snap.id);
             fetchedRegs.push({ id: snap.id, ...snap.data() } as Registration);
@@ -2309,7 +2310,7 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         relevantRegs = fetchedRegs;
       } catch (err) {
         console.warn('[FestContext] Firestore conflict check fallback to state:', err);
-        relevantRegs = registrations.filter(r => r.participantId === participantId || r.groupLeaderId === participantId);
+        relevantRegs = registrations.filter(r => r.participantId === participantId || r.groupLeaderId === participantId || (Array.isArray(r.groupMemberIds) && r.groupMemberIds.includes(participantId)));
       }
     } else {
       relevantRegs = registrations.filter(r => r.participantId === participantId || r.groupLeaderId === participantId);
@@ -2506,8 +2507,9 @@ export function FestProvider({ children }: { children: React.ReactNode }) {
         };
       });
       if (selectedIsGroup) {
+        const groupRosterIds = new Set([...selectedIds, ...selectedGroupMembers]);
         setParticipants(prev => prev.map(participant =>
-          selectedGroupMembers.includes(participant.id)
+          groupRosterIds.has(participant.id)
             ? { ...participant, registeredEventIds: Array.from(new Set([...(participant.registeredEventIds || []), regData.competitionId])) }
             : participant
         ));
