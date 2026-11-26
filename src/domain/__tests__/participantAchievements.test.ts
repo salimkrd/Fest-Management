@@ -68,6 +68,7 @@ describe('buildParticipantAchievements', () => {
     ]);
     expect(rows.find(row => row.participant.id === 'leader')).toMatchObject({ firstCount: 1, secondCount: 1, totalAwards: 2 });
     expect(rows.find(row => row.participant.id === 'member')).toMatchObject({ firstCount: 0, secondCount: 1, totalAwards: 1 });
+    expect(rows.find(row => row.participant.id === 'member')?.events.filter(event => event.resultId === 'group1')).toHaveLength(0);
     // New roster-only group members do not receive individual podium credit.
   });
 
