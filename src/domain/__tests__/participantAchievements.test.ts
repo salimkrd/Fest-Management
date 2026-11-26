@@ -9,8 +9,8 @@ const participant = (id: string, bib: string, name: string): Participant => ({
   dob: '', photoUrl: '', registeredEventIds: [], idStatus: 'GENERATED'
 });
 
-const registration = (overrides: Partial<Registration> & Pick<Registration, 'id'>): Registration => ({
-  id: overrides.id, code: 'REG-1', participantName: 'Participant',
+const registration = ({ id, ...overrides }: Partial<Registration> & Pick<Registration, 'id'>): Registration => ({
+  id, code: 'REG-1', participantName: 'Participant',
   teamId: 'team-1', teamCode: 'QHR', teamName: 'Qahira',
   categoryId: 'cat-1', categoryName: 'Senior', competitionId: 'comp-1',
   competitionName: 'Competition', type: 'SOLO', chestNumber: '#1001',
