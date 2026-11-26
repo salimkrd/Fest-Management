@@ -11,6 +11,7 @@ interface CreateRegistrationInput {
   participantIds?: string[];
   participantName?: string;
   groupMembers?: string[]; // Read-only legacy compatibility
+  groupMemberIds?: string[];
   groupLeaderId?: string;
   groupLeaderIds?: string[];
 }
@@ -102,10 +103,31 @@ export class RegistrationService {
         throw new Error('Validation Error: Group leaders can only be selected for group competitions.');
       }
 
+      const memberIds = Array.from(new Set((input.groupMemberIds || [])
+        .map(id => typeof id === 'string' ? id.trim() : '')
+        .filter(Boolean)));
+      if (isGroup && input.groupMemberIds !== undefined) {
+        if (selectedIds.length !== 1) {
+          throw new Error('Validation Error: Register one group at a time and choose exactly one group leader.');
+        }
+        if (memberIds.length !== Number(competition.groupSize) - 1) {
+          throw new Error(`Validation Error: This group requires exactly ${Number(competition.groupSize) - 1} additional member(s).`);
+        }
+        if (memberIds.some(id => selectedIds.includes(id))) {
+          throw new Error('Validation Error: The group leader cannot also be selected as an additional member.');
+        }
+      } else if (!isGroup && memberIds.length > 0) {
+        throw new Error('Validation Error: Additional group members can only be selected for group competitions.');
+      }
+
+      const allSelectedIds = Array.from(new Set([...selectedIds, ...memberIds]));
+      if (allSelectedIds.length !== selectedIds.length + memberIds.length) {
+        throw new Error('Validation Error: A participant cannot be selected more than once in the same group.');
+      }
       const participantSnapshots = await Promise.all(
-        selectedIds.map(id => transaction.get(db.collection('participants').doc(id)))
+        allSelectedIds.map(id => transaction.get(db.collection('participants').doc(id)))
       );
-      const participants = participantSnapshots.map(snapshot => {
+      const allParticipants = participantSnapshots.map(snapshot => {
         if (!snapshot.exists) {
           throw new Error('Validation Error: A selected participant does not exist.');
         }
@@ -118,6 +140,8 @@ export class RegistrationService {
         }
         return participant;
       });
+      const participants = allParticipants.filter(participant => selectedIds.includes(participant.id));
+      const groupMembers = allParticipants.filter(participant => memberIds.includes(participant.id));
 
       const currentTeamEntries = existingRegistrations.docs.filter(doc => doc.data().teamId === teamId);
       const activeTeamEntries = currentTeamEntries.filter(
@@ -148,7 +172,7 @@ export class RegistrationService {
             }
           }
         }
-        const duplicates = participants.filter(p => existingLeaderIds.has(p.id));
+        const duplicates = allParticipants.filter(p => existingLeaderIds.has(p.id));
         if (duplicates.length) {
           throw new Error(`Validation Error: Already registered as a group leader or legacy group member: ${duplicates.map(p => p.name).join(', ')}.`);
         }
@@ -185,7 +209,14 @@ export class RegistrationService {
           status: 'APPROVED',
           groupLeaderId: isGroup ? participant.id : undefined,
           groupSize: isGroup ? competition.groupSize : undefined,
-          // New records intentionally store only the group leader, never the full roster.
+          // Keep the additional roster separate from legacy groupMembers, which is
+          // intentionally retained for historical achievement-credit compatibility.
+          groupMemberIds: isGroup ? groupMembers.map(member => member.id) : undefined,
+          groupMemberSnapshots: isGroup ? groupMembers.map(member => ({
+            id: member.id,
+            name: member.name,
+            bib: member.bib || ''
+          })) : undefined,
           groupMembers: undefined,
           registeredAt: now
         };
@@ -202,7 +233,7 @@ export class RegistrationService {
       });
 
       // Update each selected contestant's registered-event mirror in the same transaction.
-      participants.forEach(participant => {
+      allParticipants.forEach(participant => {
         const currentEvents: string[] = Array.isArray(participant.registeredEventIds)
           ? participant.registeredEventIds
           : [];
