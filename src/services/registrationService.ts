@@ -153,18 +153,13 @@ export class RegistrationService {
         if (activeTeamEntries.length + selectedIds.length > maximumEntries) {
           throw new Error(`Validation Error: This team can register ${maximumEntries} entr${maximumEntries === 1 ? 'y' : 'ies'} for this competition; ${activeTeamEntries.length} already registered.`);
         }
-        const alreadyRegistered = activeTeamEntries
-          .filter(doc => {
-            const data = doc.data();
-            return selectedIds.some(id =>
-              data.participantId === id ||
-              data.groupLeaderId === id ||
-              (Array.isArray(data.groupMembers) && data.groupMembers.includes(id)) ||
-              (Array.isArray(data.groupMemberIds) && data.groupMemberIds.includes(id))
-            );
-          })
-          .map(doc => doc.data().participantId || doc.data().groupLeaderId)
-          .filter((id): id is string => typeof id === 'string' && selectedSet.has(id));
+        const alreadyRegistered = selectedIds.filter(id => activeTeamEntries.some(doc => {
+          const data = doc.data();
+          return data.participantId === id ||
+            data.groupLeaderId === id ||
+            (Array.isArray(data.groupMembers) && data.groupMembers.includes(id)) ||
+            (Array.isArray(data.groupMemberIds) && data.groupMemberIds.includes(id));
+        }));
         if (alreadyRegistered.length) {
           const names = participants.filter(p => alreadyRegistered.includes(p.id)).map(p => p.name).join(', ');
           throw new Error(`Validation Error: Already registered: ${names}.`);
