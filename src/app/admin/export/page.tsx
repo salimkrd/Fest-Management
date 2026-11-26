@@ -366,7 +366,7 @@ export default function ExportManagementPage() {
       doc.setTextColor(82, 96, 112);
       doc.text(doc.splitTextToSize(note, tableWidth), margin, y + 14);
 
-      const filename = (theme.festivalName || 'Festival').trim().replace(/\\s+/g, '_') + '_Participant_Achievements' + (excludeGroupCompetitions ? '_Without_Groups' : '') + '.pdf';
+      const filename = (theme.festivalName || 'Festival').trim().replace(/\s+/g, '_') + '_Participant_Achievements' + (excludeGroupCompetitions ? '_Without_Groups' : '') + '.pdf';
       doc.save(filename);
       notifyExport('Participant Achievement PDF downloaded successfully.');
     } catch (error) {
@@ -583,6 +583,7 @@ export default function ExportManagementPage() {
               ) : filteredParticipantAchievements.length === 0 ? (
                 <div className="px-4 py-12 text-center"><p className="text-sm font-bold text-[#111827]">No participants found</p><p className="mt-1 text-xs text-[#64748B]">Try another name, bib number or team filter.</p></div>
               ) : (
+                <>
                 <div className="divide-y divide-[#EEF2F6] md:hidden">
                   {filteredParticipantAchievements.map((entry, index) => (
                     <article key={entry.participant.id} className="px-4 py-4">
@@ -627,6 +628,7 @@ export default function ExportManagementPage() {
                     <tfoot><tr className="border-t-2 border-[#CBD5E1] bg-[#F8FAFC] font-bold text-[#111827]"><td className="px-4 py-3" colSpan={4}>Total awards in current view</td><td className="px-4 py-3 text-center">{participantAwardTotals.first}</td><td className="px-4 py-3 text-center">{participantAwardTotals.second}</td><td className="px-4 py-3 text-center">{participantAwardTotals.third}</td><td className="px-4 py-3 text-center">{participantAwardTotals.medals}</td></tr></tfoot>
                   </table>
                 </div>
+                </>
               )}
               <div className="border-t border-[#E1E7EF] bg-[#FAFBFD] px-4 py-2.5 text-[10px] leading-4 text-[#64748B]">Only published results are counted. Group event results are credited to the registered group leader; stored legacy group member IDs are also credited where available.</div>
             </div>
