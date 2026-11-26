@@ -154,7 +154,16 @@ export class RegistrationService {
           throw new Error(`Validation Error: This team can register ${maximumEntries} entr${maximumEntries === 1 ? 'y' : 'ies'} for this competition; ${activeTeamEntries.length} already registered.`);
         }
         const alreadyRegistered = activeTeamEntries
-          .map(doc => doc.data().participantId)
+          .filter(doc => {
+            const data = doc.data();
+            return selectedIds.some(id =>
+              data.participantId === id ||
+              data.groupLeaderId === id ||
+              (Array.isArray(data.groupMembers) && data.groupMembers.includes(id)) ||
+              (Array.isArray(data.groupMemberIds) && data.groupMemberIds.includes(id))
+            );
+          })
+          .map(doc => doc.data().participantId || doc.data().groupLeaderId)
           .filter((id): id is string => typeof id === 'string' && selectedSet.has(id));
         if (alreadyRegistered.length) {
           const names = participants.filter(p => alreadyRegistered.includes(p.id)).map(p => p.name).join(', ');
@@ -165,6 +174,12 @@ export class RegistrationService {
         for (const doc of activeTeamEntries) {
           const data = doc.data();
           if (data.groupLeaderId) existingLeaderIds.add(data.groupLeaderId);
+          if (data.participantId) existingLeaderIds.add(data.participantId);
+          if (Array.isArray(data.groupMemberIds)) {
+            for (const memberId of data.groupMemberIds) {
+              if (typeof memberId === 'string') existingLeaderIds.add(memberId);
+            }
+          }
           // Retain protection against overlap with legacy full-roster group records.
           if (Array.isArray(data.groupMembers)) {
             for (const memberId of data.groupMembers) {
