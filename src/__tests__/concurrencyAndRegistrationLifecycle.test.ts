@@ -525,6 +525,68 @@ describe('Phase 3.1: Concurrency and Registration Lifecycle Verification', () =>
   });
 
   describe('2. F-03 Registration Lifecycle, registeredEventIds, and entriesCount Consistency', () => {
+    it('creates one group registration with a full roster but one shared scoring identity', async () => {
+      const competitionId = `comp-roster-${suiteId}`;
+      const leaderId = `part-roster-leader-${suiteId}`;
+      const memberOneId = `part-roster-member1-${suiteId}`;
+      const memberTwoId = `part-roster-member2-${suiteId}`;
+
+      await trackRef(db.collection('competitions').doc(competitionId)).set({
+        id: competitionId,
+        code: `CMP-ROSTER-${suiteId.slice(-4)}`,
+        name: 'Junior Group Recitation',
+        categoryId: catJrId,
+        categoryName: 'Junior',
+        type: 'GROUP',
+        groupSize: 3,
+        entriesCount: 0,
+        maxEntriesPerTeam: 1,
+        status: 'SCHEDULED'
+      });
+
+      for (const [id, bib, name] of [
+        [leaderId, '#ROSTER1', 'Roster Leader'],
+        [memberOneId, '#ROSTER2', 'Roster Member One'],
+        [memberTwoId, '#ROSTER3', 'Roster Member Two']
+      ]) {
+        await trackRef(db.collection('participants').doc(id)).set({
+          id, bib, name, teamId: team1Id, teamCode: 'SHA', teamName: 'Al-Shamama',
+          categoryId: catJrId, categoryName: 'Junior', registeredEventIds: [],
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      const registration = await RegistrationService.createForTeam(
+        team1ManagerToken,
+        team1Id,
+        { competitionId, groupLeaderId: leaderId, groupMemberIds: [memberOneId, memberTwoId] }
+      );
+      trackRef(db.collection('registrations').doc(registration.id));
+
+      expect(registration.type).toBe('GROUP');
+      expect(registration.groupLeaderId).toBe(leaderId);
+      expect(registration.participantId).toBeUndefined();
+      expect(registration.groupSize).toBe(3);
+      expect(registration.groupMemberIds).toEqual([memberOneId, memberTwoId]);
+      expect(registration.groupMemberSnapshots?.map(member => member.name)).toEqual(['Roster Member One', 'Roster Member Two']);
+      expect(registration.groupMembers).toBeUndefined();
+
+      const [competition, leader, memberOne, memberTwo] = await Promise.all([
+        db.collection('competitions').doc(competitionId).get(),
+        db.collection('participants').doc(leaderId).get(),
+        db.collection('participants').doc(memberOneId).get(),
+        db.collection('participants').doc(memberTwoId).get()
+      ]);
+      expect(competition.data()?.entriesCount).toBe(1);
+      for (const participantSnapshot of [leader, memberOne, memberTwo]) {
+        expect(participantSnapshot.data()?.registeredEventIds).toContain(competitionId);
+      }
+
+      await expect(
+        ParticipantService.updateParticipant(adminIdToken, memberOneId, { categoryId: catSrId, categoryName: 'Senior' })
+      ).rejects.toThrow(/Cannot change category for participant/i);
+    });
+
     it('manages multiple registrations per participant: deleting one event cleanly leaves others intact', async () => {
       const partId = `part-multi-${suiteId}`;
       const compAId = `comp-multi-a-${suiteId}`;
