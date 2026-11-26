@@ -11,6 +11,7 @@ import {
   AlertCircle, RefreshCw, Filter, Award
 } from 'lucide-react';
 import Link from 'next/link';
+import { jsPDF } from 'jspdf';
 import { ExportService } from '@/services/exportService';
 import { DataBackupMigrationModal } from '@/components/domain/DataBackupMigrationModal';
 import { buildParticipantAchievements, selectParticipantAchievementResults } from '@/domain/participantAchievements';
@@ -29,6 +30,7 @@ export default function ExportManagementPage() {
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState<ExportNotice | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isDownloadingParticipantPDF, setIsDownloadingParticipantPDF] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectionInitialized = useRef(false);
   const knownPublishedIds = useRef<Set<string>>(new Set());
@@ -224,6 +226,156 @@ export default function ExportManagementPage() {
     }
   };
 
+  const handleDownloadParticipantAwardsPDF = () => {
+    if (!participantAwardsSyncReady) {
+      notifyExport('Participants, registrations and published results must all be synchronized before downloading this report.', 'error');
+      return;
+    }
+    if (filteredParticipantAchievements.length === 0) {
+      notifyExport('No participants match the current search or team filter.', 'error');
+      return;
+    }
+    if (isDownloadingParticipantPDF) return;
+
+    try {
+      setIsDownloadingParticipantPDF(true);
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 30;
+      const columns = [
+        { label: 'NO.', width: 34 },
+        { label: 'BIB', width: 58 },
+        { label: 'PARTICIPANT NAME', width: 190 },
+        { label: 'TEAM / HOUSE', width: 145 },
+        { label: '1ST', width: 48 },
+        { label: '2ND', width: 48 },
+        { label: '3RD', width: 48 },
+        { label: 'TOTAL', width: 55 }
+      ];
+      const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+      const generatedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const title = theme.festivalName || 'Festival';
+      const reportTitle = 'Participant Achievement Report' + (excludeGroupCompetitions ? ' - Without Group Competitions' : '');
+      const drawHeader = (pageNumber: number) => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, pageWidth, 66, 'F');
+        doc.setFillColor(37, 99, 235);
+        doc.rect(0, 0, 7, 66, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text(title.toUpperCase(), margin, 26, { maxWidth: pageWidth - margin * 2 });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text(theme.institutionName || '', margin, 44, { maxWidth: pageWidth - margin * 2 });
+        doc.setTextColor(17, 24, 39);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(reportTitle, margin, 88);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(82, 96, 112);
+        doc.text(filteredParticipantAchievements.length + ' participants | Generated ' + generatedDate, margin, 102);
+        const summaryY = 115;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(margin, summaryY, tableWidth, 27, 3, 3, 'FD');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        const summary = [
+          '1st Positions: ' + participantAwardTotals.first,
+          '2nd Positions: ' + participantAwardTotals.second,
+          '3rd Positions: ' + participantAwardTotals.third,
+          'Total Awards: ' + participantAwardTotals.medals
+        ];
+        const summaryGap = tableWidth / summary.length;
+        summary.forEach((value, index) => doc.text(value, margin + summaryGap * index + 9, summaryY + 17));
+        let x = margin;
+        const tableY = 151;
+        doc.setFillColor(226, 232, 240);
+        doc.setDrawColor(203, 213, 225);
+        columns.forEach(column => {
+          doc.rect(x, tableY, column.width, 23, 'FD');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(51, 65, 85);
+          doc.text(column.label, x + (column.width > 70 ? 5 : column.width / 2), tableY + 15, { align: column.width > 70 ? 'left' : 'center' });
+          x += column.width;
+        });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Page ' + pageNumber, pageWidth - margin, pageHeight - 16, { align: 'right' });
+        return tableY + 23;
+      };
+
+      let y = drawHeader(1);
+      const rowLineHeight = 10;
+      filteredParticipantAchievements.forEach((entry, index) => {
+        const nameLines = doc.splitTextToSize(entry.participant.name || '-', columns[2].width - 10) as string[];
+        const teamLines = doc.splitTextToSize(entry.participant.teamName || entry.participant.teamCode || '-', columns[3].width - 10) as string[];
+        const categoryLines = entry.participant.categoryName
+          ? doc.splitTextToSize(entry.participant.categoryName, columns[2].width - 10) as string[]
+          : [];
+        const rowHeight = Math.max(25, (nameLines.length + categoryLines.length) * rowLineHeight + 8, teamLines.length * rowLineHeight + 8);
+        if (y + rowHeight > pageHeight - 32) {
+          doc.addPage();
+          y = drawHeader(doc.getNumberOfPages());
+        }
+        const values = [
+          String(index + 1), entry.participant.bib || '-', '', '',
+          String(entry.firstCount), String(entry.secondCount), String(entry.thirdCount), String(entry.totalAwards)
+        ];
+        let x = margin;
+        columns.forEach((column, columnIndex) => {
+          doc.setDrawColor(226, 232, 240);
+          doc.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
+          doc.rect(x, y, column.width, rowHeight, 'FD');
+          doc.setFont('helvetica', columnIndex === 2 || columnIndex === 7 ? 'bold' : 'normal');
+          doc.setFontSize(columnIndex === 2 ? 8 : 7.5);
+          doc.setTextColor(columnIndex === 7 ? 17 : 51, columnIndex === 7 ? 24 : 65, columnIndex === 7 ? 39 : 85);
+          if (columnIndex === 2) {
+            doc.text(nameLines, x + 5, y + 11, { lineHeightFactor: 1.05 });
+            if (categoryLines.length) {
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(6.5);
+              doc.setTextColor(100, 116, 139);
+              doc.text(categoryLines, x + 5, y + 11 + nameLines.length * rowLineHeight);
+            }
+          } else if (columnIndex === 3) {
+            doc.text(teamLines, x + 5, y + 11, { lineHeightFactor: 1.05 });
+          } else {
+            doc.text(values[columnIndex], columnIndex < 2 ? x + column.width / 2 : x + column.width / 2, y + rowHeight / 2 + 2, { align: 'center' });
+          }
+          x += column.width;
+        });
+        y += rowHeight;
+      });
+
+      const note = excludeGroupCompetitions
+        ? 'Only officially published solo competition results are included. Group competitions are excluded.'
+        : 'Only officially published results are included. Group competition awards are credited to registered group leaders; legacy group member IDs are credited where available.';
+      if (y + 22 > pageHeight - 25) {
+        doc.addPage();
+        y = drawHeader(doc.getNumberOfPages());
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(82, 96, 112);
+      doc.text(doc.splitTextToSize(note, tableWidth), margin, y + 14);
+
+      const filename = (theme.festivalName || 'Festival').trim().replace(/\s+/g, '_') + '_Participant_Achievements' + (excludeGroupCompetitions ? '_Without_Groups' : '') + '.pdf';
+      doc.save(filename);
+      notifyExport('Participant Achievement PDF downloaded successfully.');
+    } catch (error) {
+      notifyExport('PDF download failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
+    } finally {
+      setIsDownloadingParticipantPDF(false);
+    }
+  };
+
   const handleRetrySync = () => window.location.reload();
 
   return (
@@ -378,9 +530,14 @@ export default function ExportManagementPage() {
                 <h2 className="text-sm font-bold text-[#111827]">Participant Achievement Summary</h2>
                 <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[#64748B]">Counts every 1st, 2nd and 3rd position in officially published competitions. Participants without podium positions remain in the report with zero counts. Use “Without Group Competitions” to exclude group-event awards.</p>
               </div>
-              <Button variant="primary" size="sm" leftIcon={<Printer className="h-4 w-4" />} onClick={handlePrintParticipantAwards} disabled={!participantAwardsSyncReady || filteredParticipantAchievements.length === 0}>
-                Print A4 Report
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" leftIcon={<FileText className="h-4 w-4 text-red-600" />} onClick={handleDownloadParticipantAwardsPDF} isLoading={isDownloadingParticipantPDF} disabled={!participantAwardsSyncReady || filteredParticipantAchievements.length === 0 || isDownloadingParticipantPDF}>
+                  Download PDF
+                </Button>
+                <Button variant="primary" size="sm" leftIcon={<Printer className="h-4 w-4" />} onClick={handlePrintParticipantAwards} disabled={!participantAwardsSyncReady || filteredParticipantAchievements.length === 0}>
+                  Print A4 Report
+                </Button>
+              </div>
             </div>
 
             {!participantAwardsSyncReady && (
@@ -426,6 +583,7 @@ export default function ExportManagementPage() {
               ) : filteredParticipantAchievements.length === 0 ? (
                 <div className="px-4 py-12 text-center"><p className="text-sm font-bold text-[#111827]">No participants found</p><p className="mt-1 text-xs text-[#64748B]">Try another name, bib number or team filter.</p></div>
               ) : (
+                <>
                 <div className="divide-y divide-[#EEF2F6] md:hidden">
                   {filteredParticipantAchievements.map((entry, index) => (
                     <article key={entry.participant.id} className="px-4 py-4">
@@ -470,6 +628,7 @@ export default function ExportManagementPage() {
                     <tfoot><tr className="border-t-2 border-[#CBD5E1] bg-[#F8FAFC] font-bold text-[#111827]"><td className="px-4 py-3" colSpan={4}>Total awards in current view</td><td className="px-4 py-3 text-center">{participantAwardTotals.first}</td><td className="px-4 py-3 text-center">{participantAwardTotals.second}</td><td className="px-4 py-3 text-center">{participantAwardTotals.third}</td><td className="px-4 py-3 text-center">{participantAwardTotals.medals}</td></tr></tfoot>
                   </table>
                 </div>
+                </>
               )}
               <div className="border-t border-[#E1E7EF] bg-[#FAFBFD] px-4 py-2.5 text-[10px] leading-4 text-[#64748B]">Only published results are counted. Group event results are credited to the registered group leader; stored legacy group member IDs are also credited where available.</div>
             </div>
