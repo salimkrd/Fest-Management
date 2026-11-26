@@ -57,7 +57,6 @@ export default function RegistrationManagementPage() {
     setCompetitionId(initialComps[0]?.id || competitions[0]?.id || '');
     setParticipantIds([]);
     setGroupMemberIds([]);
-    setGroupMemberIds([]);
     setError('');
     setModalOpen(true);
   };
