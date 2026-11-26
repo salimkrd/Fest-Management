@@ -25,6 +25,7 @@ describe('participant registered competition counts', () => {
         participantId: 'leader',
         groupLeaderId: 'leader',
         groupMembers: ['leader', 'member'],
+        groupMemberIds: ['member-2'],
         competitionId: 'group-comp',
         status: 'APPROVED'
       },
@@ -46,6 +47,8 @@ describe('participant registered competition counts', () => {
     expect(countParticipantRegisteredCompetitions(registrations, 'member')).toBe(2);
     expect(counts.get('leader')).toBe(1);
     expect(counts.get('member')).toBe(2);
+    expect(countParticipantRegisteredCompetitions(registrations, 'member-2')).toBe(1);
+    expect(counts.get('member-2')).toBe(1);
   });
 
   it('does not count registrations without a competition ID', () => {

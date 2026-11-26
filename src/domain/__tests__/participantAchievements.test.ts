@@ -59,7 +59,7 @@ describe('buildParticipantAchievements', () => {
   it('credits group events to the leader and legacy stored group members', () => {
     const people = [participant('leader', '#1001', 'Amina'), participant('member', '#1002', 'Hafiz')];
     const regs = [
-      registration({ id: 'new-group', type: 'GROUP', groupLeaderId: 'leader', participantName: 'Amina & Team' }),
+      registration({ id: 'new-group', type: 'GROUP', groupLeaderId: 'leader', groupMemberIds: ['member'], groupMemberSnapshots: [{ id: 'member', name: 'Hafiz', bib: '#1002' }], participantName: 'Amina & Team' }),
       registration({ id: 'legacy-group', type: 'GROUP', groupMembers: ['leader', 'member'], participantName: 'Amina & Team' })
     ];
     const rows = buildParticipantAchievements(people, regs, [
@@ -68,6 +68,8 @@ describe('buildParticipantAchievements', () => {
     ]);
     expect(rows.find(row => row.participant.id === 'leader')).toMatchObject({ firstCount: 1, secondCount: 1, totalAwards: 2 });
     expect(rows.find(row => row.participant.id === 'member')).toMatchObject({ firstCount: 0, secondCount: 1, totalAwards: 1 });
+    expect(rows.find(row => row.participant.id === 'member')?.events.filter(event => event.resultId === 'group1')).toHaveLength(0);
+    // New roster-only group members do not receive individual podium credit.
   });
 
   it('uses unique bib/team/name fallback when a historical registration is missing', () => {

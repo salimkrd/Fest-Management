@@ -153,11 +153,12 @@ export class ParticipantService {
       let targetCatName = currentPart.categoryName;
       if (isCatChanged) {
         const targetCatRef = db.collection('categories').doc(newCatId!);
-        const [targetCatSnap, regsSnap, grpRegsSnap, memberRegsSnap] = await Promise.all([
+        const [targetCatSnap, regsSnap, grpRegsSnap, legacyMemberRegsSnap, memberRegsSnap] = await Promise.all([
           transaction.get(targetCatRef),
           transaction.get(db.collection('registrations').where('participantId', '==', participantId)),
           transaction.get(db.collection('registrations').where('groupLeaderId', '==', participantId)),
-          transaction.get(db.collection('registrations').where('groupMembers', 'array-contains', participantId))
+          transaction.get(db.collection('registrations').where('groupMembers', 'array-contains', participantId)),
+          transaction.get(db.collection('registrations').where('groupMemberIds', 'array-contains', participantId))
         ]);
 
         if (!targetCatSnap.exists || targetCatSnap.data()?.status === 'INACTIVE') {
@@ -167,7 +168,7 @@ export class ParticipantService {
         targetCatName = targetCategory.name;
 
         // Filter active registrations (ignoring REJECTED and CANCELLED)
-        const activeRegDocs = [...regsSnap.docs, ...grpRegsSnap.docs, ...memberRegsSnap.docs].filter(d => {
+        const activeRegDocs = [...regsSnap.docs, ...grpRegsSnap.docs, ...legacyMemberRegsSnap.docs, ...memberRegsSnap.docs].filter(d => {
           const st = String(d.data().status || '');
           return st !== 'REJECTED' && st !== 'CANCELLED';
         });

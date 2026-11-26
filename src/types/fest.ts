@@ -128,6 +128,8 @@ export interface Registration {
   chestNumber: string;
   status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
   groupMembers?: string[]; // Legacy full-roster groups remain readable
+  groupMemberIds?: string[]; // Additional participants in new groups; no individual score credit
+  groupMemberSnapshots?: Array<{ id: string; name: string; bib: string }>;
   groupLeaderId?: string; // Member representing a group, no individual credit
   groupSize?: number; // Declared member count at registration time
   registeredAt: string;

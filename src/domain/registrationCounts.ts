@@ -4,6 +4,7 @@ export interface RegistrationCountRecord {
   participantId?: string;
   groupLeaderId?: string;
   groupMembers?: string[];
+  groupMemberIds?: string[];
   competitionId?: string;
   status?: Registration['status'];
 }
@@ -27,7 +28,8 @@ export function countParticipantRegisteredCompetitions(
     const belongsToParticipant =
       registration.participantId === participantId ||
       registration.groupLeaderId === participantId ||
-      (registration.groupMembers ?? []).includes(participantId);
+      (registration.groupMembers ?? []).includes(participantId) ||
+      (registration.groupMemberIds ?? []).includes(participantId);
 
     if (belongsToParticipant) competitionIds.add(registration.competitionId);
   }
@@ -51,7 +53,7 @@ export function buildParticipantEventRegistrationCounts(
     const participantIds = new Set<string>();
     if (registration.participantId) participantIds.add(registration.participantId);
     if (registration.groupLeaderId) participantIds.add(registration.groupLeaderId);
-    for (const participantId of registration.groupMembers ?? []) {
+    for (const participantId of [...(registration.groupMembers ?? []), ...(registration.groupMemberIds ?? [])]) {
       if (participantId) participantIds.add(participantId);
     }
 

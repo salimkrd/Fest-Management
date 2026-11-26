@@ -171,7 +171,9 @@ export interface FirestoreRegistration {
   type: CompetitionType;
   chestNumber: string;
   status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'CANCELLED';
-  groupMembers?: string[];
+  groupMembers?: string[]; // Legacy full-roster compatibility
+  groupMemberIds?: string[];
+  groupMemberSnapshots?: Array<{ id: string; name: string; bib: string }>;
   groupLeaderId?: string;
   groupSize?: number;
   registeredAt: string;

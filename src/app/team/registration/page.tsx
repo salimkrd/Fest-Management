@@ -32,6 +32,7 @@ export default function TeamRegistrationPage() {
   const [categoryId, setCategoryId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
@@ -72,7 +73,8 @@ export default function TeamRegistrationPage() {
   const filtered = myRegistrations.filter(registration =>
     registration.participantName.toLowerCase().includes(normalizedSearch) ||
     registration.competitionName.toLowerCase().includes(normalizedSearch) ||
-    registration.code.toLowerCase().includes(normalizedSearch)
+    registration.code.toLowerCase().includes(normalizedSearch) ||
+    (registration.groupMemberSnapshots || []).some(member => member.name.toLowerCase().includes(normalizedSearch))
   );
 
   const handleOpenAdd = () => {
@@ -81,6 +83,7 @@ export default function TeamRegistrationPage() {
     setCategoryId(initialCategoryId);
     setCompetitionId(initialCompetitions[0]?.id || '');
     setParticipantIds([]);
+    setGroupMemberIds([]);
     setError('');
     setModalOpen(true);
   };
@@ -90,6 +93,7 @@ export default function TeamRegistrationPage() {
     const matchingCompetitions = competitions.filter(comp => comp.categoryId === nextCategoryId);
     setCompetitionId(matchingCompetitions[0]?.id || '');
     setParticipantIds([]);
+    setGroupMemberIds([]);
     setError('');
   };
 
@@ -98,6 +102,7 @@ export default function TeamRegistrationPage() {
     setCompetitionId(nextCompetitionId);
     if (competition?.categoryId) setCategoryId(competition.categoryId);
     setParticipantIds([]);
+    setGroupMemberIds([]);
     setError('');
   };
 
@@ -120,10 +125,20 @@ export default function TeamRegistrationPage() {
 
     const selectedParticipants = teamEligibleParticipants.filter(item => participantIds.includes(item.id));
     if (selectedParticipants.length !== participantIds.length || selectedParticipants.length === 0) {
-      setError(isGroup
-        ? 'Choose at least one eligible group leader.'
-        : 'Choose at least one eligible participant from your team roster.');
+      setError(isGroup ? 'Choose one eligible group leader.' : 'Choose at least one eligible participant from your team roster.');
       return;
+    }
+    if (isGroup) {
+      const requiredMembers = Math.max(0, Number(competition.groupSize || 0) - 1);
+      const selectedMembers = teamEligibleParticipants.filter(item => groupMemberIds.includes(item.id));
+      if (selectedParticipants.length !== 1 || selectedMembers.length !== groupMemberIds.length || groupMemberIds.length !== requiredMembers) {
+        setError(`This group requires one leader and exactly ${requiredMembers} additional eligible member(s).`);
+        return;
+      }
+      if (groupMemberIds.includes(selectedParticipants[0].id)) {
+        setError('The group leader cannot also be selected as a group member.');
+        return;
+      }
     }
     if (!competition) return;
     if (competition.type === 'SOLO') {
@@ -150,8 +165,9 @@ export default function TeamRegistrationPage() {
       const groupEntry = competition.type === 'GROUP';
       await addRegistration({
         participantIds: groupEntry ? undefined : selectedParticipants.map(participant => participant.id),
-        groupLeaderIds: groupEntry ? selectedParticipants.map(participant => participant.id) : undefined,
-        participantName: selectedParticipants.map(participant => participant.name).join(', '),
+        groupLeaderIds: groupEntry ? [selectedParticipants[0].id] : undefined,
+        groupMemberIds: groupEntry ? groupMemberIds : undefined,
+        participantName: groupEntry ? selectedParticipants[0].name : selectedParticipants.map(participant => participant.name).join(', '),
         teamId: team.id,
         teamCode: team.code,
         teamName: team.name,
@@ -165,6 +181,7 @@ export default function TeamRegistrationPage() {
       });
       setModalOpen(false);
       setParticipantIds([]);
+      setGroupMemberIds([]);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not register for the competition.');
     } finally {
@@ -299,6 +316,7 @@ export default function TeamRegistrationPage() {
                       <div className="min-w-0">
                         <p className="break-words text-sm font-semibold text-slate-950">{registration.participantName}</p>
                         <p className="mt-1 text-xs text-slate-500">{registration.competitionName}</p>
+                        {registration.groupMemberSnapshots?.length ? <p className="mt-1 text-xs text-slate-600">Members: {registration.groupMemberSnapshots.map(member => member.name).join(', ')}</p> : null}
                         <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${scheduleStatusClass(getCompetitionScheduleStatus(registration.competitionId))}`}>
                           {getCompetitionScheduleStatus(registration.competitionId)}
                         </span>
@@ -346,6 +364,7 @@ export default function TeamRegistrationPage() {
                         <td className="px-5 py-4 font-mono text-xs font-semibold text-blue-700">{registration.code}</td>
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold text-slate-900">{registration.participantName}</p>
+                          {registration.groupMemberSnapshots?.length ? <p className="mt-1 text-xs text-slate-600">Members: {registration.groupMemberSnapshots.map(member => member.name).join(', ')}</p> : null}
                           <p className="mt-0.5 text-xs text-slate-500">Bib / chest: {registration.chestNumber || '—'}</p>
                         </td>
                         <td className="px-5 py-4">
@@ -398,7 +417,7 @@ export default function TeamRegistrationPage() {
                 className="w-full sm:w-auto"
                 type="submit"
                 form="team-registration-form"
-                disabled={saving || !selectedCompetition || participantIds.length === 0}
+                disabled={saving || !selectedCompetition || participantIds.length === 0 || (isGroup && groupMemberIds.length !== Math.max(0, Number(selectedCompetition.groupSize || 0) - 1))}
                 isLoading={saving}
               >
                 Confirm Entry
@@ -441,41 +460,79 @@ export default function TeamRegistrationPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-semibold text-slate-800">{isGroup ? 'Select Group Leader(s)' : 'Select Team Participant(s)'}</label>
-                <span className="text-xs font-semibold text-blue-700">{participantIds.length} selected</span>
-              </div>
-              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
-                {teamEligibleParticipants.map(participant => (
-                  <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      checked={participantIds.includes(participant.id)}
-                      onChange={() => toggleParticipant(participant.id)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
-                      <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
-                    </span>
-                  </label>
-                ))}
-                {participantsSyncState === 'loading' ? (
-                  <p className="px-3 py-4 text-xs text-blue-700">Loading your team roster…</p>
-                ) : teamEligibleParticipants.length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-amber-700">
-                    {myTeamParticipants.length === 0
-                      ? 'Your team has no participants yet. Add participants from My Participants first.'
-                      : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
-                  </p>
-                ) : null}
-              </div>
-              <p className="text-xs leading-5 text-slate-500">
-                {isGroup
-                  ? `Select one leader for each group. Each leader creates a separate group entry; group members are not individually registered. Championship points remain credited to the team.`
-                  : 'Select multiple contestants in one submission. Each contestant gets a separate registration and Bib number.'}
-              </p>
+            <div className="space-y-3">
+              {isGroup ? (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm font-semibold text-slate-800">Select Group Leader</label>
+                      <span className="text-xs font-semibold text-blue-700">{participantIds.length ? '1 selected' : 'None selected'}</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                      {teamEligibleParticipants.map(participant => (
+                        <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
+                          <input type="radio" name="group-leader" checked={participantIds[0] === participant.id}
+                            onChange={() => { setParticipantIds([participant.id]); setGroupMemberIds(current => current.filter(id => id !== participant.id)); }}
+                            className="h-4 w-4 shrink-0 border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
+                            <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
+                          </span>
+                          {participantIds[0] === participant.id && <Badge variant="success" size="sm">Leader</Badge>}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm font-semibold text-slate-800">Select Other Group Members</label>
+                      <span className="text-xs font-semibold text-blue-700">{groupMemberIds.length}/{Math.max(0, Number(selectedCompetition?.groupSize || 0) - 1)} selected</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                      {teamEligibleParticipants.filter(participant => participant.id !== participantIds[0]).map(participant => (
+                        <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
+                          <input type="checkbox" checked={groupMemberIds.includes(participant.id)}
+                            disabled={!groupMemberIds.includes(participant.id) && groupMemberIds.length >= Math.max(0, Number(selectedCompetition?.groupSize || 0) - 1)}
+                            onChange={() => setGroupMemberIds(current => current.includes(participant.id) ? current.filter(id => id !== participant.id) : [...current, participant.id])}
+                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
+                            <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs leading-5 text-slate-500">Choose exactly {Math.max(0, Number(selectedCompetition?.groupSize || 0) - 1)} additional participant(s). The group receives one registration and one shared result.</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-sm font-semibold text-slate-800">Select Team Participant(s)</label>
+                    <span className="text-xs font-semibold text-blue-700">{participantIds.length} selected</span>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                    {teamEligibleParticipants.map(participant => (
+                      <label key={participant.id} className="flex cursor-pointer items-center gap-3 px-3 py-3 hover:bg-slate-50">
+                        <input type="checkbox" checked={participantIds.includes(participant.id)} onChange={() => toggleParticipant(participant.id)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-slate-900">{participant.name}</span>
+                          <span className="block text-xs text-slate-500">{participant.bib || 'No Bib'}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs leading-5 text-slate-500">Select multiple contestants. Each contestant gets a separate registration and Bib number.</p>
+                </>
+              )}
+              {participantsSyncState === 'loading' ? (
+                <p className="px-3 py-2 text-xs text-blue-700">Loading your team roster…</p>
+              ) : teamEligibleParticipants.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-amber-700">
+                  {myTeamParticipants.length === 0 ? 'Your team has no participants yet. Add participants from My Participants first.' : `No team participants are eligible for ${selectedCategory?.name || 'this category'}.`}
+                </p>
+              ) : null}
             </div>
           </form>
         </Modal>
