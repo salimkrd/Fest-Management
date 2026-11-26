@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompetitionResult, Participant, Registration, ResultRank } from '@/types/fest';
-import { buildParticipantAchievements } from '../participantAchievements';
+import { buildParticipantAchievements, selectParticipantAchievementResults } from '../participantAchievements';
 
 const participant = (id: string, bib: string, name: string): Participant => ({
   id, bib, name, place: '', email: '', phone: '',
@@ -84,4 +84,43 @@ describe('buildParticipantAchievements', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].totalAwards).toBe(0);
   });
+
+  it('removes group results without increasing any participant medal count', () => {
+    const people = [participant('p1', '#1001', 'Amina'), participant('p2', '#1002', 'Hafiz')];
+    const regs = [
+      registration({ id: 'solo-1', participantId: 'p1', type: 'SOLO' }),
+      registration({ id: 'group-1', participantId: 'p1', type: 'GROUP' }),
+      registration({ id: 'solo-2', participantId: 'p2', type: 'SOLO', chestNumber: '#1002' })
+    ];
+    const allResults = [
+      result('solo-a', [rank('solo-1', '#1001', 'Amina', 1)], 'PUBLISHED', 'SOLO'),
+      result('group-a', [rank('group-1', 'GRP-QHR-A1', 'Amina & Team', 3)], 'PUBLISHED', 'GROUP'),
+      result('solo-b', [rank('solo-2', '#1002', 'Hafiz', 2)], 'PUBLISHED', 'SOLO')
+    ];
+    const all = buildParticipantAchievements(people, regs, selectParticipantAchievementResults(allResults));
+    const withoutGroup = buildParticipantAchievements(people, regs, selectParticipantAchievementResults(allResults, true));
+
+    for (const participantId of ['p1', 'p2']) {
+      const before = all.find(row => row.participant.id === participantId)!;
+      const after = withoutGroup.find(row => row.participant.id === participantId)!;
+      expect(after.firstCount).toBeLessThanOrEqual(before.firstCount);
+      expect(after.secondCount).toBeLessThanOrEqual(before.secondCount);
+      expect(after.thirdCount).toBeLessThanOrEqual(before.thirdCount);
+      expect(after.totalAwards).toBeLessThanOrEqual(before.totalAwards);
+    }
+    expect(withoutGroup.find(row => row.participant.id === 'p1')).toMatchObject({
+      firstCount: 1, secondCount: 0, thirdCount: 0, totalAwards: 1
+    });
+  });
+
+  it('includes only published solo results when group competitions are excluded', () => {
+    const selected = selectParticipantAchievementResults([
+      result('solo-published', [], 'PUBLISHED', 'SOLO'),
+      result('group-published', [], 'PUBLISHED', 'GROUP'),
+      result('solo-draft', [], 'READY_TO_PUBLISH', 'SOLO'),
+      result('group-draft', [], 'READY_TO_PUBLISH', 'GROUP')
+    ], true);
+    expect(selected.map(item => item.id)).toEqual(['solo-published']);
+  });
+
 });

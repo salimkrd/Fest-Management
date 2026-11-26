@@ -18,6 +18,16 @@ export interface ParticipantAchievement {
   events: ParticipantAchievementEvent[];
 }
 
+/** Returns the published results included in the participant achievement report. */
+export function selectParticipantAchievementResults(
+  results: CompetitionResult[],
+  excludeGroupCompetitions = false
+): CompetitionResult[] {
+  return results.filter(result =>
+    result.resultStatus === 'PUBLISHED' && (!excludeGroupCompetitions || result.type !== 'GROUP')
+  );
+}
+
 function normalizeBib(value: string | undefined): string {
   return (value || '').trim().replace(/^#/, '').toUpperCase();
 }
