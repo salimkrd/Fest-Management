@@ -147,7 +147,6 @@ export class RegistrationService {
       const activeTeamEntries = currentTeamEntries.filter(
         doc => doc.data().status !== 'REJECTED' && doc.data().status !== 'CANCELLED'
       );
-      const selectedSet = new Set(selectedIds);
       if (!isGroup) {
         const maximumEntries = Number(competition.maxEntriesPerTeam) || 1;
         if (activeTeamEntries.length + selectedIds.length > maximumEntries) {
