@@ -13,7 +13,7 @@ import {
 import Link from 'next/link';
 import { ExportService } from '@/services/exportService';
 import { DataBackupMigrationModal } from '@/components/domain/DataBackupMigrationModal';
-import { buildParticipantAchievements } from '@/domain/participantAchievements';
+import { buildParticipantAchievements, selectParticipantAchievementResults } from '@/domain/participantAchievements';
 
 type ExportNotice = { tone: 'success' | 'error'; message: string };
 
@@ -40,8 +40,8 @@ export default function ExportManagementPage() {
   );
   const publishedIds = useMemo(() => publishedResults.map(result => result.id), [publishedResults]);
   const achievementSourceResults = useMemo(
-    () => excludeGroupCompetitions ? publishedResults.filter(result => result.type !== 'GROUP') : publishedResults,
-    [publishedResults, excludeGroupCompetitions]
+    () => selectParticipantAchievementResults(results, excludeGroupCompetitions),
+    [results, excludeGroupCompetitions]
   );
   const participantAchievements = useMemo(
     () => buildParticipantAchievements(participants, registrations, achievementSourceResults),
@@ -414,7 +414,11 @@ export default function ExportManagementPage() {
 
             <div className="overflow-hidden rounded-xl border border-[#E1E7EF] bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-[#E1E7EF] px-4 py-3">
-                <div><h3 className="text-xs font-bold text-[#111827]">Participant medal counts</h3><p className="mt-0.5 text-[10px] text-[#64748B]">Sorted by 1st, then 2nd and 3rd positions</p></div>
+                <div>
+                  <h3 className="text-xs font-bold text-[#111827]">Participant medal counts</h3>
+                  <p className="mt-0.5 text-[10px] text-[#64748B]">Sorted by 1st, then 2nd and 3rd positions; row order can change when filters change</p>
+                  <p className="mt-1 text-[10px] font-semibold text-blue-700">{excludeGroupCompetitions ? 'Group competitions excluded · solo results only' : 'All published solo and group results included'}</p>
+                </div>
                 <span className="text-[10px] font-semibold text-[#64748B]">{filteredParticipantAchievements.length} records</span>
               </div>
               {!participantAwardsSyncReady ? (
@@ -422,7 +426,29 @@ export default function ExportManagementPage() {
               ) : filteredParticipantAchievements.length === 0 ? (
                 <div className="px-4 py-12 text-center"><p className="text-sm font-bold text-[#111827]">No participants found</p><p className="mt-1 text-xs text-[#64748B]">Try another name, bib number or team filter.</p></div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="divide-y divide-[#EEF2F6] md:hidden">
+                  {filteredParticipantAchievements.map((entry, index) => (
+                    <article key={entry.participant.id} className="px-4 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold leading-5 text-[#111827]">{entry.participant.name}</p>
+                          <p className="mt-1 text-[10px] font-semibold text-blue-700">{entry.participant.bib} <span className="font-normal text-[#94A3B8]">·</span> {entry.participant.categoryName || '—'}</p>
+                          <p className="mt-1 text-[11px] text-[#64748B]">{entry.participant.teamName || entry.participant.teamCode || '—'}</p>
+                        </div>
+                        <div className="shrink-0 rounded-lg bg-[#F8FAFC] px-3 py-2 text-right">
+                          <span className="block text-[9px] font-semibold uppercase tracking-wide text-[#64748B]">Total</span>
+                          <strong className="block text-lg tabular-nums text-[#111827]">{entry.totalAwards}</strong>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="rounded-lg bg-amber-50 px-3 py-2 text-center"><span className="block text-[9px] font-bold uppercase text-amber-800">1st</span><strong className="mt-0.5 block text-base tabular-nums text-amber-900">{entry.firstCount}</strong></div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2 text-center"><span className="block text-[9px] font-bold uppercase text-slate-700">2nd</span><strong className="mt-0.5 block text-base tabular-nums text-slate-900">{entry.secondCount}</strong></div>
+                        <div className="rounded-lg bg-orange-50 px-3 py-2 text-center"><span className="block text-[9px] font-bold uppercase text-orange-800">3rd</span><strong className="mt-0.5 block text-base tabular-nums text-orange-900">{entry.thirdCount}</strong></div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[760px] text-left text-xs">
                     <thead><tr className="border-b border-[#E1E7EF] bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
                       <th className="px-4 py-3">No.</th><th className="px-4 py-3">Bib</th><th className="px-4 py-3">Participant</th><th className="px-4 py-3">Team / House</th><th className="px-4 py-3 text-center">1st</th><th className="px-4 py-3 text-center">2nd</th><th className="px-4 py-3 text-center">3rd</th><th className="px-4 py-3 text-center">Total</th>
